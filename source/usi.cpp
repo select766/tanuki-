@@ -477,7 +477,7 @@ void USI::loop(int argc,char* argv[])
     }
 
     // 与えられた局面について思考するコマンド
-    else if (token == "go") go_cmd(pos, is);
+    else if (token == "go") { go_cmd(pos, is); break; }
 
     // (思考などに使うための)開始局面(root)を設定する
     else if (token == "position") position_cmd(pos, is);

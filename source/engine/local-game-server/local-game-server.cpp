@@ -3,13 +3,17 @@
 
 #include "../../extra/all.h"
 
+#include <mutex>
+#include <fstream>
 #include <windows.h>
 
 // 子プロセスとの通信ログをデバッグのために表示するオプション
-//#define OUTPUT_PROCESS_LOG
+#define OUTPUT_PROCESS_LOG
+std::mutex PROCESS_LOG_MUTEX;
+std::ofstream PROCESS_LOG_STREAM("yaneuraou-process-log.txt");
 
 // 1行ずつ結果を出力するモード
-#define ONE_LINE_OUTPUT_MODE
+//#define ONE_LINE_OUTPUT_MODE
 
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
@@ -69,7 +73,7 @@ struct ProcessNegotiator
     // ReadFileは同期的に使いたいが、しかしデータがないときにブロックされるのは困るので
     // pipeにデータがあるのかどうかを調べてからReadFile()する。
 
-    DWORD dwRead , dwReadTotal , dwLeft;
+    DWORD dwRead, dwReadTotal, dwLeft;
     CHAR chBuf[BUF_SIZE];
 
     // bufferサイズは1文字少なく申告して終端に'\0'を付与してstring化する。
@@ -77,7 +81,7 @@ struct ProcessNegotiator
     BOOL success = ::PeekNamedPipe(
       child_std_out_read, // [in]  handle of named pipe
       chBuf,              // [out] buffer     
-      BUF_SIZE-1,         // [in]  buffer size
+      BUF_SIZE - 1,         // [in]  buffer size
       &dwRead,            // [out] bytes read
       &dwReadTotal,       // [out] total bytes avail
       &dwLeft             // [out] bytes left this message
@@ -100,10 +104,13 @@ struct ProcessNegotiator
   {
     str += "\r\n"; // 改行コードの付与
     DWORD dwWritten;
-    BOOL success = ::WriteFile(child_std_in_write, str.c_str(), DWORD(str.length()) , &dwWritten, NULL);
+    BOOL success = ::WriteFile(child_std_in_write, str.c_str(), DWORD(str.length()), &dwWritten, NULL);
 
 #ifdef OUTPUT_PROCESS_LOG
-    sync_cout << "[" << pn << "] >" << str << sync_endl;
+    {
+      std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
+      PROCESS_LOG_STREAM << "[" << pn << "] >" << str << std::endl;
+    }
 #endif
 
     return success;
@@ -128,7 +135,7 @@ protected:
 
     if (!::SetHandleInformation(child_std_out_read, HANDLE_FLAG_INHERIT, 0))
       ERROR_MES("error SetHandleInformation : std out");
-    
+
     if (!::CreatePipe(&child_std_in_read, &child_std_in_write, &saAttr, 0))
       ERROR_MES("error CreatePipe : std in");
 
@@ -147,13 +154,16 @@ protected:
     // 切り出したいのは"\n"の手前まで(改行コード不要)、このあと"\n"は捨てたいので
     // it+1から最後までが次回まわし。
     auto result = read_buffer.substr(0, it);
-    read_buffer = read_buffer.substr(it+1, read_buffer.size() - it);
+    read_buffer = read_buffer.substr(it + 1, read_buffer.size() - it);
     // "\r\n"かも知れないので"\r"も除去。
     if (result.size() && result[result.size() - 1] == '\r')
       result = result.substr(0, result.size() - 1);
 
 #ifdef OUTPUT_PROCESS_LOG
-    sync_cout << "[" << pn << "] >" <<  result << sync_endl;
+    {
+      std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
+      PROCESS_LOG_STREAM << "[" << pn << "] >" << result << std::endl;
+    }
 #endif
 
     if (result.find("Error") != string::npos)
@@ -170,7 +180,7 @@ protected:
   {
     size_t ret;
     wchar_t *wcs = new wchar_t[src.length() + 1];
-    ::mbstowcs_s(&ret,wcs, src.length()+1, src.c_str(), _TRUNCATE);
+    ::mbstowcs_s(&ret, wcs, src.length() + 1, src.c_str(), _TRUNCATE);
     wstring result = wcs;
     delete[] wcs;
     return result;
@@ -195,7 +205,7 @@ protected:
 
 struct EngineState
 {
-  void run(string path,int process_id)
+  void run(string path, int process_id)
   {
 #ifdef  OUTPUT_PROCESS_LOG
     pn.set_process_id(process_id);
@@ -204,7 +214,7 @@ struct EngineState
     state = START_UP;
     engine_exe_name_ = path;
   }
- 
+
   // エンジンに対する終了処理
   ~EngineState()
   {
@@ -229,8 +239,8 @@ struct EngineState
       string line = pn.read();
       if (line == "usiok")
         state = IS_READY;
-      else if (line.substr(0,min(line.size(),8)) == "id name ")
-        engine_name_ = line.substr(8,line.size()-8);
+      else if (line.substr(0, min(line.size(), 8)) == "id name ")
+        engine_name_ = line.substr(8, line.size() - 8);
       break;
     }
 
@@ -262,7 +272,7 @@ struct EngineState
 
   }
 
-  Move think(const Position& pos, const string& think_cmd,const string& engine_name)
+  Move think(const Position& pos, const string& think_cmd, const string& engine_name)
   {
     string sfen;
     sfen = "position startpos moves " + pos.moves_from_start();
@@ -294,7 +304,7 @@ struct EngineState
     is >> skipws >> token; // "bestmove"
     is >> token; // "7g7f" etc..
 
-    Move m = move_from_usi(pos,token);
+    Move m = move_from_usi(pos, token);
     if (m == MOVE_NONE)
     {
       sync_cout << "Error : bestmove = " << token << endl << pos << sync_endl;
@@ -304,7 +314,7 @@ struct EngineState
   }
 
   enum State {
-    START_UP, WAIT_USI_OK, IS_READY , WAIT_READY_OK, GAME_START, GAME_OVER,
+    START_UP, WAIT_USI_OK, IS_READY, WAIT_READY_OK, GAME_START, GAME_OVER,
   };
 
   // 対局の準備が出来たのか？
@@ -347,7 +357,7 @@ protected:
 
   engine-config1.txt : 1つ目の思考エンジン
   engine-config2.txt : 2つ目の思考エンジン
-  
+
     1行目にengineの実行ファイル名
     2行目に思考時のコマンド
     3行目以降にsetoption等、初期化時に思考エンジンに送りたいコマンドを書く。
@@ -392,7 +402,7 @@ namespace
   string think_cmd[2];
 
   // 勝数のトータル
-  uint64_t win,draw,lose;
+  uint64_t win, draw, lose;
 
   vector<string> book;
   PRNG book_rand; // 定跡用の乱数生成器
@@ -458,7 +468,7 @@ void MainThread::think() {
   sync_cout << "local game server start : " << engine_name[0] << " vs " << engine_name[1] << sync_endl;
 
   // マルチスレッド対応
-  for (auto th : Threads.slaves) th->start_searching(); 
+  for (auto th : Threads.slaves) th->start_searching();
   Thread::search();
   for (auto th : Threads.slaves) th->wait_for_search_finished();
 
@@ -480,7 +490,7 @@ void Thread::search()
   if (!es[0].pn.success || !es[1].pn.success)
     return;
 
-  for (int i = 0; i < 2;++i)
+  for (int i = 0; i < 2; ++i)
     es[i].set_engine_config(engine_config_lines[i]);
 
   Color player1_color = BLACK;
@@ -523,7 +533,8 @@ void Thread::search()
         {
           sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
           break;
-        } else {
+        }
+        else {
           SetupStates->push(StateInfo());
           rootPos.do_move(m, SetupStates->top());
         }
@@ -544,7 +555,8 @@ void Thread::search()
 #else
       cout << '.'; // 引き分けマーク
 #endif
-    } else if (rootPos.side_to_move() == player1_color)
+    }
+    else if (rootPos.side_to_move() == player1_color)
     {
       lose++;
 #ifdef ONE_LINE_OUTPUT_MODE
@@ -552,7 +564,8 @@ void Thread::search()
 #else
       cout << 'X'; // 負けマーク
 #endif
-    } else
+    }
+    else
     {
       win++;
 #ifdef ONE_LINE_OUTPUT_MODE
@@ -568,6 +581,7 @@ void Thread::search()
     es[0].game_over();
     es[1].game_over();
     games++;
+    std::cerr << '.';
   };
 
   string line;
@@ -596,11 +610,12 @@ void Thread::search()
       rootPos.check_info_update();
 
       // 非合法手を弾く
-      if (m!=MOVE_RESIGN && (!rootPos.pseudo_legal(m) || !rootPos.legal(m)))
+      if (m != MOVE_RESIGN && (!rootPos.pseudo_legal(m) || !rootPos.legal(m)))
       {
         sync_cout << "Error : illigal move , move = " << m << " , engine name = " << engine_name << endl << rootPos << sync_endl;
         m = MOVE_RESIGN;
-      } else {
+      }
+      else {
 
         SetupStates->push(StateInfo());
         rootPos.do_move(m, SetupStates->top());
