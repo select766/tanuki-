@@ -40,6 +40,8 @@ struct ProcessNegotiator
     si.cb = sizeof(si);
     si.hStdInput = child_std_in_read;
     si.hStdOutput = child_std_out_write;
+    // 親プロセスの標準エラー出力に子プロセスの標準エラー出力を出力する
+    si.hStdError = ::GetStdHandle(STD_ERROR_HANDLE);
     si.dwFlags |= STARTF_USESTDHANDLES;
 
     // Create the child process
@@ -162,7 +164,7 @@ protected:
 #ifdef OUTPUT_PROCESS_LOG
     {
       std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
-      PROCESS_LOG_STREAM << "[" << pn << "] >" << result << std::endl;
+      PROCESS_LOG_STREAM << "[" << pn << "] <" << result << std::endl;
     }
 #endif
 
@@ -293,6 +295,7 @@ struct EngineState
         sync_cout << "Error : engine timeout , engine name = " << engine_name << endl << pos << sync_endl;
         // これ、プロセスが落ちてると思われる。
         // プロセスを再起動したほうが良いのでは…。
+        ::Sleep(INFINITE);
 
         return MOVE_NULL; // これを返して、終了してもらう。
       }
