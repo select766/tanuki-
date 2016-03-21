@@ -23,6 +23,15 @@ void USI::extra_option(USI::OptionsMap & o) {}
 struct ProcessNegotiator
 {
   ProcessNegotiator() { init(); }
+  virtual ~ProcessNegotiator() {
+    if (pi.hProcess) {
+      if (::WaitForSingleObject(pi.hProcess, 100) != WAIT_OBJECT_0) {
+        ::TerminateProcess(pi.hProcess, 0);
+      }
+      ::CloseHandle(pi.hProcess);
+      pi.hProcess = nullptr;
+    }
+  }
 
 #ifdef OUTPUT_PROCESS_LOG
   // 子プロセスとの通信ログを出力するときにプロセス番号を設定する
@@ -57,6 +66,11 @@ struct ProcessNegotiator
       &si,  // STARTUPINFO pointer
       &pi   // receives PROCESS_INFOMATION
       );
+
+    if (pi.hThread) {
+      ::CloseHandle(pi.hThread);
+      pi.hThread = nullptr;
+    }
 
     if (!success)
       sync_cout << "CreateProcessに失敗" << sync_endl;
@@ -222,9 +236,8 @@ struct EngineState
   {
     // エンジンはquitコマンドに対して自動的にプロセスを終了させるものと仮定している。
     // 暴走した場合は知らん…。
+    // ~ProcessNegotiatorの中でWaitForSingleObject()とExitProcess()とTerminateProcess()で終了させる
     pn.write("quit");
-
-    sleep(100);
   }
 
   void on_idle()
@@ -295,7 +308,7 @@ struct EngineState
         sync_cout << "Error : engine timeout , engine name = " << engine_name << endl << pos << sync_endl;
         // これ、プロセスが落ちてると思われる。
         // プロセスを再起動したほうが良いのでは…。
-        ::Sleep(INFINITE);
+        //::Sleep(INFINITE);
 
         return MOVE_NULL; // これを返して、終了してもらう。
       }
