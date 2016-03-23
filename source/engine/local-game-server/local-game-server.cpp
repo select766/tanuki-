@@ -7,10 +7,23 @@
 #include <fstream>
 #include <windows.h>
 
+namespace
+{
+  std::string generate_log_file_name()
+  {
+    time_t t = time(NULL);
+    struct tm tm;
+    char str[64];
+    localtime_s(&tm, &t);
+    strftime(str, sizeof(str), "yaneuraou-process-log-%Y-%m-%d-%H-%I-%S.txt", &tm);
+    return str;
+  }
+}
+
 // 子プロセスとの通信ログをデバッグのために表示するオプション
 #define OUTPUT_PROCESS_LOG
 std::mutex PROCESS_LOG_MUTEX;
-std::ofstream PROCESS_LOG_STREAM("yaneuraou-process-log.txt");
+std::ofstream PROCESS_LOG_STREAM(generate_log_file_name().c_str());
 
 // 1行ずつ結果を出力するモード
 //#define ONE_LINE_OUTPUT_MODE
@@ -125,7 +138,7 @@ struct ProcessNegotiator
 #ifdef OUTPUT_PROCESS_LOG
     {
       std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
-      PROCESS_LOG_STREAM << "[" << pn << "] >" << str << std::endl;
+      PROCESS_LOG_STREAM << "[" << pn << "] > " << str << std::endl;
     }
 #endif
 
@@ -178,7 +191,7 @@ protected:
 #ifdef OUTPUT_PROCESS_LOG
     {
       std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
-      PROCESS_LOG_STREAM << "[" << pn << "] <" << result << std::endl;
+      PROCESS_LOG_STREAM << "[" << pn << "] < " << result << std::endl;
     }
 #endif
 
@@ -306,6 +319,13 @@ struct EngineState
       if (now() >= start + 60 * 1000)
       {
         sync_cout << "Error : engine timeout , engine name = " << engine_name << endl << pos << sync_endl;
+#ifdef OUTPUT_PROCESS_LOG
+        {
+          std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
+          PROCESS_LOG_STREAM << "Error : engine timeout , engine name = " << engine_name << endl << pos << sync_endl;
+          PROCESS_LOG_STREAM << "sfen = " << sfen << sync_endl;
+        }
+#endif
         // これ、プロセスが落ちてると思われる。
         // プロセスを再起動したほうが良いのでは…。
         //::Sleep(INFINITE);
