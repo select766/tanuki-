@@ -15,7 +15,7 @@ namespace
     struct tm tm;
     char str[64];
     localtime_s(&tm, &t);
-    strftime(str, sizeof(str), "yaneuraou-process-log-%Y-%m-%d-%H-%I-%S.txt", &tm);
+    strftime(str, sizeof(str), "yaneuraou-process-log-%Y-%m-%d-%H-%M-%S.txt", &tm);
     return str;
   }
 }
