@@ -9,14 +9,19 @@
 
 namespace
 {
-  std::string generate_log_file_name()
+  std::string generate_datetime_string()
   {
     time_t t = time(NULL);
     struct tm tm;
     char str[64];
     localtime_s(&tm, &t);
-    strftime(str, sizeof(str), "yaneuraou-process-log-%Y-%m-%d-%H-%I-%S.txt", &tm);
+    strftime(str, sizeof(str), "%Y-%m-%d-%H-%I-%S", &tm);
     return str;
+  }
+
+  std::string generate_log_file_name()
+  {
+    return "yaneuraou-process-log-" + generate_datetime_string() + ".txt";
   }
 }
 
@@ -322,6 +327,7 @@ struct EngineState
 #ifdef OUTPUT_PROCESS_LOG
         {
           std::lock_guard<std::mutex> lock(PROCESS_LOG_MUTEX);
+          PROCESS_LOG_STREAM << generate_datetime_string() << sync_endl;
           PROCESS_LOG_STREAM << "Error : engine timeout , engine name = " << engine_name << endl << pos << sync_endl;
           PROCESS_LOG_STREAM << "sfen = " << sfen << sync_endl;
         }
