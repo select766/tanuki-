@@ -446,9 +446,24 @@ namespace
   // 勝数のトータル
   uint64_t win, draw, lose;
 
+  // 次のplayer1の手番
+  Color next_player1_color = BLACK;
+
   vector<string> book;
   PRNG book_rand; // 定跡用の乱数生成器
   Mutex local_mutex;
+
+  Color get_next_player1_color_unlocked()
+  {
+    Color color = next_player1_color;
+    next_player1_color = ~next_player1_color;
+    return color;
+  }
+  Color get_next_player1_color()
+  {
+    std::unique_lock<Mutex> lk(local_mutex);
+    return get_next_player1_color_unlocked();
+  }
 
   int64_t get_rand(size_t n)
   {
@@ -535,7 +550,7 @@ void Thread::search()
   for (int i = 0; i < 2; ++i)
     es[i].set_engine_config(engine_config_lines[i]);
 
-  Color player1_color = BLACK;
+  Color player1_color = get_next_player1_color();
 
   bool game_started = false;
 
@@ -616,7 +631,7 @@ void Thread::search()
       cout << 'O'; // 勝ちマーク
 #endif
     }
-    player1_color = ~player1_color; // 先後入れ替える。
+    player1_color = get_next_player1_color_unlocked(); // 先後入れ替える。
                                     //    sync_cout << rootPos << sync_endl; // デバッグ用に投了の局面を表示させてみる
     game_started = false;
 
