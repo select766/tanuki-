@@ -638,7 +638,9 @@ void Thread::search()
     es[0].game_over();
     es[1].game_over();
     games++;
+#ifdef ONE_LINE_OUTPUT_MODE
     std::cerr << '.';
+#endif
   };
 
   string line;
