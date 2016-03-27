@@ -608,27 +608,42 @@ void Thread::search()
     {
       draw++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "draw," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "draw," << rootPos.sfen() << sync_endl;
 #else
-      cout << '.'; // 引き分けマーク
+      if (player1_color == Color::BLACK) {
+        cout << '*'; // 先手で引き分けマーク
+      } else {
+        cout << '.'; // 後手で引き分けマーク
+      }
 #endif
     }
     else if (rootPos.side_to_move() == player1_color)
     {
       lose++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "lose," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "lose," << rootPos.sfen() << sync_endl;
 #else
-      cout << 'X'; // 負けマーク
+      if (player1_color == Color::BLACK) {
+        cout << 'X'; // 先手で負けマーク
+      } else {
+        cout << 'x'; // 後手で負けマーク
+      }
 #endif
     }
     else
     {
       win++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "win," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "win," << rootPos.sfen() << sync_endl;
 #else
-      cout << 'O'; // 勝ちマーク
+      if (player1_color == Color::BLACK) {
+        cout << 'O'; // 先手で勝ちマーク
+      } else {
+        cout << 'o'; // 後手で勝ちマーク
+      }
 #endif
     }
     player1_color = get_next_player1_color_unlocked(); // 先後入れ替える。
