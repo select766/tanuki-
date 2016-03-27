@@ -446,9 +446,24 @@ namespace
   // 勝数のトータル
   uint64_t win, draw, lose;
 
+  // 次のplayer1の手番
+  Color next_player1_color = BLACK;
+
   vector<string> book;
   PRNG book_rand; // 定跡用の乱数生成器
   Mutex local_mutex;
+
+  Color get_next_player1_color_unlocked()
+  {
+    Color color = next_player1_color;
+    next_player1_color = ~next_player1_color;
+    return color;
+  }
+  Color get_next_player1_color()
+  {
+    std::unique_lock<Mutex> lk(local_mutex);
+    return get_next_player1_color_unlocked();
+  }
 
   int64_t get_rand(size_t n)
   {
@@ -514,7 +529,7 @@ void MainThread::think() {
   Thread::search();
   for (auto th : Threads.slaves) th->wait_for_search_finished();
 
-  sync_cout << endl << "local game server end : [" << engine_name[0] << "] vs [" << engine_name[1] << "]" << sync_endl;
+  sync_cout << endl << "local game server end : [" << engine_name[0] << "(" << usi_engine_name[0] << ")] vs [" << engine_name[1] << "(" << usi_engine_name[1] << ")]" << sync_endl;
   sync_cout << "GameResult " << win << " - " << draw << " - " << lose << sync_endl;
 
 #ifdef ONE_LINE_OUTPUT_MODE
@@ -535,7 +550,7 @@ void Thread::search()
   for (int i = 0; i < 2; ++i)
     es[i].set_engine_config(engine_config_lines[i]);
 
-  Color player1_color = BLACK;
+  Color player1_color = get_next_player1_color();
 
   bool game_started = false;
 
@@ -593,37 +608,54 @@ void Thread::search()
     {
       draw++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "draw," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "draw," << rootPos.sfen() << sync_endl;
 #else
-      cout << '.'; // 引き分けマーク
+      if (player1_color == Color::BLACK) {
+        cout << '*'; // 先手で引き分けマーク
+      } else {
+        cout << '.'; // 後手で引き分けマーク
+      }
 #endif
     }
     else if (rootPos.side_to_move() == player1_color)
     {
       lose++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "lose," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "lose," << rootPos.sfen() << sync_endl;
 #else
-      cout << 'X'; // 負けマーク
+      if (player1_color == Color::BLACK) {
+        cout << 'X'; // 先手で負けマーク
+      } else {
+        cout << 'x'; // 後手で負けマーク
+      }
 #endif
     }
     else
     {
       win++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << "win," << rootPos.sfen() << sync_endl;
+      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
+              << "win," << rootPos.sfen() << sync_endl;
 #else
-      cout << 'O'; // 勝ちマーク
+      if (player1_color == Color::BLACK) {
+        cout << 'O'; // 先手で勝ちマーク
+      } else {
+        cout << 'o'; // 後手で勝ちマーク
+      }
 #endif
     }
-    player1_color = ~player1_color; // 先後入れ替える。
+    player1_color = get_next_player1_color_unlocked(); // 先後入れ替える。
                                     //    sync_cout << rootPos << sync_endl; // デバッグ用に投了の局面を表示させてみる
     game_started = false;
 
     es[0].game_over();
     es[1].game_over();
     games++;
+#ifdef ONE_LINE_OUTPUT_MODE
     std::cerr << '.';
+#endif
   };
 
   string line;
