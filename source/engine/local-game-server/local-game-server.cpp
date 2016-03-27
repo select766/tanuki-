@@ -529,7 +529,7 @@ void MainThread::think() {
   Thread::search();
   for (auto th : Threads.slaves) th->wait_for_search_finished();
 
-  sync_cout << endl << "local game server end : [" << engine_name[0] << "] vs [" << engine_name[1] << "]" << sync_endl;
+  sync_cout << endl << "local game server end : [" << engine_name[0] << "(" << usi_engine_name[0] << ")] vs [" << engine_name[1] << "(" << usi_engine_name[1] << ")]" << sync_endl;
   sync_cout << "GameResult " << win << " - " << draw << " - " << lose << sync_endl;
 
 #ifdef ONE_LINE_OUTPUT_MODE
