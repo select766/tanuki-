@@ -19,6 +19,14 @@ extern std::string SFEN_HIRATE;
 //     局面の情報
 // --------------------
 
+enum CheckInfoUpdate
+{
+  CHECK_INFO_UPDATE_NONE,           // 何もupdateされていない状態
+  CHECK_INFO_UPDATE_ALL,            // 以下の2つともupdate
+  CHECK_INFO_UPDATE_PINNED,         // pinnedの情報だけupdate
+  CHECK_INFO_UPDATE_WITHOUT_PINNED, // pinned以外の情報だけupdate
+};
+
 // 駒を動かしたときに王手になるかどうかに関係する情報構造体。
 // 指し手が王手になるかどうかを調べるときに使う。やや遅い。
 // コンストラクタで必ず局面を渡して、この構造体の情報を初期化させて使う。参照透明。
@@ -31,6 +39,7 @@ struct CheckInfo {
 
   // 盤面を与えると、この構造体のメンバー変数を適切な値にセットする。
   // 局面探索前などにこのupdateを呼び出して初期化して使う。
+  template <CheckInfoUpdate>
   void update(const Position&);
 
   // 動かすと敵玉に対して空き王手になるかも知れない自駒の候補
@@ -79,6 +88,7 @@ struct StateInfo {
   int continuousCheck[COLOR_NB];
 
   // ---- ここから下のやつは do_move()のときにコピーされない
+  // ※　ただし、do_null_move()のときは丸ごとコピーされる。
 
   // 現局面で手番側に対して王手をしている駒のbitboard。Position::do_move()で更新される。
   Bitboard checkersBB;
@@ -88,19 +98,19 @@ struct StateInfo {
 
   // この局面のハッシュキー
   // ※　次の局面にdo_move()で進むときに最終的な値が設定される
-  // key_board()は盤面のhash。key_hand()は手駒のhash。それぞれ加算したのがkey() 盤面のhash。
-  // key_board()のほうは、手番も込み。
-  // key_exclusion()は、singular extensionのために現在のkey()に一定の値を足したものを返す。
-  Key key() const { return long_key(); }
-  Key key_board() const { return long_key_board(); }
-  Key key_hand() const { return long_key_hand(); }
-  Key key_exclusion() const { return long_key_exclusion(); }
+  // board_key()は盤面のhash。hand_key()は手駒のhash。それぞれ加算したのがkey() 盤面のhash。
+  // board_key()のほうは、手番も込み。
+  // exclusion_key()は、singular extensionのために現在のkey()に一定の値を足したものを返す。
+  Key key()                     const { return long_key(); }
+  Key board_key()               const { return board_long_key(); }
+  Key hand_key()                const { return hand_long_key(); }
+  Key exclusion_key()           const { return exclusion_long_key(); }
 
   // HASH_KEY_BITSが128のときはKey128が返るhash key,256のときはKey256
-  HASH_KEY long_key() const { return key_board_ + key_hand_; }
-  HASH_KEY long_key_board() const { return key_board_; }
-  HASH_KEY long_key_hand() const { return key_hand_; }
-  HASH_KEY long_key_exclusion() const;
+  HASH_KEY long_key()           const { return board_key_ + hand_key_; }
+  HASH_KEY board_long_key()     const { return board_key_; }
+  HASH_KEY hand_long_key()      const { return hand_key_; }
+  HASH_KEY exclusion_long_key() const;
   
   // この局面における手番側の持ち駒。優等局面の判定のために必要。
   Hand hand;
@@ -141,8 +151,8 @@ struct StateInfo {
 #endif
 
   // HASH_KEY_BITSで128を指定した場合はBitboardにHashKeyが入っている。
-  HASH_KEY key_board_;
-  HASH_KEY key_hand_;
+  HASH_KEY board_key_;
+  HASH_KEY hand_key_;
 
   // 一つ前の局面に遡るためのポインタ。
   // NULL MOVEなどでそこより遡って欲しくないときはnullptrを設定しておく。
@@ -215,6 +225,14 @@ struct Position
   // この指し手によって移動させる駒を返す
   // 後手の駒打ちは後手の駒が返る。
   Piece moved_piece(Move m) const { return is_drop(m) ? (move_dropped_piece(m) + (sideToMove==WHITE ? PIECE_WHITE : NO_PIECE)) : piece_on(move_from(m)); }
+
+  // moved_pieceの拡張版。駒打ちのときは、打ち駒(+32)を加算した駒種を返す。
+  // historyなどでUSE_DROPBIT_IN_STATSを有効にするときに用いる。
+  Piece moved_piece_ex(Move m) const {
+    return is_drop(m)
+      ? Piece((move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE)) + 32)
+      : piece_on(move_from(m));
+  }
 
   // 連続王手の千日手等で引き分けかどうかを返す
   RepetitionState is_repetition(const int repPly = 16) const;
@@ -325,7 +343,7 @@ struct Position
   // 注意 : 事前にcheck_info_update()が呼び出されていること。
   bool pseudo_legal(const Move m) const { return pseudo_legal_s<true>(m); }
 
-  // All == true  : 歩や大駒の不成に対してはfalseを返すpseudo_legal()
+  // All == false        : 歩や大駒の不成に対してはfalseを返すpseudo_legal()
   template <bool All> bool pseudo_legal_s(const Move m) const;
 
   // toの地点に歩を打ったときに打ち歩詰めにならないならtrue。
@@ -347,13 +365,37 @@ struct Position
   StateInfo* state() const { return st; }
 
   // gives_check()やlegal()、do_move()を呼び出すときは事前にこれを呼び出しておくこと。
-  void check_info_update() { st->checkInfo.update(*this); }
+  void check_info_update() { st->checkInfo.update<CHECK_INFO_UPDATE_ALL>(*this); }
+
+  // check_infoのupdateを段階的に行ないたいときに用いる。
+  // 引数としてはすでに初期化が終わっているupdateを指定する。
+  void check_info_update(CheckInfoUpdate c)
+  {
+    switch (c)
+    {
+      // 何も終わっていないので丸ごと初期化
+    case CHECK_INFO_UPDATE_NONE: check_info_update(); break;
+
+      // 全部終わっている
+    case CHECK_INFO_UPDATE_ALL: break; 
+
+      // pinnedだけ終わっているのでそれ以外を初期化
+    case CHECK_INFO_UPDATE_PINNED: check_info_update_without_pinned(); break;
+
+    default: UNREACHABLE;
+    }
+  }
+
+  // CheckInfoのpinnedだけ更新したいとき(mate1ply()で必要なので)
+  void check_info_update_pinned() { st->checkInfo.update<CHECK_INFO_UPDATE_PINNED>(*this); }
+  // CheckInfoのpinned以外を更新したいとき(mate1ply()のあとに初期化するときに必要なので)
+  void check_info_update_without_pinned() { st->checkInfo.update<CHECK_INFO_UPDATE_WITHOUT_PINNED>(*this); }
 
   // --- Evaluation
 
 #ifndef EVAL_NO_USE
   // 評価関数で使うための、どの駒番号の駒がどこにあるかなどの情報。
-  Eval::EvalList eval_list() const { return evalList; }
+  const Eval::EvalList* eval_list() const { return &evalList; }
 #endif
 
 #ifdef  USE_SEE
@@ -429,10 +471,20 @@ struct Position
   // 現局面で1手詰めであるかを判定する。1手詰めであればその指し手を返す。
   // ただし1手詰めであれば確実に詰ませられるわけではなく、簡単に判定できそうな近接王手による
   // 1手詰めのみを判定する。(要するに判定に漏れがある。)
+  // 先行して、CheckInfo.pinnedを更新しておく必要がある。
+  // →　check_info_update_pinned()を利用するのが吉。
   Move mate1ply() const;
 
   // ↑の先後別のバージョン。(内部的に用いる)
   template <Color Us> Move mate1ply_impl() const;
+#endif
+
+  // 入玉時の宣言勝ち
+#ifdef USE_ENTERING_KING_WIN
+  // Search::Limits.enteringKingRuleに基いて、宣言勝ちを行なう。
+  // 条件を満たしているとき、MOVE_WINや、玉を移動する指し手(トライルール時)が返る。さもなくば、MOVE_NONEが返る。
+  // mate1ply()から内部的に呼び出す。(そうするとついでに処理出来て良い)
+  Move DeclarationWin() const;
 #endif
 
   // -- 利き

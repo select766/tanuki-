@@ -22,7 +22,6 @@
     <ProjectGuid>{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>YaneuraOu</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.10240.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -150,6 +149,8 @@
       <SDLCheck>
       </SDLCheck>
       <StructMemberAlignment>Default</StructMemberAlignment>
+      <OmitFramePointers>false</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -181,6 +182,9 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <SDLCheck>
       </SDLCheck>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+      <OmitFramePointers>false</OmitFramePointers>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -220,6 +224,7 @@
   <ItemGroup>
     <ClCompile Include="bitboard.cpp" />
     <ClCompile Include="engine\classic-engine\classic_search.cpp" />
+    <ClCompile Include="engine\classic-tce-engine\classic-tce-search.cpp" />
     <ClCompile Include="engine\help-mate-engine\help_mate_engine.cpp" />
     <ClCompile Include="engine\local-game-server\local-game-server.cpp" />
     <ClCompile Include="engine\mate-engine\mate_engine.cpp" />
@@ -234,10 +239,12 @@
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book.cpp" />
+    <ClCompile Include="extra\entering_king_win.cpp" />
     <ClCompile Include="extra\long_effect.cpp" />
     <ClCompile Include="extra\mate1ply.cpp" />
     <ClCompile Include="extra\see.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
+    <ClCompile Include="extra\timeman.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
     <ClCompile Include="shogi.cpp" />
@@ -251,6 +258,10 @@
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
     <Text Include="..\exe\eval\readme.txt" />
+    <Text Include="..\exe\YaneuraOu-classic-readme.txt" />
+    <Text Include="..\exe\YaneuraOu-classic-tce-readme.txt" />
+    <Text Include="..\exe\YaneuraOu-classic-tce_ja.txt" />
+    <Text Include="..\exe\YaneuraOu-classic_ja.txt" />
     <Text Include="..\exe\YaneuraOu-mini-readme.txt" />
     <Text Include="..\exe\YaneuraOu-mini_ja.txt" />
     <Text Include="..\exe\YaneuraOu-nano-plus-readme.txt" />
@@ -260,6 +271,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\exe\book\standard_book.db" />
+    <None Include="..\exe\YaneuraOu-classic-tce.exe" />
+    <None Include="..\exe\YaneuraOu-classic.exe" />
     <None Include="..\exe\YaneuraOu-mini.exe" />
     <None Include="..\exe\YaneuraOu-nano-plus.exe" />
     <None Include="..\exe\YaneuraOu-nano.exe" />

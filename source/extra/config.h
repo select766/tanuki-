@@ -1,9 +1,6 @@
 ﻿#ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-// 新しい置換表(次のバージョンで古いほうの置換表実装は消す)
-#define NEW_TT
-
 // --------------------
 // コンパイル時設定
 // --------------------
@@ -32,7 +29,7 @@
 
 
 // 通常探索時の最大探索深さ
-#define MAX_PLY_NUM 128
+#define MAX_PLY_NUM 127
 
 // --- デバッグ時の標準出力への局面表示などに日本語文字列を用いる。
 
@@ -104,6 +101,22 @@
 // 標準で用意されているMovePickerを用いるか
 // #define USE_MOVE_PICKER
 
+// 入玉時の宣言勝ちを用いるか
+// #define USE_ENTERING_KING_WIN
+
+// TimeMangementクラスに、今回の思考時間を計算する機能を追加するか。
+// #define USE_TIME_MANAGEMENT
+
+// MovePickerのなかで使っているCounterMoveにおいて、移動させる駒種も含めるか。
+// (これを含めると同じ移動をする別の駒をCounterMoveとしてみなさなくなり、ちょっと枝刈り性能が上がるはず)
+// #define KEEP_PIECE_IN_COUNTER_MOVE
+
+// 置換表のなかでevalを持たない
+// #define NO_EVAL_IN_TT
+
+// オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
+// #define USE_DROPBIT_IN_STATS
+
 
 // --------------------
 // release configurations
@@ -143,6 +156,18 @@
 #ifdef YANEURAOU_CLASSIC_ENGINE
 #define ENGINE_NAME "YaneuraOu classic"
 // 開発中なのでassertを有効に。
+#define ENABLE_TEST_CMD
+#define EVAL_KPP
+#define USE_SEE
+#define USE_MOVE_PICKER
+#define LONG_EFFECT_LIBRARY
+#define MATE_1PLY
+#define USE_ENTERING_KING_WIN
+#endif
+
+#ifdef YANEURAOU_CLASSIC_TCE_ENGINE
+#define ENGINE_NAME "YaneuraOu classic-tce"
+// 開発中なのでassertを有効に。
 #define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
@@ -150,6 +175,10 @@
 #define USE_MOVE_PICKER
 #define LONG_EFFECT_LIBRARY
 #define MATE_1PLY
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_COUNTER_MOVE
+#define USE_DROPBIT_IN_STATS
 #endif
 
 #ifdef YANEURAOU_2016_ENGINE
@@ -170,6 +199,7 @@
 #define ASSERT_LV 3 // ローカルゲームサーバー、host側の速度はそれほど要求されないのでASSERT_LVを3にしておく。
 #define KEEP_LAST_MOVE
 #define EVAL_NO_USE
+#define USE_ENTERING_KING_WIN
 #endif
 
 // --- 協力詰めエンジンとして実行ファイルを公開するとき用の設定集
@@ -313,6 +343,20 @@ const bool Is64Bit = true;
 const bool Is64Bit = false;
 #endif
 
+
+// --- Counter Move
+
+// KEEP_PIECE_IN_COUNTER_MOVEがdefineされていたなら、
+// 移動させた駒を上位16bitに格納しておく。
+// bit24...16 = 移動させた駒(Piece。後手の駒含む)
+// bit15... 0 = 本来のMove
+
+#ifdef KEEP_PIECE_IN_COUNTER_MOVE
+typedef uint32_t Move32;
+#define COUNTER_MOVE Move32
+#else
+#define COUNTER_MOVE Move 
+#endif
 
 // --- Long Effect Library
 

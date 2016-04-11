@@ -601,7 +601,9 @@ void Thread::search()
   };
 
   // 対局終了時のハンドラ
-  auto game_over = [&] {
+  // 投了(resign)である場合、手番側の負け。
+  // 宣言勝ち(!resign)である場合、手番側の勝ち。
+  auto game_over = [&](bool resign) {
     std::unique_lock<Mutex> lk(local_mutex);
 
     if (rootPos.game_ply() >= 256) // 長手数につき引き分け
@@ -617,8 +619,7 @@ void Thread::search()
         cout << '.'; // 後手で引き分けマーク
       }
 #endif
-    }
-    else if (rootPos.side_to_move() == player1_color)
+    } else if ((rootPos.side_to_move() == player1_color) ^ !resign)
     {
       lose++;
 #ifdef ONE_LINE_OUTPUT_MODE
@@ -646,8 +647,9 @@ void Thread::search()
       }
 #endif
     }
-    player1_color = get_next_player1_color_unlocked(); // 先後入れ替える。
-                                    //    sync_cout << rootPos << sync_endl; // デバッグ用に投了の局面を表示させてみる
+    player1_color = ~player1_color; // 先後入れ替える。
+    //    sync_cout << rootPos << sync_endl; // デバッグ用に投了の局面を表示させてみる
+  
     game_started = false;
 
     es[0].game_over();
@@ -656,6 +658,9 @@ void Thread::search()
 #ifdef ONE_LINE_OUTPUT_MODE
     std::cerr << '.';
 #endif
+
+    // これクリアしておかないとメモリを消費し続けてもったいない。
+    SetupStates->clear();
   };
 
   string line;
@@ -681,6 +686,13 @@ void Thread::search()
       if (m == MOVE_NULL)
         break;
 
+      // 宣言勝ち
+      if (m == rootPos.DeclarationWin())
+      {
+        game_over(false);
+        continue;
+      }
+
       rootPos.check_info_update();
 
       // 非合法手を弾く
@@ -697,7 +709,7 @@ void Thread::search()
 
       if (m == MOVE_RESIGN || rootPos.is_mated() || rootPos.game_ply() >= 256)
       {
-        game_over();
+        game_over(true);
         //sync_cout << "game over" << sync_endl;
       }
       sleep(5);

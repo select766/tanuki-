@@ -41,8 +41,39 @@ namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 // Option設定が格納されたglobal object。
 USI::OptionsMap Options;
 
+// 試合開始後、一度でも"go ponder"が送られてきたかのフラグ
+// 本来は、Options["Ponder"]で設定すべきだが(UCIではそうなっている)、
+// USIプロトコルだとGUIが勝手に設定するので、思考エンジン側からPonder有りのモードなのかどうかが取得できない。
+// ゆえに、このようにして判定している。
+bool ponder_mode;
+
+// 引き分けになるまでの手数。(MaxMovesToDrawとして定義される)
+// これは、"go"コマンドのときにLimits.max_game_plyに反映される。
+// INT_MAXにすると残り手数を計算するときにあふれかねない。
+int max_game_ply = 100000;
+
 namespace USI
 {
+  // 入玉ルール
+#ifdef USE_ENTERING_KING_WIN
+  EnteringKingRule ekr = EKR_27_POINT;
+  // 入玉ルールのUSI文字列
+  std::vector<std::string> ekr_rules = { "NoEnteringKing", "CSARule24" , "CSARule27" , "TryRule" };
+
+  // 入玉ルールがGUIから変更されたときのハンドラ
+  void set_entering_king_rule(const std::string& rule)
+  {
+    for (int i = 0; i < ekr_rules.size(); ++i)
+      if (ekr_rules[i] == rule)
+      {
+        ekr = (EnteringKingRule)i;
+        break;
+      }
+  }
+#else
+  EnteringKingRule ekr = EKR_NONE;
+#endif
+
 // --------------------
 //    読み筋の出力
 // --------------------
@@ -167,15 +198,18 @@ namespace USI
     // Hash上限。32bitモードなら2GB、64bitモードなら1024GB
     const int MaxHashMB = Is64Bit ? 1024 * 1024 : 2048;
 
+    // 並列探索するときのスレッド数
+    // CPUの搭載コア数をデフォルトとすべきかも知れないが余計なお世話のような気もするのでしていない。
+
     o["Threads"] << Option(4, 1, 128, [](auto& o) { Threads.read_usi_options(); });
 
-    // USIプロトコルでは、"USI_Hash"と"USI_Ponder"なのだが、
+    // USIプロトコルでは、"USI_Hash"なのだが、
     // 置換表サイズを変更しての自己対戦などをさせたいので、
     // 片方だけ変更できなければならない。
     // ゆえにGUIでの対局設定は無視して、思考エンジンの設定ダイアログのところで
     // 個別設定が出来るようにする。
+
     o["Hash"]    << Option(16, 1, MaxHashMB, [](auto&o) { TT.resize(o); });
-    o["Ponder"]  << Option(false);
 
     // その局面での上位N個の候補手を調べる機能
     o["MultiPV"] << Option(1, 1, 800);
@@ -183,11 +217,30 @@ namespace USI
     // cin/coutの入出力をファイルにリダイレクトする
     o["WriteDebugLog"] << Option(false, [](auto& o) { start_logger(o); });
 
-    // ネットワーク遅延時間[ms]
-    o["NetworkDelay"] << Option(400, 0, 10000);
+    // ネットワークの平均遅延時間[ms]
+    // この時間だけ早めに指せばだいたい間に合う。
+    // 切れ負けの瞬間は、NetworkDelayのほうなので大丈夫。
+    o["NetworkDelay"] << Option(200, 0, 10000);
+
+    // ネットワークの最大遅延時間[ms]
+    // 切れ負けの瞬間だけはこの時間だけ早めに指す。
+    // 1.2秒ほど早く指さないとfloodgateで切れ負けしかねない。
+    o["NetworkDelay2"] << Option(1200, 0, 10000);
+
+    // 最小思考時間[ms]
+    o["MinimumThinkingTime"] << Option(2000, 1000, 100000);
+
+    // 引き分けまでの最大手数。256手ルールのときに256。0なら無制限。
+    o["MaxMovesToDraw"] << Option(0, 0, 100000, [](auto& o) { max_game_ply = (o == 0) ? INT_MAX : o; });
 
     // 引き分けを受け入れるスコア
+    // 歩を100とする。例えば、この値を100にすると引き分けの局面は評価値が -100とみなされる。
     o["Contempt"] << Option(0, -30000, 30000);
+
+#ifdef USE_ENTERING_KING_WIN
+    // 入玉ルール
+    o["EnteringKingRule"] << Option(ekr_rules, ekr_rules[EKR_27_POINT], [](auto& o) { set_entering_king_rule(o); });
+#endif
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
@@ -225,8 +278,15 @@ namespace USI
         {
           const Option& o = it.second;
           os << "option name " << it.first << " type " << o.type;
+
           if (o.type != "button")
             os << " default " << o.defaultValue;
+
+          // コンボボックス
+          if (o.list.size())
+            for (auto v : o.list)
+              os << " var " << v;
+
           if (o.type == "spin")
             os << " min " << o.min << " max " << o.max;
           os << endl;
@@ -242,7 +302,7 @@ namespace USI
 // --------------------
 
 // is_ready_cmd()を外部から呼び出せるようにしておく。(benchコマンドなどから呼び出したいため)
-void is_ready()
+void is_ready(Position& pos)
 {
   static bool first = true;
 
@@ -256,13 +316,18 @@ void is_ready()
     first = false;
   }
 
+  // Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
+  // evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
+  pos.set(SFEN_HIRATE);
+
   Search::clear();
 }
 
 // isreadyコマンド処理部
-void is_ready_cmd()
+void is_ready_cmd(Position& pos)
 {
-  is_ready();
+  is_ready(pos);
+  ponder_mode = false;
   sync_cout << "readyok" << sync_endl;
 }
 
@@ -336,12 +401,14 @@ void go_cmd(const Position& pos, istringstream& is) {
   Search::LimitsType limits;
   string token;
 
-  // 思考開始時刻の初期化。なるべく早い段階でこれを代入しておかないとサーバー時間との誤差が大きくなる。
-  Time.init();
-  
-  // goコマンド、デバッグ時に使うが、そのときに"go btime XXX wtime XXX byoyomi XXX"と毎回入力するのが面倒なので
-  // デフォルトで1秒読み状態で呼び出されて欲しい。
-  limits.byoyomi[BLACK] = limits.byoyomi[WHITE] = 1000;
+  // 思考開始時刻の初期化。なるべく早い段階でこれをしておかないとサーバー時間との誤差が大きくなる。
+  Time.reset();
+
+  // 入玉ルール
+  limits.enteringKingRule = USI::ekr;
+
+  // 終局(引き分け)になるまでの手数
+  limits.max_game_ply = max_game_ply;
 
   while (is >> token)
   {
@@ -354,6 +421,10 @@ void go_cmd(const Position& pos, istringstream& is) {
     // 先手、後手の残り時間。[ms]
     else if (token == "wtime")     is >> limits.time[WHITE];
     else if (token == "btime")     is >> limits.time[BLACK];
+
+    // フィッシャールール時における時間
+    else if (token == "winc")      is >> limits.inc[WHITE];
+    else if (token == "binc")      is >> limits.inc[BLACK];
 
     // "go rtime 100"だと100～300[ms]思考する。
     else if (token == "rtime")     is >> limits.rtime;
@@ -391,8 +462,21 @@ void go_cmd(const Position& pos, istringstream& is) {
     else if (token == "infinite")  limits.infinite = 1;
 
     // ponderモードでの思考。
-    else if (token == "ponder")    limits.ponder = 1;
+    else if (token == "ponder")
+    {
+      limits.ponder = 1;
+
+      // 試合開始後、一度でも"go ponder"が送られてきたら、それを記録しておく。
+      ponder_mode = true;
+    }
   }
+
+  // goコマンド、デバッグ時に使うが、そのときに"go btime XXX wtime XXX byoyomi XXX"と毎回入力するのが面倒なので
+  // デフォルトで1秒読み状態で呼び出されて欲しい。
+  if (limits.byoyomi[BLACK] == 0 && limits.inc[BLACK] == 0 && limits.time[BLACK] == 0 && limits.rtime == 0)
+    limits.byoyomi[BLACK] = limits.byoyomi[WHITE] = 1000;
+
+  limits.ponder_mode = ponder_mode;
 
   Threads.start_thinking(pos, limits, Search::SetupStates);
 }
@@ -408,6 +492,7 @@ void USI::loop(int argc,char* argv[])
 {
   // 探索開始局面(root)を格納するPositionクラス
   Position pos;
+
   string cmd,token;
 
   // 先行入力されているコマンド
@@ -468,12 +553,24 @@ void USI::loop(int argc,char* argv[])
     token = "";
     is >> skipws >> token;
 
-    if (token == "quit" || token == "stop")
+    if (token == "quit" || token == "stop" || token == "gameover")
     {
+      // USIプロトコルにはUCIプロトコルから、
+      // gameover win | lose | draw
+      // が追加されているが、stopと同じ扱いをして良いと思う。
+      // これハンドルしておかないとponderが停止しなくて困る。
+      // gameoverに対してbestmoveは返すべきではないのかも知れないが、
+      // それを言えばstopにだって…。
+
       Search::Signals.stop = true;
 
       // 思考を終えて寝てるかも知れないのでresume==trueにして呼び出してやる
       Threads.main()->start_searching(true);
+
+    } else if (token == "ponderhit")
+    {
+      Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
+      Search::Limits.ponder = 0; // 通常探索に切り替える。
     }
 
     // 与えられた局面について思考するコマンド
@@ -490,7 +587,7 @@ void USI::loop(int argc,char* argv[])
     else if (token == "setoption") setoption_cmd(is);
 
     // 思考エンジンの準備が出来たかの確認
-    else if (token == "isready") is_ready_cmd();
+    else if (token == "isready") is_ready_cmd(pos);
 
     // ユーザーによる実験用コマンド。user.cppのuser()が呼び出される。
     else if (token == "user") user_test(pos,is);
@@ -621,6 +718,9 @@ Move move_from_usi(const Position& pos, const std::string& str)
 
   if (str == "resign")
     return MOVE_RESIGN;
+
+  if (str == "win")
+    return MOVE_WIN;
 
   // usi文字列をmoveに変換するやつがいるがな..
   Move move = move_from_usi(str);

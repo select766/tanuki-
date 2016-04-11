@@ -29,8 +29,8 @@ namespace {
   // 返し値は今回発見されたtoに利く最小の攻撃駒。これがtoの地点において成れるなら成ったあとの駒を返すべき。
 
   template<int Pt> inline
-    Piece min_attacker(const Position& pos,const Bitboard(&bb)[8][2], const Square& to, const Bitboard& stmAttackers,
-    Bitboard& occupied, Bitboard& attackers, Color stm,int& uncapValue) {
+    Piece min_attacker(const Position& pos,const Bitboard(&bb)[PIECE_TYPE_BITBOARD_NB][COLOR_NB],const Square& to
+      , const Bitboard& stmAttackers, Bitboard& occupied, Bitboard& attackers, Color stm,int& uncapValue) {
 
       // 駒種ごとのbitboardのうち、攻撃駒の候補を調べる
 //:      Bitboard b = stmAttackers & bb[Pt];
@@ -61,7 +61,7 @@ namespace {
       {
       case DIRECT_RU: case DIRECT_RD: case DIRECT_LU: case DIRECT_LD:
         // 斜め方向なら斜め方向の升をスキャンしてその上にある角・馬を足す
-        attackers |= bishopEffect(to, occupied) & (bb[BLACK][PIECE_TYPE_BITBOARD_BISHOP] | bb[WHITE][PIECE_TYPE_BITBOARD_BISHOP]);
+        attackers |= bishopEffect(to, occupied) & (bb[PIECE_TYPE_BITBOARD_BISHOP][BLACK] | bb[PIECE_TYPE_BITBOARD_BISHOP][WHITE]);
 
         ASSERT_LV3((bishopStepEffect(to) & sq));
         break;
@@ -69,7 +69,7 @@ namespace {
       case DIRECT_U:
         // 後手の香 + 先後の飛車
         attackers |= rookEffect(to, occupied) & lanceStepEffect(BLACK, to)
-          & (bb[BLACK][PIECE_TYPE_BITBOARD_ROOK] | bb[WHITE][PIECE_TYPE_BITBOARD_ROOK] | bb[WHITE][PIECE_TYPE_BITBOARD_LANCE]);
+          & (bb[PIECE_TYPE_BITBOARD_ROOK][BLACK] | bb[PIECE_TYPE_BITBOARD_ROOK][WHITE] | bb[PIECE_TYPE_BITBOARD_LANCE][WHITE]);
 
         ASSERT_LV3((lanceStepEffect(BLACK, to) & sq));
         break;
@@ -77,7 +77,7 @@ namespace {
       case DIRECT_D:
         // 先手の香 + 先後の飛車
         attackers |= rookEffect(to, occupied) & lanceStepEffect(WHITE, to)
-          & (bb[BLACK][PIECE_TYPE_BITBOARD_ROOK] | bb[WHITE][PIECE_TYPE_BITBOARD_ROOK] | bb[BLACK][PIECE_TYPE_BITBOARD_LANCE]);
+          & (bb[PIECE_TYPE_BITBOARD_ROOK][BLACK] | bb[PIECE_TYPE_BITBOARD_ROOK][WHITE] | bb[PIECE_TYPE_BITBOARD_LANCE][BLACK]);
 
         ASSERT_LV3((lanceStepEffect(WHITE, to) & sq));
         break;
@@ -85,7 +85,7 @@ namespace {
       case DIRECT_L: case DIRECT_R:
         // 左右なので先後の飛車
         attackers |= rookEffect(to, occupied)
-          & (bb[BLACK][PIECE_TYPE_BITBOARD_ROOK] | bb[WHITE][PIECE_TYPE_BITBOARD_ROOK]);
+          & (bb[PIECE_TYPE_BITBOARD_ROOK][BLACK] | bb[PIECE_TYPE_BITBOARD_ROOK][WHITE]);
 
         ASSERT_LV3(((rookStepEffect(to) & sq)));
         break;
@@ -122,8 +122,8 @@ namespace {
 
   template<> inline
     // 馬、龍もHDKに含めて、KINGの処理もしたいのでこの処理はKING+1としておく。
-    Piece min_attacker<KING + 1>(const Position& pos, const Bitboard(&)[8][2], const Square&, const Bitboard&
-    , Bitboard&, Bitboard& occ, Color, int& uncapValue) {
+    Piece min_attacker<KING + 1>(const Position& pos, const Bitboard(&)[PIECE_TYPE_BITBOARD_NB][COLOR_NB], const Square&
+      , const Bitboard& , Bitboard&, Bitboard& occ, Color, int& uncapValue) {
       uncapValue = VALUE_ZERO;
       return Piece(KING + 1);
 
@@ -155,8 +155,6 @@ namespace {
 // 正か、0か負かが返る。
 Value Position::see_sign(Move m) const {
 
-  ASSERT_LV3(is_ok(m));
-
   // 捕獲される駒の価値が捕獲する駒の価値より低いのであれば、
   // SEEは負であるはずがないので、このときは速攻帰る。
   // ※　例) 歩で飛車をとって、その升でどう取り合おうと、駒損になることはない。
@@ -175,6 +173,7 @@ Value Position::see_sign(Move m) const {
 
 // ↑の関数の下請け。
 Value Position::see(Move m) const {
+
   Square from, to;
 
   // occupied : 盤上の全駒を表すbitboard
@@ -200,6 +199,7 @@ Value Position::see(Move m) const {
 
    to = move_to(m);
 
+
   // toの地点にある駒を格納(最初に捕獲できるであろう駒)
   // 捕獲する駒がない場合はNO_PIECEとなり、PieceValue[NO_PIECE] == 0である。
 
@@ -222,55 +222,82 @@ Value Position::see(Move m) const {
 
   // 最初に捕獲される駒はfromにあった駒である
 
+  // 相手番の攻撃駒
+   stm = ~sideToMove;
+
    if (is_drop(m))
    {
      // 駒打ちの場合、敵駒が利いていなければ0は確定する。
 
-     // 相手番の攻撃駒
-     stm = ~sideToMove;
+#ifdef LONG_EFFECT_LIBRARY
+    // 移動させる升に相手からの利きがないなら、seeが負であることはない。
+    if (!effected_to(stm,to))
+      return VALUE_ZERO;
 
-     // 手番側(相手番)の攻撃駒
-     stmAttackers = attackers_to(stm, to, pieces());
-     // pieces()をいじる必要はないので、とりあえずコピーせずに元のまま渡しておく。
+    // 手番側(相手番)の攻撃駒
+    occupied = pieces();
 
+    // ↑の条件から、敵の駒がtoに利いている。
+    // このとき、味方の駒もtoに利いているなら、その両方を列挙。
+    // さもなくば、敵の駒だけ列挙。
+    stmAttackers = attackers_to(stm, to, occupied);
+    if (effected_to(~stm,to))
+      attackers = stmAttackers | attackers_to(~stm, to, occupied);
+    else
+      attackers = stmAttackers;
+
+#else
+     occupied = pieces();
+     stmAttackers = attackers_to(stm, to, occupied);
      if (!stmAttackers)
        return VALUE_ZERO;
 
-     swapList[0] = VALUE_ZERO;
-     uncapValue[0] = VALUE_ZERO;
-     occupied = pieces();
-
      // 自駒のうちtoに利く駒も足したものをattackersとする。
      attackers = stmAttackers | attackers_to(~stm, to, occupied);
+#endif
+
+     swapList[0] = VALUE_ZERO;
+     uncapValue[0] = VALUE_ZERO;
 
      captured = move_dropped_piece(m);
+
    } else if (is_promote(m)) {
 
      // 成りの処理も上の処理とほぼ同様だが、駒を取り返されないときの値が成りのスコア分だけ大きい
 
      from = move_from(m);
-     swapList[0] = PieceValueCapture[piece_on(to)]; // 最初に捕獲する駒
-     uncapValue[0] = ProDiffPieceValue[piece_on(from)]; // この駒を取り返されなかったときに成りの分だけ儲かる。
-                                                        //  see()は変動する評価値の半分を返すように設計する
+     
+     // 最初に捕獲する駒
+     swapList[0] = PieceValueCapture[piece_on(to)];
 
-                                                        //  ↑ここが不成りのときと違う。その1。
+     // この駒を取り返されなかったときに成りの分だけ儲かる。
+     uncapValue[0] = ProDiffPieceValue[piece_on(from)];
 
-                                                        // fromの駒がないものとして考える。
+#ifdef LONG_EFFECT_LIBRARY
+     // 移動させる升に相手からの利きがないなら、seeが負であることはない。
+     // fromから移動させているのでfromに相手のlong effectがあるとこのfromの駒をtoに移動させたときに
+     // 取られてしまうのでそこは注意が必要。
+     if (!effected_to(stm,to,from))
+       return Value(swapList[0] + uncapValue[0]);
+
+     // fromの駒がないものとして考える。
      occupied = pieces() ^ from;
 
-     // 相手番に
-     stm = ~color_of(piece_on(from));
-     //      attackers = attackers_to(stm, to, slide) & occupied;
-     //　→　fromは自駒であるのでこの時点で取り除く必要はない。
-
      // 手番側(相手番)の攻撃駒
-     // ※　"stm"はSideToMoveの略だと思われる。
+     // ※　"stm"はSideToMoveの略。
+     stmAttackers = attackers_to(stm, to, occupied);
+
+#else
+
+     occupied = pieces() ^ from;
      stmAttackers = attackers_to(stm, to, occupied);
 
      // なくなったので最初に手番側が捕獲した駒の価値をSEE値として返す
      if (!stmAttackers)
        return Value(swapList[0] + uncapValue[0]);
      //  ↑ここが不成りのときと違う。その2。
+
+#endif
 
      // fromの駒を取り除いて自駒のうちtoに利く駒も足したものをattackersとする。
      attackers = (stmAttackers | attackers_to(~stm, to, occupied)) & occupied;
@@ -279,25 +306,33 @@ Value Position::see(Move m) const {
      // ↑このSEEの処理ルーチンではPROMOTEのときも生駒にしてしまっていい。
 
    } else {
-     // 成る手と普通の手でわける必要あるのか？よくわからん。
+
+     // 成る手と成らない指し手とで処理をわける。
+     // 成る手である場合、それが玉である可能性はないのでそのへんの処理が違うし…。
+     
      from = move_from(m);
      swapList[0] = PieceValueCapture[piece_on(to)]; // 最初に捕獲する駒
 
-     // 相手番に
-     stm = ~color_of(piece_on(from));
      //      attackers = attackers_to(stm, to, slide) & occupied;
      //　→　fromは自駒であるのでこの時点で取り除く必要はない。
 
+#ifdef LONG_EFFECT_LIBRARY
+     if (!effected_to(stm,to,from))
+       return Value(swapList[0]);
+
      // fromの駒がないものとして考える。
      occupied = pieces() ^ from;
+     stmAttackers = attackers_to(stm, to, occupied);
 
-     // 手番側(相手番)の攻撃駒
-     // ※　"stm"はSideToMoveの略だと思われる。
+#else
+     occupied = pieces() ^ from;
      stmAttackers = attackers_to(stm, to, occupied);
 
      // なくなったので最初に手番側が捕獲した駒の価値をSEE値として返す
      if (!stmAttackers)
        return Value(swapList[0]);
+
+#endif
 
      // fromの駒を取り除いて自駒のうちtoに利く駒も足したものをattackersとする。
      attackers = (stmAttackers | attackers_to(~stm, to, occupied)) & occupied;

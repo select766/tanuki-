@@ -23,50 +23,65 @@ namespace Zobrist {
 //           CheckInfo
 // ----------------------------------
 
+template <CheckInfoUpdate ciu>
 void CheckInfo::update(const Position& pos) {
+
+  ASSERT_LV1(ciu != CHECK_INFO_UPDATE_NONE);
 
   // このクラスのメンバー変数は、このコンストラクタで適切な値をセットしてやる必要がある。
 
-  // 相手の手番
-  Color them = ~pos.side_to_move();
+  if (ciu == CHECK_INFO_UPDATE_ALL || ciu == CHECK_INFO_UPDATE_PINNED)
+  {
+    // 手番側のpinされている駒
+    pinned = pos.pinned_pieces(pos.side_to_move());
+  }
 
-  // 敵玉の位置
-  ksq = pos.king_square(them);
+  if (ciu == CHECK_INFO_UPDATE_ALL || ciu == CHECK_INFO_UPDATE_WITHOUT_PINNED)
+  {
 
-  // 手番側のpinされている駒
-  pinned = pos.pinned_pieces(pos.side_to_move());
+    // 相手の手番
+    Color them = ~pos.side_to_move();
 
-  // 動かすと開き王手になる自駒の候補
-  dcCandidates = pos.discovered_check_candidates();
+    // 敵玉の位置
+    ksq = pos.king_square(them);
 
-  // 駒種Xによって敵玉に王手となる升のbitboard
+    // 動かすと開き王手になる自駒の候補
+    dcCandidates = pos.discovered_check_candidates();
 
-  // 歩であれば、自玉に敵の歩を置いたときの利きにある場所に自分の歩があればそれは敵玉に対して王手になるので、
-  // そういう意味で(ksq,them)となっている。
+    // 駒種Xによって敵玉に王手となる升のbitboard
 
-  Bitboard occ = pos.pieces();
+    // 歩であれば、自玉に敵の歩を置いたときの利きにある場所に自分の歩があればそれは敵玉に対して王手になるので、
+    // そういう意味で(ksq,them)となっている。
 
-  // この指し手が二歩でないかは、この時点でテストしない。指し手生成で除外する。なるべくこの手のチェックは遅延させる。
-  checkSq[PAWN  ] = pawnEffect(them, ksq);
-  checkSq[LANCE ] = lanceEffect(them, ksq,occ);
-  checkSq[KNIGHT] = knightEffect(them, ksq);
-  checkSq[SILVER] = silverEffect(them, ksq);
-  checkSq[BISHOP] = bishopEffect(ksq,occ);
-  checkSq[ROOK  ] = rookEffect(ksq,occ);
-  checkSq[GOLD  ] = goldEffect(them, ksq);
+    Bitboard occ = pos.pieces();
 
-  // 王を移動させて直接王手になることはない。それは自殺手である。
-  checkSq[KING  ] = ZERO_BB;
+    // この指し手が二歩でないかは、この時点でテストしない。指し手生成で除外する。なるべくこの手のチェックは遅延させる。
+    checkSq[PAWN] = pawnEffect(them, ksq);
+    checkSq[LANCE] = lanceEffect(them, ksq, occ);
+    checkSq[KNIGHT] = knightEffect(them, ksq);
+    checkSq[SILVER] = silverEffect(them, ksq);
+    checkSq[BISHOP] = bishopEffect(ksq, occ);
+    checkSq[ROOK] = rookEffect(ksq, occ);
+    checkSq[GOLD] = goldEffect(them, ksq);
 
-  // 成り駒。この初期化は馬鹿らしいようだが、gives_check()は指し手ごとに呼び出されるので、その処理を軽くしたいので
-  // ここでの初期化は許容できる。(このコードはノードの最初に1回呼び出されるだけなので)
-  checkSq[PRO_PAWN  ] = checkSq[GOLD];
-  checkSq[PRO_LANCE ] = checkSq[GOLD];
-  checkSq[PRO_KNIGHT] = checkSq[GOLD];
-  checkSq[PRO_SILVER] = checkSq[GOLD];
-  checkSq[HORSE     ] = checkSq[BISHOP] | kingEffect(ksq);
-  checkSq[DRAGON    ] = checkSq[ROOK  ] | kingEffect(ksq);
+    // 王を移動させて直接王手になることはない。それは自殺手である。
+    checkSq[KING] = ZERO_BB;
+
+    // 成り駒。この初期化は馬鹿らしいようだが、gives_check()は指し手ごとに呼び出されるので、その処理を軽くしたいので
+    // ここでの初期化は許容できる。(このコードはノードの最初に1回呼び出されるだけなので)
+    checkSq[PRO_PAWN] = checkSq[GOLD];
+    checkSq[PRO_LANCE] = checkSq[GOLD];
+    checkSq[PRO_KNIGHT] = checkSq[GOLD];
+    checkSq[PRO_SILVER] = checkSq[GOLD];
+    checkSq[HORSE] = checkSq[BISHOP] | kingEffect(ksq);
+    checkSq[DRAGON] = checkSq[ROOK] | kingEffect(ksq);
+  }
 }
+
+template void CheckInfo::update<CHECK_INFO_UPDATE_ALL           >(const Position& pos);
+template void CheckInfo::update<CHECK_INFO_UPDATE_PINNED        >(const Position& pos);
+template void CheckInfo::update<CHECK_INFO_UPDATE_WITHOUT_PINNED>(const Position& pos);
+
 
 // ----------------------------------
 //       Zorbrist keyの初期化
@@ -98,7 +113,7 @@ void Position::init() {
 // depthに応じたZobrist Hashを得る。depthを含めてhash keyを求めたいときに用いる。
 HASH_KEY DepthHash(int depth) { return Zobrist::depth[depth]; }
 
-HASH_KEY StateInfo::long_key_exclusion() const { return long_key() + Zobrist::exclusion; }
+HASH_KEY StateInfo::exclusion_long_key() const { return long_key() + Zobrist::exclusion; }
 
 // ----------------------------------
 //  Position::set()とその逆変換sfen()
@@ -351,16 +366,16 @@ void Position::set_state(StateInfo* si) const {
   st->checkersBB = attackers_to(~sideToMove, king_square(sideToMove));
 
   // --- hash keyの計算
-  si->key_board_ = sideToMove == BLACK ? Zobrist::zero : Zobrist::side;
-  si->key_hand_ = Zobrist::zero;
+  si->board_key_ = sideToMove == BLACK ? Zobrist::zero : Zobrist::side;
+  si->hand_key_ = Zobrist::zero;
   for (auto sq : pieces())
   {
     auto pc = piece_on(sq);
-    si->key_board_ += Zobrist::psq[sq][pc];
+    si->board_key_ += Zobrist::psq[sq][pc];
   }
   for (auto c : COLOR)
     for (Piece pr = PAWN; pr < PIECE_HAND_NB; ++pr)
-      si->key_hand_ += Zobrist::hand[c][pr] * (int64_t)hand_count(hand[c], pr) ; // 手駒はaddにする(差分計算が楽になるため)
+      si->hand_key_ += Zobrist::hand[c][pr] * (int64_t)hand_count(hand[c], pr) ; // 手駒はaddにする(差分計算が楽になるため)
 
   // --- hand
   si->hand = hand[sideToMove];
@@ -696,7 +711,7 @@ bool Position::pseudo_legal_s(const Move m) const {
     }
 
     // 歩のとき、二歩および打ち歩詰めであるなら非合法手
-    if (pr == PAWN && !legal_pawn_drop(us,to))
+    if (pr==PAWN && !legal_pawn_drop(us,to))
       return false;
 
     // --- 移動できない升への歩・香・桂打ちについて
@@ -705,7 +720,36 @@ bool Position::pseudo_legal_s(const Move m) const {
     // 置換表のhash衝突で、後手の指し手が先手の指し手にならないことは保証されている。
     // (先手の手番の局面と後手の手番の局面とのhash keyはbit0で区別しているので)
 
-    // ゆえに、ここではこれ以上のチェックは不要なのである。
+#ifndef KEEP_PIECE_IN_COUNTER_MOVE
+    // しかし、Counter Moveの手は手番に関係ないので(駒種を保持していないなら)取り違える可能性があるため
+    // (しかも、その可能性はそこそこ高い)、ここで合法性をチェックする必要がある。
+    switch (pr)
+    {
+    case PAWN:
+    case LANCE:
+      if ((us == BLACK && rank_of(to) == RANK_1) || (us == WHITE && rank_of(to) == RANK_9))
+        return false;
+      break;
+    case KNIGHT:
+      if ((us == BLACK && rank_of(to) < RANK_3) || (us == WHITE && rank_of(to) > RANK_7))
+        return false;
+      break;
+    }
+#else
+    // 変な指し手を渡していないか、assertを入れて調べておく。(ASSERT_LV4以上のとき用)
+    switch (pr)
+    {
+    case PAWN:
+    case LANCE:
+      if ((us == BLACK && rank_of(to) == RANK_1) || (us == WHITE && rank_of(to) == RANK_9))
+        ASSERT_LV4(false);
+      break;
+    case KNIGHT:
+      if ((us == BLACK && rank_of(to) < RANK_3) || (us == WHITE && rank_of(to) > RANK_7))
+        ASSERT_LV4(false);
+      break;
+    }
+#endif
 
   } else {
 
@@ -743,7 +787,7 @@ bool Position::pseudo_legal_s(const Move m) const {
       // --- 成らない指し手
 
       // 駒打ちのところに書いた理由により、不成で進めない升への指し手のチェックも不要。
-      // 間違い　→　駒種をmoveに含めていないのでこのチェック必要だわ。
+      // 間違い　→　駒種をmoveに含めていないならこのチェック必要だわ。
       // 52から51銀のような指し手がkillerやcountermoveに登録されていたとして、52に歩があると
       // 51歩不成という指し手を生成してしまう…。
       // あと、歩や大駒が敵陣において成らない指し手も不要なのでは..。
@@ -831,8 +875,8 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
   // hash key
 
   // 現在の局面のhash keyはこれで、これを更新していき、次の局面のhash keyを求めてStateInfo::key_に格納。
-  auto k = st->key_board_ ^ Zobrist::side;
-  auto h = st->key_hand_;
+  auto k = st->board_key_ ^ Zobrist::side;
+  auto h = st->hand_key_;
 
   // StateInfoの構造体のメンバーの上からkeyのところまでは前のを丸ごとコピーしておく。
   // undo_moveで戻すときにこの部分はundo処理が要らないので細かい更新処理が必要なものはここに載せておけばundoが速くなる。
@@ -851,8 +895,9 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
   // 評価値の差分計算用の初期化
 
 #ifdef EVAL_KPP
-  // KPPのとき差分計算は遅延させるのでここではKPPの値を未計算であることを意味するVALUE_NONEを代入しておく。
-  st->sumKKP = VALUE_NONE;
+  // KPPのとき差分計算は遅延させるのでここではKPPの値を未計算であることを意味するINT_MAXを代入しておく。
+  // これVALUNE_NONEにするとsumKKPが32bitなので偶然一致することがある。
+  st->sumKKP = INT_MAX;
 #endif
 
   // 直前の指し手を保存するならばここで行なう。
@@ -1110,8 +1155,8 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
   sideToMove = ~Us;
 
   // 更新されたhash keyをStateInfoに書き戻す。
-  st->key_board_ = k;
-  st->key_hand_ = h;
+  st->board_key_ = k;
+  st->hand_key_ = h;
 
   st->hand = hand[sideToMove];
 
@@ -1236,12 +1281,12 @@ void Position::do_null_move(StateInfo& newSt) {
   ASSERT_LV3(!checkers());
   ASSERT_LV3(&newSt != st);
 
-  // StateInfo自体は丸ごとコピーしておかないといけない。(他の初期化をしないので)
+  // この場合、StateInfo自体は丸ごとコピーしておかないといけない。(他の初期化をしないので)
   std::memcpy(&newSt, st, sizeof(StateInfo));
   newSt.previous = st;
   st = &newSt;
 
-  st->key_board_ ^= Zobrist::side;
+  st->board_key_ ^= Zobrist::side;
   st->pliesFromNull = 0;
 
   sideToMove = ~sideToMove;
@@ -1272,13 +1317,13 @@ RepetitionState Position::is_repetition(const int repPly) const
   if (i <= e)
   {
     auto stp = st->previous->previous;
-    auto key = st->key_board(); // 盤上の駒のみのhash(手駒を除く)
+    auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
 
     do {
       stp = stp->previous->previous;
 
       // 同じboard hash keyの局面であるか？
-      if (stp->key_board() == key)
+      if (stp->board_key() == key)
       {
         // 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
         if (stp->hand == st->hand)

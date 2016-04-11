@@ -27,6 +27,10 @@ namespace Search {
     // これを置換表に保存する。
     void insert_pv_in_tt(Position& pos);
 
+    // ponderの指し手がないときにponderの指し手を置換表からひねり出す。
+    // pv[1]に格納される。なかった場合は、この関数はfalseを返す。
+    bool extract_ponder_from_tt(Position& pos);
+
     // 今回の(反復深化の)iterationでの探索結果のスコア
     Value score = -VALUE_INFINITE;
 
@@ -43,9 +47,12 @@ namespace Search {
 
     // PODでない型をmemsetでゼロクリアするとMSVCは破壊してしまうので明示的に初期化する。
     LimitsType() {
-       nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = npmsec = movestogo
+       nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = byoyomi[WHITE] = byoyomi[BLACK] = npmsec
          = depth = movetime = mate = infinite = ponder = rtime = 0;
        silent = false;
+       max_game_ply = 100000;
+       ponder_mode = false;
+       enteringKingRule = EKR_NONE;
     }
 
     // 時間制御を行うのか。
@@ -70,10 +77,9 @@ namespace Search {
     // 探索node数を思考経過時間の代わりに用いるモードであるかのフラグ(from UCI)
     int npmsec;
 
-    // movestogo : 次の時間制御までx手あるという意味。
-    //    これが指定されておらず、"wtime"と"btime"を受信したのならば切れ負けの意味。
-    //    これが指定されているときは、手数制限的な意味だと思われる。(100手で引き分け、など)
-    int movestogo;
+    // この手数で引き分けとなる。
+    // USIのoption["MaxMovesToDraw"]の値。引き分けなしならINT_MAX。
+    int max_game_ply;
 
     // depth    : 探索深さ固定(0以外を指定してあるなら)
     // movetime : 思考時間固定(0以外が指定してあるなら) : 単位は[ms]
@@ -98,11 +104,13 @@ namespace Search {
     // 画面に出力しないサイレントモード(プロセス内での連続自己対戦のとき用)
     bool silent;
 
-    // ---- ↑ここまでコンストラクタでゼロ初期化↑ ----
+    // 試合開始後、ponderが一度でも送られてきたか
+    bool ponder_mode;
   };
 
   struct SignalsType {
-    std::atomic_bool stop; // これがtrueになったら探索を強制終了すること。
+    // これがtrueになったら探索を即座に終了すること。
+    std::atomic_bool stop;
   };
 
   typedef std::unique_ptr<aligned_stack<StateInfo>> StateStackPtr;
@@ -123,14 +131,14 @@ namespace Search {
   // -----------------------
 
   struct Stack {
-    Move* pv;              // PVへのポインター。RootMovesのvector<Move> pvを指している。
-    int ply;               // rootからの手数
-    Move currentMove;      // そのスレッドの探索においてこの局面で現在選択されている指し手
-    Move excludedMove;     // singular extension判定のときに置換表の指し手をそのnodeで除外して探索したいのでその除外する指し手
-    Move killers[2];       // killer move
-    Value staticEval;      // 評価関数を呼び出して得た値。NULL MOVEのときに親nodeでの評価値が欲しいので保存しておく。
-    bool skipEarlyPruning; // 指し手生成前に行なう枝刈りを省略するか。(NULL MOVEの直後など)
-    int moveCount;         // このnodeでdo_move()した生成した何手目の指し手か。(1ならおそらく置換表の指し手だろう)
+    Move* pv;                // PVへのポインター。RootMovesのvector<Move> pvを指している。
+    int ply;                 // rootからの手数
+    Move currentMove;        // そのスレッドの探索においてこの局面で現在選択されている指し手
+    Move excludedMove;       // singular extension判定のときに置換表の指し手をそのnodeで除外して探索したいのでその除外する指し手
+    COUNTER_MOVE killers[2]; // killer move
+    Value staticEval;        // 評価関数を呼び出して得た値。NULL MOVEのときに親nodeでの評価値が欲しいので保存しておく。
+    bool skipEarlyPruning;   // 指し手生成前に行なう枝刈りを省略するか。(NULL MOVEの直後など)
+    int moveCount;           // このnodeでdo_move()した生成した何手目の指し手か。(1ならおそらく置換表の指し手だろう)
   };
 
 } // end of namespace Search

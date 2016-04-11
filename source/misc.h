@@ -48,6 +48,23 @@ extern void start_logger(bool b);
 extern int read_all_lines(std::string filename, std::vector<std::string>& lines);
 
 
+
+// --------------------
+//  統計情報
+// --------------------
+
+// 1秒おきにdbg_print()が呼び出される(やねうら王classic-tceなど)とする。
+// このとき、以下の関数を呼び出すと、その統計情報をcerrに出力する。
+
+extern void dbg_print();
+
+// bがtrueであった回数 / dbg_hit_on()が呼び出された回数 を調べるためのもの。
+// (どれくらいの割合でXが成り立つか、みたいなのを調べるときに用いる)
+extern void dbg_hit_on(bool b);
+
+// vの合計 / 呼びだされた回数 ( = vの平均) みたいなのを求めるときに調べるためのもの。
+extern void dbg_mean_of(int v);
+
 // --------------------
 //  Time[ms] wrapper
 // --------------------
@@ -71,21 +88,75 @@ inline void sleep(int ms)
 //  探索のときに使う時間管理用
 // -----------------------
 
+namespace Search { struct LimitsType; }
+
 struct Timer
 {
   // タイマーを初期化する。以降、elapsed()でinit()してからの経過時間が得られる。
-  void init() { startTime = now(); }
+  void reset() { startTime = startTimeFromPonderhit = now(); }
+
+  // "ponderhit"からの時刻を計測する用
+  void reset_for_ponderhit() { startTimeFromPonderhit = now(); }
 
   // 探索開始からの経過時間。単位は[ms]
   // 探索node数に縛りがある場合、elapsed()で探索node数が返ってくる仕様にすることにより、一元管理できる。
-  int elapsed() const { return int(now() - startTime); }
+  int elapsed() const;
 
+  // reset_for_ponderhit()からの経過時間。その関数は"ponderhit"したときに呼び出される。
+  // reset_for_ponderhit()が呼び出されていないときは、reset()からの経過時間。その関数は"go"コマンドでの探索開始時に呼び出される。
+  int elapsed_from_ponderhit() const;
+
+  // reset()されてからreset_for_ponderhit()までの時間
+  int elapsed_from_start_to_ponderhit() const { return (int)(startTimeFromPonderhit - startTime); }
+
+  // 探索node数を経過時間の代わりに使う。(こうするとタイマーに左右されない思考が出来るので、思考に再現性を持たせることが出来る)
   // node数を指定して探索するとき、探索できる残りnode数。
   int64_t availableNodes;
+
+  // このシンボルが定義されていると、今回の思考時間を計算する機能が有効になる。
+#ifdef  USE_TIME_MANAGEMENT
+
+  // 今回の思考時間を計算して、optimum(),maximum()が値をきちんと返せるようにする。
+  void init(Search::LimitsType& limits, Color us, int ply);
+
+  int minimum() const { return minimumTime; }
+  int optimum() const { return optimumTime; }
+  int maximum() const { return maximumTime; }
+
+  // 1秒単位で繰り上げてdelayを引く。
+  // ただし、remain_timeよりは小さくなるように制限する。
+  int round_up(int t) const {
+    // 1000で繰り上げる。Options["MinimalThinkingTime"]が最低値。
+    t = std::max(((t + 999) / 1000) * 1000 , minimum_thinking_time );
+    // そこから、Options["NetworkDelay"]の値を引くが、remain_timeを上回ってはならない。
+    t = std::min(t - network_delay , remain_time);
+    return t;
+  }
+
+  // 探索終了の時間(startTime + search_end >= now()になったら停止)
+  // この値がマイナスのときは、startTimeFromPonderhit - (search_end) >= now() になったら停止。
+  int search_end;
+
+private:
+  int minimumTime;
+  int optimumTime;
+  int maximumTime;
+
+  // Options["NetworkDelay"]の値
+  int network_delay;
+  // Options["MinimalThinkingTime"]の値
+  int minimum_thinking_time;
+
+  // 今回の残り時間 - Options["NetworkDelay2"]
+  int remain_time;
+
+#endif
 
 private:
   // 探索開始時間
   TimePoint startTime;
+
+  TimePoint startTimeFromPonderhit;
 };
 
 extern Timer Time;

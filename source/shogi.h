@@ -7,7 +7,7 @@
 //
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列
-#define ENGINE_VERSION "2.09"
+#define ENGINE_VERSION "2.67"
 
 // --------------------
 // コンパイル時の設定
@@ -23,16 +23,17 @@
 // オリジナルの思考エンジンをユーザーが作成する場合は、USER_ENGINE を defineして 他のエンジンのソースコードを参考に
 //  engine/user-engine/ フォルダの中身を書くべし。
 
-//#define YANEURAOU_NANO_ENGINE      // やねうら王nano(完成2016/01/31)
-//#define YANEURAOU_NANO_PLUS_ENGINE // やねうら王nano plus(完成2016/02/25)
-//#define YANEURAOU_MINI_ENGINE      // やねうら王mini      (完成2016/02/29)
-//#define YANEURAOU_CLASSIC_ENGINE   // やねうら王classic   (開発中)
-//#define YANEURAOU_2016_ENGINE      // やねうら王2016      (開発中)
-//#define RANDOM_PLAYER_ENGINE       // ランダムプレイヤー
-//#define MATE_ENGINE                // 詰め将棋solverとしてリリースする場合。(開発中)
-//#define HELP_MATE_ENGINE           // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
-#define LOCAL_GAME_SERVER          // 連続自動対局フレームワーク
-//#define USER_ENGINE                // ユーザーの思考エンジン
+//#define YANEURAOU_NANO_ENGINE        // やねうら王nano        (完成2016/01/31)
+//#define YANEURAOU_NANO_PLUS_ENGINE   // やねうら王nano plus   (完成2016/02/25)
+//#define YANEURAOU_MINI_ENGINE        // やねうら王mini        (完成2016/02/29)
+//#define YANEURAOU_CLASSIC_ENGINE     // やねうら王classic     (完成2016/04/03)
+//#define YANEURAOU_CLASSIC_TCE_ENGINE // やねうら王classic tce (開発中)
+//#define YANEURAOU_2016_ENGINE        // やねうら王2016        (開発中)
+//#define RANDOM_PLAYER_ENGINE         // ランダムプレイヤー
+//#define MATE_ENGINE                  // 詰め将棋solverとしてリリースする場合。(開発中)
+//#define HELP_MATE_ENGINE             // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
+#define LOCAL_GAME_SERVER            // 連続自動対局フレームワーク
+//#define USER_ENGINE                  // ユーザーの思考エンジン
 
 // --------------------
 // release configurations
@@ -338,13 +339,10 @@ enum Bound {
 //        評価値
 // --------------------
 
-// 置換表に格納するときにあまりbit数が多いともったいないので16bitで。
+// 置換表に格納するときにあまりbit数が多いともったいないので値自体は16bitで収まる範囲で。
 enum Value : int32_t
 {
   VALUE_ZERO = 0,
-
-  // 千日手による優等局面への突入。
-  VALUE_KNOWN_WIN = 30000,
 
   // 1手詰めのスコア(例えば、3手詰めならこの値より2少ない)
   VALUE_MATE = 32000,
@@ -355,9 +353,20 @@ enum Value : int32_t
   // 無効な値
   VALUE_NONE = 32002,
 
-  VALUE_MATE_IN_MAX_PLY =   int(VALUE_MATE) - MAX_PLY,   // MAX_PLYでの詰みのときのスコア。
-  VALUE_MATED_IN_MAX_PLY = -int(VALUE_MATE) + MAX_PLY, // MAX_PLYで詰まされるときのスコア。
-  
+  VALUE_MATE_IN_MAX_PLY  =   int(VALUE_MATE) - MAX_PLY,   // MAX_PLYでの詰みのときのスコア。
+  VALUE_MATED_IN_MAX_PLY =  -int(VALUE_MATE_IN_MAX_PLY), // MAX_PLYで詰まされるときのスコア。
+
+  // 勝ち手順が何らか証明されているときのスコア下限値
+  VALUE_KNOWN_WIN        =   int(VALUE_MATE_IN_MAX_PLY) - 1000,
+
+  // 千日手による優等局面への突入したときのスコア
+  // これある程度離しておかないと、置換表に書き込んで、相手番から見て、これから
+  // singularの判定なんかをしようと思ったときに
+  // -VALUE_KNOWN_WIN - margin が、VALUE_MATED_IN_MAX_PLYを下回るとまずいので…。
+  VALUE_SUPERIOR             = 28000,
+
+  // 評価関数の返す値の最大値(2**14ぐらいに収まっていて欲しいところだが..)
+  VALUE_MAX_EVAL             = 25000,
 };
 
 // ply手で詰ませるときのスコア
@@ -460,11 +469,14 @@ constexpr bool is_ok(PieceNo pn) { return PIECE_NO_ZERO <= pn && pn < PIECE_NO_N
 // 指し手 bit0..6 = 移動先のSquare、bit7..13 = 移動元のSquare(駒打ちのときは駒種)、bit14..駒打ちか、bit15..成りか
 enum Move : uint16_t {
 
-  MOVE_NONE = 0, // 無効な移動
-  MOVE_NULL = (1 << 7) + 1, // NULL MOVEを意味する指し手。Square(1)からSquare(1)への移動は存在しないのでここを特殊な記号として使う。
-  MOVE_RESIGN = (2 << 7) + 2,// << で出力したときに"resign"と表示する投了を意味する指し手。
-  MOVE_DROP = 1 << 14, // 駒打ちフラグ
-  MOVE_PROMOTE = 1 << 15, // 駒成りフラグ
+  MOVE_NONE    = 0,             // 無効な移動
+
+  MOVE_NULL    = (1 << 7) + 1,  // NULL MOVEを意味する指し手。Square(1)からSquare(1)への移動は存在しないのでここを特殊な記号として使う。
+  MOVE_RESIGN  = (2 << 7) + 2,  // << で出力したときに"resign"と表示する投了を意味する指し手。
+  MOVE_WIN     = (3 << 7) + 3,  // 入玉時の宣言勝ちのために使う特殊な指し手
+
+  MOVE_DROP    = 1 << 14,       // 駒打ちフラグ
+  MOVE_PROMOTE = 1 << 15,       // 駒成りフラグ
 };
 
 // 指し手の移動元の升を返す
@@ -529,6 +541,11 @@ struct ExtMove {
 
   operator Move() const { return move; }
   void operator=(Move m) { move = m; }
+
+#ifdef KEEP_PIECE_IN_COUNTER_MOVE
+  // killerやcounter moveを32bit(Move32)で扱うときに、無理やりExtMoveに代入するためのhack
+  void operator=(Move32 m) { *(Move32*)this = m; }
+#endif
 };
 
 // ExtMoveの並べ替えを行なうので比較オペレーターを定義しておく。
@@ -568,20 +585,22 @@ constexpr int32_t HAND_BIT_MASK = PIECE_BIT_MASK2[PAWN] | PIECE_BIT_MASK2[LANCE]
 // 余らせてあるbitの集合。
 constexpr int32_t HAND_BORROW_MASK = (HAND_BIT_MASK << 1) & ~HAND_BIT_MASK;
 
+
 // 手駒pcの枚数を返す。
-extern int hand_count(Hand hand, Piece pr);
+inline int hand_count(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return (hand >> PIECE_BITS[pr]) & PIECE_BIT_MASK[pr]; }
 
 // 手駒pcを持っているかどうかを返す。
-extern int hand_exists(Hand hand, Piece pr);
+inline int hand_exists(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return hand & PIECE_BIT_MASK2[pr]; }
 
 // 手駒にpcをc枚加える
-extern void add_hand(Hand &hand, Piece pr, int c = 1);
+inline void add_hand(Hand &hand, Piece pr, int c = 1) { hand = (Hand)(hand + PIECE_TO_HAND[pr] * c); }
 
 // 手駒からpcをc枚減ずる
-extern void sub_hand(Hand &hand, Piece pr, int c = 1);
+inline void sub_hand(Hand &hand, Piece pr, int c = 1) { hand = (Hand)(hand - PIECE_TO_HAND[pr] * c); }
+
 
 // 手駒h1のほうがh2より優れているか。(すべての種類の手駒がh2のそれ以上ある)
-// 優等局面の判定のとき、局面のhash key(StateInfo::key() )が一致していなくて、盤面のhash key(StateInfo::key_board() )が
+// 優等局面の判定のとき、局面のhash key(StateInfo::key() )が一致していなくて、盤面のhash key(StateInfo::board_key() )が
 // 一致しているときに手駒の比較に用いるので、手駒がequalというケースは前提により除外されているから、この関数を以ってsuperiorであるという判定が出来る。
 inline bool hand_is_equal_or_superior(Hand h1, Hand h2) { return ((h1-h2) & HAND_BORROW_MASK) == 0; }
 
@@ -716,7 +735,7 @@ typedef uint64_t Key;
 enum EnteringKingRule
 {
   EKR_NONE ,           // 入玉ルールなし
-  EKR_24_POINT,        // 24点法
+  EKR_24_POINT,        // 24点法(31点以上で宣言勝ち)
   EKR_27_POINT,        // 27点法 = CSAルール
   EKR_TRY_RULE,        // トライルール
 };
@@ -773,8 +792,14 @@ namespace USI {
     Option(int v, int min_, int max_, OnChange f = nullptr) : type("spin"),min(min_),max(max_),on_change(f)
     { defaultValue = currentValue = std::to_string(v); }
 
+    // combo型。内容的には、string型と同等。
+    // list = コンボボックスに表示する値。v = デフォルト値かつ現在の値
+    Option(const std::vector<std::string>&list, const std::string& v, OnChange f = nullptr) : type("combo"), on_change(f) ,list(list)
+    { defaultValue = currentValue = v; }
+
     // USIプロトコル経由で値を設定されたときにそれをcurrentValueに反映させる。
     Option& operator=(const std::string&);
+    Option& operator=(const char* ptr) { return *this = std::string(ptr); };
 
     // 起動時に設定を代入する。
     void operator<<(const Option&);
@@ -786,18 +811,24 @@ namespace USI {
     }
 
     // string型への暗黙の変換子
-    operator std::string() const { ASSERT_LV1(type == "string");  return currentValue; }
+    operator std::string() const { ASSERT_LV1(type == "string" || type == "combo");  return currentValue; }
 
   private:
     friend std::ostream& operator<<(std::ostream& os, const OptionsMap& om);
 
-    size_t idx; // 出力するときの順番。この順番に従ってGUIの設定ダイアログに反映されるので順番重要！
+    // 出力するときの順番。この順番に従ってGUIの設定ダイアログに反映されるので順番重要！
+    size_t idx;
 
     std::string defaultValue, currentValue, type;
 
-    int min, max; // int型のときの最小と最大
+    // int型のときの最小と最大
+    int min, max;
 
-    OnChange on_change; // 値が変わったときに呼び出されるハンドラ
+    // combo boxのときの表示する文字列リスト
+    std::vector<std::string> list;
+
+    // 値が変わったときに呼び出されるハンドラ
+    OnChange on_change;
   };
 
   // USIメッセージ応答部(起動時に、各種初期化のあとに呼び出される)

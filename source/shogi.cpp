@@ -102,8 +102,9 @@ std::string to_usi_string(Move m)
   if (!is_ok(m))
   {
     ss <<((m == MOVE_RESIGN) ? "resign" :
-          (m == MOVE_NULL  ) ? "null" :
-          (m == MOVE_NONE  ) ? "none" :
+          (m == MOVE_WIN   ) ? "win"    :
+          (m == MOVE_NULL  ) ? "null"   :
+          (m == MOVE_NONE  ) ? "none"   :
           "");
   }
   else if (is_drop(m))
@@ -144,22 +145,12 @@ namespace Search {
       // 銀の不成の指し手をcounter moveとして登録して、この位置に角が来ると
       // 角の不成の指し手を生成することになるからLEGALではなくLEGAL_ALLで判定しないといけない。
       ASSERT_LV3(MoveList<LEGAL_ALL>(pos).contains(m));
-#ifdef NEW_TT
       TTEntry* tte = TT.probe(pos.state()->key(), ttHit);
 
       // 正しいエントリーは書き換えない。
       if (!ttHit || tte->move() != m)
         tte->save(pos.state()->key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE,
-          m, VALUE_NONE, TT.generation());
-#else
-      const TTEntry* tte = TT.probe(pos.state()->key());
-      ttHit = tte != nullptr;
-
-      // 正しいエントリーは書き換えない。
-      if (!ttHit || tte->move() != m)
-        TT.store(pos.state()->key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE,
-          m, VALUE_NONE);
-#endif
+          m,  VALUE_NONE, TT.generation());
 
       pos.do_move(m, *st++);
     }
@@ -167,29 +158,48 @@ namespace Search {
     for (size_t i = pv.size(); i > 0; )
       pos.undo_move(pv[--i]);
   }
+
+  // 探索を抜ける前にponderの指し手がないとき(rootでfail highしているだとか)にこの関数を呼び出す。
+  // ponderの指し手として何かを指定したほうが、その分、相手の手番において考えられて得なので。
+
+  bool RootMove::extract_ponder_from_tt(Position& pos)
+  {
+    StateInfo st;
+    bool ttHit;
+
+    ASSERT_LV3(pv.size() == 1);
+
+    // 詰みの局面が"ponderhit"で返ってくることがあるので、ここでのpv[0] == MOVE_RESIGNであることがありうる。
+    if (!is_ok(pv[0]))
+      return false;
+
+    pos.check_info_update();
+    pos.do_move(pv[0], st, pos.gives_check(pv[0]));
+    TTEntry* tte = TT.probe(pos.state()->key(), ttHit);
+    pos.undo_move(pv[0]);
+
+    if (ttHit)
+    {
+      Move m = tte->move(); // SMP safeにするためlocal copy
+      if (MoveList<LEGAL_ALL>(pos).contains(m))
+        return pv.push_back(m), true;
+    }
+
+    return false;
+  }
+
 }
 
 // 引き分け時のスコア(とそのdefault値)
 Value drawValueTable[REPETITION_NB][COLOR_NB] =
 {
-  {  VALUE_ZERO      ,  VALUE_ZERO      }, // REPETITION_NONE
-  {  VALUE_MATE      ,  VALUE_MATE      }, // REPETITION_WIN
-  { -VALUE_MATE      , -VALUE_MATE      }, // REPETITION_LOSE
-  {  VALUE_ZERO      ,  VALUE_ZERO      }, // REPETITION_DRAW  : このスコアはUSIのoptionコマンドで変更可能
-  {  VALUE_KNOWN_WIN ,  VALUE_KNOWN_WIN }, // REPETITION_SUPERIOR
-  { -VALUE_KNOWN_WIN , -VALUE_KNOWN_WIN }, // REPETITION_INFERIOR
+  {  VALUE_ZERO        ,  VALUE_ZERO        }, // REPETITION_NONE
+  {  VALUE_MATE        ,  VALUE_MATE        }, // REPETITION_WIN
+  { -VALUE_MATE        , -VALUE_MATE        }, // REPETITION_LOSE
+  {  VALUE_ZERO        ,  VALUE_ZERO        }, // REPETITION_DRAW  : このスコアはUSIのoptionコマンドで変更可能
+  {  VALUE_SUPERIOR    ,  VALUE_SUPERIOR    }, // REPETITION_SUPERIOR
+  { -VALUE_SUPERIOR    , -VALUE_SUPERIOR    }, // REPETITION_INFERIOR
 };
-
-// ----------------------------------------
-// inlineで書くとVC++2015の内部コンパイルエラーになる
-// ----------------------------------------
-
-// VC++のupdateで内部コンパイルエラーにならないように修正されたら、これをまたshogi.hに移動させる。
-
-int hand_count(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return (hand >> PIECE_BITS[pr]) & PIECE_BIT_MASK[pr]; }
-int hand_exists(Hand hand, Piece pr) { ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); return hand & PIECE_BIT_MASK2[pr]; }
-void add_hand(Hand &hand, Piece pr, int c) { hand = (Hand)(hand + PIECE_TO_HAND[pr] * c); }
-void sub_hand(Hand &hand, Piece pr, int c) { hand = (Hand)(hand - PIECE_TO_HAND[pr] * c); }
 
 // ----------------------------------------
 //  main()

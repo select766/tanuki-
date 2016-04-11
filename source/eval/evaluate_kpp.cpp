@@ -31,9 +31,6 @@ namespace Eval
   // [][][fe_end]のところはKK定数にしてあるものとする。
   ValueKkp kkp[SQ_NB_PLUS1][SQ_NB_PLUS1][fe_end + 1];
 
-  ValueKpp kpp2[SQ_NB_PLUS1][fe_end][fe_end];
-  ValueKkp kkp2[SQ_NB_PLUS1][SQ_NB_PLUS1][fe_end + 1];
-
   // 評価関数ファイルを読み込む
   void load_eval()
   {
@@ -57,6 +54,42 @@ namespace Eval
       goto Error;
     fs.close();
 
+    {
+      // 手駒の添字、コンバートするときにひとつ間違えてた。(๑´ڡ`๑)
+      //ValueKpp kpp2[SQ_NB_PLUS1][fe_end][fe_end];
+      //ValueKkp kkp2[SQ_NB_PLUS1][SQ_NB_PLUS1][fe_end + 1];
+
+      ValueKkp* kkp2 = new ValueKkp[SQ_NB_PLUS1*(int)SQ_NB_PLUS1*(int)(fe_end + 1)];
+      ValueKpp* kpp2 = new ValueKpp[SQ_NB_PLUS1*(int)fe_end*(int)fe_end];
+      #define KKP2(k1,k2,p) kkp2[k1 * (int)SQ_NB_PLUS1*(int)(fe_end + 1) + k2 * (int)(fe_end + 1) + p ]
+      #define KPP2(k,p1,p2) kpp2[k * (int)fe_end*(int)fe_end + p1 * (int)fe_end + p2 ]
+      memset(kkp2, 0, sizeof(kkp));
+      memset(kpp2, 0, sizeof(kpp));
+
+      for (int k1 = 0; k1 < SQ_NB_PLUS1; ++k1)
+        for (int k2 = 0; k2 < SQ_NB_PLUS1; ++k2)
+          for (int j = 1; j < fe_end + 1; ++j)
+          {
+            int j2 = j < fe_hand_end ? j - 1 : j;
+            KKP2(k1, k2, j) = kkp[k1][k2][j2];
+          }
+
+      for (int k = 0; k < SQ_NB_PLUS1; ++k)
+        for (int i = 1; i < fe_end; ++i)
+          for (int j = 1; j < fe_end; ++j)
+          {
+            int i2 = i < fe_hand_end ? i - 1 : i;
+            int j2 = j < fe_hand_end ? j - 1 : j;
+            KPP2(k,i,j) = kpp[k][i2][j2];
+          }
+
+      memcpy(kkp, kkp2, sizeof(kkp));
+      memcpy(kpp, kpp2, sizeof(kpp));
+
+      delete[] kkp2;
+      delete[] kpp2;
+    }
+
     return;
 
   Error:;
@@ -78,7 +111,7 @@ namespace Eval
     Square sq_wk1 = Inv(pos.king_square(WHITE));
 
     auto& pos_ = *const_cast<Position*>(&pos);
-    auto list = pos_.eval_list().piece_list();
+    auto list = pos_.eval_list()->piece_list();
 
     int i, j;
     BonaPiece k0, k1;
@@ -119,7 +152,7 @@ namespace Eval
 
     // すでに計算されている。rootか？
     int sumKKP, sumBKPP, sumWKPP;
-    if (st->sumKKP != VALUE_NONE)
+    if (st->sumKKP != INT_MAX)
     {
       sumKKP = st->sumKKP;
       sumBKPP = st->sumBKPP;
@@ -127,12 +160,13 @@ namespace Eval
       goto CALC_DIFF_END;
     }
 
-    // 遡る一つだけ
+    // 遡るのは一つだけ
     // ひとつずつ遡りながらsumKPPがVALUE_NONEでないところまで探してそこからの差分を計算することは出来るが
-    // レアケースだし、StateInfoのEvalListを持たせる必要が出てきて、あまり得しない。
+    // レアケースだし、StateInfoにEvalListを持たせる必要が出てきて、あまり得しない。
     auto now = st;
     auto prev = st->previous;
-    if (prev->sumKKP == VALUE_NONE)
+
+    if (prev->sumKKP == INT_MAX)
     {
       // 全計算
       compute_eval(pos);
@@ -152,7 +186,7 @@ namespace Eval
       auto sq_bk0 = pos.king_square(BLACK);
       auto sq_wk1 = Inv(pos.king_square(WHITE));
 
-      auto now_list = pos.eval_list().piece_list();
+      auto now_list = pos.eval_list()->piece_list();
 
       int i, j;
       auto& dp = now->dirtyPiece;
@@ -363,14 +397,14 @@ namespace Eval
     Square sq_bk0 = pos.king_square(BLACK);
     Square sq_wk1 = Inv(pos.king_square(WHITE));
 
-    auto list = pos.eval_list().piece_list();
+    auto list = pos.eval_list()->piece_list();
 
     int i, j;
     BonaPiece k0, k1;
 
     // 38枚の駒を表示
     for (i = 0; i < PIECE_NO_KING; ++i)
-      cout << int(list[i].fb) << " = " << list[i].fb << endl;
+      cout << int(list[i].fb) << " = " << list[i].fb << " , " << int(list[i].fw) << " =  " << list[i].fw << endl;
 
     int32_t sumBKPP, sumWKPP, sumKKP;
 
@@ -403,7 +437,7 @@ namespace Eval
     }
 
     cout << "Material = " << pos.state()->materialValue << endl;
-    cout << "sumWKPP = " << sumWKPP << " sumBKPP " << sumBKPP << " sumWKPP " << sumWKPP << endl;
+    cout << "sumKKP = " << sumKKP << " sumBKPP " << sumBKPP << " sumWKPP " << sumWKPP << endl;
     cout << "---\n";
   }
 

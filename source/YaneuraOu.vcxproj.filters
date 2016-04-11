@@ -53,6 +53,9 @@
     <Filter Include="リソース ファイル\engine\nano-plus-engine">
       <UniqueIdentifier>{f3ba1c3a-285c-4fbb-b041-1a46902f2f8c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="リソース ファイル\engine\classic-tce-engine">
+      <UniqueIdentifier>{c572f93f-e4d8-4d96-ad1f-2f6a5a11d108}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="evaluate.h">
@@ -195,6 +198,15 @@
     <ClCompile Include="engine\nano-plus-engine\nano_plus_search.cpp">
       <Filter>リソース ファイル\engine\nano-plus-engine</Filter>
     </ClCompile>
+    <ClCompile Include="extra\entering_king_win.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\timeman.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\classic-tce-engine\classic-tce-search.cpp">
+      <Filter>リソース ファイル\engine\classic-tce-engine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
@@ -227,6 +239,18 @@
     <Text Include="..\exe\YaneuraOu-mini-readme.txt">
       <Filter>exe</Filter>
     </Text>
+    <Text Include="..\exe\YaneuraOu-classic_ja.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-classic-readme.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-classic-tce_ja.txt">
+      <Filter>exe</Filter>
+    </Text>
+    <Text Include="..\exe\YaneuraOu-classic-tce-readme.txt">
+      <Filter>exe</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md">
@@ -242,6 +266,12 @@
       <Filter>exe</Filter>
     </None>
     <None Include="..\exe\YaneuraOu-mini.exe">
+      <Filter>exe</Filter>
+    </None>
+    <None Include="..\exe\YaneuraOu-classic.exe">
+      <Filter>exe</Filter>
+    </None>
+    <None Include="..\exe\YaneuraOu-classic-tce.exe">
       <Filter>exe</Filter>
     </None>
   </ItemGroup>
