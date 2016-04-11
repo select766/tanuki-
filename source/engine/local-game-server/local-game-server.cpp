@@ -21,7 +21,7 @@ namespace
 
   std::string generate_log_file_name()
   {
-    return "yaneuraou-process-log-" + generate_datetime_string() + ".txt";
+    return "log/yaneuraou-process-log-" + generate_datetime_string() + ".txt";
   }
 }
 
