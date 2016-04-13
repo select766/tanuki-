@@ -579,9 +579,8 @@ void Thread::search()
       int book_number = (int)get_rand(book.size());
       istringstream is(book[book_number]);
       string token;
-      while (rootPos.game_ply() < max_book_move)
+      while (rootPos.game_ply() < max_book_move && is >> token)
       {
-        is >> token;
         if (token == "startpos" || token == "moves")
           continue;
 
