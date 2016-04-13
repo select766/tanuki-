@@ -585,7 +585,7 @@ void Thread::search()
           continue;
 
         Move m = move_from_usi(rootPos, token);
-        if (m == MOVE_NULL)
+        if (m == MOVE_NULL || m == MOVE_NONE)
         {
           sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
           break;
