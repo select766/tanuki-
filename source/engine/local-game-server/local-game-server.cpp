@@ -81,6 +81,9 @@ struct ProcessNegotiator
       0,    // creation flags
       NULL, // use parent's environment
       NULL, // use parent's current directory
+      // ここにカレントディレクトリを指定する。
+      // engine/xxx.exe を起動するなら engine/ を指定するほうがいいような気は少しする。
+      
       &si,  // STARTUPINFO pointer
       &pi   // receives PROCESS_INFOMATION
       );
@@ -585,9 +588,10 @@ void Thread::search()
           continue;
 
         Move m = move_from_usi(rootPos, token);
-        if (m == MOVE_NULL || m == MOVE_NONE)
+        if (!is_ok(m))
         {
-          sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
+          //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
+          // →　エラー扱いはしない。
           break;
         }
         else {

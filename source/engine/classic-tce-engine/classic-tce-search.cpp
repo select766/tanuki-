@@ -67,6 +67,9 @@ namespace YaneuraOuClassicTce
   // 定跡等で用いる乱数
   PRNG prng;
 
+  // Ponder用の指し手
+  Move ponder_candidate;
+
   // -----------------------
   //      探索用の定数
   // -----------------------
@@ -186,6 +189,7 @@ namespace YaneuraOuClassicTce
 
   typedef std::vector<int> Row;
   const Row HalfDensity[] = {
+    // 0番目のスレッドはmain threadだとして。
     { 0, 1 },        // 1番目のスレッド用
     { 1, 0 },        // 2番目のスレッド用
     { 0, 0, 1, 1 },  // 3番目のスレッド用
@@ -217,13 +221,9 @@ namespace YaneuraOuClassicTce
   // MovePickerで用いる直前の指し手に対するそれぞれの指し手のスコア
   CounterMoveHistoryStats CounterMoveHistory;
 
-  // 指し手の上位に駒種を格納してMove32化する。
-#define make_move32(move) ((Move32)(move + (pos.moved_piece(move) << 16)))
-
-// 直前のnoddの指し手で動かした駒とその移動先の升を返す。
-// ただしNULL_MOVE(or MOVE_NONE)のときは、sq = + 0か + 1の地点にNO_PIECEを動かしたことにする。
-  // しかしこれ、どうせこれに対応するcounterが登録されていないのでMOVE_NONEをcounter moveにしたほうが良いのでは。
+  // 直前のnodeの指し手で動かした駒(移動後の駒)とその移動先の升を返す。
   // この実装においてmoved_piece()は使えない。これは現在のPosition::side_to_move()の駒が返るからである。
+  // 駒打ちのときは、駒打ちの駒(+32した駒)が返る。
 #define sq_pc_from_move(sq,pc,move)                                \
     {                                                              \
       sq = move_to(move);                                          \
@@ -238,10 +238,25 @@ namespace YaneuraOuClassicTce
   inline void update_stats(const Position& pos, Stack* ss, Move move,
     Depth depth, Move* quiets, int quietsCnt)
   {
+    // 今回の指し手の32bit化
+    Move32 move32 = make_move32(move);
+
+    // IID、null move、singular extensionの判定のときは浅い探索なのでこのときに
+    // killer等を更新するのは有害である。
+    if (ss->skipEarlyPruning)
+    {
+      // しかしkillerがないときはkillerぐらいは登録したほうが少しだけ得かも。
+      if (ss->killers[0] == MOVE_NONE)
+        ss->killers[0] = move32;
+      else if (ss->killers[1] == MOVE_NONE)
+        ss->killers[1] = move32;
+
+      return;
+    }
+
     //   killerのupdate
 
     // killer 2本しかないので[0]と違うならいまの[0]を[1]に降格させて[0]と差し替え
-    Move32 move32 = make_move32(move);
     if (ss->killers[0] != move32)
     {
       ss->killers[1] = ss->killers[0];
@@ -254,6 +269,7 @@ namespace YaneuraOuClassicTce
     Value bonus = Value((int)depth*(int)depth / ((int)ONE_PLY*(int)ONE_PLY) + (int)depth / (int)ONE_PLY + 1);
 
     // 直前に移動させた升(その升に移動させた駒がある。今回の指し手はcaptureではないはずなので)
+    // 駒打ちの場合は+32した駒
     Square prevSq, prevPrevSq;
     Piece prevPc, prevPrevPc;
 
@@ -266,7 +282,7 @@ namespace YaneuraOuClassicTce
     auto& fmh = CounterMoveHistory[prevPrevSq][prevPrevPc];
 
     auto thisThread = pos.this_thread();
-    Piece mpc = pos.moved_piece_ex(move);
+    Piece mpc = pos.moved_piece_after_ex(move);
     thisThread->history.update(mpc, move_to(move), bonus);
 
     if (is_ok((ss - 1)->currentMove))
@@ -282,7 +298,7 @@ namespace YaneuraOuClassicTce
     // このnodeのベストの指し手以外の指し手はボーナス分を減らす
     for (int i = 0; i < quietsCnt; ++i)
     {
-      Piece qpc = pos.moved_piece_ex(quiets[i]);
+      Piece qpc = pos.moved_piece_after_ex(quiets[i]);
       thisThread->history.update(qpc, move_to(quiets[i]), -bonus);
 
       // 前の局面の指し手がMOVE_NULLでないならcounter moveもupdateしておく。
@@ -418,7 +434,7 @@ namespace YaneuraOuClassicTce
     if (draw_type != REPETITION_NONE)
       return value_from_tt(draw_value(draw_type, pos.side_to_move()),ss->ply);
 
-    if (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply)
+    if (pos.game_ply() > Limits.max_game_ply)
       return draw_value(REPETITION_DRAW, pos.side_to_move());
 
     // -----------------------
@@ -509,6 +525,7 @@ namespace YaneuraOuClassicTce
 
         // 置換表がhitしなかった場合、bestValueの初期値としてevaluate()を呼び出すしかないが、
         // NULL_MOVEの場合は前の局面での値を反転させると良い。(手番を考慮しない評価関数であるなら)
+        // NULL_MOVEしているということは王手がかかっていないということであり、staticEvalの値は取り出せるはず。
         ss->staticEval = bestValue =
          (ss - 1)->currentMove != MOVE_NULL ? evaluate(pos)
                                             : -(ss - 1)->staticEval;
@@ -575,7 +592,7 @@ namespace YaneuraOuClassicTce
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
     if (pos.state()->sumKKP == INT_MAX)
-      ss->staticEval = evaluate(pos);
+      evaluate(pos);
 
     while ((move = mp.next_move()) != MOVE_NONE)
     {
@@ -815,7 +832,7 @@ namespace YaneuraOuClassicTce
         return value_from_tt(draw_value(draw_type, pos.side_to_move()),ss->ply);
 
       // 最大手数を超えている、もしくは停止命令が来ている。
-      if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply)
+      if (Signals.stop.load(std::memory_order_relaxed) || pos.game_ply() > Limits.max_game_ply)
         return draw_value(REPETITION_DRAW, pos.side_to_move());
 
       // -----------------------
@@ -1100,7 +1117,7 @@ namespace YaneuraOuClassicTce
       &&  depth >= 5 * ONE_PLY
       &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
     {
-      Value rbeta = std::min(beta + 200, VALUE_INFINITE);
+      Value rbeta = std::min(beta + 200 , VALUE_INFINITE);
 
       // 大胆に探索depthを減らす
       Depth rdepth = depth - 4 * ONE_PLY;
@@ -1331,8 +1348,8 @@ namespace YaneuraOuClassicTce
       //
 
       // 浅い深さでの枝刈り
-      Piece mpc = pos.moved_piece_ex(move);
-      
+      Piece mpc = pos.moved_piece_after_ex(move);
+
       if (!RootNode
         && !captureOrPromotion
         && !InCheck
@@ -1618,9 +1635,8 @@ namespace YaneuraOuClassicTce
       && is_ok((ss - 1)->currentMove)
       && is_ok((ss - 2)->currentMove))
     {
-      // 残り探索depthの3乗ぐらいのボーナスを与えてもええやろ。
-      // Valueはint32なのでdepthが256までだから、3乗してもオーバーフローはすぐにはしない。
-      Value bonus = Value(((int)depth * (int)depth * (int)depth) / ((int)ONE_PLY*(int)ONE_PLY*(int)ONE_PLY) - 1);
+      // 残り探索depthの2乗ぐらいのボーナスを与える。
+      Value bonus = Value(int(depth / ONE_PLY) * (depth / ONE_PLY) + depth / ONE_PLY - 1);
       auto& prevCmh = CounterMoveHistory[prevPrevSq][prevPrevPc];
       prevCmh.update(prevPc,prevSq, bonus);
     }
@@ -1765,6 +1781,9 @@ void Thread::search()
     mainThread->easyMovePlayed = mainThread->failedLow = false;
     mainThread->bestMoveChanges = 0;
 
+    // ponder用の指し手の初期化
+    ponder_candidate = MOVE_NONE;
+
     // --- 置換表のTTEntryの世代を進める。
     TT.new_search();
   }
@@ -1792,6 +1811,7 @@ void Thread::search()
     {
       // これにはhalf density matrixを用いる。
       // 詳しくは、このmatrixの定義部の説明を読むこと。
+      // game_ply()は加算すべきではない気がする。あとで実験する。
       const Row& row = HalfDensity[(idx - 1) % HalfDensitySize];
       if (row[(rootDepth + rootPos.game_ply()) % row.size()])
         continue;
@@ -1819,7 +1839,8 @@ void Thread::search()
       // 探索深さが一定以上あるなら前回の反復深化のiteration時の最小値と最大値
       // より少し幅を広げたぐらいの探索窓をデフォルトとする。
 
-      if (rootDepth >= 5 * ONE_PLY)
+      // この値は 6～10ぐらいがベスト。Stockfish7では、5 * ONE_PLY。
+      if (rootDepth >= 7)
       {
         // aspiration windowの幅
         // 精度の良い評価関数ならばこの幅を小さくすると探索効率が上がるのだが、
@@ -1922,6 +1943,12 @@ void Thread::search()
 
     if (!mainThread)
       continue;
+
+    // ponder用の指し手として、2手目の指し手を保存しておく。
+    // これがmain threadのものだけでいいかどうかはよくわからないが。
+    // とりあえず、無いよりマシだろう。
+    if (mainThread->rootMoves[0].pv.size() > 1)
+      ponder_candidate = mainThread->rootMoves[0].pv[1];
 
     //
     // main threadのときは探索の停止判定が必要
@@ -2141,6 +2168,12 @@ void MainThread::think()
     StateInfo si;
     auto& pos = rootPos;
 
+    // -- MAX_PLYに到達したかの判定が面倒なのでLimits.max_game_plyに一本化する。
+
+    // あとで戻す用
+    auto max_game_ply = Limits.max_game_ply;
+    Limits.max_game_ply = std::min(Limits.max_game_ply, rootPos.game_ply() + MAX_PLY -1);
+
     // --- contempt factor(引き分けのスコア)
 
     // Contempt: 引き分けを受け入れるスコア。歩を100とする。例えば、この値を100にすると引き分けの局面は
@@ -2167,6 +2200,9 @@ void MainThread::think()
     }
 
     Thread::search();
+
+    // 復元する。
+    Limits.max_game_ply = max_game_ply;
   }
 
   // 反復深化の終了。
@@ -2233,7 +2269,7 @@ ID_END:;
     // pomderの指し手の出力。
     // pvにはbestmoveのときの読み筋(PV)が格納されているので、ponderとしてpv[1]があればそれを出力してやる。
     // また、pv[1]がない場合(rootでfail highを起こしたなど)、置換表からひねり出してみる。
-    if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
+    if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos, ponder_candidate))
       std::cout << " ponder " << bestThread->rootMoves[0].pv[1];
 
     std::cout << sync_endl;
