@@ -36,86 +36,51 @@ import argparse
 import cPickle as pickle
 
 space = [
-  hp.quniform('QSEARCH_FUTILITY_MARGIN', 0, 256, 1),
-  hp.quniform('SEARCH_FUTILITY_MARGIN_DEPTH_THRESHOLD', 2, 28, 1),
-  hp.quniform('SEARCH_FUTILITY_MARGIN_INTERCEPT', 0, 136986, 1),
-  hp.quniform('SEARCH_FUTILITY_MARGIN_LOG_D_COEFFICIENT', 0, 138096, 1),
-  hp.quniform('SEARCH_FUTILITY_MARGIN_MOVE_COUNT_COEFFICIENT', 0, 16384, 1),
-  hp.quniform('SEARCH_FUTILITY_MOVE_COUNTS_INTERCEPT', 0, 6146, 1),
-  hp.quniform('SEARCH_FUTILITY_MOVE_COUNTS_POWER', 1024, 3686, 1),
-  hp.quniform('SEARCH_FUTILITY_MOVE_COUNTS_SCALE', 0, 614, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_NON_PV_REDUCTION_INTERCEPT', 0, 682, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_NON_PV_REDUCTION_SLOPE', 0, 910, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_PREDICTED_DEPTH_THRESHOLD', 2, 16, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_PV_REDUCTION_INTERCEPT', 0, 256, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_PV_REDUCTION_SLOPE', 0, 682, 1),
-  hp.quniform('SEARCH_FUTILITY_PRUNING_SCORE_GAIN_SLOPE', 0, 4096, 1),
-  hp.quniform('SEARCH_INTERNAL_ITERATIVE_DEEPENING_NON_PV_DEPTH_SCALE', 0, 1024, 1),
-  hp.quniform('SEARCH_INTERNAL_ITERATIVE_DEEPENING_NON_PV_NODE_DEPTH_THRESHOLD', 2, 32, 1),
-  hp.quniform('SEARCH_INTERNAL_ITERATIVE_DEEPENING_PV_NODE_DEPTH_DELTA', 2, 8, 1),
-  hp.quniform('SEARCH_INTERNAL_ITERATIVE_DEEPENING_PV_NODE_DEPTH_THRESHOLD', 2, 20, 1),
-  hp.quniform('SEARCH_INTERNAL_ITERATIVE_DEEPENING_SCORE_MARGIN', 0, 512, 1),
-  hp.quniform('SEARCH_LATE_MOVE_REDUCTION_DEPTH_THRESHOLD', 2, 12, 1),
-  hp.quniform('SEARCH_NULL_FAIL_LOW_SCORE_DEPTH_THRESHOLD', 2, 20, 1),
-  hp.quniform('SEARCH_NULL_MOVE_DEPTH_THRESHOLD', 2, 8, 1),
-  hp.quniform('SEARCH_NULL_MOVE_MARGIN', 0, 180, 1),
-  hp.quniform('SEARCH_NULL_MOVE_NULL_SCORE_DEPTH_THRESHOLD', 2, 24, 1),
-  hp.quniform('SEARCH_NULL_MOVE_REDUCTION_INTERCEPT', 2, 12, 1),
-  hp.quniform('SEARCH_NULL_MOVE_REDUCTION_SLOPE', 0, 512, 1),
-  hp.quniform('SEARCH_PROBCUT_DEPTH_THRESHOLD', 3, 20, 1),
-  hp.quniform('SEARCH_PROBCUT_RBETA_DEPTH_DELTA', 2, 16, 1),
-  hp.quniform('SEARCH_PROBCUT_RBETA_SCORE_DELTA', 0, 400, 1),
-  hp.quniform('SEARCH_RAZORING_DEPTH', 2, 16, 1),
-  hp.quniform('SEARCH_RAZORING_MARGIN_INTERCEPT', 0, 1048576, 1),
-  hp.quniform('SEARCH_RAZORING_MARGIN_SLOPE', 0, 32768, 1),
-  hp.quniform('SEARCH_SINGULAR_EXTENSION_DEPTH_THRESHOLD', 2, 32, 1),
-  hp.quniform('SEARCH_SINGULAR_EXTENSION_NULL_WINDOW_SEARCH_DEPTH_SCALE', 0, 1024, 1),
-  hp.quniform('SEARCH_SINGULAR_EXTENSION_TTE_DEPTH_THRESHOLD', 2, 12, 1),
-  hp.quniform('SEARCH_STATIC_NULL_MOVE_PRUNING_DEPTH_THRESHOLD', 2, 16, 1),
-]
+  hp.quniform('PARAM_FUTILITY_MARGIN_DEPTH', 50, 120, 1),
+  hp.quniform('PARAM_FUTILITY_MARGIN_QUIET', 50, 150, 1),
+  hp.quniform('PARAM_FUTILITY_RETURN_DEPTH', 5, 13, 1),
+  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_DEPTH', 5, 13, 1),
+  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN', 100, 200, 1),
+  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH', 2, 10, 1),
+  hp.quniform('PARAM_NULL_MOVE_DYNAMIC_ALPHA', 500, 1500, 1),
+  hp.quniform('PARAM_NULL_MOVE_DYNAMIC_BETA', 50, 100, 1),
+  hp.quniform('PARAM_NULL_MOVE_RETURN_DEPTH', 4, 10, 1),
+  hp.quniform('PARAM_PROBCUT_DEPTH', 3, 10, 1),
+  hp.quniform('PARAM_SINGULAR_EXTENSION_DEPTH', 6, 13, 1),
+  hp.quniform('PARAM_SINGULAR_MARGIN', 2, 20, 1),
+  hp.quniform('PARAM_SINGULAR_SEARCH_DEPTH', 64, 192, 1),
+  hp.quniform('PARAM_PRUNING_BY_MOVE_COUNT_DEPTH', 8, 32, 1),
+  hp.quniform('PARAM_PRUNING_BY_HISTORY_DEPTH', 4, 32, 1),
+  hp.quniform('PARAM_REDUCTION_BY_HISTORY', 4000, 32000, 1),
+  hp.quniform('PARAM_RAZORING_MARGIN', 64, 1024, 1),
+  hp.quniform('PARAM_RAZORING_ALPHA', 4, 32, 1),
+  hp.quniform('PARAM_QUIET_SEARCH_COUNT', 32, 128, 1),]
 
 build_argument_names = [
-  'QSEARCH_FUTILITY_MARGIN',
-  'SEARCH_FUTILITY_MARGIN_DEPTH_THRESHOLD',
-  'SEARCH_FUTILITY_MARGIN_INTERCEPT',
-  'SEARCH_FUTILITY_MARGIN_LOG_D_COEFFICIENT',
-  'SEARCH_FUTILITY_MARGIN_MOVE_COUNT_COEFFICIENT',
-  'SEARCH_FUTILITY_MOVE_COUNTS_INTERCEPT',
-  'SEARCH_FUTILITY_MOVE_COUNTS_POWER',
-  'SEARCH_FUTILITY_MOVE_COUNTS_SCALE',
-  'SEARCH_FUTILITY_PRUNING_NON_PV_REDUCTION_INTERCEPT',
-  'SEARCH_FUTILITY_PRUNING_NON_PV_REDUCTION_SLOPE',
-  'SEARCH_FUTILITY_PRUNING_PREDICTED_DEPTH_THRESHOLD',
-  'SEARCH_FUTILITY_PRUNING_PV_REDUCTION_INTERCEPT',
-  'SEARCH_FUTILITY_PRUNING_PV_REDUCTION_SLOPE',
-  'SEARCH_FUTILITY_PRUNING_SCORE_GAIN_SLOPE',
-  'SEARCH_INTERNAL_ITERATIVE_DEEPENING_NON_PV_DEPTH_SCALE',
-  'SEARCH_INTERNAL_ITERATIVE_DEEPENING_NON_PV_NODE_DEPTH_THRESHOLD',
-  'SEARCH_INTERNAL_ITERATIVE_DEEPENING_PV_NODE_DEPTH_DELTA',
-  'SEARCH_INTERNAL_ITERATIVE_DEEPENING_PV_NODE_DEPTH_THRESHOLD',
-  'SEARCH_INTERNAL_ITERATIVE_DEEPENING_SCORE_MARGIN',
-  'SEARCH_LATE_MOVE_REDUCTION_DEPTH_THRESHOLD',
-  'SEARCH_NULL_FAIL_LOW_SCORE_DEPTH_THRESHOLD',
-  'SEARCH_NULL_MOVE_DEPTH_THRESHOLD',
-  'SEARCH_NULL_MOVE_MARGIN',
-  'SEARCH_NULL_MOVE_NULL_SCORE_DEPTH_THRESHOLD',
-  'SEARCH_NULL_MOVE_REDUCTION_INTERCEPT',
-  'SEARCH_NULL_MOVE_REDUCTION_SLOPE',
-  'SEARCH_PROBCUT_DEPTH_THRESHOLD',
-  'SEARCH_PROBCUT_RBETA_DEPTH_DELTA',
-  'SEARCH_PROBCUT_RBETA_SCORE_DELTA',
-  'SEARCH_RAZORING_DEPTH',
-  'SEARCH_RAZORING_MARGIN_INTERCEPT',
-  'SEARCH_RAZORING_MARGIN_SLOPE',
-  'SEARCH_SINGULAR_EXTENSION_DEPTH_THRESHOLD',
-  'SEARCH_SINGULAR_EXTENSION_NULL_WINDOW_SEARCH_DEPTH_SCALE',
-  'SEARCH_SINGULAR_EXTENSION_TTE_DEPTH_THRESHOLD',
-  'SEARCH_STATIC_NULL_MOVE_PRUNING_DEPTH_THRESHOLD',
+  'PARAM_FUTILITY_MARGIN_DEPTH'
+  'PARAM_FUTILITY_MARGIN_QUIET'
+  'PARAM_FUTILITY_RETURN_DEPTH'
+  'PARAM_FUTILITY_AT_PARENT_NODE_DEPTH'
+  'PARAM_FUTILITY_AT_PARENT_NODE_MARGIN'
+  'PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH'
+  'PARAM_NULL_MOVE_DYNAMIC_ALPHA'
+  'PARAM_NULL_MOVE_DYNAMIC_BETA'
+  'PARAM_NULL_MOVE_RETURN_DEPTH'
+  'PARAM_PROBCUT_DEPTH'
+  'PARAM_SINGULAR_EXTENSION_DEPTH'
+  'PARAM_SINGULAR_MARGIN'
+  'PARAM_SINGULAR_SEARCH_DEPTH'
+  'PARAM_PRUNING_BY_MOVE_COUNT_DEPTH'
+  'PARAM_PRUNING_BY_HISTORY_DEPTH'
+  'PARAM_REDUCTION_BY_HISTORY'
+  'PARAM_RAZORING_MARGIN'
+  'PARAM_RAZORING_ALPHA'
+  'PARAM_QUIET_SEARCH_COUNT'
   ]
 
 START_COUNTER = 0
 CURRENT_COUNTER = 0
-MAX_EVALS = 1000
+MAX_EVALS = 10000
 START_TIME_SEC = time.time()
 
 # pause/resume
@@ -305,6 +270,23 @@ class MSVCBuilder(object):
     subprocess.call(['taskkill', '/T', '/F', '/IM', process_name + '.exe'])
 
 
+class YaneuraouBuilder(object):
+  FILENAME = 'param/parameters_slave.h'
+  def __init__(self):
+    pass
+
+  def clean(self):
+    os.remove(self.FILENAME)
+
+  def build(self, args):
+    with open(self.FILENAME, 'w') as f:
+      for key, val in zip(build_argument_names, args):
+        f.write('PARAM_DEFINE {0} = {1};'.format(key, int(val)))
+
+  def kill(self, process_name):
+    subprocess.call(['taskkill', '/T', '/F', '/IM', process_name + '.exe'])
+
+
 def function(args):
   print('-' * 78)
 
@@ -325,7 +307,7 @@ def function(args):
   builder.clean()
   builder.build(args)
 
-  popenargs = ['./YaneuraOu.exe',]
+  popenargs = ['./YaneuraOu-local-game-server.exe',]
   print(popenargs)
   output = None
   try:
@@ -343,8 +325,8 @@ def function(args):
    ratio = win / (lose + draw + win)
   print ratio
 
-  builder.kill('tanuki-baseline')
-  builder.kill('tanuki-modified')
+  builder.kill('YaneuraOu-2016-mid-engine-master')
+  builder.kill('YaneuraOu-2016-mid-engine-slave')
 
   global state
   state.record_iteration(
@@ -370,8 +352,8 @@ if __name__=='__main__':
       help=u'open a hyper-parameter search file and dump its log.')
   parser.add_argument('--max-evals', type=int, default=MAX_EVALS,
       help=u'max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
-  parser.add_argument('--builder', type=str, default='MSYS',
-      help=u'select building environment. MSYS or MSVC.')
+  parser.add_argument('--builder', type=str, default='Yaneuraou',
+      help=u'select building environment. Yaneuraou, MSYS or MSVC.')
   commandline_args = parser.parse_args()
   MAX_EVALS = commandline_args.max_evals
 
@@ -390,8 +372,10 @@ if __name__=='__main__':
   # build environment.
   if commandline_args.builder == 'MSVC':
     builder = MSVCBuilder()
-  else:
+  elif commandline_args.builder == 'MSYS':
     builder = MSYSBuilder()
+  else:
+    builder = YaneuraouBuilder()
 
   # shutil.copyfile('../tanuki-/x64/Release/tanuki-.exe', 'tanuki-.exe')
   best = fmin(function, space, algo=tpe.suggest, max_evals=state.calc_max_evals(MAX_EVALS), trials=state.get_trials())
