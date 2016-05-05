@@ -1163,6 +1163,7 @@ namespace YaneuraOu2016Mid
 
       // 大胆に探索depthを減らす
       Depth rdepth = depth - 4 * ONE_PLY;
+      rdepth = std::max(rdepth, ONE_PLY);
 
       ASSERT_LV3(rdepth >= ONE_PLY);
       ASSERT_LV3((ss - 1)->currentMove != MOVE_NONE);
