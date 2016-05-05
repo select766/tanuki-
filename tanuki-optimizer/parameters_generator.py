@@ -17,6 +17,7 @@ def main():
       print('#define {0} {1}'.format(name, str(int(parameters[index]))))
       print('#endif')
       #print("{0}={1}".format(name, str(int(parameters[index]))))
+      #print("  '{0}'".format(name))
 
 if __name__ == '__main__':
     main()
