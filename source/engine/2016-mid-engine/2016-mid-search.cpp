@@ -761,6 +761,14 @@ namespace YaneuraOu2016Mid
   }
 
 
+  // valueをlowerBoundからupperBoundの間でクランプする
+  Value clamp(Value value, Value lowerBound, Value upperBound)
+  {
+    value = std::max(value, lowerBound);
+    value = std::min(value, upperBound);
+    return value;
+  }
+
   // -----------------------
   //      通常探索
   // -----------------------
@@ -1351,6 +1359,7 @@ namespace YaneuraOu2016Mid
       {
         // このmargin値は評価関数の性質に合わせて調整されるべき。
         Value rBeta = ttValue - PARAM_SINGULAR_MARGIN * depth / ONE_PLY;
+        rBeta = clamp(rBeta, -VALUE_INFINITE + 1, VALUE_INFINITE - 1);
 
         // ttMoveの指し手を以下のsearch()での探索から除外
         ss->excludedMove = move;
