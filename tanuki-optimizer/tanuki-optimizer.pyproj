@@ -27,6 +27,7 @@
     <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="analyze_optimizer_log.py" />
     <Compile Include="optimize_parameters.py" />
     <Compile Include="parameters_generator.py" />
   </ItemGroup>

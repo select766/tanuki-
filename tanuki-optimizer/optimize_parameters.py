@@ -2,21 +2,22 @@
 # coding:utf-8
 #
 # Preparation
-# http://qiita.com/mojaie/items/995661f7467ffdb40331
 #
-# 1. Install the following softwares
-# - Python 2.7.*
+# 1. Install Python 2.7.* 64-bit ver
+# - Python 2.7.* 64bit
 # -- http://www.python.org
-# - numpy-*.*.*-win32-superpack-python2.7.exe
-# -- http://sourceforge.net/projects/numpy
-# - scipy-*.*.*-win32-superpack-python2.7.exe
-# -- http://sourceforge.net/projects/scipy
 #
-# 2. Execute the following commands.
+# 2. Download the following libraries.
+# - numpy-*.*.*+mkl-cp27-cp27m-win_amd64.whl
+# -- http://www.lfd.uci.edu/~gohlke/pythonlibs/
+# - scipy-*.*.*-cp27-none-win_amd64.whl
+# -- http://www.lfd.uci.edu/~gohlke/pythonlibs/
+#
+# 3. Execute the following command.
 # - python -m pip install --upgrade pip
-# - pip install hyperopt bson pymongo networkx
+# - pip install numpy-*.*.*+mkl-cp27-cp27m-win_amd64.whl scipy-*.*.*-cp27-none-win_amd64.whl hyperopt pymongo networkx pandas sklearn matplotlib
 #
-# 3. If using MSVC instead of MSYS (Windows)
+# 4. If using MSVC instead of MSYS (Windows)
 # - install MSVC14 (Visual Studio 2015)
 # - uncomment the line: buider = MSVCBuilder()
 # - open developer console
