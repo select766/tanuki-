@@ -36,7 +36,7 @@ import argparse
 import cPickle as pickle
 
 space = [
-  hp.quniform('PARAM_FUTILITY_MARGIN_DEPTH', 50, 120, 1),
+  hp.quniform('PARAM_FUTILITY_MARGIN_ALPHA', 50, 120, 1),
   hp.quniform('PARAM_FUTILITY_MARGIN_QUIET', 50, 150, 1),
   hp.quniform('PARAM_FUTILITY_RETURN_DEPTH', 5, 13, 1),
   hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_DEPTH', 5, 13, 1),
@@ -50,14 +50,15 @@ space = [
   hp.quniform('PARAM_SINGULAR_MARGIN', 2, 20, 1),
   hp.quniform('PARAM_SINGULAR_SEARCH_DEPTH', 64, 192, 1),
   hp.quniform('PARAM_PRUNING_BY_MOVE_COUNT_DEPTH', 8, 32, 1),
-  hp.quniform('PARAM_PRUNING_BY_HISTORY_DEPTH', 4, 32, 1),
+  hp.quniform('PARAM_PRUNING_BY_HISTORY_DEPTH', 8, 32, 1),
   hp.quniform('PARAM_REDUCTION_BY_HISTORY', 4000, 32000, 1),
   hp.quniform('PARAM_RAZORING_MARGIN', 64, 1024, 1),
   hp.quniform('PARAM_RAZORING_ALPHA', 4, 32, 1),
-  hp.quniform('PARAM_QUIET_SEARCH_COUNT', 32, 128, 1),]
+  hp.quniform('PARAM_QUIET_SEARCH_COUNT', 32, 128, 1),
+  ]
 
 build_argument_names = [
-  'PARAM_FUTILITY_MARGIN_DEPTH',
+  'PARAM_FUTILITY_MARGIN_ALPHA',
   'PARAM_FUTILITY_MARGIN_QUIET',
   'PARAM_FUTILITY_RETURN_DEPTH',
   'PARAM_FUTILITY_AT_PARENT_NODE_DEPTH',
@@ -276,7 +277,10 @@ class YaneuraouBuilder(object):
     pass
 
   def clean(self):
-    os.remove(self.FILENAME)
+    try:
+      os.remove(self.FILENAME)
+    except WindowsError:
+      pass
 
   def build(self, args):
     with open(self.FILENAME, 'w') as f:
