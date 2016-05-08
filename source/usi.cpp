@@ -7,6 +7,7 @@
 #include "thread.h"
 #include "tt.h"
 #include "misc.h"
+#include "kifu_generator.h"
 
 using namespace std;
 
@@ -637,13 +638,20 @@ void USI::loop(int argc,char* argv[])
     else if (token == "test") test_cmd(pos, is);
 
     // ベンチコマンド
-    else if (token == "bench") bench_cmd(pos, is);
+    else if (token == "bench") {
+      bench_cmd(pos, is);
+      break;
+    }
 #endif
 
 #ifdef ENABLE_MAKEBOOK_CMD
     // 定跡を作るコマンド
     else if (token == "makebook") Book::makebook_cmd(pos, is);
 #endif
+    else if (token == "generate_kifu") {
+      KifuGenerator::generate();
+      break;
+    }
     ;
 
   } while (token != "quit" );
