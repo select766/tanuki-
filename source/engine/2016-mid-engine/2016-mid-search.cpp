@@ -12,7 +12,7 @@
 
 // パラメーターを自動調整するのか
 // 自動調整が終われば、ファイルを固定してincludeしたほうが良い。
-#define USE_AUTO_TUNE_PARAMETERS
+//#define USE_AUTO_TUNE_PARAMETERS
 
 // 読み込むパラメーターファイル名
 // これがdefineされていると"parameters_master.h"
@@ -136,7 +136,7 @@ namespace YaneuraOu2016Mid
   // game ply(≒進行度)とdepth(残り探索深さ)に応じたfutility margin。
   Value futility_margin(Depth d, int game_ply) {
     // ここ、本当はONE_PLY掛けてからのほうがいいような気がするがパラメーターが調整しにくくなるのでこれでいく。
-    return Value(d * PARAM_FUTILITY_MARGIN_DEPTH);
+    return Value(d * PARAM_FUTILITY_MARGIN_ALPHA);
   }
 #endif
 
@@ -279,11 +279,31 @@ namespace YaneuraOu2016Mid
     // killer等を更新するのは有害である。
     if (ss->skipEarlyPruning)
     {
-      // しかしkillerがないときはkillerぐらいは登録したほうが少しだけ得かも。
-      if (ss->killers[0] == MOVE_NONE)
-        ss->killers[0] = move32;
-      else if (ss->killers[1] == MOVE_NONE)
-        ss->killers[1] = move32;
+      // ただし、null move時のkillerは理想的な(浅い深さの探索ではない)killerなので有効だと考えられる。
+      // →　しかし弱くなったのでコメントアウト
+#if 0
+      if ((ss - 1)->currentMove == MOVE_NULL)
+      {
+
+        // 普通にkillerのupdateを行なう。
+        if (ss->killers[0] != move32)
+        {
+          ss->killers[1] = ss->killers[0];
+          ss->killers[0] = move32;
+        }
+
+      } else
+#endif      
+      {
+
+        // IID、singular extension時であっても
+        // killerがないときはkillerぐらいは登録したほうが少しだけ得。
+
+        if (ss->killers[0] == MOVE_NONE)
+          ss->killers[0] = move32;
+        else if (ss->killers[1] == MOVE_NONE)
+          ss->killers[1] = move32;
+      }
 
       return;
     }
@@ -616,7 +636,6 @@ namespace YaneuraOu2016Mid
     // 取り合いの指し手だけ生成する
     // searchから呼び出された場合、直前の指し手がMOVE_NULLであることがありうるが、
     // 静止探索の1つ目の深さではrecaptureを生成しないならこれは問題とならない。
-    // ToDo: あとでNULL MOVEを実装したときにrecapture以外も生成するように修正する。
     MovePicker mp(pos, ttMove, depth, pos.this_thread()->history, move_to((ss - 1)->currentMove));
     Move move;
     Value value;
@@ -1154,7 +1173,7 @@ namespace YaneuraOu2016Mid
       Value rbeta = std::min(beta + 200 , VALUE_INFINITE);
 
       // 大胆に探索depthを減らす
-      Depth rdepth = depth - 4 * ONE_PLY;
+      Depth rdepth = depth - (PARAM_PROBCUT_DEPTH-1) * ONE_PLY;
 
       ASSERT_LV3(rdepth >= ONE_PLY);
       ASSERT_LV3((ss - 1)->currentMove != MOVE_NONE);
@@ -1720,7 +1739,7 @@ void Search::init() {
 #ifdef  USE_AUTO_TUNE_PARAMETERS
   {
     vector<string> param_names = {
-      "PARAM_FUTILITY_MARGIN_DEPTH" , "PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
+      "PARAM_FUTILITY_MARGIN_ALPHA" , "PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
       "PARAM_FUTILITY_AT_PARENT_NODE_DEPTH","PARAM_FUTILITY_AT_PARENT_NODE_MARGIN","PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH",
       "PARAM_NULL_MOVE_DYNAMIC_ALPHA","PARAM_NULL_MOVE_DYNAMIC_BETA","PARAM_NULL_MOVE_RETURN_DEPTH",
       "PARAM_PROBCUT_DEPTH","PARAM_SINGULAR_EXTENSION_DEPTH","PARAM_SINGULAR_MARGIN",
@@ -1729,7 +1748,7 @@ void Search::init() {
       "PARAM_QUIET_SEARCH_COUNT"
     };
     vector<int*> param_vars = {
-      &PARAM_FUTILITY_MARGIN_DEPTH , &PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
+      &PARAM_FUTILITY_MARGIN_ALPHA , &PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
       &PARAM_FUTILITY_AT_PARENT_NODE_DEPTH, &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN, &PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH,
       &PARAM_NULL_MOVE_DYNAMIC_ALPHA, &PARAM_NULL_MOVE_DYNAMIC_BETA, &PARAM_NULL_MOVE_RETURN_DEPTH,
       &PARAM_PROBCUT_DEPTH, &PARAM_SINGULAR_EXTENSION_DEPTH, &PARAM_SINGULAR_MARGIN,
@@ -1741,7 +1760,10 @@ void Search::init() {
     fstream fs;
     fs.open("param\\" PARAM_FILE, ios::in);
     if (fs.fail())
-      cout << "ERROR:can't read " PARAM_FILE << endl;
+    {
+      cout << "info string Error! : can't read " PARAM_FILE << endl;
+      return;
+    }
 
     int count = 0;
     string line;
@@ -1756,8 +1778,8 @@ void Search::init() {
             // "="の右側にある数値を読む。
             auto pos = line.find("=");
             ASSERT_LV3(pos != -1);
-            int n = stoi(line.substr(pos + 1));
             *param_vars[i] = stoi(line.substr(pos + 1));
+//            cout << param_names[i] << " = " << *param_vars[i] << endl;
           }
     }
     fs.close();
@@ -1765,11 +1787,6 @@ void Search::init() {
     ASSERT_LV3(count == param_names.size());
   }
 #endif
-
-  // -----------------------
-  //   定跡の読み込み
-  // -----------------------
-  Book::read_book("book/standard_book.db", book);
 
   // -----------------------
   // LMRで使うreduction tableの初期化
@@ -1817,6 +1834,19 @@ void Search::init() {
 // isreadyコマンドの応答中に呼び出される。時間のかかる処理はここに書くこと。
 void Search::clear()
 {
+  // -----------------------
+  //   定跡の読み込み
+  // -----------------------
+  static bool first = true;
+  if (first)
+  {
+    Book::read_book("book/standard_book.db", book);
+    first = false;
+  }
+
+  // -----------------------
+  //   置換表のクリアなど
+  // -----------------------
   TT.clear();
   CounterMoveHistory.clear();
 
@@ -1843,6 +1873,9 @@ void Thread::search()
   // (ss-2)と(ss+2)にアクセスしたいので4つ余分に確保しておく。
   Stack stack[MAX_PLY + 4], *ss = stack + 2;
 
+  // 先頭5つを初期化しておけば十分。そのあとはsearchの先頭でss+2を初期化する。
+  memset(stack, 0, 5 * sizeof(Stack));
+
   // aspiration searchの窓の範囲(alpha,beta)
   // apritation searchで窓を動かす大きさdelta
   Value bestValue, alpha, beta, delta;
@@ -1855,13 +1888,13 @@ void Thread::search()
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
 
+  // この初期化は、Thread::MainThread()のほうで行なっている。
+  // (この関数を直接呼び出すときには注意が必要)
+//  completedDepth = DEPTH_ZERO;
 
   // もし自分がメインスレッドであるならmainThreadにそのポインタを入れる。
   // 自分がスレーブのときはnullptrになる。
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
-
-  // 先頭5つを初期化しておけば十分。そのあとはsearchの先頭でss+2を初期化する。
-  memset(stack, 0, 5 * sizeof(Stack));
 
   // メインスレッド用の初期化処理
   if (mainThread)

@@ -33,6 +33,10 @@ std::ofstream PROCESS_LOG_STREAM(generate_log_file_name().c_str());
 // 1行ずつ結果を出力するモード
 //#define ONE_LINE_OUTPUT_MODE
 
+// 勝敗の出力のときについでに対局棋譜を出力する機能
+//#define OUTPUT_KIF_LOG
+
+
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o) {}
@@ -512,7 +516,7 @@ void MainThread::think() {
   fs_book.open("book.sfen");
   if (!fs_book.fail())
   {
-    cout << "read book.sfen ";
+    sync_cout << "read book.sfen " << sync_endl;
     string line;
     while (!fs_book.eof())
     {
@@ -523,6 +527,8 @@ void MainThread::think() {
         cout << ".";
     }
     cout << endl;
+  } else {
+    sync_cout << "Error! : can't read book.sfen" << sync_endl;
   }
 
   sync_cout << "local game server start : " << engine_name[0] << " vs " << engine_name[1] << sync_endl;
@@ -609,12 +615,19 @@ void Thread::search()
   auto game_over = [&](bool resign) {
     std::unique_lock<Mutex> lk(local_mutex);
 
+    auto kif =
+#ifdef OUTPUT_KIF_LOG
+      // sfen形式の棋譜を出力する。
+      "startpos moves " + rootPos.moves_from_start();
+#else
+      rootPos.sfen();
+#endif
+
     if (rootPos.game_ply() >= 256) // 長手数につき引き分け
     {
       draw++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
-              << "draw," << rootPos.sfen() << sync_endl;
+      sync_cout << "draw," << kif << sync_endl;
 #else
       if (player1_color == Color::BLACK) {
         cout << '*'; // 先手で引き分けマーク
@@ -626,8 +639,7 @@ void Thread::search()
     {
       lose++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
-              << "lose," << rootPos.sfen() << sync_endl;
+      sync_cout << "lose," << kif << sync_endl;
 #else
       if (player1_color == Color::BLACK) {
         cout << 'X'; // 先手で負けマーク
@@ -640,8 +652,7 @@ void Thread::search()
     {
       win++;
 #ifdef ONE_LINE_OUTPUT_MODE
-      sync_cout << (player1_color == Color::BLACK ? "black-" : "white-")
-              << "win," << rootPos.sfen() << sync_endl;
+      sync_cout << "win," << kif << sync_endl;
 #else
       if (player1_color == Color::BLACK) {
         cout << 'O'; // 先手で勝ちマーク
@@ -715,8 +726,8 @@ void Thread::search()
         game_over(true);
         //sync_cout << "game over" << sync_endl;
       }
-      sleep(5);
     }
+    sleep(5);
   }
 
   if (is_main())
