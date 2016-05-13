@@ -715,6 +715,11 @@ namespace YaneuraOu2016Mid
       // 現在このスレッドで探索している指し手を保存しておく。
       ss->currentMove = move;
 
+      // 自駒2駒をランダムに入れ替えた際に相手玉を取ってしまう手を調べてしまうのでハック
+      if (type_of(pos.piece_on(move_to(move))) == KING) {
+        return mate_in(ss->ply);
+      }
+
       pos.do_move(move, st, givesCheck);
       value = givesCheck ? -qsearch<NT, true>(pos, ss + 1, -beta, -alpha, depth - ONE_PLY)
                          : -qsearch<NT,false>(pos, ss + 1, -beta, -alpha, depth - ONE_PLY);
@@ -1476,6 +1481,11 @@ namespace YaneuraOu2016Mid
 
       // 現在このスレッドで探索している指し手を保存しておく。
       ss->currentMove = move;
+
+      // 自駒2駒をランダムに入れ替えた際に相手玉を取ってしまう手を調べてしまうのでハック
+      if (type_of(pos.piece_on(move_to(move))) == KING) {
+        return mate_in(ss->ply);
+      }
 
       // 指し手で1手進める
       pos.do_move(move, st, givesCheck);

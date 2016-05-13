@@ -13,13 +13,14 @@ using Search::RootMove;
 
 namespace
 {
-  constexpr int NumGames = 10000;
+  constexpr int NumGames = 1000000;
   constexpr char* BookFileName = "book.sfen";
   constexpr char* OutputFileName = "kifu.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
   constexpr Value CloseOutValueThreshold = Value(2000);
   constexpr int MaxGamePlay = 256;
+  constexpr int MaxSwapTrials = 10;
 
   std::mutex output_mutex;
   std::ofstream output_stream;
@@ -27,6 +28,7 @@ namespace
   std::vector<std::string> book;
   std::random_device random_device;
   std::mt19937_64 mt19937_64(random_device());
+  std::uniform_int_distribution<> swap_distribution(0, 9);
 
   bool read_book()
   {
@@ -101,12 +103,64 @@ namespace
         }
       }
 
-      // TODO(nodchip): 自駒2個の入れ替えを実装する
-
       while (pos.game_ply() < MaxGamePlay) {
+        if (swap_distribution(mt19937_64) == 0) {
+          std::string originalSfen = pos.sfen();
+          int counter = 0;
+          do {
+            pos.set(originalSfen);
+
+            // 自駒2駒を入れ替える
+            std::vector<Square> squares;
+            for (Square square = SQ_11; square < SQ_NB; ++square) {
+              Piece piece = pos.piece_on(square);
+              if (piece == NO_PIECE) {
+                continue;
+              }
+              if (color_of(piece) != pos.side_to_move()) {
+                continue;
+              }
+              squares.push_back(square);
+            }
+
+            Square square0;
+            Square square1;
+            do {
+              std::uniform_int_distribution<> square_index_distribution(0, squares.size() - 1);
+              square0 = squares[square_index_distribution(mt19937_64)];
+              square1 = squares[square_index_distribution(mt19937_64)];
+            } while (pos.piece_on(square0) == pos.piece_on(square1));
+
+            Piece piece0 = pos.piece_on(square0);
+            PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
+            Piece piece1 = pos.piece_on(square1);
+            PieceNo pieceNo1 = pos.piece_no_of(piece1, square1);
+            pos.remove_piece(square0);
+            pos.remove_piece(square1);
+            pos.put_piece(square0, piece1, pieceNo1);
+            pos.put_piece(square1, piece0, pieceNo0);
+            // ランダムに入れ替えると2歩等不正な状態になる場合があるため
+          } while (!pos.pos_is_ok() && ++counter <= MaxSwapTrials);
+
+          if (counter >= MaxSwapTrials) {
+            pos.set(originalSfen);
+            //std::cerr << pos << std::endl;
+          }
+        }
+
         thread.rootMoves.clear();
+        bool mateExist = false;
         for (auto m : MoveList<LEGAL>(pos)) {
+          // ランダムに入れ替えるといきなり相手玉を取れるような配置になる場合があるため
+          if (type_of(pos.piece_on(move_to(m))) == KING) {
+            mateExist = true;
+            break;
+          }
           thread.rootMoves.push_back(RootMove(m));
+        }
+
+        if (mateExist) {
+          break;
         }
 
         if (thread.rootMoves.empty()) {
@@ -159,6 +213,7 @@ void KifuGenerator::generate()
   Search::Limits = limits;
 
   //generate_procedure(0);
+  //Options["Threads"] = 1;
 
   std::vector<std::thread> threads;
   while (threads.size() < Options["Threads"]) {

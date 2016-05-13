@@ -290,8 +290,8 @@ void Position::set(std::string sfen)
   // --- validation
 
   // これassertにしてしまうと、先手玉のいない局面や駒落ちの局面で落ちて困る。
-  if (!is_ok(*this))
-      std::cout << "info string Illigal Position?" << endl;
+  //if (!is_ok(*this))
+  //    std::cout << "info string Illigal Position?" << endl;
 }
 
 // 局面のsfen文字列を取得する。
@@ -1028,6 +1028,10 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
       // 玉を取る指し手が実現することはない。この直前の局面で玉を逃げる指し手しか合法手ではないし、
       // 玉を逃げる指し手がないのだとしたら、それは詰みの局面であるから。
 
+      if (type_of(to_pc) == KING) {
+        std::cerr << *this << std::endl;
+      }
+
       ASSERT_LV1(type_of(to_pc) != KING);
 
       Piece pr = raw_type_of(to_pc);
@@ -1137,7 +1141,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
         }
 
         // 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
-        ASSERT_LV3(st->checkersBB == attackers_to(Us, king_square(~Us)));
+        //ASSERT_LV3(st->checkersBB == attackers_to(Us, king_square(~Us)));
 
       }
       st->continuousCheck[Us] += 2;
@@ -1420,6 +1424,15 @@ bool Position::pos_is_ok() const
   // 6) 王手している駒は敵駒か
   if (checkers() & pieces(side_to_move()))
     return false;
+
+  // 7) 2歩
+  for (File file = FILE_1; file <= FILE_9; ++file) {
+    for (Color color = BLACK; color < COLOR_NB; ++color) {
+      if ((pieces(color, PAWN) & FILE_BB[file]).pop_count() > 1) {
+        return false;
+      }
+    }
+  }
 
   return true;
 }
