@@ -60,10 +60,10 @@ namespace
   {
     auto start = std::chrono::system_clock::now();
     ASSERT_LV3(book.size());
-    std::uniform_int<> opening_index(0, static_cast<int>(book.size()));
+    std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
     for (int game_index = global_game_index++; game_index < NumGames; game_index = global_game_index++)
     {
-      if (game_index && game_index % 1000 == 0) {
+      if (game_index && game_index % 100 == 0) {
         auto current = std::chrono::system_clock::now();
         auto duration = current - start;
         auto remaining = duration * (NumGames - game_index) / game_index;
@@ -71,8 +71,17 @@ namespace
         int h = remainingSec / 3600;
         int m = remainingSec / 60 % 60;
         int s = remainingSec % 60;
+
+        time_t     current_time;
+        struct tm  *local_time;
+
+        time(&current_time);
+        local_time = localtime(&current_time);
         char buffer[1024];
-        sprintf(buffer, "%d / %d (%02d:%02d:%02d)", game_index, NumGames, h, m, s);
+        sprintf(buffer, "%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)",
+          game_index, NumGames,
+          local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
+          local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
         std::cerr << buffer << std::endl;
       }
 
@@ -104,10 +113,10 @@ namespace
       }
 
       while (pos.game_ply() < MaxGamePlay) {
-        if (swap_distribution(mt19937_64) == 0) {
+        if (swap_distribution(mt19937_64) == 0 && !pos.in_check()) {
           std::string originalSfen = pos.sfen();
           int counter = 0;
-          do {
+          for (; counter < MaxSwapTrials; ++counter) {
             pos.set(originalSfen);
 
             // 自駒2駒を入れ替える
@@ -135,12 +144,39 @@ namespace
             PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
             Piece piece1 = pos.piece_on(square1);
             PieceNo pieceNo1 = pos.piece_no_of(piece1, square1);
+
+            // 玉が相手の駒の効きのある升に移動しそうな場合はキャンセル
+            if (type_of(piece0) == KING && pos.effected_to(~pos.side_to_move(), square1)) {
+              continue;
+            }
+            if (type_of(piece1) == KING && pos.effected_to(~pos.side_to_move(), square0)) {
+              continue;
+            }
+
             pos.remove_piece(square0);
             pos.remove_piece(square1);
             pos.put_piece(square0, piece1, pieceNo1);
             pos.put_piece(square1, piece0, pieceNo0);
+
             // ランダムに入れ替えると2歩等不正な状態になる場合があるため
-          } while (!pos.pos_is_ok() && ++counter <= MaxSwapTrials);
+            if (pos.pos_is_ok()) {
+              continue;
+            }
+
+            if (pos.mate1ply()) {
+              continue;
+            }
+
+            if (pos.is_mated()) {
+              continue;
+            }
+
+            if (pos.in_check()) {
+              continue;
+            }
+
+            break;
+          };
 
           if (counter >= MaxSwapTrials) {
             pos.set(originalSfen);
@@ -212,15 +248,15 @@ void KifuGenerator::generate()
   limits.silent = true;
   Search::Limits = limits;
 
-  //generate_procedure(0);
-  //Options["Threads"] = 1;
+  generate_procedure(0);
+  //Options["Threads"] = 2;
 
-  std::vector<std::thread> threads;
-  while (threads.size() < Options["Threads"]) {
-    int thread_id = static_cast<int>(threads.size());
-    threads.push_back(std::thread([thread_id] {generate_procedure(thread_id); }));
-  }
-  for (auto& thread : threads) {
-    thread.join();
-  }
+  //std::vector<std::thread> threads;
+  //while (threads.size() < Options["Threads"]) {
+  //  int thread_id = static_cast<int>(threads.size());
+  //  threads.push_back(std::thread([thread_id] {generate_procedure(thread_id); }));
+  //}
+  //for (auto& thread : threads) {
+  //  thread.join();
+  //}
 }

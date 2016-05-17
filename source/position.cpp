@@ -290,8 +290,8 @@ void Position::set(std::string sfen)
   // --- validation
 
   // これassertにしてしまうと、先手玉のいない局面や駒落ちの局面で落ちて困る。
-  //if (!is_ok(*this))
-  //    std::cout << "info string Illigal Position?" << endl;
+  if (!is_ok(*this))
+      std::cout << "info string Illigal Position?" << endl;
 }
 
 // 局面のsfen文字列を取得する。
@@ -1141,7 +1141,10 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
         }
 
         // 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
-        //ASSERT_LV3(st->checkersBB == attackers_to(Us, king_square(~Us)));
+        if (st->checkersBB != attackers_to(Us, king_square(~Us))) {
+          std::cerr << std::endl << *this << std::endl;
+        }
+        ASSERT_LV3(st->checkersBB == attackers_to(Us, king_square(~Us)));
 
       }
       st->continuousCheck[Us] += 2;
