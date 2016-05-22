@@ -1440,6 +1440,20 @@ bool Position::pos_is_ok() const
     }
   }
 
+  // 7) 9段目の歩・香 89段目の桂
+  for (auto sq : SQ) {
+    Piece piece = piece_on(sq);
+    Rank rank = rank_of(sq);
+    if (piece == B_PAWN && rank == RANK_1 ||
+      piece == B_LANCE && rank == RANK_1 ||
+      piece == B_KNIGHT && (rank == RANK_1 || rank == RANK_2) ||
+      piece == W_PAWN && rank == RANK_9 ||
+      piece == W_LANCE && rank == RANK_9 ||
+      piece == W_KNIGHT && (rank == RANK_9 || rank == RANK_8)) {
+      return false;
+    }
+  }
+
   return true;
 }
 

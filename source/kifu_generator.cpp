@@ -113,40 +113,68 @@ namespace
       }
 
       while (pos.game_ply() < MaxGamePlay) {
-        if (swap_distribution(mt19937_64) == 0 && pos.pos_is_ok() && !pos.mate1ply() && !pos.is_mated() && !pos.in_check()) {
+        // 一定の確率で自駒2駒を入れ替える
+        // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
+        if (swap_distribution(mt19937_64) == 0 &&
+          pos.pos_is_ok() &&
+          !pos.mate1ply() &&
+          !pos.is_mated() &&
+          !pos.in_check() &&
+          !pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
           std::string originalSfen = pos.sfen();
           int counter = 0;
           for (; counter < MaxSwapTrials; ++counter) {
             pos.set(originalSfen);
 
             // 自駒2駒を入れ替える
+            // 自駒のあるマス
             std::vector<Square> myPieceSquares;
+            // 空きマス
+            // 駒を入れ替える際の一時的な置き場として使用する
             std::vector<Square> emptySquares;
             for (Square square = SQ_11; square < SQ_NB; ++square) {
               Piece piece = pos.piece_on(square);
+              Rank rank = rank_of(square);
               if (piece == NO_PIECE) {
+                if (!pos.effected_to(~pos.side_to_move(), square)) {
+                  continue;
+                }
+                // 歩・香・桂を8・9段目に移動しないようにする
+                if (pos.side_to_move() == BLACK && (rank == RANK_2 || rank == RANK_1)) {
+                  continue;
+                }
+                if (pos.side_to_move() == WHITE && (rank == RANK_8 || rank == RANK_9)) {
+                  continue;
+                }
                 emptySquares.push_back(square);
               } else if (color_of(piece) == pos.side_to_move()) {
                 myPieceSquares.push_back(square);
               }
             }
 
+            // 駒を入れ替える際の一時領域を確保できなかった場合はやり直す
+            if (emptySquares.size() < 2) {
+              continue;
+            }
+
             std::random_shuffle(emptySquares.begin(), emptySquares.end());
             Square emptySquare0 = emptySquares[0];
             Square emptySquare1 = emptySquares[1];
 
+            // 一時領域として使用するマスを選ぶ
             Square square0;
             Square square1;
             do {
               std::uniform_int_distribution<> square_index_distribution(0, myPieceSquares.size() - 1);
               square0 = myPieceSquares[square_index_distribution(mt19937_64)];
               square1 = myPieceSquares[square_index_distribution(mt19937_64)];
+              // 同じ種類の駒を選ばないようにする
             } while (pos.piece_on(square0) == pos.piece_on(square1));
 
             Piece piece0 = pos.piece_on(square0);
             Piece piece1 = pos.piece_on(square1);
 
-            // 玉が相手の駒の効きのある升に移動しそうな場合はキャンセル
+            // 玉が相手の駒の利きのある升に移動する場合はやり直す
             // TODO(tanuki-): 必要かどうかわからないので調べる
             if (type_of(piece0) == KING && pos.attackers_to(~pos.side_to_move(), square1)) {
               continue;
@@ -155,26 +183,29 @@ namespace
               continue;
             }
 
+            // 2つの駒を入れ替える
+            // 4手入れ替えることで手番を入れ替えないようにする
             StateInfo stateInfo[4];
             pos.do_move(make_move(square0, emptySquare0), stateInfo[0]);
             pos.do_move(make_move(square1, square0), stateInfo[1]);
             pos.do_move(make_move(emptySquare0, emptySquare1), stateInfo[2]);
             pos.do_move(make_move(emptySquare1, square1), stateInfo[3]);
 
-            // 不正な局面になった場合はキャンセル
-            // ランダムに入れ替えると2歩等不正な状態になる場合があるため
+            // 不正な局面になった場合はやり直す
+            // ランダムに入れ替えると2歩・9段目の歩香・89段目の桂など
+            // 不正な状態になる場合があるため
             if (!pos.pos_is_ok()) {
               continue;
             }
 
-            // 1手詰めになった場合もキャンセル
-            // TODO(tanuki-): 必要かどうかわからないので調べる
+            // 1手詰めになった場合もやり直す
+            // TODO(tanuki-): やり直しの条件を絞り込む
             if (pos.mate1ply()) {
               continue;
             }
 
-            // 詰んでしまっている場合もキャンセル
-            // TODO(tanuki-): 必要かどうかわからないので調べる
+            // 詰んでしまっている場合もやり直す
+            // TODO(tanuki-): やり直しの条件を絞り込む
             if (pos.is_mated()) {
               continue;
             }
@@ -184,37 +215,29 @@ namespace
               continue;
             }
 
-            // 入れ替えた駒で相手の王を取れる場合もキャンセル
+            // 入れ替えた駒で相手の王を取れる場合もやり直す
             if (pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
               continue;
             }
 
-            //std::cerr << pos << std::endl;
-
-            pos.set(pos.sfen());
+#ifdef LONG_EFFECT_LIBRARY
+            // 利きの全計算による更新
+            // これがないと内部情報が壊れてassertで落ちる
+            LongEffect::calc_effect(pos);
+#endif
 
             break;
           };
 
+          // 何度やり直してもうまくいかない場合は諦める
           if (counter >= MaxSwapTrials) {
             pos.set(originalSfen);
-            //std::cerr << pos << std::endl;
           }
         }
 
         thread.rootMoves.clear();
-        bool mateExist = false;
         for (auto m : MoveList<LEGAL>(pos)) {
-          // ランダムに入れ替えるといきなり相手玉を取れるような配置になる場合があるため
-          if (type_of(pos.piece_on(move_to(m))) == KING) {
-            mateExist = true;
-            break;
-          }
           thread.rootMoves.push_back(RootMove(m));
-        }
-
-        if (mateExist) {
-          break;
         }
 
         if (thread.rootMoves.empty()) {
@@ -267,7 +290,6 @@ void KifuGenerator::generate()
   Search::Limits = limits;
 
   //generate_procedure(0);
-  //Options["Threads"] = 2;
 
   std::vector<std::thread> threads;
   while (threads.size() < Options["Threads"]) {
