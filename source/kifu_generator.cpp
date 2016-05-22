@@ -127,39 +127,13 @@ namespace
             pos.set(originalSfen);
 
             // 自駒2駒を入れ替える
-            // 自駒のあるマス
             std::vector<Square> myPieceSquares;
-            // 空きマス
-            // 駒を入れ替える際の一時的な置き場として使用する
-            std::vector<Square> emptySquares;
             for (Square square = SQ_11; square < SQ_NB; ++square) {
               Piece piece = pos.piece_on(square);
-              Rank rank = rank_of(square);
-              if (piece == NO_PIECE) {
-                if (!pos.effected_to(~pos.side_to_move(), square)) {
-                  continue;
-                }
-                // 歩・香・桂を8・9段目に移動しないようにする
-                if (pos.side_to_move() == BLACK && (rank == RANK_2 || rank == RANK_1)) {
-                  continue;
-                }
-                if (pos.side_to_move() == WHITE && (rank == RANK_8 || rank == RANK_9)) {
-                  continue;
-                }
-                emptySquares.push_back(square);
-              } else if (color_of(piece) == pos.side_to_move()) {
+              if (color_of(piece) == pos.side_to_move()) {
                 myPieceSquares.push_back(square);
               }
             }
-
-            // 駒を入れ替える際の一時領域を確保できなかった場合はやり直す
-            if (emptySquares.size() < 2) {
-              continue;
-            }
-
-            std::random_shuffle(emptySquares.begin(), emptySquares.end());
-            Square emptySquare0 = emptySquares[0];
-            Square emptySquare1 = emptySquares[1];
 
             // 一時領域として使用するマスを選ぶ
             Square square0;
@@ -172,7 +146,9 @@ namespace
             } while (pos.piece_on(square0) == pos.piece_on(square1));
 
             Piece piece0 = pos.piece_on(square0);
+            PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
             Piece piece1 = pos.piece_on(square1);
+            PieceNo pieceNo1 = pos.piece_no_of(piece1, square1);
 
             // 玉が相手の駒の利きのある升に移動する場合はやり直す
             // TODO(tanuki-): 必要かどうかわからないので調べる
@@ -184,12 +160,10 @@ namespace
             }
 
             // 2つの駒を入れ替える
-            // 4手入れ替えることで手番を入れ替えないようにする
-            StateInfo stateInfo[4];
-            pos.do_move(make_move(square0, emptySquare0), stateInfo[0]);
-            pos.do_move(make_move(square1, square0), stateInfo[1]);
-            pos.do_move(make_move(emptySquare0, emptySquare1), stateInfo[2]);
-            pos.do_move(make_move(emptySquare1, square1), stateInfo[3]);
+            pos.remove_piece(square0);
+            pos.remove_piece(square1);
+            pos.put_piece(square0, piece1, pieceNo1);
+            pos.put_piece(square1, piece0, pieceNo0);
 
             // 不正な局面になった場合はやり直す
             // ランダムに入れ替えると2歩・9段目の歩香・89段目の桂など
@@ -246,8 +220,6 @@ namespace
         thread.maxPly = 0;
         thread.rootDepth = 0;
         pos.set_this_thread(&thread);
-
-        //std::cerr << pos << std::endl;
 
         thread.Thread::start_searching();
         thread.wait_for_search_finished();
