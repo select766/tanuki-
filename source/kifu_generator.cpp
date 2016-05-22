@@ -146,6 +146,15 @@ namespace
             Piece piece0 = pos.piece_on(square0);
             Piece piece1 = pos.piece_on(square1);
 
+            // 玉が相手の駒の効きのある升に移動しそうな場合はキャンセル
+            // TODO(tanuki-): 必要かどうかわからないので調べる
+            if (type_of(piece0) == KING && pos.attackers_to(~pos.side_to_move(), square1)) {
+              continue;
+            }
+            if (type_of(piece1) == KING && pos.attackers_to(~pos.side_to_move(), square0)) {
+              continue;
+            }
+
             StateInfo stateInfo[4];
             pos.do_move(make_move(square0, emptySquare0), stateInfo[0]);
             pos.do_move(make_move(square1, square0), stateInfo[1]);
@@ -158,10 +167,29 @@ namespace
               continue;
             }
 
+            // 1手詰めになった場合もキャンセル
+            // TODO(tanuki-): 必要かどうかわからないので調べる
+            if (pos.mate1ply()) {
+              continue;
+            }
+
+            // 詰んでしまっている場合もキャンセル
+            // TODO(tanuki-): 必要かどうかわからないので調べる
+            if (pos.is_mated()) {
+              continue;
+            }
+
+            // 王手がかかっている場合もキャンセル
+            if (pos.in_check()) {
+              continue;
+            }
+
             // 入れ替えた駒で相手の王を取れる場合もキャンセル
             if (pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
               continue;
             }
+
+            //std::cerr << pos << std::endl;
 
             pos.set(pos.sfen());
 
