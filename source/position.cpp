@@ -290,8 +290,11 @@ void Position::set(std::string sfen)
   // --- validation
 
   // これassertにしてしまうと、先手玉のいない局面や駒落ちの局面で落ちて困る。
-  if (!is_ok(*this))
-      std::cout << "info string Illigal Position?" << endl;
+  if (!is_ok(*this)) {
+    std::cout << "info string Illigal Position?" << endl;
+    std::cerr << *this << std::endl;
+    is_ok(*this);
+  }
 }
 
 // 局面のsfen文字列を取得する。
@@ -1376,7 +1379,7 @@ bool Position::pos_is_ok() const
 {
   // Bitboardの完全なテストには時間がかかるので、あまりややこしいテストは現実的ではない。
 
-#if 0
+#if 1
   // 1) 盤上の駒と手駒を合わせて40駒あるか。
   // →　駒落ちに対応させたいのでコメントアウト
 

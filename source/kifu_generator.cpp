@@ -113,67 +113,57 @@ namespace
       }
 
       while (pos.game_ply() < MaxGamePlay) {
-        if (swap_distribution(mt19937_64) == 0 && !pos.in_check()) {
+        if (swap_distribution(mt19937_64) == 0 && pos.pos_is_ok() && !pos.mate1ply() && !pos.is_mated() && !pos.in_check()) {
           std::string originalSfen = pos.sfen();
           int counter = 0;
           for (; counter < MaxSwapTrials; ++counter) {
             pos.set(originalSfen);
 
             // 自駒2駒を入れ替える
-            std::vector<Square> squares;
+            std::vector<Square> myPieceSquares;
+            std::vector<Square> emptySquares;
             for (Square square = SQ_11; square < SQ_NB; ++square) {
               Piece piece = pos.piece_on(square);
               if (piece == NO_PIECE) {
-                continue;
+                emptySquares.push_back(square);
+              } else if (color_of(piece) == pos.side_to_move()) {
+                myPieceSquares.push_back(square);
               }
-              if (color_of(piece) != pos.side_to_move()) {
-                continue;
-              }
-              squares.push_back(square);
             }
+
+            std::random_shuffle(emptySquares.begin(), emptySquares.end());
+            Square emptySquare0 = emptySquares[0];
+            Square emptySquare1 = emptySquares[1];
 
             Square square0;
             Square square1;
             do {
-              std::uniform_int_distribution<> square_index_distribution(0, squares.size() - 1);
-              square0 = squares[square_index_distribution(mt19937_64)];
-              square1 = squares[square_index_distribution(mt19937_64)];
+              std::uniform_int_distribution<> square_index_distribution(0, myPieceSquares.size() - 1);
+              square0 = myPieceSquares[square_index_distribution(mt19937_64)];
+              square1 = myPieceSquares[square_index_distribution(mt19937_64)];
             } while (pos.piece_on(square0) == pos.piece_on(square1));
 
             Piece piece0 = pos.piece_on(square0);
-            PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
             Piece piece1 = pos.piece_on(square1);
-            PieceNo pieceNo1 = pos.piece_no_of(piece1, square1);
 
-            // 玉が相手の駒の効きのある升に移動しそうな場合はキャンセル
-            if (type_of(piece0) == KING && pos.effected_to(~pos.side_to_move(), square1)) {
-              continue;
-            }
-            if (type_of(piece1) == KING && pos.effected_to(~pos.side_to_move(), square0)) {
-              continue;
-            }
+            StateInfo stateInfo[4];
+            pos.do_move(make_move(square0, emptySquare0), stateInfo[0]);
+            pos.do_move(make_move(square1, square0), stateInfo[1]);
+            pos.do_move(make_move(emptySquare0, emptySquare1), stateInfo[2]);
+            pos.do_move(make_move(emptySquare1, square1), stateInfo[3]);
 
-            pos.remove_piece(square0);
-            pos.remove_piece(square1);
-            pos.put_piece(square0, piece1, pieceNo1);
-            pos.put_piece(square1, piece0, pieceNo0);
-
+            // 不正な局面になった場合はキャンセル
             // ランダムに入れ替えると2歩等不正な状態になる場合があるため
-            if (pos.pos_is_ok()) {
+            if (!pos.pos_is_ok()) {
               continue;
             }
 
-            if (pos.mate1ply()) {
+            // 入れ替えた駒で相手の王を取れる場合もキャンセル
+            if (pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
               continue;
             }
 
-            if (pos.is_mated()) {
-              continue;
-            }
-
-            if (pos.in_check()) {
-              continue;
-            }
+            pos.set(pos.sfen());
 
             break;
           };
@@ -248,15 +238,15 @@ void KifuGenerator::generate()
   limits.silent = true;
   Search::Limits = limits;
 
-  generate_procedure(0);
+  //generate_procedure(0);
   //Options["Threads"] = 2;
 
-  //std::vector<std::thread> threads;
-  //while (threads.size() < Options["Threads"]) {
-  //  int thread_id = static_cast<int>(threads.size());
-  //  threads.push_back(std::thread([thread_id] {generate_procedure(thread_id); }));
-  //}
-  //for (auto& thread : threads) {
-  //  thread.join();
-  //}
+  std::vector<std::thread> threads;
+  while (threads.size() < Options["Threads"]) {
+    int thread_id = static_cast<int>(threads.size());
+    threads.push_back(std::thread([thread_id] {generate_procedure(thread_id); }));
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
