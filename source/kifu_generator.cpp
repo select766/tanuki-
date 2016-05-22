@@ -130,7 +130,9 @@ namespace
             std::vector<Square> myPieceSquares;
             for (Square square = SQ_11; square < SQ_NB; ++square) {
               Piece piece = pos.piece_on(square);
-              if (color_of(piece) == pos.side_to_move()) {
+              if (piece == NO_PIECE) {
+                continue;
+              } else if (color_of(piece) == pos.side_to_move()) {
                 myPieceSquares.push_back(square);
               }
             }
@@ -220,6 +222,8 @@ namespace
         thread.maxPly = 0;
         thread.rootDepth = 0;
         pos.set_this_thread(&thread);
+
+        //std::cerr << pos << std::endl;
 
         thread.Thread::start_searching();
         thread.wait_for_search_finished();
