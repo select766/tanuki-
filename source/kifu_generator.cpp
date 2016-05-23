@@ -196,11 +196,8 @@ namespace
               continue;
             }
 
-#ifdef LONG_EFFECT_LIBRARY
-            // 利きの全計算による更新
-            // これがないと内部情報が壊れてassertで落ちる
-            LongEffect::calc_effect(pos);
-#endif
+            // ハッシュ・利き等の内部状態を更新するためsfen化してsetする
+            pos.set(pos.sfen());
 
             break;
           };
