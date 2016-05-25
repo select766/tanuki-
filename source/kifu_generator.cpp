@@ -256,6 +256,10 @@ void KifuGenerator::generate()
     return;
   }
 
+  Eval::load_eval();
+
+  Options["Hash"] = 1024;
+
   Search::LimitsType limits;
   limits.max_game_ply = MaxGamePlay;
   limits.depth = SearchDepth;
