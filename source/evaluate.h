@@ -94,7 +94,7 @@ namespace Eval {
 
   // BonanzaのようにKPPを求めるときに、39の地点の歩のように、
   // 升×駒種に対して一意な番号が必要となる。これをBonaPiece型と呼ぶことにする。
-  enum BonaPiece : int16_t
+  enum BonaPiece : int32_t
   {
     // f = friend(≒先手)の意味。e = enemy(≒後手)の意味
 

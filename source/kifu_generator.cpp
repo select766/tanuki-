@@ -18,7 +18,6 @@ namespace
   constexpr char* OutputFileName = "kifu.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
-  constexpr Value CloseOutValueThreshold = Value(2000);
   constexpr int MaxGamePlay = 256;
   constexpr int MaxSwapTrials = 10;
 

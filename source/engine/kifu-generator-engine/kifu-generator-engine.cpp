@@ -90,7 +90,7 @@ void USI::extra_option(USI::OptionsMap & o)
 //   やねうら王2016(mid)探索部
 // -----------------------
 
-namespace YaneuraOu2016Mid
+namespace KifuGenerator
 {
 
   // 外部から調整される探索パラメーター
@@ -1742,7 +1742,7 @@ namespace YaneuraOu2016Mid
 
 }
 
-using namespace YaneuraOu2016Mid;
+using namespace KifuGenerator;
 
 // --- 以下に好きなように探索のプログラムを書くべし。
 
@@ -1989,7 +1989,7 @@ void Thread::search()
 
       while (true)
       {
-        bestValue = YaneuraOu2016Mid::search<PV>(rootPos, ss, alpha, beta, rootDepth * ONE_PLY, false);
+        bestValue = KifuGenerator::search<PV>(rootPos, ss, alpha, beta, rootDepth * ONE_PLY, false);
 
         // それぞれの指し手に対するスコアリングが終わったので並べ替えおく。
         // 一つ目の指し手以外は-VALUE_INFINITEが返る仕様なので並べ替えのために安定ソートを
@@ -2014,7 +2014,7 @@ void Thread::search()
         //  sync_cout << USI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
 
         // aspiration窓の範囲外
-        if (bestValue <= alpha)
+        if (bestValue <= alpha && alpha < -VALUE_INFINITE)
         {
           // fails low
           
@@ -2027,7 +2027,7 @@ void Thread::search()
           //if (mainThread)
           //  mainThread->failedLow = true;
         }
-        else if (bestValue >= beta)
+        else if (bestValue >= beta && beta > VALUE_INFINITE)
         {
           // fails high
 

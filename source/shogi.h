@@ -765,7 +765,7 @@ inline Value draw_value(RepetitionState rs, Color c) { ASSERT_LV3(is_ok(rs)); re
 // --------------------
 
 namespace Eval {
-  enum BonaPiece : int16_t;
+  enum BonaPiece : int32_t;
 
   Value evaluate(const Position& pos);
 }

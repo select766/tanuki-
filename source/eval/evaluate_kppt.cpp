@@ -23,6 +23,15 @@ namespace Eval
 // KPPファイル名
 #define KPP_BIN "eval\\KPP_synthesized.bin"
 
+// KKファイル名
+#define KK_LEARN_BIN "eval\\KK_synthesized.learn.bin"
+
+// KKPファイル名
+#define KKP_LEARN_BIN "eval\\KKP_synthesized.learn.bin"
+
+// KPPファイル名
+#define KPP_LEARN_BIN "eval\\KPP_synthesized.learn.bin"
+
   // 手番込みの評価値。[0]が手番に無縁な部分。[1]が手番があるときの上乗せ
   //  (これは先手から見たものではなく先後に依存しないボーナス)。
   // 先手から見て、先手の手番があるときの評価値 =  [0] + [1]
@@ -71,7 +80,36 @@ namespace Eval
     cout << "\ninfo string Error! open evaluation file failed.\n";
     exit(EXIT_FAILURE);
   }
-  
+
+  // 評価関数ファイルを保存する
+  void save_eval()
+  {
+    do {
+      // KK
+      std::ofstream ofsKK(KK_LEARN_BIN, std::ios::binary);
+      if (ofsKK) ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
+      else goto Error;
+
+      // KKP
+      std::ofstream ofsKKP(KKP_LEARN_BIN, std::ios::binary);
+      if (ofsKKP) ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp));
+      else goto Error;
+
+      // KPP
+      std::ofstream ofsKPP(KPP_LEARN_BIN, std::ios::binary);
+      if (ofsKPP) ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp));
+      else goto Error;
+
+    } while (0);
+
+    return;
+
+  Error:;
+    cout << "\ninfo string open evaluation file failed.\n";
+    //    cout << "\nERROR open evaluation file failed.\n";
+    // 評価関数ファイルの読み込みに失敗した場合、思考を開始しないように抑制したほうがいいと思う。
+  }
+
   // KP,KPP,KKPのスケール
   const int FV_SCALE = 32;
 

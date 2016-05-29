@@ -133,6 +133,9 @@
     <ClInclude Include="kifu_generator.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="learner.h">
+      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -235,6 +238,9 @@
       <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
     </ClCompile>
     <ClCompile Include="kifu_generator.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="learner.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

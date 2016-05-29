@@ -1,13 +1,14 @@
 ﻿#include <sstream>
 #include <queue>
 
-#include "shogi.h"
+#include "kifu_generator.h"
+#include "learner.h"
+#include "misc.h"
 #include "position.h"
 #include "search.h"
+#include "shogi.h"
 #include "thread.h"
 #include "tt.h"
-#include "misc.h"
-#include "kifu_generator.h"
 
 using namespace std;
 
@@ -650,6 +651,10 @@ void USI::loop(int argc,char* argv[])
 #endif
     else if (token == "generate_kifu") {
       KifuGenerator::generate();
+      break;
+    }
+    else if (token == "learn") {
+      Learner::learn();
       break;
     }
     ;
