@@ -35,7 +35,7 @@ namespace
     Value value;
   };
 
-  constexpr char* KIFU_FILE_NAME = "kifu.2016-05-26.csv";
+  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-05-26.csv";
   constexpr Value CLOSE_OUT_VALUE_THRESHOLD = Value(2000);
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
@@ -134,6 +134,22 @@ namespace
     sum_w += previous_w * (current_index - last_update_index);
     last_update_index = current_index;
   }
+
+  template<typename T>
+  void increase_parameters(int64_t current_index, float delta, int feature_index, T& eval_element, std::vector<float>& w, std::vector<float>& m, std::vector<float>& v, std::vector<float>& sum_w, std::vector<int64_t>& last_update_indexes) {
+    increase_parameters(current_index, delta, w[feature_index], m[feature_index], v[feature_index], sum_w[feature_index], last_update_indexes[feature_index]);
+    eval_element = static_cast<T>(std::round(w[feature_index]));
+  }
+
+  template<typename T>
+  void clamp_and_store(int64_t current_index, int feature_index, T& dest, std::vector<float>& sum_w, std::vector<float>& w, std::vector<int64_t>& last_update_indexes)
+  {
+    sum_w[feature_index] += w[feature_index] * (current_index - last_update_indexes[feature_index]);
+    int64_t value = static_cast<int64_t>(std::round(sum_w[feature_index] / current_index));
+    value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
+    value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
+    dest = static_cast<T>(value);
+  }
 }
 
 void Learner::learn()
@@ -198,9 +214,9 @@ void Learner::learn()
   Search::Limits = limits;
 
   Position& position = thread.rootPos;
-  Value recordedValue;
+  Value recordValue;
   int64_t current_index = 0;
-  while (read_position_and_value(position, recordedValue)) {
+  while (read_position_and_value(position, recordValue)) {
     // 浅い探索を行う
     // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
     thread.rootMoves.clear();
@@ -222,13 +238,12 @@ void Learner::learn()
     //  thread.rootMoves.push_back(Search::RootMove(m));
     //}
 
+    Value value;
     if (thread.rootMoves.empty()) {
       // 現在の局面が静止している状態なのだと思う
-      // 後段の処理で現在の局面の評価値を計算させるため
-      // ダミーのRootMoveを追加する
-      thread.rootMoves.push_back(Search::RootMove(MOVE_NONE));
-      thread.rootMoves[0].pv.clear();
-   }
+      // 現在の局面の評価値をそのまま使う
+      value = Eval::compute_eval(position);
+    }
     else {
       // 実際に探索する
       thread.maxPly = 0;
@@ -239,28 +254,26 @@ void Learner::learn()
 
       thread.Thread::start_searching();
       thread.wait_for_search_finished();
+      value = thread.rootMoves[0].score;
     }
+
+    Color rootColor = position.side_to_move();
 
     // 静止した局面まで進める
     StateInfo stateInfo[MAX_PLY];
     int play = 0;
-    Color rootColor = position.side_to_move();
     for (auto m : thread.rootMoves[0].pv) {
       position.do_move(m, stateInfo[play++]);
     }
 
-    // 静止した局面の評価値を求める
-    Value value = Eval::compute_eval(position);
-    if (rootColor != position.side_to_move()) {
-      value = -value;
-    }
-    if (rootColor == WHITE) {
-      value = -value;
-    }
-    ASSERT_LV3(thread.rootMoves[0].score == value);
-
     // 深い深さの探索による評価値との差分を求める
-    float delta = static_cast<float>((recordedValue - value) * FV_SCALE);
+    float delta = static_cast<float>((recordValue - value) * FV_SCALE);
+    // Aperyだと[0]に相当する値は現在の局面の手番で場合分けしている
+    float delta0 = rootColor == BLACK ? delta : -delta;
+    // Aperyだと[1]に相当する値は現在の局面の手番と
+    // 浅い探索のPVの末端の局面の手番が等しいかどうかで場合分けしている
+    // TODO(tanuki-): 理由を考える
+    float delta1 = rootColor == position.side_to_move() ? delta : -delta;
 
     // 値を更新する
     Square sq_bk = position.king_square(BLACK);
@@ -268,15 +281,9 @@ void Learner::learn()
     const auto& list0 = position.eval_list()->piece_list_fb();
     const auto& list1 = position.eval_list()->piece_list_fw();
 
-    // 本当はマクロは使いたくないけど
-    // マクロ無しだと冗長になって読みにくくなるので仕方がないと思う…
-#define INCREASE_PARAMETERS(delta, index, eval_element) \
-    increase_parameters(current_index, delta, w[index], m[index], v[index], sum_w[index], last_update_indexes[index]); \
-    eval_element = static_cast<int32_t>(std::round(w[index]));
-
     // KK
-    INCREASE_PARAMETERS(delta, kk_index_to_raw_index(sq_bk, sq_wk, BLACK), Eval::kk[sq_bk][sq_wk][BLACK]);
-    INCREASE_PARAMETERS(delta, kk_index_to_raw_index(sq_bk, sq_wk, WHITE), Eval::kk[sq_bk][sq_wk][WHITE]);
+    increase_parameters(current_index, delta0, kk_index_to_raw_index(sq_bk, sq_wk, BLACK), Eval::kk[sq_bk][sq_wk][BLACK], w, m, v, sum_w, last_update_indexes);
+    increase_parameters(current_index, delta1, kk_index_to_raw_index(sq_bk, sq_wk, WHITE), Eval::kk[sq_bk][sq_wk][WHITE], w, m, v, sum_w, last_update_indexes);
 
     for (int i = 0; i < PIECE_NO_KING; ++i) {
       Eval::BonaPiece k0 = list0[i];
@@ -286,34 +293,29 @@ void Learner::learn()
         Eval::BonaPiece l1 = list1[j];
 
         // KPP
-        INCREASE_PARAMETERS(delta, kpp_index_to_raw_index(sq_bk, k0, l0, BLACK), Eval::kpp[sq_bk][k0][l0][BLACK]);
-        INCREASE_PARAMETERS(delta, kpp_index_to_raw_index(sq_bk, k0, l0, WHITE), Eval::kpp[sq_bk][k0][l0][WHITE]);
+        increase_parameters(current_index, delta0, kpp_index_to_raw_index(sq_bk, k0, l0, BLACK), Eval::kpp[sq_bk][k0][l0][BLACK], w, m, v, sum_w, last_update_indexes);
+        increase_parameters(current_index, delta1, kpp_index_to_raw_index(sq_bk, k0, l0, WHITE), Eval::kpp[sq_bk][k0][l0][WHITE], w, m, v, sum_w, last_update_indexes);
 
         // KPP
-        INCREASE_PARAMETERS(-delta, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, BLACK), Eval::kpp[Inv(sq_wk)][k1][l1][BLACK]);
-        INCREASE_PARAMETERS(delta, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WHITE), Eval::kpp[Inv(sq_wk)][k1][l1][WHITE]);
+        increase_parameters(current_index, -delta0, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, BLACK), Eval::kpp[Inv(sq_wk)][k1][l1][BLACK], w, m, v, sum_w, last_update_indexes);
+        increase_parameters(current_index, delta1, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WHITE), Eval::kpp[Inv(sq_wk)][k1][l1][WHITE], w, m, v, sum_w, last_update_indexes);
       }
 
       // KKP
-      INCREASE_PARAMETERS(delta, kkp_index_to_raw_index(sq_bk, sq_wk, k0, BLACK), Eval::kkp[sq_bk][sq_wk][k0][BLACK]);
-      INCREASE_PARAMETERS(delta, kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE), Eval::kkp[sq_bk][sq_wk][k0][WHITE]);
+      increase_parameters(current_index, delta0, kkp_index_to_raw_index(sq_bk, sq_wk, k0, BLACK), Eval::kkp[sq_bk][sq_wk][k0][BLACK], w, m, v, sum_w, last_update_indexes);
+      increase_parameters(current_index, delta1, kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE), Eval::kkp[sq_bk][sq_wk][k0][WHITE], w, m, v, sum_w, last_update_indexes);
     }
-
-#undef INCREASE_PARAMETERS
 
     // 前回計算した分をクリアする
     Value value_after = Eval::compute_eval(position);
     if (rootColor != position.side_to_move()) {
       value_after = -value_after;
     }
-    if (rootColor == WHITE) {
-      value_after = -value_after;
-    }
-    ASSERT_LV3(value == value_after);
+    //ASSERT_LV3(value == value_after);
 
     if (current_index % 1000 == 0) {
       fprintf(stderr, "recorded=%5d before=%5d after=%5d delta=%5d target=%c turn=%s\n",
-        static_cast<int>(recordedValue),
+        static_cast<int>(recordValue),
         static_cast<int>(value),
         static_cast<int>(value_after),
         static_cast<int>(value_after - value),
@@ -325,18 +327,11 @@ void Learner::learn()
     ++current_index;
   }
 
-#define CLAMP_AND_STORE(index, type, dest) \
-  sum_w[index] += w[index] * (current_index - last_update_indexes[index]); \
-  int64_t value = static_cast<int64_t>(std::round(sum_w[index] / current_index)); \
-  value = std::max<int64_t>(std::numeric_limits<type>::min(), value); \
-  value = std::min<int64_t>(std::numeric_limits<type>::max(), value); \
-  dest = static_cast<type>(value);
-
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          CLAMP_AND_STORE(kpp_index_to_raw_index(k, p0, p1, c), int16_t, Eval::kpp[k][p0][p1][c]);
+          clamp_and_store(current_index, kpp_index_to_raw_index(k, p0, p1, c), Eval::kpp[k][p0][p1][c], sum_w, w, last_update_indexes);
         }
       }
     }
@@ -345,7 +340,7 @@ void Learner::learn()
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          CLAMP_AND_STORE(kkp_index_to_raw_index(k0, k1, p, c), int32_t, Eval::kkp[k0][k1][p][c]);
+          clamp_and_store(current_index, kkp_index_to_raw_index(k0, k1, p, c), Eval::kkp[k0][k1][p][c], sum_w, w, last_update_indexes);
         }
       }
     }
@@ -353,12 +348,10 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        CLAMP_AND_STORE(kk_index_to_raw_index(k0, k1, c), int32_t, Eval::kk[k0][k1][c]);
+        clamp_and_store(current_index, kk_index_to_raw_index(k0, k1, c), Eval::kk[k0][k1][c], sum_w, w, last_update_indexes);
       }
     }
   }
-
-#undef CLAMP_AND_STORE
 
   Eval::save_eval();
 }

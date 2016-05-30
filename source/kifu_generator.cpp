@@ -13,9 +13,9 @@ using Search::RootMove;
 
 namespace
 {
-  constexpr int NumGames = 1000000;
+  constexpr int NumGames = 100000;
   constexpr char* BookFileName = "book.sfen";
-  constexpr char* OutputFileName = "kifu.csv";
+  constexpr char* OutputFileName = "kifu/kifu.2016-05-30.100000.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
   constexpr int MaxGamePlay = 256;
@@ -224,12 +224,11 @@ namespace
         thread.Thread::start_searching();
         thread.wait_for_search_finished();
 
+        // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         int score = thread.rootMoves[0].score;
-        if (pos.side_to_move() == WHITE) {
-          score = -score;
-        }
 
-        {
+        // 読み込んだ局面が不正な場合があるので再度チェックする
+        if (pos.pos_is_ok()) {
           std::lock_guard<std::mutex> lock(output_mutex);
           output_stream << pos.sfen() << "," << score << std::endl;
         }
