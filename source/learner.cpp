@@ -42,7 +42,7 @@ namespace
   constexpr float EPS = 1e-8;
   constexpr float ADAM_BETA1 = 0.9f;
   constexpr float ADAM_BETA2 = 0.999f;
-  constexpr float LEARNING_RATE = 0.02f;
+  constexpr float LEARNING_RATE = 0.001f;
   constexpr int MAX_GAME_PLAY = 256;
 
   std::ifstream kifu_file_stream;
