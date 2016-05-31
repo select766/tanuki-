@@ -29,20 +29,22 @@ namespace Eval
 
 namespace
 {
+  using VALUE_TYPE = double;
+
   struct PositionAndValue
   {
     std::string sfen;
     Value value;
   };
 
-  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-05-26.csv";
+  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-05-30.100000.csv";
   constexpr Value CLOSE_OUT_VALUE_THRESHOLD = Value(2000);
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
-  constexpr float EPS = 1e-8;
-  constexpr float ADAM_BETA1 = 0.9f;
-  constexpr float ADAM_BETA2 = 0.999f;
-  constexpr float LEARNING_RATE = 0.001f;
+  constexpr VALUE_TYPE EPS = 1e-8;
+  constexpr VALUE_TYPE ADAM_BETA1 = 0.9;
+  constexpr VALUE_TYPE ADAM_BETA2 = 0.999;
+  constexpr VALUE_TYPE LEARNING_RATE = 0.001;
   constexpr int MAX_GAME_PLAY = 256;
 
   std::ifstream kifu_file_stream;
@@ -91,18 +93,6 @@ namespace
     return true;
   }
 
-  //template<typename T>
-  //std::array<T, 2> to_ints(const std::array<float, 2>& value)
-  //{
-  //  return{ { static_cast<T>(std::round(value[0])), static_cast<T>(std::round(value[1])) } };
-  //}
-
-  //template<typename T>
-  //std::array<float, 2> to_floats(const std::array<T, 2>& value)
-  //{
-  //  return{ { static_cast<float>(value[0]), static_cast<float>(value[1]) } };
-  //}
-
   int kpp_index_to_raw_index(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, Color c) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * COLOR_NB + c;
   }
@@ -117,16 +107,16 @@ namespace
       (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + c;
   }
 
-  void increase_parameters(int64_t current_index, float dt, float& w, float& m, float& v, float& sum_w, int64_t& last_update_index) {
-    float previous_w = w;
+  void increase_parameters(int64_t current_index, VALUE_TYPE dt, VALUE_TYPE& w, VALUE_TYPE& m, VALUE_TYPE& v, VALUE_TYPE& sum_w, int64_t& last_update_index) {
+    VALUE_TYPE previous_w = w;
 
     // Adam
-    m = ADAM_BETA1 * m + (1.0f - ADAM_BETA1) * dt;
-    v = ADAM_BETA2 * v + (1.0f - ADAM_BETA2) * dt * dt;
-    float t = current_index + 1.0f;
-    float mm = m / (1.0f - pow(ADAM_BETA1, t));
-    float vv = v / (1.0f - pow(ADAM_BETA2, t));
-    float delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
+    m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
+    v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
+    VALUE_TYPE t = current_index + 1.0;
+    VALUE_TYPE mm = m / (1.0 - pow(ADAM_BETA1, t));
+    VALUE_TYPE vv = v / (1.0 - pow(ADAM_BETA2, t));
+    VALUE_TYPE delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
     //std::cerr << current_index << " " << delta << std::endl;
     w += delta;
 
@@ -136,13 +126,13 @@ namespace
   }
 
   template<typename T>
-  void increase_parameters(int64_t current_index, float delta, int feature_index, T& eval_element, std::vector<float>& w, std::vector<float>& m, std::vector<float>& v, std::vector<float>& sum_w, std::vector<int64_t>& last_update_indexes) {
+  void increase_parameters(int64_t current_index, VALUE_TYPE delta, int feature_index, T& eval_element, std::vector<VALUE_TYPE>& w, std::vector<VALUE_TYPE>& m, std::vector<VALUE_TYPE>& v, std::vector<VALUE_TYPE>& sum_w, std::vector<int64_t>& last_update_indexes) {
     increase_parameters(current_index, delta, w[feature_index], m[feature_index], v[feature_index], sum_w[feature_index], last_update_indexes[feature_index]);
     eval_element = static_cast<T>(std::round(w[feature_index]));
   }
 
   template<typename T>
-  void clamp_and_store(int64_t current_index, int feature_index, T& dest, std::vector<float>& sum_w, std::vector<float>& w, std::vector<int64_t>& last_update_indexes)
+  void clamp_and_store(int64_t current_index, int feature_index, T& dest, std::vector<VALUE_TYPE>& sum_w, std::vector<VALUE_TYPE>& w, std::vector<int64_t>& last_update_indexes)
   {
     sum_w[feature_index] += w[feature_index] * (current_index - last_update_indexes[feature_index]);
     int64_t value = static_cast<int64_t>(std::round(sum_w[feature_index] / current_index));
@@ -170,20 +160,20 @@ void Learner::learn()
   int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO);
 
   // 重みベクトル
-  std::vector<float> w(vector_length);
+  std::vector<VALUE_TYPE> w(vector_length);
   // Adam用変数
-  std::vector<float> m(vector_length);
+  std::vector<VALUE_TYPE> m(vector_length);
   // Adam用変数
-  std::vector<float> v(vector_length);
+  std::vector<VALUE_TYPE> v(vector_length);
   // 平均化確率的勾配降下法用変数
-  std::vector<float> sum_w(vector_length);
+  std::vector<VALUE_TYPE> sum_w(vector_length);
   std::vector<int64_t> last_update_indexes(vector_length);
 
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          w[kpp_index_to_raw_index(k, p0, p1, c)] = static_cast<float>(Eval::kpp[k][p0][p1][c]);
+          w[kpp_index_to_raw_index(k, p0, p1, c)] = static_cast<VALUE_TYPE>(Eval::kpp[k][p0][p1][c]);
         }
       }
     }
@@ -192,7 +182,7 @@ void Learner::learn()
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          w[kkp_index_to_raw_index(k0, k1, p, c)] = static_cast<float>(Eval::kkp[k0][k1][p][c]);
+          w[kkp_index_to_raw_index(k0, k1, p, c)] = static_cast<VALUE_TYPE>(Eval::kkp[k0][k1][p][c]);
         }
       }
     }
@@ -200,7 +190,7 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        w[kk_index_to_raw_index(k0, k1, c)] = static_cast<float>(Eval::kk[k0][k1][c]);
+        w[kk_index_to_raw_index(k0, k1, c)] = static_cast<VALUE_TYPE>(Eval::kk[k0][k1][c]);
       }
     }
   }
@@ -267,13 +257,13 @@ void Learner::learn()
     }
 
     // 深い深さの探索による評価値との差分を求める
-    float delta = static_cast<float>((recordValue - value) * FV_SCALE);
+    VALUE_TYPE delta = static_cast<VALUE_TYPE>((recordValue - value) * FV_SCALE);
     // Aperyだと[0]に相当する値は現在の局面の手番で場合分けしている
-    float delta0 = rootColor == BLACK ? delta : -delta;
+    VALUE_TYPE delta0 = rootColor == BLACK ? delta : -delta;
     // Aperyだと[1]に相当する値は現在の局面の手番と
     // 浅い探索のPVの末端の局面の手番が等しいかどうかで場合分けしている
     // TODO(tanuki-): 理由を考える
-    float delta1 = rootColor == position.side_to_move() ? delta : -delta;
+    VALUE_TYPE delta1 = rootColor == position.side_to_move() ? delta : -delta;
 
     // 値を更新する
     Square sq_bk = position.king_square(BLACK);
@@ -306,14 +296,12 @@ void Learner::learn()
       increase_parameters(current_index, delta1, kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE), Eval::kkp[sq_bk][sq_wk][k0][WHITE], w, m, v, sum_w, last_update_indexes);
     }
 
-    // 前回計算した分をクリアする
-    Value value_after = Eval::compute_eval(position);
-    if (rootColor != position.side_to_move()) {
-      value_after = -value_after;
-    }
-    //ASSERT_LV3(value == value_after);
-
     if (current_index % 1000 == 0) {
+      Value value_after = Eval::compute_eval(position);
+      if (rootColor != position.side_to_move()) {
+        value_after = -value_after;
+      }
+
       fprintf(stderr, "recorded=%5d before=%5d after=%5d delta=%5d target=%c turn=%s\n",
         static_cast<int>(recordValue),
         static_cast<int>(value),
