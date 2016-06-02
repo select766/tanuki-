@@ -13,13 +13,14 @@ using Search::RootMove;
 
 namespace
 {
-  constexpr int NumGames = 100000;
+  constexpr int NumGames = 1000000;
   constexpr char* BookFileName = "book.sfen";
-  constexpr char* OutputFileName = "kifu/kifu.2016-05-30.100000.csv";
+  constexpr char* OutputFileName = "kifu/kifu.2016-06-01.1000000.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
   constexpr int MaxGamePlay = 256;
   constexpr int MaxSwapTrials = 10;
+  constexpr int MaxTrialsToSelectSquares = 100;
 
   std::mutex output_mutex;
   std::ofstream output_stream;
@@ -139,12 +140,23 @@ namespace
             // 一時領域として使用するマスを選ぶ
             Square square0;
             Square square1;
-            do {
+            int num_trials_to_select_squares;
+            // 無限ループに陥る場合があるので制限をかける
+            for (num_trials_to_select_squares = 0;
+              num_trials_to_select_squares < MaxTrialsToSelectSquares;
+              ++num_trials_to_select_squares) {
               std::uniform_int_distribution<> square_index_distribution(0, myPieceSquares.size() - 1);
               square0 = myPieceSquares[square_index_distribution(mt19937_64)];
               square1 = myPieceSquares[square_index_distribution(mt19937_64)];
               // 同じ種類の駒を選ばないようにする
-            } while (pos.piece_on(square0) == pos.piece_on(square1));
+              if (pos.piece_on(square0) != pos.piece_on(square1)) {
+                break;
+              }
+            }
+
+            if (num_trials_to_select_squares == MaxTrialsToSelectSquares) {
+              break;
+            }
 
             Piece piece0 = pos.piece_on(square0);
             PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
@@ -221,8 +233,7 @@ namespace
 
         //std::cerr << pos << std::endl;
 
-        thread.Thread::start_searching();
-        thread.wait_for_search_finished();
+        thread.Thread::search();
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         int score = thread.rootMoves[0].score;

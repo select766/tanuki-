@@ -37,14 +37,14 @@ namespace
     Value value;
   };
 
-  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-05-30.100000.csv";
+  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-06-01.1000000.csv";
   constexpr Value CLOSE_OUT_VALUE_THRESHOLD = Value(2000);
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
   constexpr VALUE_TYPE EPS = 1e-8;
   constexpr VALUE_TYPE ADAM_BETA1 = 0.9;
   constexpr VALUE_TYPE ADAM_BETA2 = 0.999;
-  constexpr VALUE_TYPE LEARNING_RATE = 0.01;
+  constexpr VALUE_TYPE LEARNING_RATE = 0.001;
   constexpr int MAX_GAME_PLAY = 256;
 
   std::ifstream kifu_file_stream;
