@@ -579,10 +579,13 @@ namespace YaneuraOu2016Mid
 
         // 置換表がhitしなかった場合、bestValueの初期値としてevaluate()を呼び出すしかないが、
         // NULL_MOVEの場合は前の局面での値を反転させると良い。(手番を考慮しない評価関数であるなら)
-        // NULL_MOVEしているということは王手がかかっていないということであり、staticEvalの値は取り出せるはず。
+        // NULL_MOVEしているということは王手がかかっていないということであり、前の局面でevaluate()は呼び出しているから
+        // StateInfo.sumは更新されていて、そのあとdo_null_move()ではStateInfoが丸ごとコピーされるから、現在のpos.state().sumは
+        // 正しい値のはず。
         ss->staticEval = bestValue =
          (ss - 1)->currentMove != MOVE_NULL ? evaluate(pos)
                                             : -(ss - 1)->staticEval;
+
       }
 
       // Stand pat.
@@ -644,7 +647,7 @@ namespace YaneuraOu2016Mid
 
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
-    if (pos.state()->sumKKP == INT_MAX)
+    if (pos.state()->sum.p[2][0] == INT_MAX)
       evaluate(pos);
 
     while ((move = mp.next_move()) != MOVE_NONE)
@@ -1296,7 +1299,7 @@ namespace YaneuraOu2016Mid
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
     // ss->staticEvalに代入するとimprovingの判定間違うのでそれはしないほうがよさげ。
-    if (pos.state()->sumKKP == INT_MAX)
+    if (pos.state()->sum.p[2][0] == INT_MAX)
       evaluate(pos);
 
     MovePicker mp(pos, ttMove, depth, thisThread->history, cmh, fmh, cm, ss);
@@ -1798,11 +1801,6 @@ void Search::init() {
 #endif
 
   // -----------------------
-  //   定跡の読み込み
-  // -----------------------
-  Book::read_book("book/standard_book.db", book);
-
-  // -----------------------
   // LMRで使うreduction tableの初期化
   // -----------------------
 
@@ -1848,6 +1846,19 @@ void Search::init() {
 // isreadyコマンドの応答中に呼び出される。時間のかかる処理はここに書くこと。
 void Search::clear()
 {
+  // -----------------------
+  //   定跡の読み込み
+  // -----------------------
+  static bool first = true;
+  if (first)
+  {
+    Book::read_book("book/standard_book.db", book);
+    first = false;
+  }
+
+  // -----------------------
+  //   置換表のクリアなど
+  // -----------------------
   TT.clear();
   CounterMoveHistory.clear();
 
