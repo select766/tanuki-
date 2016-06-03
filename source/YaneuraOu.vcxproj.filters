@@ -134,7 +134,7 @@
       <Filter>リソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="learner.h">
-      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
+      <Filter>リソース ファイル</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

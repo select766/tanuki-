@@ -261,11 +261,11 @@
 #endif
 
 #ifdef KIFU_GENERATOR_ENGINE
-#define ENGINE_NAME "YaneuraOu 2016 Mid"
+#define ENGINE_NAME "Kifu Generator"
 // 開発中なのでassertを有効に。
-#define ASSERT_LV 3
+#define ASSERT_LV 0
 #define ENABLE_TEST_CMD
-#define EVAL_KPP
+#define EVAL_KPPT
 #define USE_SEE
 #define USE_MOVE_PICKER
 #define LONG_EFFECT_LIBRARY

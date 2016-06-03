@@ -644,7 +644,7 @@ namespace KifuGenerator
 
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
-    if (pos.state()->sumKKP == INT_MAX)
+    if (pos.state()->sum.p[2][0] == INT_MAX)
       evaluate(pos);
 
     while ((move = mp.next_move()) != MOVE_NONE)
@@ -1301,7 +1301,7 @@ namespace KifuGenerator
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
     // ss->staticEvalに代入するとimprovingの判定間違うのでそれはしないほうがよさげ。
-    if (pos.state()->sumKKP == INT_MAX)
+    if (pos.state()->sum.p[2][0] == INT_MAX)
       evaluate(pos);
 
     MovePicker mp(pos, ttMove, depth, thisThread->history, cmh, fmh, cm, ss);
