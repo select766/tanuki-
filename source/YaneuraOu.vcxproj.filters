@@ -59,6 +59,9 @@
     <Filter Include="リソース ファイル\engine\2016-mid-engine">
       <UniqueIdentifier>{307735dd-d642-4bb7-a1c0-4b578152201a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="リソース ファイル\engine\kifu-generator-engine">
+      <UniqueIdentifier>{05f76b83-9c39-4d4c-bb0e-760d2d0c8288}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="evaluate.h">
@@ -123,6 +126,12 @@
     </ClInclude>
     <ClInclude Include="extra\evalsum.h">
       <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\kifu-generator-engine\parameters.h">
+      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="kifu_generator.h">
+      <Filter>リソース ファイル</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -221,6 +230,12 @@
     </ClCompile>
     <ClCompile Include="eval\evaluate_kppt.cpp">
       <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\kifu-generator-engine\kifu-generator-engine.cpp">
+      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="kifu_generator.cpp">
+      <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
