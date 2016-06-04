@@ -29,7 +29,7 @@ namespace Eval
 
 namespace
 {
-  using VALUE_TYPE = double;
+  using WeightType = float;
 
   struct PositionAndValue
   {
@@ -37,14 +37,31 @@ namespace
     Value value;
   };
 
+  struct Weight
+  {
+    // 重み
+    WeightType w;
+    // Adam用変数
+    WeightType m;
+    WeightType v;
+    // 平均化確率的勾配降下法用変数
+    WeightType sum_w;
+    int64_t last_update_index;
+
+    template<typename T>
+    void update(int64_t current_index, double dt, T& eval_weight);
+    template<typename T>
+    void finalize(int64_t current_index, T& eval_weight);
+  };
+
   constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-06-01.1000000.csv";
   constexpr Value CLOSE_OUT_VALUE_THRESHOLD = Value(2000);
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
-  constexpr VALUE_TYPE EPS = 1e-8;
-  constexpr VALUE_TYPE ADAM_BETA1 = 0.9;
-  constexpr VALUE_TYPE ADAM_BETA2 = 0.999;
-  constexpr VALUE_TYPE LEARNING_RATE = 0.001;
+  constexpr WeightType EPS = 1e-8;
+  constexpr WeightType ADAM_BETA1 = 0.9;
+  constexpr WeightType ADAM_BETA2 = 0.999;
+  constexpr WeightType LEARNING_RATE = 0.001;
   constexpr int MAX_GAME_PLAY = 256;
 
   std::ifstream kifu_file_stream;
@@ -110,38 +127,37 @@ namespace
       (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + c;
   }
 
-  void increase_parameters(int64_t current_index, VALUE_TYPE dt, VALUE_TYPE& w, VALUE_TYPE& m, VALUE_TYPE& v, VALUE_TYPE& sum_w, int64_t& last_update_index) {
-    VALUE_TYPE previous_w = w;
+  template<typename T>
+  void Weight::update(int64_t current_index, double dt, T& eval_weight)
+  {
+    WeightType previous_w = w;
 
     // Adam
     m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
     v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
-    VALUE_TYPE t = current_index + 1.0;
-    VALUE_TYPE mm = m / (1.0 - pow(ADAM_BETA1, t));
-    VALUE_TYPE vv = v / (1.0 - pow(ADAM_BETA2, t));
-    VALUE_TYPE delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
+    WeightType t = current_index + 1;
+    WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
+    WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
+    WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
     //std::cerr << current_index << " " << delta << std::endl;
     w += delta;
 
     // 平均化確率的勾配降下法
     sum_w += previous_w * (current_index - last_update_index);
     last_update_index = current_index;
+
+    // 重みテーブルに書き戻す
+    eval_weight = static_cast<T>(std::round(w));
   }
 
   template<typename T>
-  void increase_parameters(int64_t current_index, VALUE_TYPE delta, int feature_index, T& eval_element, std::vector<VALUE_TYPE>& w, std::vector<VALUE_TYPE>& m, std::vector<VALUE_TYPE>& v, std::vector<VALUE_TYPE>& sum_w, std::vector<int64_t>& last_update_indexes) {
-    increase_parameters(current_index, delta, w[feature_index], m[feature_index], v[feature_index], sum_w[feature_index], last_update_indexes[feature_index]);
-    eval_element = static_cast<T>(std::round(w[feature_index]));
-  }
-
-  template<typename T>
-  void clamp_and_store(int64_t current_index, int feature_index, T& dest, std::vector<VALUE_TYPE>& sum_w, std::vector<VALUE_TYPE>& w, std::vector<int64_t>& last_update_indexes)
+  void Weight::finalize(int64_t current_index, T& eval_weight)
   {
-    sum_w[feature_index] += w[feature_index] * (current_index - last_update_indexes[feature_index]);
-    int64_t value = static_cast<int64_t>(std::round(sum_w[feature_index] / current_index));
+    sum_w += w * (current_index - last_update_index);
+    int64_t value = static_cast<int64_t>(std::round(sum_w / current_index));
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
-    dest = static_cast<T>(value);
+    eval_weight = static_cast<T>(value);
   }
 }
 
@@ -162,21 +178,15 @@ void Learner::learn()
 
   int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO);
 
-  // 重みベクトル
-  std::vector<VALUE_TYPE> w(vector_length);
-  // Adam用変数
-  std::vector<VALUE_TYPE> m(vector_length);
-  // Adam用変数
-  std::vector<VALUE_TYPE> v(vector_length);
-  // 平均化確率的勾配降下法用変数
-  std::vector<VALUE_TYPE> sum_w(vector_length);
-  std::vector<int64_t> last_update_indexes(vector_length);
+  std::vector<Weight> weights(vector_length);
+  memset(&weights[0], 0, sizeof(weights[0]) * weights.size());
 
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          w[kpp_index_to_raw_index(k, p0, p1, c)] = static_cast<VALUE_TYPE>(Eval::kpp[k][p0][p1][c]);
+          weights[kpp_index_to_raw_index(k, p0, p1, c)].w =
+            static_cast<WeightType>(Eval::kpp[k][p0][p1][c]);
         }
       }
     }
@@ -185,7 +195,8 @@ void Learner::learn()
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          w[kkp_index_to_raw_index(k0, k1, p, c)] = static_cast<VALUE_TYPE>(Eval::kkp[k0][k1][p][c]);
+          weights[kkp_index_to_raw_index(k0, k1, p, c)].w =
+            static_cast<WeightType>(Eval::kkp[k0][k1][p][c]);
         }
       }
     }
@@ -193,7 +204,8 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        w[kk_index_to_raw_index(k0, k1, c)] = static_cast<VALUE_TYPE>(Eval::kk[k0][k1][c]);
+        weights[kk_index_to_raw_index(k0, k1, c)].w =
+          static_cast<WeightType>(Eval::kk[k0][k1][c]);
       }
     }
   }
@@ -208,13 +220,13 @@ void Learner::learn()
   std::vector<std::thread> threads;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_current_index, &threads, &w, &m, &v, &sum_w, &last_update_indexes, thread_index] {
+    auto procedure = [&global_current_index, &threads, &weights, thread_index] {
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
       pos.set_this_thread(&thread);
-      Value recordValue;
-      while (read_position_and_value(pos, recordValue)) {
+      Value record_value;
+      while (read_position_and_value(pos, record_value)) {
         pos.check_info_update();
 
         int64_t current_index = global_current_index++;
@@ -241,9 +253,6 @@ void Learner::learn()
             }
           }
         }
-        //for (auto m : MoveList<LEGAL>(pos)) {
-        //  thread.rootMoves.push_back(Search::RootMove(m));
-        //}
 
         Color rootColor = pos.side_to_move();
 
@@ -259,10 +268,7 @@ void Learner::learn()
           thread.rootDepth = 0;
           pos.set_this_thread(&thread);
 
-          //std::cerr << pos << std::endl;
-
           thread.search();
-          //Value debugValue = thread.rootMoves[0].score;
           value = thread.rootMoves[0].score;
 
           // 静止した局面まで進める
@@ -270,25 +276,15 @@ void Learner::learn()
           int play = 0;
           for (auto m : thread.rootMoves[0].pv) {
             pos.do_move(m, stateInfo[play++]);
-            //Eval::evaluate(pos);
           }
-          //value = Eval::evaluate(pos);
-          //if (rootColor != pos.side_to_move()) {
-          //  value = -value;
-          //}
-          //std::cerr << pos << std::endl;
-          //std::cerr << "debugValue=" << debugValue << " value=" << value << std::endl;
-          //ASSERT_LV3(value == debugValue);
         }
 
         // 深い深さの探索による評価値との差分を求める
-        VALUE_TYPE delta = static_cast<VALUE_TYPE>((recordValue - value) * FV_SCALE);
-        // Aperyだと[0]に相当する値は現在の局面の手番で場合分けしている
-        VALUE_TYPE delta0 = rootColor == BLACK ? delta : -delta;
-        // Aperyだと[1]に相当する値は現在の局面の手番と
-        // 浅い探索のPVの末端の局面の手番が等しいかどうかで場合分けしている
-        // TODO(tanuki-): 理由を考える
-        VALUE_TYPE delta1 = rootColor == pos.side_to_move() ? delta : -delta;
+        WeightType delta = static_cast<WeightType>((record_value - value) * FV_SCALE);
+        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+        WeightType delta_color = (rootColor == BLACK ? delta : -delta);
+        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+        WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
 
         // 値を更新する
         Square sq_bk = pos.king_square(BLACK);
@@ -297,8 +293,8 @@ void Learner::learn()
         const auto& list1 = pos.eval_list()->piece_list_fw();
 
         // KK
-        increase_parameters(current_index, delta0, kk_index_to_raw_index(sq_bk, sq_wk, BLACK), Eval::kk[sq_bk][sq_wk][BLACK], w, m, v, sum_w, last_update_indexes);
-        increase_parameters(current_index, delta1, kk_index_to_raw_index(sq_bk, sq_wk, WHITE), Eval::kk[sq_bk][sq_wk][WHITE], w, m, v, sum_w, last_update_indexes);
+        weights[kk_index_to_raw_index(sq_bk, sq_wk, BLACK)].update(current_index, delta_color, Eval::kk[sq_bk][sq_wk][BLACK]);
+        weights[kk_index_to_raw_index(sq_bk, sq_wk, WHITE)].update(current_index, delta_turn, Eval::kk[sq_bk][sq_wk][WHITE]);
 
         for (int i = 0; i < PIECE_NO_KING; ++i) {
           Eval::BonaPiece k0 = list0[i];
@@ -308,17 +304,17 @@ void Learner::learn()
             Eval::BonaPiece l1 = list1[j];
 
             // KPP
-            increase_parameters(current_index, delta0, kpp_index_to_raw_index(sq_bk, k0, l0, BLACK), Eval::kpp[sq_bk][k0][l0][BLACK], w, m, v, sum_w, last_update_indexes);
-            increase_parameters(current_index, delta1, kpp_index_to_raw_index(sq_bk, k0, l0, WHITE), Eval::kpp[sq_bk][k0][l0][WHITE], w, m, v, sum_w, last_update_indexes);
+            weights[kpp_index_to_raw_index(sq_bk, k0, l0, BLACK)].update(current_index, delta_color, Eval::kpp[sq_bk][k0][l0][BLACK]);
+            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WHITE)].update(current_index, delta_turn, Eval::kpp[sq_bk][k0][l0][WHITE]);
 
             // KPP
-            increase_parameters(current_index, -delta0, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, BLACK), Eval::kpp[Inv(sq_wk)][k1][l1][BLACK], w, m, v, sum_w, last_update_indexes);
-            increase_parameters(current_index, delta1, kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WHITE), Eval::kpp[Inv(sq_wk)][k1][l1][WHITE], w, m, v, sum_w, last_update_indexes);
+            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, BLACK)].update(current_index, -delta_color, Eval::kpp[Inv(sq_wk)][k1][l1][BLACK]);
+            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WHITE)].update(current_index, delta_turn, Eval::kpp[Inv(sq_wk)][k1][l1][WHITE]);
           }
 
           // KKP
-          increase_parameters(current_index, delta0, kkp_index_to_raw_index(sq_bk, sq_wk, k0, BLACK), Eval::kkp[sq_bk][sq_wk][k0][BLACK], w, m, v, sum_w, last_update_indexes);
-          increase_parameters(current_index, delta1, kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE), Eval::kkp[sq_bk][sq_wk][k0][WHITE], w, m, v, sum_w, last_update_indexes);
+          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, BLACK)].update(current_index, delta_color, Eval::kkp[sq_bk][sq_wk][k0][BLACK]);
+          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE)].update(current_index, delta_turn, Eval::kkp[sq_bk][sq_wk][k0][WHITE]);
         }
 
         if (current_index % 10000 == 0) {
@@ -327,17 +323,19 @@ void Learner::learn()
             value_after = -value_after;
           }
 
-          fprintf(stderr, "index=%I64d recorded=%5d before=%5d after=%5d delta=%5d target=%c turn=%s\n",
+          fprintf(stderr, "index=%I64d recorded=%5d before=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
             current_index,
-            static_cast<int>(recordValue),
+            static_cast<int>(record_value),
             static_cast<int>(value),
             static_cast<int>(value_after),
             static_cast<int>(value_after - value),
             delta > 0 ? '+' : '-',
-            rootColor == BLACK ? "black" : "white");
+            rootColor == BLACK ? "black" : "white",
+            abs(record_value - value) > abs(record_value - value_after) ? '>' :
+            abs(record_value - value) == abs(record_value - value_after) ? '=' : '<');
         }
 
-        // 局面は元に戻さなくても大丈夫
+        // 局面は元に戻さなくても問題ない
       }
     };
 
@@ -351,7 +349,7 @@ void Learner::learn()
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          clamp_and_store(global_current_index, kpp_index_to_raw_index(k, p0, p1, c), Eval::kpp[k][p0][p1][c], sum_w, w, last_update_indexes);
+          weights[kpp_index_to_raw_index(k, p0, p1, c)].finalize(global_current_index, Eval::kpp[k][p0][p1][c]);
         }
       }
     }
@@ -360,7 +358,7 @@ void Learner::learn()
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
         for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          clamp_and_store(global_current_index, kkp_index_to_raw_index(k0, k1, p, c), Eval::kkp[k0][k1][p][c], sum_w, w, last_update_indexes);
+          weights[kkp_index_to_raw_index(k0, k1, p, c)].finalize(global_current_index, Eval::kkp[k0][k1][p][c]);
         }
       }
     }
@@ -368,7 +366,7 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        clamp_and_store(global_current_index, kk_index_to_raw_index(k0, k1, c), Eval::kk[k0][k1][c], sum_w, w, last_update_indexes);
+        weights[kk_index_to_raw_index(k0, k1, c)].finalize(global_current_index, Eval::kk[k0][k1][c]);
       }
     }
   }
