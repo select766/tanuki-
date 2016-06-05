@@ -265,9 +265,10 @@ namespace
 
       // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
       // 処理に含めないようfalseを返す
-      //if (value != value_pv) {
-      //  return false;
-      //}
+      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
+      if (value != value_pv) {
+        return false;
+      }
     }
 
     return true;
