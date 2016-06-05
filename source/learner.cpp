@@ -114,7 +114,7 @@ namespace
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock_guard(mutex);
 
-    if (kifu_file_loop >= MAX_KIFU_FILE_LOOP) {
+    if (kifu_file_loop > MAX_KIFU_FILE_LOOP) {
       return false;
     }
 
