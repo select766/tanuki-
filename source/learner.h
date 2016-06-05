@@ -4,6 +4,7 @@
 namespace Learner
 {
   void learn();
+  void error_measurement();
 }
 
 #endif

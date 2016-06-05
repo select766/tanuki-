@@ -653,8 +653,12 @@ void USI::loop(int argc,char* argv[])
       KifuGenerator::generate();
       break;
     }
-    else if (token == "learn") {
+    else if (token == "learn" || token == "l") {
       Learner::learn();
+      break;
+    }
+    else if (token == "error_measurement" || token == "e") {
+      Learner::error_measurement();
       break;
     }
     ;

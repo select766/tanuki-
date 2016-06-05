@@ -63,16 +63,50 @@ namespace
   constexpr WeightType ADAM_BETA2 = 0.999;
   constexpr WeightType LEARNING_RATE = 0.001;
   constexpr int MAX_GAME_PLAY = 256;
+  constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
+  constexpr int MAX_KIFU_FILE_LOOP = 3;
 
   std::ifstream kifu_file_stream;
   std::vector<PositionAndValue> position_and_values;
   int position_and_value_index = 0;
-
+  int kifu_file_loop = 0;
 
   bool open_kifu()
   {
     kifu_file_stream.open(KIFU_FILE_NAME);
-    return kifu_file_stream.is_open();
+    if (!kifu_file_stream.is_open()) {
+      sync_cout << "info string Failed to open the kifu file." << sync_endl;
+      return false;
+    }
+    return true;
+  }
+
+  bool try_fill_buffer() {
+    position_and_values.clear();
+    position_and_value_index = 0;
+
+    std::string sfen;
+    while (static_cast<int>(position_and_values.size()) < POSITION_BATCH_SIZE &&
+      std::getline(kifu_file_stream, sfen, ',')) {
+      int value;
+      kifu_file_stream >> value;
+      std::string _;
+      std::getline(kifu_file_stream, _);
+
+      if (abs(value) > CLOSE_OUT_VALUE_THRESHOLD) {
+        continue;
+      }
+
+      PositionAndValue position_and_value = { sfen, static_cast<Value>(value) };
+      position_and_values.push_back(position_and_value);
+    }
+
+    if (position_and_values.empty()) {
+      return false;
+    }
+
+    std::random_shuffle(position_and_values.begin(), position_and_values.end());
+    return true;
   }
 
   bool read_position_and_value(Position& pos, Value& value)
@@ -80,31 +114,32 @@ namespace
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock_guard(mutex);
 
-    if (static_cast<int>(position_and_values.size()) <= position_and_value_index) {
-      position_and_values.clear();
-      position_and_value_index = 0;
+    if (kifu_file_loop >= MAX_KIFU_FILE_LOOP) {
+      return false;
+    }
 
-      std::string sfen;
-      while (static_cast<int>(position_and_values.size()) < POSITION_BATCH_SIZE &&
-        std::getline(kifu_file_stream, sfen, ',')) {
-        int value;
-        kifu_file_stream >> value;
-        std::string _;
-        std::getline(kifu_file_stream, _);
-
-        if (abs(value) > CLOSE_OUT_VALUE_THRESHOLD) {
-          continue;
+    if (position_and_value_index >= static_cast<int>(position_and_values.size())) {
+      // 局面バッファを最後まで使い切った場合は
+      // 棋譜ファイルから局面をバッファに読み込む
+      if (!try_fill_buffer()) {
+        // 棋譜ファイルから局面をバッファに読み込めなかった場合は
+        // 棋譜ファイルを開き直す
+        if (kifu_file_loop++ >= MAX_KIFU_FILE_LOOP) {
+          // ファイルの読み込み回数の上限に達していたら終了する
+          return false;
         }
 
-        PositionAndValue position_and_value = { sfen, static_cast<Value>(value) };
-        position_and_values.push_back(position_and_value);
-      }
+        if (!open_kifu()) {
+          // そもそもファイルを開くことができない場合は終了する
+          return false;
+        }
 
-      if (position_and_values.empty()) {
-        return false;
+        // 棋譜ファイルから局面バッファに読み込む
+        if (!try_fill_buffer()) {
+          // 棋譜ファイルから局面バッファに読み込めなかった場合は終了する
+          return false;
+        }
       }
-
-      std::random_shuffle(position_and_values.begin(), position_and_values.end());
     }
 
     pos.set(position_and_values[position_and_value_index].sfen);
@@ -159,6 +194,84 @@ namespace
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
     eval_weight = static_cast<T>(value);
   }
+
+  // 浅く探索する
+  // pos 探索対象の局面
+  // value 浅い探索の評価値
+  // rootColor 探索対象の局面の手番
+  // return 浅い探索の評価値とPVの末端ノードの評価値が一致していればtrue
+  //        そうでない場合はfalse
+  bool search_shallowly(Position& pos, Value& value, Color& root_color) {
+    Thread& thread = *pos.this_thread();
+    root_color = pos.side_to_move();
+
+    pos.check_info_update();
+
+    // 浅い探索を行う
+    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
+    thread.rootMoves.clear();
+    // 王手が掛かっているかどうかに応じてrootMovesの種類を変える
+    if (pos.in_check()) {
+      for (auto m : MoveList<EVASIONS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+    }
+    else {
+      for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+      for (auto m : MoveList<QUIET_CHECKS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+    }
+
+    if (thread.rootMoves.empty()) {
+      // 現在の局面が静止している状態なのだと思う
+      // 現在の局面の評価値をそのまま使う
+      value = Eval::compute_eval(pos);
+    }
+    else {
+      // 実際に探索する
+      thread.maxPly = 0;
+      thread.rootDepth = 0;
+
+      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
+      // こちらのほうが探索スレッドを起こさないので速いはず
+      thread.search();
+      value = thread.rootMoves[0].score;
+
+      // 静止した局面まで進める
+      StateInfo stateInfo[MAX_PLY];
+      int play = 0;
+      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+      // 全計算はPosition::set()の中で行われているので差分計算ができる
+      Value value_pv = Eval::evaluate(pos);
+      for (auto m : thread.rootMoves[0].pv) {
+        pos.do_move(m, stateInfo[play++]);
+        value_pv = Eval::evaluate(pos);
+      }
+
+      // Eval::evaluate()は常に手番から見た評価値を返すので
+      // 探索開始局面と手番が違う場合は符号を反転する
+      if (root_color != pos.side_to_move()) {
+        value_pv = -value_pv;
+      }
+
+      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
+      // 処理に含めないようfalseを返す
+      //if (value != value_pv) {
+      //  return false;
+      //}
+    }
+
+    return true;
+  }
 }
 
 void Learner::learn()
@@ -170,11 +283,6 @@ void Learner::learn()
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * 2);
 
   Eval::load_eval();
-
-  if (!open_kifu()) {
-    sync_cout << "info string Failed to open the kifu file." << sync_endl;
-    return;
-  }
 
   int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO);
 
@@ -224,59 +332,15 @@ void Learner::learn()
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
-      pos.set_this_thread(&thread);
       Value record_value;
       while (read_position_and_value(pos, record_value)) {
-        pos.check_info_update();
-
         int64_t current_index = global_current_index++;
-        // 浅い探索を行う
-        // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
-        thread.rootMoves.clear();
-        // 王手が掛かっているかどうかに応じてrootMovesの種類を変える
-        if (pos.in_check()) {
-          for (auto m : MoveList<EVASIONS>(pos)) {
-            if (pos.legal(m)) {
-              thread.rootMoves.push_back(Search::RootMove(m));
-            }
-          }
-        }
-        else {
-          for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos)) {
-            if (pos.legal(m)) {
-              thread.rootMoves.push_back(Search::RootMove(m));
-            }
-          }
-          for (auto m : MoveList<QUIET_CHECKS>(pos)) {
-            if (pos.legal(m)) {
-              thread.rootMoves.push_back(Search::RootMove(m));
-            }
-          }
-        }
-
-        Color rootColor = pos.side_to_move();
 
         Value value;
-        if (thread.rootMoves.empty()) {
-          // 現在の局面が静止している状態なのだと思う
-          // 現在の局面の評価値をそのまま使う
-          value = Eval::compute_eval(pos);
-        }
-        else {
-          // 実際に探索する
-          thread.maxPly = 0;
-          thread.rootDepth = 0;
-          pos.set_this_thread(&thread);
-
-          thread.search();
-          value = thread.rootMoves[0].score;
-
-          // 静止した局面まで進める
-          StateInfo stateInfo[MAX_PLY];
-          int play = 0;
-          for (auto m : thread.rootMoves[0].pv) {
-            pos.do_move(m, stateInfo[play++]);
-          }
+        Color rootColor;
+        pos.set_this_thread(&thread);
+        if (!search_shallowly(pos, value, rootColor)) {
+          continue;
         }
 
         // 深い深さの探索による評価値との差分を求める
@@ -372,4 +436,74 @@ void Learner::learn()
   }
 
   Eval::save_eval();
+}
+
+void Learner::error_measurement()
+{
+  ASSERT_LV3(
+    kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO) ==
+    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * 2 +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * 2 +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * 2);
+
+  Eval::load_eval();
+
+  if (!open_kifu()) {
+    sync_cout << "info string Failed to open the kifu file." << sync_endl;
+    return;
+  }
+
+  Search::LimitsType limits;
+  limits.max_game_ply = MAX_GAME_PLAY;
+  limits.depth = 1;
+  limits.silent = true;
+  Search::Limits = limits;
+
+  std::atomic_int64_t global_current_index = 0;
+  std::vector<std::thread> threads;
+  double global_error = 0.0;
+  while (threads.size() < Threads.size()) {
+    int thread_index = static_cast<int>(threads.size());
+    auto procedure = [thread_index, &global_current_index, &threads, &global_error] {
+      double error = 0.0;
+      Thread& thread = *Threads[thread_index];
+
+      Position& pos = thread.rootPos;
+      Value record_value;
+      while (global_current_index < MAX_POSITIONS_FOR_ERROR_MEASUREMENT &&
+        read_position_and_value(pos, record_value)) {
+        int64_t current_index = global_current_index++;
+
+        Value value;
+        Color rootColor;
+        pos.set_this_thread(&thread);
+        if (!search_shallowly(pos, value, rootColor)) {
+          continue;
+        }
+
+        double diff = record_value - value;
+        error += diff * diff;
+
+        if (current_index % 10000 == 0) {
+          Value value_after = Eval::compute_eval(pos);
+          if (rootColor != pos.side_to_move()) {
+            value_after = -value_after;
+          }
+
+          fprintf(stderr, "index=%I64d\n", current_index);
+        }
+      }
+
+      static std::mutex mutex;
+      std::lock_guard<std::mutex> lock_guard(mutex);
+      global_error += error;
+    };
+
+    threads.emplace_back(procedure);
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  sync_cout << "info string Error=" << sqrt(global_error / global_current_index) << sync_endl;
 }
