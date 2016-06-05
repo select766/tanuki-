@@ -1,7 +1,7 @@
-YaneuraOu-2016-mid-engine-slave.exe
-go btime 0 wtime 0 byoyomi 100
+YaneuraOu-learn.exe
+go rtime 100
 setoption name Threads value 1
-setoption name Hash value 1024
+setoption name Hash value 256
 setoption name MultiPV value 1
 setoption name WriteDebugLog value false
 setoption name NetworkDelay value 200
