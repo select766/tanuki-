@@ -31,6 +31,14 @@ namespace
 {
   using WeightType = float;
 
+  enum WeightKind {
+    WEIGHT_KIND_COLOR,
+    WEIGHT_KIND_TURN,
+    WEIGHT_KIND_ZERO = 0,
+    WEIGHT_KIND_NB = 2,
+  };
+  ENABLE_OPERATORS_ON(WeightKind);
+
   struct PositionAndValue
   {
     std::string sfen;
@@ -42,16 +50,17 @@ namespace
     // 重み
     WeightType w;
     // Adam用変数
-    WeightType m;
-    WeightType v;
+    //WeightType m;
+    //WeightType v;
+    int t;
     // 平均化確率的勾配降下法用変数
-    WeightType sum_w;
-    int64_t last_update_index;
+    //WeightType sum_w;
+    //int64_t last_update_index;
 
     template<typename T>
-    void update(int64_t current_index, double dt, T& eval_weight);
+    void update(int64_t position_index, double dt, T& eval_weight);
     template<typename T>
-    void finalize(int64_t current_index, T& eval_weight);
+    void finalize(int64_t position_index, T& eval_weight);
   };
 
   constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-06-01.1000000.csv";
@@ -61,10 +70,10 @@ namespace
   constexpr WeightType EPS = 1e-8;
   constexpr WeightType ADAM_BETA1 = 0.9;
   constexpr WeightType ADAM_BETA2 = 0.999;
-  constexpr WeightType LEARNING_RATE = 0.001;
+  constexpr WeightType LEARNING_RATE = 0.000001;
   constexpr int MAX_GAME_PLAY = 256;
   constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
-  constexpr int MAX_KIFU_FILE_LOOP = 3;
+  constexpr int MAX_KIFU_FILE_LOOP = 1;
 
   std::ifstream kifu_file_stream;
   std::vector<PositionAndValue> position_and_values;
@@ -148,48 +157,50 @@ namespace
     return true;
   }
 
-  int kpp_index_to_raw_index(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, Color c) {
-    return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * COLOR_NB + c;
+  int kpp_index_to_raw_index(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
+    return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
   }
 
-  int kkp_index_to_raw_index(Square k0, Square k1, Eval::BonaPiece p, Color c) {
-    return kpp_index_to_raw_index(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, COLOR_ZERO) +
-      static_cast<int>(static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * Eval::fe_end + p) * COLOR_NB + c;
+  int kkp_index_to_raw_index(Square k0, Square k1, Eval::BonaPiece p, WeightKind weight_kind) {
+    return kpp_index_to_raw_index(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_NB) +
+      static_cast<int>(static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * Eval::fe_end + p) * COLOR_NB + weight_kind;
   }
 
-  int kk_index_to_raw_index(Square k0, Square k1, Color c) {
-    return kkp_index_to_raw_index(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, COLOR_ZERO) +
-      (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + c;
+  int kk_index_to_raw_index(Square k0, Square k1, WeightKind weight_kind) {
+    return kkp_index_to_raw_index(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_NB) +
+      (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + weight_kind;
   }
 
   template<typename T>
-  void Weight::update(int64_t current_index, double dt, T& eval_weight)
+  void Weight::update(int64_t position_index, double dt, T& eval_weight)
   {
-    WeightType previous_w = w;
+    //WeightType previous_w = w;
 
     // Adam
-    m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
-    v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
-    WeightType t = current_index + 1;
-    WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
-    WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
-    WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
+    //m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
+    //v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
+    //WeightType t = current_index + 1;
+    //WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
+    //WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
+    //WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
     //std::cerr << current_index << " " << delta << std::endl;
-    w += delta;
+    //w += delta;
+    w += dt * LEARNING_RATE;
 
     // 平均化確率的勾配降下法
-    sum_w += previous_w * (current_index - last_update_index);
-    last_update_index = current_index;
+    //sum_w += previous_w * (current_index - last_update_index);
+    //last_update_index = current_index;
 
     // 重みテーブルに書き戻す
     eval_weight = static_cast<T>(std::round(w));
   }
 
   template<typename T>
-  void Weight::finalize(int64_t current_index, T& eval_weight)
+  void Weight::finalize(int64_t position_index, T& eval_weight)
   {
-    sum_w += w * (current_index - last_update_index);
-    int64_t value = static_cast<int64_t>(std::round(sum_w / current_index));
+    //sum_w += w * (position_index - last_update_index);
+    //int64_t value = static_cast<int64_t>(std::round(sum_w / current_index));
+    int64_t value = static_cast<int64_t>(std::round(w));
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
     eval_weight = static_cast<T>(value);
@@ -234,7 +245,7 @@ namespace
     if (thread.rootMoves.empty()) {
       // 現在の局面が静止している状態なのだと思う
       // 現在の局面の評価値をそのまま使う
-      value = Eval::compute_eval(pos);
+      value = Eval::evaluate(pos);
     }
     else {
       // 実際に探索する
@@ -278,14 +289,14 @@ namespace
 void Learner::learn()
 {
   ASSERT_LV3(
-    kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO) ==
-    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * 2 +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * 2 +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * 2);
+    kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
+    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   Eval::load_eval();
 
-  int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO);
+  int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
 
   std::vector<Weight> weights(vector_length);
   memset(&weights[0], 0, sizeof(weights[0]) * weights.size());
@@ -293,9 +304,9 @@ void Learner::learn()
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
-        for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          weights[kpp_index_to_raw_index(k, p0, p1, c)].w =
-            static_cast<WeightType>(Eval::kpp[k][p0][p1][c]);
+        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+          weights[kpp_index_to_raw_index(k, p0, p1, weight_kind)].w =
+            static_cast<WeightType>(Eval::kpp[k][p0][p1][weight_kind]);
         }
       }
     }
@@ -303,18 +314,18 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
-        for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          weights[kkp_index_to_raw_index(k0, k1, p, c)].w =
-            static_cast<WeightType>(Eval::kkp[k0][k1][p][c]);
+        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+          weights[kkp_index_to_raw_index(k0, k1, p, weight_kind)].w =
+            static_cast<WeightType>(Eval::kkp[k0][k1][p][weight_kind]);
         }
       }
     }
   }
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
-      for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        weights[kk_index_to_raw_index(k0, k1, c)].w =
-          static_cast<WeightType>(Eval::kk[k0][k1][c]);
+      for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+        weights[kk_index_to_raw_index(k0, k1, weight_kind)].w =
+          static_cast<WeightType>(Eval::kk[k0][k1][weight_kind]);
       }
     }
   }
@@ -325,17 +336,17 @@ void Learner::learn()
   limits.silent = true;
   Search::Limits = limits;
 
-  std::atomic_int64_t global_current_index = 0;
+  std::atomic_int64_t global_position_index = 0;
   std::vector<std::thread> threads;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_current_index, &threads, &weights, thread_index] {
+    auto procedure = [&global_position_index, &threads, &weights, thread_index] {
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
       Value record_value;
       while (read_position_and_value(pos, record_value)) {
-        int64_t current_index = global_current_index++;
+        int64_t position_index = global_position_index++;
 
         Value value;
         Color rootColor;
@@ -358,40 +369,44 @@ void Learner::learn()
         const auto& list1 = pos.eval_list()->piece_list_fw();
 
         // KK
-        weights[kk_index_to_raw_index(sq_bk, sq_wk, BLACK)].update(current_index, delta_color, Eval::kk[sq_bk][sq_wk][BLACK]);
-        weights[kk_index_to_raw_index(sq_bk, sq_wk, WHITE)].update(current_index, delta_turn, Eval::kk[sq_bk][sq_wk][WHITE]);
+        weights[kk_index_to_raw_index(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kk[sq_bk][sq_wk][WEIGHT_KIND_COLOR]);
+        weights[kk_index_to_raw_index(sq_bk, sq_wk, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kk[sq_bk][sq_wk][WEIGHT_KIND_TURN]);
 
         for (int i = 0; i < PIECE_NO_KING; ++i) {
           Eval::BonaPiece k0 = list0[i];
           Eval::BonaPiece k1 = list1[i];
-          for (int j = 0; j < i; ++j) {
+          for (int j = 0; j < PIECE_NO_KING; ++j) {
+            if (i == j) {
+              continue;
+            }
             Eval::BonaPiece l0 = list0[j];
             Eval::BonaPiece l1 = list1[j];
 
             // KPP
-            weights[kpp_index_to_raw_index(sq_bk, k0, l0, BLACK)].update(current_index, delta_color, Eval::kpp[sq_bk][k0][l0][BLACK]);
-            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WHITE)].update(current_index, delta_turn, Eval::kpp[sq_bk][k0][l0][WHITE]);
+            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_COLOR]);
+            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_TURN]);
 
             // KPP
-            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, BLACK)].update(current_index, -delta_color, Eval::kpp[Inv(sq_wk)][k1][l1][BLACK]);
-            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WHITE)].update(current_index, delta_turn, Eval::kpp[Inv(sq_wk)][k1][l1][WHITE]);
+            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)].update(position_index, -delta_color, Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_COLOR]);
+            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_TURN]);
           }
 
           // KKP
-          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, BLACK)].update(current_index, delta_color, Eval::kkp[sq_bk][sq_wk][k0][BLACK]);
-          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WHITE)].update(current_index, delta_turn, Eval::kkp[sq_bk][sq_wk][k0][WHITE]);
+          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kkp[sq_bk][sq_wk][k0][WEIGHT_KIND_COLOR]);
+          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kkp[sq_bk][sq_wk][k0][WEIGHT_KIND_TURN]);
         }
 
-        if (current_index % 10000 == 0) {
+        if (position_index % 10000 == 0) {
           Value value_after = Eval::compute_eval(pos);
           if (rootColor != pos.side_to_move()) {
             value_after = -value_after;
           }
 
-          fprintf(stderr, "index=%I64d recorded=%5d before=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
-            current_index,
+          fprintf(stderr, "position_index=%I64d recorded=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
+            position_index,
             static_cast<int>(record_value),
             static_cast<int>(value),
+            static_cast<int>(record_value - value),
             static_cast<int>(value_after),
             static_cast<int>(value_after - value),
             delta > 0 ? '+' : '-',
@@ -413,8 +428,8 @@ void Learner::learn()
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
-        for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          weights[kpp_index_to_raw_index(k, p0, p1, c)].finalize(global_current_index, Eval::kpp[k][p0][p1][c]);
+        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+          weights[kpp_index_to_raw_index(k, p0, p1, weight_kind)].finalize(global_position_index, Eval::kpp[k][p0][p1][weight_kind]);
         }
       }
     }
@@ -422,16 +437,16 @@ void Learner::learn()
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
       for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
-        for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-          weights[kkp_index_to_raw_index(k0, k1, p, c)].finalize(global_current_index, Eval::kkp[k0][k1][p][c]);
+        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+          weights[kkp_index_to_raw_index(k0, k1, p, weight_kind)].finalize(global_position_index, Eval::kkp[k0][k1][p][weight_kind]);
         }
       }
     }
   }
   for (Square k0 : SQ) {
     for (Square k1 : SQ) {
-      for (Color c = COLOR_ZERO; c < COLOR_NB; ++c) {
-        weights[kk_index_to_raw_index(k0, k1, c)].finalize(global_current_index, Eval::kk[k0][k1][c]);
+      for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
+        weights[kk_index_to_raw_index(k0, k1, weight_kind)].finalize(global_position_index, Eval::kk[k0][k1][weight_kind]);
       }
     }
   }
@@ -442,10 +457,10 @@ void Learner::learn()
 void Learner::error_measurement()
 {
   ASSERT_LV3(
-    kk_index_to_raw_index(SQ_NB, SQ_ZERO, COLOR_ZERO) ==
-    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * 2 +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * 2 +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * 2);
+    kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
+    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   Eval::load_eval();
 
@@ -460,20 +475,22 @@ void Learner::error_measurement()
   limits.silent = true;
   Search::Limits = limits;
 
-  std::atomic_int64_t global_current_index = 0;
+  std::atomic_int64_t global_position_index = 0;
   std::vector<std::thread> threads;
   double global_error = 0.0;
+  double global_norm = 0.0;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [thread_index, &global_current_index, &threads, &global_error] {
+    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm] {
       double error = 0.0;
+      double norm = 0.0;
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
       Value record_value;
-      while (global_current_index < MAX_POSITIONS_FOR_ERROR_MEASUREMENT &&
+      while (global_position_index < MAX_POSITIONS_FOR_ERROR_MEASUREMENT &&
         read_position_and_value(pos, record_value)) {
-        int64_t current_index = global_current_index++;
+        int64_t position_index = global_position_index++;
 
         Value value;
         Color rootColor;
@@ -484,20 +501,22 @@ void Learner::error_measurement()
 
         double diff = record_value - value;
         error += diff * diff;
+        norm += abs(value);
 
-        if (current_index % 10000 == 0) {
+        if (position_index % 100000 == 0) {
           Value value_after = Eval::compute_eval(pos);
           if (rootColor != pos.side_to_move()) {
             value_after = -value_after;
           }
 
-          fprintf(stderr, "index=%I64d\n", current_index);
+          fprintf(stderr, "index=%I64d\n", position_index);
         }
       }
 
       static std::mutex mutex;
       std::lock_guard<std::mutex> lock_guard(mutex);
       global_error += error;
+      global_norm += abs(static_cast<int>(norm));
     };
 
     threads.emplace_back(procedure);
@@ -506,5 +525,8 @@ void Learner::error_measurement()
     thread.join();
   }
 
-  sync_cout << "info string Error=" << sqrt(global_error / global_current_index) << sync_endl;
+  printf(
+    "info string mse=%f norm=%f\n",
+    sqrt(global_error / global_position_index),
+    global_norm / global_position_index);
 }
