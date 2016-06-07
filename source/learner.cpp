@@ -282,6 +282,14 @@ namespace
 
     return true;
   }
+
+  double sigmoid(double x) {
+    return 1.0 / (1.0 + std::exp(-x));
+  }
+
+  double winning_percentage(Value value) {
+    return sigmoid(static_cast<int>(value) / 600.0);
+  }
 }
 
 void Learner::learn()
@@ -353,11 +361,11 @@ void Learner::learn()
           continue;
         }
 
-        // 深い深さの探索による評価値との差分を求める
-        WeightType delta = static_cast<WeightType>((record_value - value) * FV_SCALE);
-        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+        // 勝率の差を求める
+        WeightType delta = winning_percentage(record_value) - winning_percentage(value);
+        // 先手から見た評価値の勾配。sum.p[?][0]に足したり引いたりする。
         WeightType delta_color = (rootColor == BLACK ? delta : -delta);
-        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+        // 手番から見た評価値の勾配。sum.p[?][1]に足したり引いたりする。
         WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
 
         // 値を更新する
@@ -407,17 +415,20 @@ void Learner::learn()
             value_after = -value_after;
           }
 
-          fprintf(stderr, "position_index=%I64d recorded=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
+          double recorded = winning_percentage(record_value);
+          double before = winning_percentage(value);
+          double after = winning_percentage(value_after);
+          fprintf(stderr, "position_index=%I64d recorded=%.2f before=%.2f diff=%5.2f after=%.2f updated=%5d target=%c error=%c\n",
             position_index,
-            static_cast<int>(record_value),
-            static_cast<int>(value),
-            static_cast<int>(record_value - value),
-            static_cast<int>(value_after),
-            static_cast<int>(value_after - value),
+            recorded,
+            before,
+            recorded - before,
+            after,
+            value_after - value,
+            abs(delta) < EPS ? '=' :
             delta > 0 ? '+' : '-',
-            rootColor == BLACK ? "black" : "white",
-            abs(record_value - value) > abs(record_value - value_after) ? '>' :
-            abs(record_value - value) == abs(record_value - value_after) ? '=' : '<');
+            abs(before - after) < EPS ? '=' :
+            abs(recorded - before) > abs(recorded - after) ? '>' : '<');
         }
 
         // 局面は元に戻さなくても問題ない
@@ -484,11 +495,13 @@ void Learner::error_measurement()
   std::vector<std::thread> threads;
   double global_error = 0.0;
   double global_norm = 0.0;
+  double global_winning_percentage_mse = 0.0;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm] {
+    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm, &global_winning_percentage_mse] {
       double error = 0.0;
       double norm = 0.0;
+      double winning_percentage_mse = 0.0;
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
@@ -507,6 +520,8 @@ void Learner::error_measurement()
         double diff = record_value - value;
         error += diff * diff;
         norm += abs(value);
+        double diff_winning_percentage = winning_percentage(record_value) - winning_percentage(value);
+        winning_percentage_mse += diff_winning_percentage * diff_winning_percentage;
 
         if (position_index % 100000 == 0) {
           Value value_after = Eval::compute_eval(pos);
@@ -522,6 +537,7 @@ void Learner::error_measurement()
       std::lock_guard<std::mutex> lock_guard(mutex);
       global_error += error;
       global_norm += abs(static_cast<int>(norm));
+      global_winning_percentage_mse += winning_percentage_mse;
     };
 
     threads.emplace_back(procedure);
@@ -531,7 +547,8 @@ void Learner::error_measurement()
   }
 
   printf(
-    "info string mse=%f norm=%f\n",
+    "info string mse=%f norm=%f winning_percentage_mse=%f\n",
     sqrt(global_error / global_position_index),
-    global_norm / global_position_index);
+    global_norm / global_position_index,
+    sqrt(global_winning_percentage_mse / global_position_index));
 }
