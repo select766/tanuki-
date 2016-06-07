@@ -50,8 +50,8 @@ namespace
     // 重み
     WeightType w;
     // Adam用変数
-    //WeightType m;
-    //WeightType v;
+    WeightType m;
+    WeightType v;
     int t;
     // 平均化確率的勾配降下法用変数
     //WeightType sum_w;
@@ -70,7 +70,7 @@ namespace
   constexpr WeightType EPS = 1e-8;
   constexpr WeightType ADAM_BETA1 = 0.9;
   constexpr WeightType ADAM_BETA2 = 0.999;
-  constexpr WeightType LEARNING_RATE = 0.000001;
+  constexpr WeightType LEARNING_RATE = 0.1;
   constexpr int MAX_GAME_PLAY = 256;
   constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
   constexpr int MAX_KIFU_FILE_LOOP = 1;
@@ -177,15 +177,13 @@ namespace
     //WeightType previous_w = w;
 
     // Adam
-    //m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
-    //v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
-    //WeightType t = current_index + 1;
-    //WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
-    //WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
-    //WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
-    //std::cerr << current_index << " " << delta << std::endl;
-    //w += delta;
-    w += dt * LEARNING_RATE;
+    m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
+    v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
+    ++t;
+    WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
+    WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
+    WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
+    w += delta;
 
     // 平均化確率的勾配降下法
     //sum_w += previous_w * (current_index - last_update_index);
