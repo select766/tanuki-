@@ -1,10 +1,10 @@
-..\..\YaneuraOu2016Engine\YaneuraOu.exe l
+..\..\YaneuraOu2016Engine\YaneuraOu.exe < YaneuraOu-learn.txt
 
 PUSHD eval
 CALL backup.bat
 POPD
 
-..\..\YaneuraOu2016Engine\YaneuraOu.exe e
+..\..\YaneuraOu2016Engine\YaneuraOu.exe < YaneuraOu-error-measurement.txt
 
 PUSHD eval
 CALL restore.bat
