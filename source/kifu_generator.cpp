@@ -13,9 +13,9 @@ using Search::RootMove;
 
 namespace
 {
-  constexpr int NumGames = 1000000;
+  constexpr int NumGames = 100000000;
   constexpr char* BookFileName = "book.sfen";
-  constexpr char* OutputFileName = "kifu/kifu.2016-06-01.1000000.csv";
+  constexpr char* OutputFileName = "kifu/kifu.2016-06-08.100000000.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
   constexpr int MaxGamePlay = 256;
@@ -23,7 +23,7 @@ namespace
   constexpr int MaxTrialsToSelectSquares = 100;
 
   std::mutex output_mutex;
-  std::ofstream output_stream;
+  FILE* output_file = nullptr;
   std::atomic_int global_game_index = 0;
   std::vector<std::string> book;
   std::random_device random_device;
@@ -241,7 +241,12 @@ namespace
         // 読み込んだ局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
           std::lock_guard<std::mutex> lock(output_mutex);
-          output_stream << pos.sfen() << "," << score << std::endl;
+          fprintf(output_file, "%s,%d\n", pos.sfen().c_str(), score);
+          if (game_index % 100000 == 0) {
+            if (fflush(output_file)) {
+              sync_cout << "info string Failed to flush the output file stream." << sync_endl;
+            }
+          }
         }
 
         SetupStates->push(StateInfo());
@@ -259,10 +264,13 @@ void KifuGenerator::generate()
   }
 
   // 出力ファイルを開く
-  output_stream.open(OutputFileName);
-  if (!output_stream.is_open()) {
-    sync_cout << "Error! : can't open " << OutputFileName << sync_endl;
+  output_file = fopen(OutputFileName, "wt");
+  if (!output_file) {
+    sync_cout << "info string Failed to open " << OutputFileName << sync_endl;
     return;
+  }
+  if (setvbuf(output_file, nullptr, _IOFBF, 1024 * 1024)) {
+    sync_cout << "info string Failed to set a buffer to the output file stream." << sync_endl;
   }
 
   Eval::load_eval();
@@ -285,4 +293,9 @@ void KifuGenerator::generate()
   for (auto& thread : threads) {
     thread.join();
   }
+
+  if (fclose(output_file)) {
+    sync_cout << "info string Failed to close the output file stream." << sync_endl;
+  }
+  output_file = nullptr;
 }
