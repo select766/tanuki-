@@ -121,40 +121,48 @@ namespace
 
   bool read_position_and_value(Position& pos, Value& value)
   {
-    static std::mutex mutex;
-    std::lock_guard<std::mutex> lock_guard(mutex);
+    std::string sfen;
 
-    if (kifu_file_loop > MAX_KIFU_FILE_LOOP) {
-      return false;
-    }
+    {
+      static std::mutex mutex;
+      std::lock_guard<std::mutex> lock_guard(mutex);
 
-    if (position_and_value_index >= static_cast<int>(position_and_values.size())) {
-      // 局面バッファを最後まで使い切った場合は
-      // 棋譜ファイルから局面をバッファに読み込む
-      if (!try_fill_buffer()) {
-        // 棋譜ファイルから局面をバッファに読み込めなかった場合は
-        // 棋譜ファイルを開き直す
-        if (kifu_file_loop++ >= MAX_KIFU_FILE_LOOP) {
-          // ファイルの読み込み回数の上限に達していたら終了する
-          return false;
-        }
+      if (kifu_file_loop > MAX_KIFU_FILE_LOOP) {
+        return false;
+      }
 
-        if (!open_kifu()) {
-          // そもそもファイルを開くことができない場合は終了する
-          return false;
-        }
-
-        // 棋譜ファイルから局面バッファに読み込む
+      if (position_and_value_index >= static_cast<int>(position_and_values.size())) {
+        // 局面バッファを最後まで使い切った場合は
+        // 棋譜ファイルから局面をバッファに読み込む
         if (!try_fill_buffer()) {
-          // 棋譜ファイルから局面バッファに読み込めなかった場合は終了する
-          return false;
+          // 棋譜ファイルから局面をバッファに読み込めなかった場合は
+          // 棋譜ファイルを開き直す
+          if (kifu_file_loop++ >= MAX_KIFU_FILE_LOOP) {
+            // ファイルの読み込み回数の上限に達していたら終了する
+            return false;
+          }
+
+          if (!open_kifu()) {
+            // そもそもファイルを開くことができない場合は終了する
+            return false;
+          }
+
+          // 棋譜ファイルから局面バッファに読み込む
+          if (!try_fill_buffer()) {
+            // 棋譜ファイルから局面バッファに読み込めなかった場合は終了する
+            return false;
+          }
         }
       }
+
+      // Position::set()はある程度時間がかかるためスレッド同期の外側で行いたい。
+      // sfenの文字列をコピーしておきあとからset()する。
+      sfen = position_and_values[position_and_value_index].sfen;
+      value = position_and_values[position_and_value_index].value;
+      ++position_and_value_index;
     }
 
-    pos.set(position_and_values[position_and_value_index].sfen);
-    value = position_and_values[position_and_value_index].value;
-    ++position_and_value_index;
+    pos.set(sfen);
     return true;
   }
 
