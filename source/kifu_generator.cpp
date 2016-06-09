@@ -1,6 +1,7 @@
 #include "kifu_generator.h"
 
 #include <atomic>
+#include <ctime>
 #include <fstream>
 #include <mutex>
 #include <random>
@@ -258,6 +259,8 @@ namespace
 
 void KifuGenerator::generate()
 {
+  std::srand(std::time(nullptr));
+
   // ’èÕ‚Ì“Ç‚İ‚İ
   if (!read_book()) {
     return;

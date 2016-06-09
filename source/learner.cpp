@@ -1,6 +1,7 @@
 #include "learner.h"
 
 #include <array>
+#include <ctime>
 #include <fstream>
 
 #include "position.h"
@@ -277,6 +278,8 @@ void Learner::learn()
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
+  std::srand(std::time(nullptr));
+
   Eval::load_eval();
 
   int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
@@ -451,6 +454,8 @@ void Learner::error_measurement()
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
+
+  std::srand(std::time(nullptr));
 
   Eval::load_eval();
 
