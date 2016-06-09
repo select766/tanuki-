@@ -53,7 +53,8 @@ namespace
     // Adam用変数
     WeightType m;
     WeightType v;
-    int t;
+    WeightType adam_beta1_t = 1.0;
+    WeightType adam_beta2_t = 1.0;
     // 平均化確率的勾配降下法用変数
     //WeightType sum_w;
     //int64_t last_update_index;
@@ -188,9 +189,11 @@ namespace
     // Adam
     m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
     v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
-    ++t;
-    WeightType mm = m / (1.0 - pow(ADAM_BETA1, t));
-    WeightType vv = v / (1.0 - pow(ADAM_BETA2, t));
+    // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
+    adam_beta1_t *= ADAM_BETA1;
+    adam_beta2_t *= ADAM_BETA2;
+    WeightType mm = m / (1.0 - adam_beta1_t);
+    WeightType vv = v / (1.0 - adam_beta2_t);
     WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
     w += delta;
 
