@@ -70,7 +70,7 @@ namespace
   constexpr WeightType EPS = 1e-8;
   constexpr WeightType ADAM_BETA1 = 0.9;
   constexpr WeightType ADAM_BETA2 = 0.999;
-  constexpr WeightType LEARNING_RATE = 0.1;
+  constexpr WeightType LEARNING_RATE = 1.0;
   constexpr int MAX_GAME_PLAY = 256;
   constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
   constexpr int MAX_KIFU_FILE_LOOP = 1;
@@ -214,18 +214,58 @@ namespace
     Thread& thread = *pos.this_thread();
     root_color = pos.side_to_move();
 
-    // 現在の局面の評価値をそのまま使う
-    value = Eval::evaluate(pos);
+    pos.check_info_update();
+
+    // 浅い探索を行う
+    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
+    thread.rootMoves.clear();
+    for (auto m : MoveList<LEGAL>(pos)) {
+      if (pos.legal(m)) {
+        thread.rootMoves.push_back(Search::RootMove(m));
+      }
+    }
+
+    if (thread.rootMoves.empty()) {
+      // 現在の局面が静止している状態なのだと思う
+      // 現在の局面の評価値をそのまま使う
+      value = Eval::evaluate(pos);
+    }
+    else {
+      // 実際に探索する
+      thread.maxPly = 0;
+      thread.rootDepth = 0;
+
+      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
+      // こちらのほうが探索スレッドを起こさないので速いはず
+      thread.search();
+      value = thread.rootMoves[0].score;
+
+      // 静止した局面まで進める
+      StateInfo stateInfo[MAX_PLY];
+      int play = 0;
+      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+      // 全計算はPosition::set()の中で行われているので差分計算ができる
+      Value value_pv = Eval::evaluate(pos);
+      for (auto m : thread.rootMoves[0].pv) {
+        pos.do_move(m, stateInfo[play++]);
+        value_pv = Eval::evaluate(pos);
+      }
+
+      // Eval::evaluate()は常に手番から見た評価値を返すので
+      // 探索開始局面と手番が違う場合は符号を反転する
+      if (root_color != pos.side_to_move()) {
+        value_pv = -value_pv;
+      }
+
+      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
+      // 処理に含めないようfalseを返す
+      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
+      if (value != value_pv) {
+        return false;
+      }
+    }
 
     return true;
-  }
-
-  double sigmoid(double x) {
-    return 1.0 / (1.0 + std::exp(-x));
-  }
-
-  double winning_percentage(Value value) {
-    return sigmoid(static_cast<int>(value) / 600.0);
   }
 }
 
@@ -298,11 +338,11 @@ void Learner::learn()
           continue;
         }
 
-        // 勝率の差を求める
-        WeightType delta = winning_percentage(record_value) - winning_percentage(value);
-        // 先手から見た評価値の勾配。sum.p[?][0]に足したり引いたりする。
+        // 深い深さの探索による評価値との差分を求める
+        WeightType delta = static_cast<WeightType>((record_value - value) * FV_SCALE);
+        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
         WeightType delta_color = (rootColor == BLACK ? delta : -delta);
-        // 手番から見た評価値の勾配。sum.p[?][1]に足したり引いたりする。
+        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
         WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
 
         // 値を更新する
@@ -352,20 +392,17 @@ void Learner::learn()
             value_after = -value_after;
           }
 
-          double recorded = winning_percentage(record_value);
-          double before = winning_percentage(value);
-          double after = winning_percentage(value_after);
-          fprintf(stderr, "position_index=%I64d recorded=%.2f before=%.2f diff=%5.2f after=%.2f updated=%5d target=%c error=%c\n",
+          fprintf(stderr, "position_index=%I64d recorded=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
             position_index,
-            recorded,
-            before,
-            recorded - before,
-            after,
-            value_after - value,
-            abs(delta) < EPS ? '=' :
+            static_cast<int>(record_value),
+            static_cast<int>(value),
+            static_cast<int>(record_value - value),
+            static_cast<int>(value_after),
+            static_cast<int>(value_after - value),
             delta > 0 ? '+' : '-',
-            abs(before - after) < EPS ? '=' :
-            abs(recorded - before) > abs(recorded - after) ? '>' : '<');
+            rootColor == BLACK ? "black" : "white",
+            abs(record_value - value) > abs(record_value - value_after) ? '>' :
+            abs(record_value - value) == abs(record_value - value_after) ? '=' : '<');
         }
 
         // 局面は元に戻さなくても問題ない
@@ -432,13 +469,11 @@ void Learner::error_measurement()
   std::vector<std::thread> threads;
   double global_error = 0.0;
   double global_norm = 0.0;
-  double global_winning_percentage_mse = 0.0;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm, &global_winning_percentage_mse] {
+    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm] {
       double error = 0.0;
       double norm = 0.0;
-      double winning_percentage_mse = 0.0;
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
@@ -457,8 +492,6 @@ void Learner::error_measurement()
         double diff = record_value - value;
         error += diff * diff;
         norm += abs(value);
-        double diff_winning_percentage = winning_percentage(record_value) - winning_percentage(value);
-        winning_percentage_mse += diff_winning_percentage * diff_winning_percentage;
 
         if (position_index % 100000 == 0) {
           Value value_after = Eval::compute_eval(pos);
@@ -474,7 +507,6 @@ void Learner::error_measurement()
       std::lock_guard<std::mutex> lock_guard(mutex);
       global_error += error;
       global_norm += abs(static_cast<int>(norm));
-      global_winning_percentage_mse += winning_percentage_mse;
     };
 
     threads.emplace_back(procedure);
@@ -484,8 +516,7 @@ void Learner::error_measurement()
   }
 
   printf(
-    "info string mse=%f norm=%f winning_percentage_mse=%f\n",
+    "info string mse=%f norm=%f\n",
     sqrt(global_error / global_position_index),
-    global_norm / global_position_index,
-    sqrt(global_winning_percentage_mse / global_position_index));
+    global_norm / global_position_index);
 }
