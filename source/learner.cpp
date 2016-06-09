@@ -215,6 +215,13 @@ namespace
     Thread& thread = *pos.this_thread();
     root_color = pos.side_to_move();
 
+#if 1
+    // evaluate()の値を直接使う場合
+    // evaluate()は手番から見た評価値を返すので
+    // 符号の反転はしなくて良い
+    value = Eval::evaluate(pos);
+#elif 0
+    // 1手読みを行う場合
     pos.check_info_update();
 
     // 浅い探索を行う
@@ -265,6 +272,76 @@ namespace
         return false;
       }
     }
+#elif 0
+    // 1手読みを行う場合
+    pos.check_info_update();
+
+    // qsearch()相当の探索を行う
+    // 本当はqsearch()を呼びたいが、呼んだらクラッシュしたので…。
+    thread.rootMoves.clear();
+    // 王手が掛かっているかどうかに応じてrootMovesの種類を変える
+    if (pos.in_check()) {
+      for (auto m : MoveList<EVASIONS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+    }
+    else {
+      for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+      for (auto m : MoveList<QUIET_CHECKS>(pos)) {
+        if (pos.legal(m)) {
+          thread.rootMoves.push_back(Search::RootMove(m));
+        }
+      }
+    }
+
+    if (thread.rootMoves.empty()) {
+      // 現在の局面が静止している状態なのだと思う
+      // 現在の局面の評価値をそのまま使う
+      value = Eval::evaluate(pos);
+    }
+    else {
+      // 実際に探索する
+      thread.maxPly = 0;
+      thread.rootDepth = 0;
+
+      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
+      // こちらのほうが探索スレッドを起こさないので速いはず
+      thread.search();
+      value = thread.rootMoves[0].score;
+
+      // 静止した局面まで進める
+      StateInfo stateInfo[MAX_PLY];
+      int play = 0;
+      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+      // 全計算はPosition::set()の中で行われているので差分計算ができる
+      Value value_pv = Eval::evaluate(pos);
+      for (auto m : thread.rootMoves[0].pv) {
+        pos.do_move(m, stateInfo[play++]);
+        value_pv = Eval::evaluate(pos);
+      }
+
+      // Eval::evaluate()は常に手番から見た評価値を返すので
+      // 探索開始局面と手番が違う場合は符号を反転する
+      if (root_color != pos.side_to_move()) {
+        value_pv = -value_pv;
+      }
+
+      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
+      // 処理に含めないようfalseを返す
+      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
+      if (value != value_pv) {
+        return false;
+      }
+    }
+#else
+    static_assert(false, "Choose a method to search shallowly.");
+#endif
 
     return true;
   }
