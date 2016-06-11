@@ -22,6 +22,7 @@ namespace
   constexpr int MaxGamePlay = 256;
   constexpr int MaxSwapTrials = 10;
   constexpr int MaxTrialsToSelectSquares = 100;
+  constexpr int OutputFileBufferSize = 1 << 24; // 16MB
 
   std::mutex output_mutex;
   FILE* output_file = nullptr;
@@ -64,14 +65,14 @@ namespace
     std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
     for (int game_index = global_game_index++; game_index < NumGames; game_index = global_game_index++)
     {
-      if (game_index && game_index % 100 == 0) {
+      if (game_index && game_index % 1000 == 0) {
         auto current = std::chrono::system_clock::now();
-        auto duration = current - start;
-        auto remaining = duration * (NumGames - game_index) / game_index;
-        int remainingSec = std::chrono::duration_cast<std::chrono::seconds>(remaining).count();
-        int h = remainingSec / 3600;
-        int m = remainingSec / 60 % 60;
-        int s = remainingSec % 60;
+        auto elapsed = current - start;
+        double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+        int remaining_sec = static_cast<int>(elapsed_sec / game_index * (NumGames - game_index));
+        int h = remaining_sec / 3600;
+        int m = remaining_sec / 60 % 60;
+        int s = remaining_sec % 60;
 
         time_t     current_time;
         struct tm  *local_time;
