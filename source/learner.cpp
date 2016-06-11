@@ -356,6 +356,18 @@ namespace
 
     return true;
   }
+
+  double sigmoid(double x) {
+    return 1.0 / (1.0 + std::exp(-x));
+  }
+
+  double winning_percentage(Value value) {
+    return sigmoid(static_cast<int>(value) / 600.0);
+  }
+
+  double dsigmoid(double x) {
+    return sigmoid(x) * (1.0 - sigmoid(x));
+  }
 }
 
 void Learner::learn()
@@ -429,8 +441,16 @@ void Learner::learn()
           continue;
         }
 
-        // [‚¢[‚³‚Ì’Tõ‚É‚æ‚é•]‰¿’l‚Æ‚Ì·•ª‚ğ‹‚ß‚é
+#if 1
+        // [‚¢’Tõ‚Ì•]‰¿’l‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
         WeightType delta = static_cast<WeightType>((record_value - value) * FV_SCALE);
+#elif 0
+        // [‚¢[‚³‚Ì•]‰¿’l‚©‚ç‹‚ß‚½Ÿ—¦‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
+        WeightType delta = (sigmoid(static_cast<int>(value) / 600.0) - sigmoid(static_cast<int>(record_value) / 600.0))
+          * dsigmoid(static_cast<int>(value) / 600.0);
+#else
+        static_assert(false, "Choose a loss function.");
+#endif
         // æè‚©‚çŒ©‚½•]‰¿’l‚Ì·•ªBsum.p[?][0]‚É‘«‚µ‚½‚èˆø‚¢‚½‚è‚·‚éB
         WeightType delta_color = (rootColor == BLACK ? delta : -delta);
         // è”Ô‚©‚çŒ©‚½•]‰¿’l‚Ì·•ªBsum.p[?][1]‚É‘«‚µ‚½‚èˆø‚¢‚½‚è‚·‚éB
@@ -483,7 +503,7 @@ void Learner::learn()
             value_after = -value_after;
           }
 
-          fprintf(stderr, "position_index=%I64d recorded=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
+          fprintf(stderr, "position_index=%I64d record=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
             position_index,
             static_cast<int>(record_value),
             static_cast<int>(value),
