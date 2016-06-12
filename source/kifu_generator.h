@@ -1,9 +1,9 @@
 #ifndef _KIFU_GENERATOR_H_
 #define _KIFU_GENERATOR_H_
 
-namespace KifuGenerator
+namespace Learner
 {
-  void generate();
+  void GenerateKifu();
 }
 
 #endif

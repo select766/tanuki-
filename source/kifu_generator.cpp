@@ -3,10 +3,11 @@
 #include <atomic>
 #include <ctime>
 #include <fstream>
-#include <mutex>
+#include <memory>
 #include <random>
 #include <sstream>
 
+#include "kifu_writer.h"
 #include "search.h"
 #include "thread.h"
 
@@ -15,24 +16,23 @@ using Search::RootMove;
 namespace
 {
   constexpr int NumGames = 100000000;
+  constexpr char* kOutputFilePathFormat =
+    "kifu/kifu.2016-06-12.3.100000000.%03d.csv";
   constexpr char* BookFileName = "book.sfen";
-  constexpr char* OutputFileName = "kifu/kifu.2016-06-08.100000000.csv";
   constexpr int MaxBookMove = 32;
   constexpr Depth SearchDepth = Depth(3);
   constexpr int MaxGamePlay = 256;
   constexpr int MaxSwapTrials = 10;
   constexpr int MaxTrialsToSelectSquares = 100;
-  constexpr int OutputFileBufferSize = 1 << 24; // 16MB
 
-  std::mutex output_mutex;
-  FILE* output_file = nullptr;
   std::atomic_int global_game_index = 0;
   std::vector<std::string> book;
   std::random_device random_device;
   std::mt19937_64 mt19937_64(random_device());
   std::uniform_int_distribution<> swap_distribution(0, 9);
+  std::unique_ptr<Learner::KifuWriter> kifu_writer;
 
-  bool read_book()
+  bool ReadBook()
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
     std::ifstream fs_book;
@@ -58,7 +58,7 @@ namespace
     return true;
   }
 
-  void generate_procedure(int thread_id)
+  void GenerateKifuProcedure(int thread_id)
   {
     auto start = std::chrono::system_clock::now();
     ASSERT_LV3(book.size());
@@ -134,7 +134,8 @@ namespace
               Piece piece = pos.piece_on(square);
               if (piece == NO_PIECE) {
                 continue;
-              } else if (color_of(piece) == pos.side_to_move()) {
+              }
+              else if (color_of(piece) == pos.side_to_move()) {
                 myPieceSquares.push_back(square);
               }
             }
@@ -238,17 +239,11 @@ namespace
         thread.Thread::search();
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-        int score = thread.rootMoves[0].score;
+        Value value = thread.rootMoves[0].score;
 
-        // 読み込んだ局面が不正な場合があるので再度チェックする
+        // 局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
-          std::lock_guard<std::mutex> lock(output_mutex);
-          fprintf(output_file, "%s,%d\n", pos.sfen().c_str(), score);
-          if (game_index % 100000 == 0) {
-            if (fflush(output_file)) {
-              sync_cout << "info string Failed to flush the output file stream." << sync_endl;
-            }
-          }
+          kifu_writer->Write(pos, value);
         }
 
         SetupStates->push(StateInfo());
@@ -258,24 +253,16 @@ namespace
   }
 }
 
-void KifuGenerator::generate()
+void Learner::GenerateKifu()
 {
   std::srand(std::time(nullptr));
 
   // 定跡の読み込み
-  if (!read_book()) {
+  if (!ReadBook()) {
     return;
   }
 
-  // 出力ファイルを開く
-  output_file = fopen(OutputFileName, "wt");
-  if (!output_file) {
-    sync_cout << "info string Failed to open " << OutputFileName << sync_endl;
-    return;
-  }
-  if (setvbuf(output_file, nullptr, _IOFBF, 1024 * 1024)) {
-    sync_cout << "info string Failed to set a buffer to the output file stream." << sync_endl;
-  }
+  kifu_writer = std::make_unique<Learner::KifuWriter>(kOutputFilePathFormat);
 
   Eval::load_eval();
 
@@ -292,14 +279,11 @@ void KifuGenerator::generate()
   std::vector<std::thread> threads;
   while (threads.size() < Options["Threads"]) {
     int thread_id = static_cast<int>(threads.size());
-    threads.push_back(std::thread([thread_id] {generate_procedure(thread_id); }));
+    threads.push_back(std::thread([thread_id] {GenerateKifuProcedure(thread_id); }));
   }
   for (auto& thread : threads) {
     thread.join();
   }
 
-  if (fclose(output_file)) {
-    sync_cout << "info string Failed to close the output file stream." << sync_endl;
-  }
-  output_file = nullptr;
+  kifu_writer.reset();
 }

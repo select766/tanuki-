@@ -136,6 +136,7 @@
     <ClInclude Include="learner.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="kifu_writer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -243,6 +244,7 @@
     <ClCompile Include="learner.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="kifu_writer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">

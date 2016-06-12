@@ -650,7 +650,7 @@ void USI::loop(int argc,char* argv[])
     else if (token == "makebook") Book::makebook_cmd(pos, is);
 #endif
     else if (token == "generate_kifu") {
-      KifuGenerator::generate();
+      Learner::GenerateKifu();
       break;
     }
     else if (token == "learn" || token == "l") {
