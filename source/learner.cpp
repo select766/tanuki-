@@ -4,6 +4,7 @@
 #include <ctime>
 #include <fstream>
 
+#include "kifu_reader.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
@@ -40,12 +41,6 @@ namespace
   };
   ENABLE_OPERATORS_ON(WeightKind);
 
-  struct PositionAndValue
-  {
-    std::string sfen;
-    Value value;
-  };
-
   struct Weight
   {
     // 重み
@@ -65,8 +60,7 @@ namespace
     void finalize(int64_t position_index, T& eval_weight);
   };
 
-  constexpr char* KIFU_FILE_NAME = "kifu/kifu.2016-06-01.1000000.csv";
-  constexpr Value CLOSE_OUT_VALUE_THRESHOLD = Value(2000);
+  constexpr char* kFolderName = "kifu";
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
   constexpr WeightType EPS = 1e-8;
@@ -77,95 +71,7 @@ namespace
   constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
   constexpr int MAX_KIFU_FILE_LOOP = 1;
 
-  std::ifstream kifu_file_stream;
-  std::vector<PositionAndValue> position_and_values;
-  int position_and_value_index = 0;
-  int kifu_file_loop = 0;
-
-  bool open_kifu()
-  {
-    kifu_file_stream.open(KIFU_FILE_NAME);
-    if (!kifu_file_stream.is_open()) {
-      sync_cout << "info string Failed to open the kifu file." << sync_endl;
-      return false;
-    }
-    return true;
-  }
-
-  bool try_fill_buffer() {
-    position_and_values.clear();
-    position_and_value_index = 0;
-
-    std::string sfen;
-    while (static_cast<int>(position_and_values.size()) < POSITION_BATCH_SIZE &&
-      std::getline(kifu_file_stream, sfen, ',')) {
-      int value;
-      kifu_file_stream >> value;
-      std::string _;
-      std::getline(kifu_file_stream, _);
-
-      if (abs(value) > CLOSE_OUT_VALUE_THRESHOLD) {
-        continue;
-      }
-
-      PositionAndValue position_and_value = { sfen, static_cast<Value>(value) };
-      position_and_values.push_back(position_and_value);
-    }
-
-    if (position_and_values.empty()) {
-      return false;
-    }
-
-    std::random_shuffle(position_and_values.begin(), position_and_values.end());
-    return true;
-  }
-
-  bool read_position_and_value(Position& pos, Value& value)
-  {
-    std::string sfen;
-
-    {
-      static std::mutex mutex;
-      std::lock_guard<std::mutex> lock_guard(mutex);
-
-      if (kifu_file_loop > MAX_KIFU_FILE_LOOP) {
-        return false;
-      }
-
-      if (position_and_value_index >= static_cast<int>(position_and_values.size())) {
-        // 局面バッファを最後まで使い切った場合は
-        // 棋譜ファイルから局面をバッファに読み込む
-        if (!try_fill_buffer()) {
-          // 棋譜ファイルから局面をバッファに読み込めなかった場合は
-          // 棋譜ファイルを開き直す
-          if (kifu_file_loop++ >= MAX_KIFU_FILE_LOOP) {
-            // ファイルの読み込み回数の上限に達していたら終了する
-            return false;
-          }
-
-          if (!open_kifu()) {
-            // そもそもファイルを開くことができない場合は終了する
-            return false;
-          }
-
-          // 棋譜ファイルから局面バッファに読み込む
-          if (!try_fill_buffer()) {
-            // 棋譜ファイルから局面バッファに読み込めなかった場合は終了する
-            return false;
-          }
-        }
-      }
-
-      // Position::set()はある程度時間がかかるためスレッド同期の外側で行いたい。
-      // sfenの文字列をコピーしておきあとからset()する。
-      sfen = position_and_values[position_and_value_index].sfen;
-      value = position_and_values[position_and_value_index].value;
-      ++position_and_value_index;
-    }
-
-    pos.set(sfen);
-    return true;
-  }
+  std::unique_ptr<Learner::KifuReader> kifu_reader;
 
   int kpp_index_to_raw_index(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -380,6 +286,8 @@ void Learner::learn()
 
   std::srand(std::time(nullptr));
 
+  kifu_reader = std::make_unique<Learner::KifuReader>(kFolderName);
+
   Eval::load_eval();
 
   int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
@@ -431,7 +339,7 @@ void Learner::learn()
 
       Position& pos = thread.rootPos;
       Value record_value;
-      while (read_position_and_value(pos, record_value)) {
+      while (kifu_reader->Read(pos, record_value)) {
         int64_t position_index = global_position_index++;
 
         Value value;
@@ -565,12 +473,9 @@ void Learner::error_measurement()
 
   std::srand(std::time(nullptr));
 
-  Eval::load_eval();
+  kifu_reader = std::make_unique<KifuReader>(kFolderName);
 
-  if (!open_kifu()) {
-    sync_cout << "info string Failed to open the kifu file." << sync_endl;
-    return;
-  }
+  Eval::load_eval();
 
   Search::LimitsType limits;
   limits.max_game_ply = MAX_GAME_PLAY;
@@ -592,7 +497,7 @@ void Learner::error_measurement()
       Position& pos = thread.rootPos;
       Value record_value;
       while (global_position_index < MAX_POSITIONS_FOR_ERROR_MEASUREMENT &&
-        read_position_and_value(pos, record_value)) {
+        kifu_reader->Read(pos, record_value)) {
         int64_t position_index = global_position_index++;
 
         Value value;

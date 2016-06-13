@@ -136,7 +136,12 @@
     <ClInclude Include="learner.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="kifu_writer.h" />
+    <ClInclude Include="kifu_writer.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="kifu_reader.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -244,7 +249,12 @@
     <ClCompile Include="learner.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="kifu_writer.cpp" />
+    <ClCompile Include="kifu_writer.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="kifu_reader.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
