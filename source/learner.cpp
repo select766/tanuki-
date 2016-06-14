@@ -26,7 +26,7 @@ namespace Eval
   extern ValueKk kk[SQ_NB][SQ_NB];
   extern const int FV_SCALE = 32;
 
-  void save_eval();
+  void save_eval(const std::string& folderPath);
 }
 
 namespace
@@ -61,6 +61,7 @@ namespace
   };
 
   constexpr char* kFolderName = "kifu";
+  constexpr char* kOutputFolderPath = "eval/2016-06-14-20-59";
   constexpr int POSITION_BATCH_SIZE = 1000000;
   constexpr int FV_SCALE = 32;
   constexpr WeightType EPS = 1e-8;
@@ -460,7 +461,7 @@ void Learner::learn()
     }
   }
 
-  Eval::save_eval();
+  Eval::save_eval(kOutputFolderPath);
 }
 
 void Learner::error_measurement()
