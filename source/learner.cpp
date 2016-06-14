@@ -62,15 +62,14 @@ namespace
 
   constexpr char* kFolderName = "kifu";
   constexpr char* kOutputFolderPath = "eval/2016-06-14-20-59";
-  constexpr int POSITION_BATCH_SIZE = 1000000;
-  constexpr int FV_SCALE = 32;
-  constexpr WeightType EPS = 1e-8;
-  constexpr WeightType ADAM_BETA1 = 0.9;
-  constexpr WeightType ADAM_BETA2 = 0.999;
-  constexpr WeightType LEARNING_RATE = 1.0;
-  constexpr int MAX_GAME_PLAY = 256;
-  constexpr int64_t MAX_POSITIONS_FOR_ERROR_MEASUREMENT = 1000000;
-  constexpr int MAX_KIFU_FILE_LOOP = 1;
+  constexpr int kPositionBatchSize = 10000000;
+  constexpr int kFvScale = 32;
+  constexpr WeightType kEps = 1e-8;
+  constexpr WeightType kAdamBeta1 = 0.9;
+  constexpr WeightType kAdamBeta2 = 0.999;
+  constexpr WeightType kLearningRate = 1.0;
+  constexpr int kMaxGamePlay = 256;
+  constexpr int64_t kMaxPositionsForErrorMeasurement = 1000000;
 
   std::unique_ptr<Learner::KifuReader> kifu_reader;
 
@@ -94,14 +93,14 @@ namespace
     //WeightType previous_w = w;
 
     // Adam
-    m = ADAM_BETA1 * m + (1.0 - ADAM_BETA1) * dt;
-    v = ADAM_BETA2 * v + (1.0 - ADAM_BETA2) * dt * dt;
+    m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * dt;
+    v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * dt * dt;
     // çÇë¨âªÇÃÇΩÇﬂpow(ADAM_BETA1, t)ÇÃílÇï€éùÇµÇƒÇ®Ç≠
-    adam_beta1_t *= ADAM_BETA1;
-    adam_beta2_t *= ADAM_BETA2;
+    adam_beta1_t *= kAdamBeta1;
+    adam_beta2_t *= kAdamBeta2;
     WeightType mm = m / (1.0 - adam_beta1_t);
     WeightType vv = v / (1.0 - adam_beta2_t);
-    WeightType delta = LEARNING_RATE * mm / (sqrt(vv) + EPS);
+    WeightType delta = kLearningRate * mm / (sqrt(vv) + kEps);
     w += delta;
 
     // ïΩãœâªämó¶ìIå˘îzç~â∫ñ@
@@ -285,7 +284,7 @@ void Learner::learn()
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
-  std::srand(std::time(nullptr));
+  std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   kifu_reader = std::make_unique<Learner::KifuReader>(kFolderName);
 
@@ -326,7 +325,7 @@ void Learner::learn()
   }
 
   Search::LimitsType limits;
-  limits.max_game_ply = MAX_GAME_PLAY;
+  limits.max_game_ply = kMaxGamePlay;
   limits.depth = 1;
   limits.silent = true;
   Search::Limits = limits;
@@ -352,7 +351,7 @@ void Learner::learn()
 
 #if 1
         // ê[Ç¢íTçıÇÃï]âøílÇ∆êÛÇ¢íTçıÇÃï]âøílÇÃìÒèÊåÎç∑Çç≈è¨Ç…Ç∑ÇÈ
-        WeightType delta = static_cast<WeightType>((record_value - value) * FV_SCALE);
+        WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
 #elif 0
         // ê[Ç¢ê[Ç≥ÇÃï]âøílÇ©ÇÁãÅÇﬂÇΩèüó¶Ç∆êÛÇ¢íTçıÇÃï]âøílÇÃìÒèÊåÎç∑Çç≈è¨Ç…Ç∑ÇÈ
         WeightType delta = (sigmoid(static_cast<int>(value) / 600.0) - sigmoid(static_cast<int>(record_value) / 600.0))
@@ -472,14 +471,14 @@ void Learner::error_measurement()
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
-  std::srand(std::time(nullptr));
+  std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   kifu_reader = std::make_unique<KifuReader>(kFolderName);
 
   Eval::load_eval();
 
   Search::LimitsType limits;
-  limits.max_game_ply = MAX_GAME_PLAY;
+  limits.max_game_ply = kMaxGamePlay;
   limits.depth = 1;
   limits.silent = true;
   Search::Limits = limits;
@@ -497,7 +496,7 @@ void Learner::error_measurement()
 
       Position& pos = thread.rootPos;
       Value record_value;
-      while (global_position_index < MAX_POSITIONS_FOR_ERROR_MEASUREMENT &&
+      while (global_position_index < kMaxPositionsForErrorMeasurement &&
         kifu_reader->Read(pos, record_value)) {
         int64_t position_index = global_position_index++;
 
