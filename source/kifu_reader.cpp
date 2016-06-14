@@ -8,8 +8,8 @@
 #include "misc.h"
 
 namespace {
-  constexpr int kBatchSize = 1000000;
-  constexpr int kMaxLoop = 3;
+  constexpr int kBatchSize = 10000000;
+  constexpr int kMaxLoop = 1;
   constexpr Value kCloseOutValueThreshold = Value(2000);
 }
 
@@ -30,7 +30,7 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
       return false;
     }
 
-    if (record_index_ == static_cast<int>(records_.size())) {
+    if (record_index_ >= static_cast<int>(records_.size())) {
       records_.clear();
       while (records_.size() < kBatchSize) {
         std::string line;
@@ -82,6 +82,10 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
 
       std::random_shuffle(records_.begin(), records_.end());
       record_index_ = 0;
+    }
+
+    if (records_.empty()) {
+      return false;
     }
 
     sfen = records_[record_index_].sfen;
