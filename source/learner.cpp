@@ -61,15 +61,15 @@ namespace
   };
 
   constexpr char* kFolderName = "kifu";
-  constexpr char* kOutputFolderPath = "eval/2016-06-14-20-59";
-  constexpr int kPositionBatchSize = 10000000;
+  constexpr char* kOutputFolderPathBase = "eval";
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
   constexpr WeightType kLearningRate = 1.0;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kMaxPositionsForErrorMeasurement = 1000000;
+  constexpr int64_t kWriteEvalPerPosition = 1000000000; // 10â≠
+  constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1êÁñú
 
   std::unique_ptr<Learner::KifuReader> kifu_reader;
 
@@ -274,6 +274,14 @@ namespace
   double dsigmoid(double x) {
     return sigmoid(x) * (1.0 - sigmoid(x));
   }
+
+  std::string GetDateTimeString() {
+    time_t time = std::time(nullptr);
+    struct tm *tm = std::localtime(&time);
+    char buffer[1024];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d-%H-%M-%S", tm);
+    return buffer;
+  }
 }
 
 void Learner::learn()
@@ -424,6 +432,12 @@ void Learner::learn()
             abs(record_value - value) == abs(record_value - value_after) ? '=' : '<');
         }
 
+        if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
+          std::string folderPath = std::string(kOutputFolderPathBase) + "/" + GetDateTimeString();
+          fprintf(stderr, "Writing eval files: %s\n", folderPath.c_str());
+          Eval::save_eval(folderPath);
+        }
+
         // ã«ñ ÇÕå≥Ç…ñﬂÇ≥Ç»Ç≠ÇƒÇ‡ñ‚ëËÇ»Ç¢
       }
     };
@@ -434,6 +448,7 @@ void Learner::learn()
     thread.join();
   }
 
+  fprintf(stderr, "Finalizin weights\n");
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
@@ -460,7 +475,9 @@ void Learner::learn()
     }
   }
 
-  Eval::save_eval(kOutputFolderPath);
+  std::string folderPath = std::string(kOutputFolderPathBase) + "/" + GetDateTimeString();
+  fprintf(stderr, "Writing eval files: %s\n", folderPath.c_str());
+  Eval::save_eval(folderPath);
 }
 
 void Learner::error_measurement()
