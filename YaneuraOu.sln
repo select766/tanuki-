@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25402.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "YaneuraOu", "source\YaneuraOu.vcxproj", "{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}"
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "tanuki-optimizer", "tanuki-optimizer\tanuki-optimizer.pyproj", "{2944D269-829B-4B9D-AB0E-F90A50204A21}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "tools", "tools\tools.pyproj", "{34E1B03C-EF28-4724-A7D8-334CA4727C90}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,12 @@ Global
 		{2944D269-829B-4B9D-AB0E-F90A50204A21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2944D269-829B-4B9D-AB0E-F90A50204A21}.Release|x64.ActiveCfg = Release|Any CPU
 		{2944D269-829B-4B9D-AB0E-F90A50204A21}.Release|x86.ActiveCfg = Release|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Release|x64.ActiveCfg = Release|Any CPU
+		{34E1B03C-EF28-4724-A7D8-334CA4727C90}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,2 +1,0 @@
-setoption name Threads value 4
-go btime 250
