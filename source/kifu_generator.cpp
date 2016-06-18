@@ -15,15 +15,15 @@ using Search::RootMove;
 
 namespace
 {
-  constexpr int NumGames = 100000000;
+  constexpr int kNumGames = 100000000;
   constexpr char* kOutputFilePathFormat =
     "kifu/kifu.2016-06-12.3.100000000.%03d.csv";
-  constexpr char* BookFileName = "book.sfen";
-  constexpr int MaxBookMove = 32;
-  constexpr Depth SearchDepth = Depth(3);
-  constexpr int MaxGamePlay = 256;
-  constexpr int MaxSwapTrials = 10;
-  constexpr int MaxTrialsToSelectSquares = 100;
+  constexpr char* kBookFileName = "book.sfen";
+  constexpr int kMaxBookMove = 32;
+  constexpr Depth kSearchDepth = Depth(3);
+  constexpr int kMaxGamePlay = 256;
+  constexpr int kMaxSwapTrials = 10;
+  constexpr int kMaxTrialsToSelectSquares = 100;
 
   std::atomic_int global_game_index = 0;
   std::vector<std::string> book;
@@ -36,11 +36,11 @@ namespace
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
     std::ifstream fs_book;
-    fs_book.open(BookFileName);
+    fs_book.open(kBookFileName);
 
     if (!fs_book.is_open())
     {
-      sync_cout << "Error! : can't read " << BookFileName << sync_endl;
+      sync_cout << "Error! : can't read " << kBookFileName << sync_endl;
       return false;
     }
 
@@ -63,13 +63,13 @@ namespace
     auto start = std::chrono::system_clock::now();
     ASSERT_LV3(book.size());
     std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
-    for (int game_index = global_game_index++; game_index < NumGames; game_index = global_game_index++)
+    for (int game_index = global_game_index++; game_index < kNumGames; game_index = global_game_index++)
     {
       if (game_index && game_index % 1000 == 0) {
         auto current = std::chrono::system_clock::now();
         auto elapsed = current - start;
         double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / game_index * (NumGames - game_index));
+        int remaining_sec = static_cast<int>(elapsed_sec / game_index * (kNumGames - game_index));
         int h = remaining_sec / 3600;
         int m = remaining_sec / 60 % 60;
         int s = remaining_sec % 60;
@@ -81,7 +81,7 @@ namespace
         local_time = localtime(&current_time);
         char buffer[1024];
         sprintf(buffer, "%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)",
-          game_index, NumGames,
+          game_index, kNumGames,
           local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
           local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
         std::cerr << buffer << std::endl;
@@ -95,7 +95,7 @@ namespace
       const std::string& opening = book[opening_index(mt19937_64)];
       std::istringstream is(opening);
       std::string token;
-      while (pos.game_ply() < MaxBookMove)
+      while (pos.game_ply() < kMaxBookMove)
       {
         is >> token;
         if (token == "startpos" || token == "moves")
@@ -114,7 +114,7 @@ namespace
         }
       }
 
-      while (pos.game_ply() < MaxGamePlay) {
+      while (pos.game_ply() < kMaxGamePlay) {
         // 一定の確率で自駒2駒を入れ替える
         // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
         if (swap_distribution(mt19937_64) == 0 &&
@@ -125,7 +125,7 @@ namespace
           !pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
           std::string originalSfen = pos.sfen();
           int counter = 0;
-          for (; counter < MaxSwapTrials; ++counter) {
+          for (; counter < kMaxSwapTrials; ++counter) {
             pos.set(originalSfen);
 
             // 自駒2駒を入れ替える
@@ -146,7 +146,7 @@ namespace
             int num_trials_to_select_squares;
             // 無限ループに陥る場合があるので制限をかける
             for (num_trials_to_select_squares = 0;
-              num_trials_to_select_squares < MaxTrialsToSelectSquares;
+              num_trials_to_select_squares < kMaxTrialsToSelectSquares;
               ++num_trials_to_select_squares) {
               std::uniform_int_distribution<> square_index_distribution(0, myPieceSquares.size() - 1);
               square0 = myPieceSquares[square_index_distribution(mt19937_64)];
@@ -157,7 +157,7 @@ namespace
               }
             }
 
-            if (num_trials_to_select_squares == MaxTrialsToSelectSquares) {
+            if (num_trials_to_select_squares == kMaxTrialsToSelectSquares) {
               break;
             }
 
@@ -217,7 +217,7 @@ namespace
           };
 
           // 何度やり直してもうまくいかない場合は諦める
-          if (counter >= MaxSwapTrials) {
+          if (counter >= kMaxSwapTrials) {
             pos.set(originalSfen);
           }
         }
@@ -269,8 +269,8 @@ void Learner::GenerateKifu()
   Options["Hash"] = 1024;
 
   Search::LimitsType limits;
-  limits.max_game_ply = MaxGamePlay;
-  limits.depth = SearchDepth;
+  limits.max_game_ply = kMaxGamePlay;
+  limits.depth = kSearchDepth;
   limits.silent = true;
   Search::Limits = limits;
 
