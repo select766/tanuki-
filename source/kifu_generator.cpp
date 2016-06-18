@@ -19,6 +19,7 @@ namespace
   constexpr char* kOutputFilePathFormat =
     "kifu/kifu.2016-06-12.3.100000000.%03d.csv";
   constexpr char* kBookFileName = "book.sfen";
+  constexpr int kMinBookMove = 0;
   constexpr int kMaxBookMove = 32;
   constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
@@ -31,6 +32,7 @@ namespace
   std::mt19937_64 mt19937_64(random_device());
   std::uniform_int_distribution<> swap_distribution(0, 9);
   std::unique_ptr<Learner::KifuWriter> kifu_writer;
+  std::uniform_int_distribution<> num_book_move_distribution(kMinBookMove, kMaxBookMove);
 
   bool ReadBook()
   {
@@ -95,23 +97,24 @@ namespace
       const std::string& opening = book[opening_index(mt19937_64)];
       std::istringstream is(opening);
       std::string token;
-      while (pos.game_ply() < kMaxBookMove)
+      int num_book_move = num_book_move_distribution(mt19937_64);
+      while (pos.game_ply() < num_book_move)
       {
         is >> token;
         if (token == "startpos" || token == "moves")
           continue;
 
         Move m = move_from_usi(pos, token);
-        if (!is_ok(m))
+        pos.check_info_update();
+        if (!is_ok(m) || !pos.legal(m))
         {
           //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
           // →　エラー扱いはしない。
           break;
         }
-        else {
-          SetupStates->push(StateInfo());
-          pos.do_move(m, SetupStates->top());
-        }
+
+        SetupStates->push(StateInfo());
+        pos.do_move(m, SetupStates->top());
       }
 
       while (pos.game_ply() < kMaxGamePlay) {
