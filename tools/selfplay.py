@@ -46,6 +46,7 @@ def main():
   with open(GetDateTimeString() + '.csv', 'wb') as output_file:
     csvwriter = csv.writer(output_file)
     for eval_subfolder in eval_subfolders:
+      print(eval_subfolder)
       for src_filename, dst_filename in [
         ('KPP_synthesized.bin', 'KPP_synthesized.learn.bin'),
         ('KKP_synthesized.bin', 'KKP_synthesized.learn.bin'),
