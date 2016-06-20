@@ -420,15 +420,15 @@ void Learner::learn()
           }
 
           fprintf(stderr,
-            "position_index=%I64d record=%5d (%.2f) before=%5d (%.2f) diff=%5d\n"
-            "                      after=%5d (%.2f) delta=%5d target=%c error=%c\n",
+            "position_index=%I64d record=%5d (%.2f)\n"
+            "    before=%5d (%.2f)  diff=%5d\n"
+            "     after=%5d (%.2f) delta=%5d error=%s\n",
             position_index,
             static_cast<int>(record_value), winning_percentage(record_value),
             static_cast<int>(value), winning_percentage(value),
             static_cast<int>(record_value - value),
             static_cast<int>(value_after), winning_percentage(value_after),
             static_cast<int>(value_after - value),
-            delta > 0 ? '+' : '-',
             abs(record_value - value) > abs(record_value - value_after) ? "Å´" :
             abs(record_value - value) == abs(record_value - value_after) ? "ÅÅ" : "Å™");
         }
