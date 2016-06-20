@@ -433,9 +433,10 @@ void Learner::learn()
         }
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
-          std::string folderPath = std::string(kOutputFolderPathBase) + "/" + GetDateTimeString();
-          fprintf(stderr, "Writing eval files: %s\n", folderPath.c_str());
-          Eval::save_eval(folderPath);
+          char buffer[1024];
+          sprintf(buffer, "%s/%I64d", kOutputFolderPathBase, position_index);
+          fprintf(stderr, "Writing eval files: %s\n", buffer);
+          Eval::save_eval(buffer);
         }
 
         // ‹Ç–Ê‚ÍŒ³‚É–ß‚³‚È‚­‚Ä‚à–â‘è‚È‚¢
@@ -448,7 +449,7 @@ void Learner::learn()
     thread.join();
   }
 
-  fprintf(stderr, "Finalizin weights\n");
+  fprintf(stderr, "Finalizing weights\n");
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
