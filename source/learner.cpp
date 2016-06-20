@@ -419,17 +419,18 @@ void Learner::learn()
             value_after = -value_after;
           }
 
-          fprintf(stderr, "position_index=%I64d record=%5d before=%5d diff=%5d after=%5d delta=%5d target=%c turn=%s error=%c\n",
+          fprintf(stderr,
+            "position_index=%I64d record=%5d (%.2f) before=%5d (%.2f) diff=%5d\n"
+            "                      after=%5d (%.2f) delta=%5d target=%c error=%c\n",
             position_index,
-            static_cast<int>(record_value),
-            static_cast<int>(value),
+            static_cast<int>(record_value), winning_percentage(record_value),
+            static_cast<int>(value), winning_percentage(value),
             static_cast<int>(record_value - value),
-            static_cast<int>(value_after),
+            static_cast<int>(value_after), winning_percentage(value_after),
             static_cast<int>(value_after - value),
             delta > 0 ? '+' : '-',
-            rootColor == BLACK ? "black" : "white",
-            abs(record_value - value) > abs(record_value - value_after) ? '>' :
-            abs(record_value - value) == abs(record_value - value_after) ? '=' : '<');
+            abs(record_value - value) > abs(record_value - value_after) ? "«" :
+            abs(record_value - value) == abs(record_value - value_after) ? "" : "ª");
         }
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
