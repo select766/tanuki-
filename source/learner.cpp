@@ -44,15 +44,15 @@ namespace
   struct Weight
   {
     // 重み
-    WeightType w;
+    WeightType w = 0.0;
     // Adam用変数
-    WeightType m;
-    WeightType v;
+    WeightType m = 0.0;
+    WeightType v = 0.0;
     WeightType adam_beta1_t = 1.0;
     WeightType adam_beta2_t = 1.0;
     // 平均化確率的勾配降下法用変数
-    //WeightType sum_w;
-    //int64_t last_update_index;
+    WeightType sum_w = 0.0;
+    int64_t last_update_index = 0.0;
 
     template<typename T>
     void update(int64_t position_index, double dt, T& eval_weight);
@@ -90,7 +90,9 @@ namespace
   template<typename T>
   void Weight::update(int64_t position_index, double dt, T& eval_weight)
   {
-    //WeightType previous_w = w;
+    // 平均化確率的勾配降下法
+    sum_w += w * (position_index - last_update_index);
+    last_update_index = position_index;
 
     // Adam
     m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * dt;
@@ -103,10 +105,6 @@ namespace
     WeightType delta = kLearningRate * mm / (sqrt(vv) + kEps);
     w += delta;
 
-    // 平均化確率的勾配降下法
-    //sum_w += previous_w * (current_index - last_update_index);
-    //last_update_index = current_index;
-
     // 重みテーブルに書き戻す
     eval_weight = static_cast<T>(std::round(w));
   }
@@ -114,9 +112,9 @@ namespace
   template<typename T>
   void Weight::finalize(int64_t position_index, T& eval_weight)
   {
-    //sum_w += w * (position_index - last_update_index);
-    //int64_t value = static_cast<int64_t>(std::round(sum_w / current_index));
-    int64_t value = static_cast<int64_t>(std::round(w));
+    sum_w += w * (position_index - last_update_index);
+    int64_t value = static_cast<int64_t>(std::round(sum_w / position_index));
+    //int64_t value = static_cast<int64_t>(std::round(w));
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
     eval_weight = static_cast<T>(value);
