@@ -68,7 +68,7 @@ namespace
   constexpr WeightType kAdamBeta2 = 0.999;
   constexpr WeightType kLearningRate = 1.0;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kWriteEvalPerPosition = 1000000000; // 10â≠
+  constexpr int64_t kWriteEvalPerPosition = 100000000; // 1â≠
   constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1êÁñú
 
   std::unique_ptr<Learner::KifuReader> kifu_reader;
