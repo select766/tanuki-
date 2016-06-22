@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # coding:utf-8
 
+import argparse
 import csv
 import datetime
 import os
@@ -9,11 +10,11 @@ import shutil
 import subprocess
 
 
-EVAL_FOLDER_NAME = 'eval'
+EVAL_FOLDER_PATH = 'eval'
 
 
-def GetEvalSubfolders():
-  return [x for x in os.listdir(EVAL_FOLDER_NAME) if os.path.isdir(os.path.join(EVAL_FOLDER_NAME, x)) and x != 'book']
+def GetSubfolders(folder_path):
+  return [x for x in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, x))]
 
 
 def GetWinningPercentage():
@@ -42,20 +43,30 @@ def GetDateTimeString():
 
 
 def main():
-  eval_subfolders = GetEvalSubfolders()
-  with open(GetDateTimeString() + '.csv', 'wb') as output_file:
+  parser = argparse.ArgumentParser(description='selfplay')
+  parser.add_argument(
+    '--learner_output_folder_path',
+    action='store',
+    dest='learner_output_folder_path',
+    help='Ignored unit test labels. Multiple file names can be specified with separating by comma(s). ex) ignore,benchmark',
+    default=EVAL_FOLDER_PATH)
+  args = parser.parse_args()
+
+  subfolders = GetSubfolders(args.learner_output_folder_path)
+  output_cvs_file_path = os.path.join(args.learner_output_folder_path, GetDateTimeString() + '.csv')
+  with open(output_cvs_file_path, 'wb') as output_file:
     csvwriter = csv.writer(output_file)
-    for eval_subfolder in eval_subfolders:
-      print(eval_subfolder)
+    for subfolder in subfolders:
+      print(subfolder)
       for src_filename, dst_filename in [
         ('KPP_synthesized.bin', 'KPP_synthesized.learn.bin'),
         ('KKP_synthesized.bin', 'KKP_synthesized.learn.bin'),
         ('KK_synthesized.bin', 'KK_synthesized.learn.bin')]:
-        src = os.path.join(EVAL_FOLDER_NAME, eval_subfolder, src_filename)
-        dst = os.path.join(EVAL_FOLDER_NAME, dst_filename)
+        src = os.path.join(args.learner_output_folder_path, subfolder, src_filename)
+        dst = os.path.join(EVAL_FOLDER_PATH, dst_filename)
         shutil.copyfile(src, dst)
       winning_percentage = GetWinningPercentage()
-      csvwriter.writerow([eval_subfolder, winning_percentage])
+      csvwriter.writerow([subfolder, winning_percentage])
 
 
 if __name__ == '__main__':
