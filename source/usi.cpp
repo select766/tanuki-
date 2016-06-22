@@ -654,7 +654,7 @@ void USI::loop(int argc,char* argv[])
       break;
     }
     else if (token == "learn" || token == "l") {
-      Learner::learn();
+      Learner::learn(is);
       break;
     }
     else if (token == "error_measurement" || token == "e") {

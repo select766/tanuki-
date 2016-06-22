@@ -3,6 +3,8 @@
 #include <array>
 #include <ctime>
 #include <fstream>
+#include <sstream>
+#include <direct.h>
 
 #include "kifu_reader.h"
 #include "position.h"
@@ -61,7 +63,6 @@ namespace
   };
 
   constexpr char* kFolderName = "kifu";
-  constexpr char* kOutputFolderPathBase = "eval";
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -282,8 +283,16 @@ namespace
   }
 }
 
-void Learner::learn()
-{
+void Learner::learn(std::istringstream& iss) {
+  std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
+
+  std::string token;
+  while (iss >> token) {
+    if (token == "output_folder_path_base") {
+      iss >> output_folder_path_base;
+    }
+  }
+
   ASSERT_LV3(
     kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
@@ -340,7 +349,7 @@ void Learner::learn()
   std::vector<std::thread> threads;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_position_index, &threads, &weights, thread_index] {
+    auto procedure = [&global_position_index, &threads, &weights, thread_index, output_folder_path_base] {
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
@@ -432,8 +441,9 @@ void Learner::learn()
         }
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
+          _mkdir(output_folder_path_base.c_str());
           char buffer[1024];
-          sprintf(buffer, "%s/%I64d", kOutputFolderPathBase, position_index);
+          sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
           fprintf(stderr, "Writing eval files: %s\n", buffer);
           Eval::save_eval(buffer);
         }
@@ -475,9 +485,11 @@ void Learner::learn()
     }
   }
 
-  std::string folderPath = std::string(kOutputFolderPathBase) + "/" + GetDateTimeString();
-  fprintf(stderr, "Writing eval files: %s\n", folderPath.c_str());
-  Eval::save_eval(folderPath);
+  _mkdir(output_folder_path_base.c_str());
+  char buffer[1024];
+  sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), global_position_index);
+  fprintf(stderr, "Writing eval files: %s\n", buffer);
+  Eval::save_eval(buffer);
 }
 
 void Learner::error_measurement()
