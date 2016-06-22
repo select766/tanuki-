@@ -2475,13 +2475,12 @@ namespace Learner
     auto bestValue = rootMoves[0].score;
     return pair<Move,Value>(bestMove , bestValue);
   }
-
-  pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta)
+  
+  pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta, Move pv[MAX_PLY + 1])
   {
     Stack stack[MAX_PLY + 7], *ss = stack + 5;
     memset(ss - 5, 0, 8 * sizeof(Stack));
 
-    Move pv[MAX_PLY + 1];
     ss->pv = pv; // とりあえずダミーでどこかバッファがないといけない。
 
     pos.check_info_update();
@@ -2494,6 +2493,12 @@ namespace Learner
 
     auto bestMove = pos.this_thread()->rootMoves[0].pv[0];
     return pair<Move,Value>(bestMove , bestValue);
+  }
+
+  pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta)
+  {
+    Move pv[MAX_PLY + 1];
+    return qsearch(pos, alpha, beta, pv);
   }
 }
 
