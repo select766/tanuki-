@@ -3,7 +3,7 @@
 #include "misc.h"
 
 namespace {
-  constexpr int64_t kMaxPositionsPerFile = 10000;
+  constexpr int64_t kMaxPositionsPerFile = 100000000;
   constexpr int64_t kFlushPerPositions = 1000000;
   constexpr int kBufferSize = 1 << 24; // 16MB
 }
