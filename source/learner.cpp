@@ -147,6 +147,8 @@ namespace
       pos.do_move(pv[play], stateInfo[play]);
     }
 
+    // TODO(nodchip): extract_pv_from_tt()を実装して使う
+
     // qsearch()の返した評価値とPVの末端の評価値が正しいかどうかを
     // 調べる場合は以下をコメントアウトする
 
@@ -181,6 +183,8 @@ namespace
     for (auto m : thread.rootMoves[0].pv) {
       pos.do_move(m, stateInfo[play++]);
     }
+
+    // TODO(nodchip): extract_pv_from_tt()を実装して使う
 
     //int play = 0;
     //// Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
