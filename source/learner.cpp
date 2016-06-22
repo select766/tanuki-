@@ -26,7 +26,7 @@ namespace Eval
   extern ValueKk kk[SQ_NB][SQ_NB];
   extern const int FV_SCALE = 32;
 
-  void save_eval(const std::string& folderPath);
+  void save_eval();
 }
 
 namespace
@@ -433,9 +433,9 @@ void Learner::learn()
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
           char buffer[1024];
-          sprintf(buffer, "%s/%I64d", kOutputFolderPathBase, position_index);
+          sprintf(buffer, "%s/%I64d", ((std::string)Options["EvalDir"]).c_str(), position_index);
           fprintf(stderr, "Writing eval files: %s\n", buffer);
-          Eval::save_eval(buffer);
+          Eval::save_eval();
         }
 
         // ‹Ç–Ê‚ÍŒ³‚É–ß‚³‚È‚­‚Ä‚à–â‘è‚È‚¢
@@ -475,9 +475,10 @@ void Learner::learn()
     }
   }
 
-  std::string folderPath = std::string(kOutputFolderPathBase) + "/" + GetDateTimeString();
-  fprintf(stderr, "Writing eval files: %s\n", folderPath.c_str());
-  Eval::save_eval(folderPath);
+  char buffer[1024];
+  sprintf(buffer, "%s/%I64d", ((std::string)Options["EvalDir"]).c_str(), global_position_index);
+  fprintf(stderr, "Writing eval files: %s\n", buffer);
+  Eval::save_eval();
 }
 
 void Learner::error_measurement()

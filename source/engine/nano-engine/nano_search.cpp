@@ -225,7 +225,7 @@ namespace YaneuraOuNano
 
     // RootNodeであるなら、指し手は現在注目している1手だけであるから、それが置換表にあったものとして指し手を進める。
     Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
-      :  ttHit ? tte->move() : MOVE_NONE;
+                  :  ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
 
     // 置換表の値による枝刈り
     
@@ -437,7 +437,7 @@ void MainThread::think() {
   // ---------------------
 
   {
-    auto it = book.find(rootPos.sfen());
+    auto it = book.find(rootPos);
     if (it != book.end()) {
       // 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
       const auto& move_list = it->second;

@@ -179,6 +179,7 @@ struct Position
   Position() { clear(); set_hirate(); }
 
   // コピー。startStateもコピーして、外部のデータに依存しないように(detach)する。
+  // 積極的に使うべきではない。探索開始時にslaveに局面をコピーするときに仕方なく使っているだけ。
   Position& operator=(const Position& pos);
 
   // 初期化
@@ -219,7 +220,7 @@ struct Position
   Hand hand_of(Color c) const { return hand[c]; }
 
   // c側の玉の位置を返す
-  Square king_square(Color c) const { return kingSquare[c]; }
+  FORCE_INLINE Square king_square(Color c) const { return kingSquare[c]; }
 
   // 保持しているデータに矛盾がないかテストする。
   bool pos_is_ok() const;
@@ -228,6 +229,7 @@ struct Position
   void set_nodes_searched(uint64_t n) { nodes = n; }
   int64_t nodes_searched() const { return nodes; }
 
+  // 現局面に対して
   // この指し手によって移動させる駒を返す。(移動前の駒)
   // 後手の駒打ちは後手の駒が返る。
   Piece moved_piece_before(Move m) const {
@@ -238,18 +240,36 @@ struct Position
 
   // moved_piece_before()の移動後の駒が返る版。
   Piece moved_piece_after(Move m) const {
+#ifdef    KEEP_PIECE_IN_GENERATE_MOVES
+    // 上位16bitにそのまま格納されているはず。
+    return Piece((m >> 16) & ~32); // DROP BITを飛ばす
+#else
     return is_drop(m)
       ? (move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE))
       : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m));
+#endif
   }
 
   // moved_pieceの拡張版。駒打ちのときは、打ち駒(+32)を加算した駒種を返す。
   // historyなどでUSE_DROPBIT_IN_STATSを有効にするときに用いる。
   // 成りの指し手のときは成りの指し手を返す。(移動後の駒)
   Piece moved_piece_after_ex(Move m) const {
+#ifdef    KEEP_PIECE_IN_GENERATE_MOVES
+    // 上位16bitにそのまま格納されているはず。
+    return Piece(m >> 16);
+#else
     return is_drop(m)
-      ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + 32)
+      ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + 32 )
       : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m));
+#endif
+  }
+
+  // 置換表から取り出したMoveを32bit化する。
+  Move move16_to_move(Move m) const {
+    return Move(u16(m) +
+      (( is_drop(m) ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + 32)
+      : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m))) << 16)
+    );
   }
 
   // 連続王手の千日手等で引き分けかどうかを返す
@@ -272,6 +292,11 @@ struct Position
 
   // 駒に対応するBitboardを得る。
   Bitboard pieces(Color c,Piece pr) const { ASSERT_LV3(PAWN <= pr && pr <= KING);  return piece_bb[(PieceTypeBitboard)(pr - 1)][c]; }
+
+  // 駒が存在する升を表すBitboard
+  // 高速化したいときだけ用いる。普段は使うべきではない。
+  // ※　see()の高速化のために用いている。
+  Bitboard piece_bb[PIECE_TYPE_BITBOARD_NB][COLOR_NB];
 
   // --- 利き
 
@@ -307,7 +332,8 @@ struct Position
   void do_move(Move m, StateInfo& st, bool givesCheck);
 
   // do_move()の4パラメーター版のほうを呼び出すにはgivesCheckも渡さないといけないが、
-  // mで王手になるかどうかがわからないときはこちらの関数を用いる。都度CheckInfoのコンストラクタが呼び出されるので遅い。探索中には使わないこと。
+  // mで王手になるかどうかがわからないときはこちらの関数を用いる。
+  // 都度CheckInfoのコンストラクタが呼び出されるので遅い。探索中には使わないこと。
   void do_move(Move m, StateInfo& st) { check_info_update(); do_move(m, st, gives_check(m)); }
 
   // 指し手で盤面を1手戻す
@@ -444,6 +470,14 @@ struct Position
   // c側のpinされている駒(その駒を動かすとc側の玉がとられる)
   Bitboard pinned_pieces(Color c) const { return check_blockers(c, c);  }
 
+  // avoidで指定されている遠方駒は除外して、pinされている駒のbitboardを得る。
+  // ※利きのない1手詰め判定のときに必要。
+  Bitboard pinned_pieces(Color c, Square avoid) const;
+
+  // fromからtoに駒が移動したものと仮定して、pinを得る
+  // ※利きのない1手詰め判定のときに必要。
+  Bitboard pinned_pieces(Color c, Square from, Square to) const;
+
   // 駒を配置して、内部的に保持しているBitboardなどを更新する。
   void put_piece( Square sq , Piece pc, PieceNo piece_no);
 
@@ -475,21 +509,19 @@ struct Position
   // 捕獲する指し手か、成りの指し手であるかを返す。
   bool capture_or_promotion(Move m) const { return (m & MOVE_PROMOTE) || capture(m); }
 
+  // 捕獲する指し手か、歩の成りの指し手であるかを返す。
+  bool capture_or_pawn_promotion(Move m) const
+  { return ((m & MOVE_PROMOTE) && type_of(piece_on(move_from(m)))==PAWN) || capture(m); }
+
   // 捕獲する指し手であるか。
   bool capture(Move m) const { return !is_drop(m) && piece_on(move_to(m)) != NO_PIECE; }
 
-  // 捕獲する指し手もしくは歩を成る指し手であるか。
-  bool capture_or_pawn_promotion(Move m) const {
-    return capture(m) ||
-      (type_of(piece_on(move_from(m))) == PAWN && (m & MOVE_PROMOTE));
-  }
-
-  // --- 超高速1手詰め判定
-#if defined(MATE_1PLY) && defined(LONG_EFFECT_LIBRARY)
+  // --- 1手詰め判定
+#ifdef USE_MATE_1PLY
   // 現局面で1手詰めであるかを判定する。1手詰めであればその指し手を返す。
   // ただし1手詰めであれば確実に詰ませられるわけではなく、簡単に判定できそうな近接王手による
   // 1手詰めのみを判定する。(要するに判定に漏れがある。)
-  // 先行して、CheckInfo.pinnedを更新しておく必要がある。
+  // 先行して、CheckInfo.pinnedを更新しておく必要がある。(LONG_EFFECT_LIBRARYを用いる場合)
   // →　check_info_update_pinned()を利用するのが吉。
   Move mate1ply() const;
 
@@ -544,9 +576,6 @@ protected:
   
   // 盤上の先手/後手/両方の駒があるところが1であるBitboard
   Bitboard occupied[COLOR_NB + 1];
-
-  // 駒が存在する升を表すBitboard
-  Bitboard piece_bb[PIECE_TYPE_BITBOARD_NB][COLOR_NB];
 
   // stが初期状態で指している、空のStateInfo
   StateInfo startState;

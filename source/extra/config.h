@@ -7,17 +7,28 @@
 
 // --- ターゲットCPUの選択
 
-// AVX2(Haswell以降)でサポートされた命令を使うか。
-// このシンボルをdefineしなければ、pext命令をソフトウェアでエミュレートする。
-// 古いCPUのPCで開発をしたていて、遅くてもいいからともかく動いて欲しいときにそうすると良い。
+// ターゲットCPUを選ぶ。
+
+// USE_AVX2  : AVX2(Haswell以降)でサポートされた命令を使うか。pextなど。
+// USE_SSE42 : SSE4.2でサポートされた命令を使うか。popcnt命令など。
+// USE_SSE4  : SSE4　でサポートされた命令を使うか。_mm_testz_si128など。
+// USE_SSE2  : SSE2  でサポートされた命令を使うか。
+// すべてdefineしなければSSEは使用しない。
+// (Windowsの64bit環境だと自動的にSSE2は使えるはず？)
+
+// Visual Studioのプロジェクト設定で
+// 「構成のプロパティ」→「C / C++」→「コード生成」→「拡張命令セットを有効にする」
+// のところの設定の変更も忘れずに。
+
+// noSSE ⊂ SSE2 ⊂ SSE4 ⊂ SSE4.2 ⊂ AVX2
+// なので、例えば、SSE4.2を選択するときは、
+// USE_SSE4.2をdefineして、そこ以降である、USE_SSE4とUSE_SSE2もdefineしてください。
+
 
 #define USE_AVX2
-
-// SSE4.2以降でサポートされた命令を使うか。
-// このシンボルをdefineしなければ、popcnt命令をソフトウェアでエミュレートする。
-// 古いCPUのPCで開発をしたていて、遅くてもいいからともかく動いて欲しいときにそうすると良い。
-
 #define USE_SSE42
+#define USE_SSE4
+#define USE_SSE2
 
 
 // 通例hash keyは64bitだが、これを128にするとPosition::state()->long_key()から128bit hash keyが
@@ -84,11 +95,17 @@
 // do_move()のときに利きの差分更新を行なうので、do_move()は少し遅くなる。(その代わり、利きが使えるようになる)
 //#define LONG_EFFECT_LIBRARY
 
-// 超高速1手詰め判定ルーチンを用いるか。
-//#define MATE_1PLY
+// 1手詰め判定ルーチンを用いるか。
+// LONG_EFFECT_LIBRARYが有効なときは、利きを利用した高速な一手詰め。
+// LONG_EFFECT_LIBRARYが無効なときは、Bonanza6風の一手詰め。
+//#define USE_MATE_1PLY
 
 // Position::see()を用いるか。これはSEE(Static Exchange Evaluation : 静的取り合い評価)の値を返す関数。
 //#define USE_SEE
+
+// Apery風の単純化されたSEE()を用いる場合
+// これを指定しないときは、厳密な計算を行うSEE()で、そちらのほうが少し重い。
+// #define USE_SIMPLE_SEE
 
 // PV(読み筋)を表示するときに置換表の指し手をかき集めてきて表示するか。
 // 自前でPVを管理してRootMoves::pvを更新するなら、この機能を使う必要はない。
@@ -100,7 +117,7 @@
 // #define ENABLE_MAKEBOOK_CMD
 
 // 標準で用意されているMovePickerを用いるか
-// #define USE_MOVE_PICKER
+// #define USE_MOVE_PICKER_2016Q2
 
 // 入玉時の宣言勝ちを用いるか
 // #define USE_ENTERING_KING_WIN
@@ -108,15 +125,20 @@
 // TimeMangementクラスに、今回の思考時間を計算する機能を追加するか。
 // #define USE_TIME_MANAGEMENT
 
-// MovePickerのなかで使っているCounterMoveにおいて、移動させる駒種も含めるか。
-// (これを含めると同じ移動をする別の駒をCounterMoveとしてみなさなくなり、ちょっと枝刈り性能が上がるはず)
-// #define KEEP_PIECE_IN_COUNTER_MOVE
-
 // 置換表のなかでevalを持たない
 // #define NO_EVAL_IN_TT
 
+// ONE_PLY == 1にするためのモード。これを指定していなければONE_PLY == 2
+// #define ONE_PLY_EQ_1
+
 // オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
 // #define USE_DROPBIT_IN_STATS
+
+// 指し手生成のときに上位16bitにto(移動後の升)に来る駒を格納する。
+// #define KEEP_PIECE_IN_GENERATE_MOVES
+
+// 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
+// #define USE_EVAL_HASH
 
 
 // --------------------
@@ -131,6 +153,7 @@
 #define EVAL_KPP
 #define USE_TT_PV
 #define KEEP_LAST_MOVE
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_NANO_PLUS_ENGINE
@@ -139,9 +162,10 @@
 #define EVAL_KPP
 #define USE_TT_PV
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_MINI_ENGINE
@@ -149,52 +173,57 @@
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
+#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_CLASSIC_ENGINE
 #define ENGINE_NAME "YaneuraOu classic"
-// 開発中なのでassertを有効に。
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
+#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_CLASSIC_TCE_ENGINE
 #define ENGINE_NAME "YaneuraOu classic-tce"
-//#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
 #define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_2016_MID_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Mid"
 // 開発中なのでassertを有効に。
-#define ASSERT_LV 3
+//#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 #define EVAL_KPPT
+//#define USE_EVAL_HASH
 #define USE_SEE
-#define USE_MOVE_PICKER
-#define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+//#define USE_SIMPLE_SEE
+#define USE_MOVE_PICKER_2016Q2
+//#define LONG_EFFECT_LIBRARY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
 #define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
@@ -202,14 +231,13 @@
 // 開発中なのでassertを有効に。
 #define ASSERT_LV 3
 #define ENABLE_TEST_CMD
-#define EVAL_KPP
+#define EVAL_KPPT
 #define USE_SEE
-#define USE_MOVE_PICKER
-#define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MOVE_PICKER_2016Q2
+//#define LONG_EFFECT_LIBRARY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
 #define USE_DROPBIT_IN_STATS
 #endif
 
@@ -248,7 +276,7 @@
 #define KEEP_LAST_MOVE
 #undef  MAX_PLY_NUM
 #define MAX_PLY_NUM 2000
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define EVAL_NO_USE
 #define LONG_EFFECT_LIBRARY
 #endif
@@ -288,6 +316,8 @@
 #include <memory>
 #include <map>
 #include <iostream>
+#include <cstring>  // std::memcpy()
+#include <cmath>    // log()
 
 // --------------------
 //   diable warnings
@@ -338,7 +368,6 @@
 #define ASSERT_LV4(X) ASSERT_LV_EX(4, X)
 #define ASSERT_LV5(X) ASSERT_LV_EX(5, X)
 
-
 // --- declaration of unreachablity
 
 // switchにおいてdefaultに到達しないことを明示して高速化させる
@@ -377,41 +406,33 @@ const bool pretty_jp = false;
 #endif
 
 
-// --- 32-bit OS or 64-bit OS
+// ----------------------------
+//      CPU environment
+// ----------------------------
 
 // ターゲットが64bitOSかどうか
-#if defined(_WIN64) && defined(_MSC_VER)
+#if (defined(_WIN64) && defined(_MSC_VER)) || (defined(__GNUC__) && defined(__x86_64__))
 const bool Is64Bit = true;
+#define IS_64BIT
 #else
 const bool Is64Bit = false;
 #endif
 
-
-// --- Counter Move
-
-// KEEP_PIECE_IN_COUNTER_MOVEがdefineされていたなら、
-// 移動させた駒を上位16bitに格納しておく。
-// bit24...16 = 移動させた駒(Piece。後手の駒含む)
-// bit15... 0 = 本来のMove
-
-#ifdef KEEP_PIECE_IN_COUNTER_MOVE
-typedef uint32_t Move32;
-#define COUNTER_MOVE Move32
-// 指し手の上位に駒種(移動前の駒)を格納してMove32化する。
-#define make_move32(move) ((Move32)((move) + (pos.moved_piece_before(move) << 16)))
+#if defined(USE_AVX2)
+#define TARGET_CPU "AVX2"
+#elif defined(USE_SSE41)
+#define TARGET_CPU "SSE4.2"
+#elif defined(USE_SSE4)
+#define TARGET_CPU "SSE4"
+#elif defined(USE_SSE2)
+#define TARGET_CPU "SSE2"
 #else
-#define COUNTER_MOVE Move 
+#define TARGET_CPU "noSSE"
 #endif
 
-// --- Long Effect Library
-
-// 1手詰め判定は、LONG_EFFECT_LIBRARYに依存している。
-#ifdef MATE_1PLY
-#define LONG_EFFECT_LIBRARY
-#endif
-
-
-// --- evaluate function
+// ----------------------------
+//     evaluate function
+// ----------------------------
 
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
 #if defined(EVAL_MATERIAL)

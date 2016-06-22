@@ -7,7 +7,7 @@
 //
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列
-#define ENGINE_VERSION "2.90"
+#define ENGINE_VERSION "3.16"
 
 // --------------------
 // コンパイル時の設定
@@ -28,14 +28,14 @@
 //#define YANEURAOU_MINI_ENGINE        // やねうら王mini        (完成2016/02/29)
 //#define YANEURAOU_CLASSIC_ENGINE     // やねうら王classic     (完成2016/04/03)
 //#define YANEURAOU_CLASSIC_TCE_ENGINE // やねうら王classic tce (完成2016/04/15)
-//#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (開発中)
+#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (完成2016/06/22)
 //#define YANEURAOU_2016_LATE_ENGINE   // やねうら王2016(LATE)  (開発中)
 //#define RANDOM_PLAYER_ENGINE         // ランダムプレイヤー
 //#define MATE_ENGINE                  // 詰め将棋solverとしてリリースする場合。(開発中)
 //#define HELP_MATE_ENGINE             // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
 //#define LOCAL_GAME_SERVER            // 連続自動対局フレームワーク
 //#define USER_ENGINE                  // ユーザーの思考エンジン
-#define KIFU_GENERATOR_ENGINE
+//#define KIFU_GENERATOR_ENGINE
 
 // --------------------
 // release configurations
@@ -145,7 +145,7 @@ enum Square : int32_t
   SQ_ZERO = 0, SQ_NB = 81,
   SQ_NB_PLUS1 = SQ_NB + 1, // 玉がいない場合、SQ_NBに移動したものとして扱うため、配列をSQ_NB+1で確保しないといけないときがあるのでこの定数を用いる。
 
-  // 方角に関する定数。N=北=盤面の下を意味する。
+  // 方角に関する定数。StockfishだとN=北=盤面の下を意味するようだが…。
   SQ_D  = +1, // 下(Down)
   SQ_R  = -9, // 右(Right)
   SQ_U  = -1, // 上(Up)
@@ -191,6 +191,13 @@ inline int dist(Square sq1, Square sq2) { return (!is_ok(sq1) || !is_ok(sq2)) ? 
 inline bool canPromote(const Color c, const Square fromOrTo) {
   ASSERT_LV2(is_ok(fromOrTo));
   return canPromote(c, rank_of(fromOrTo));
+}
+
+// 移動元と移動先の升を与えて、成れるかどうかを判定する。
+// (移動元か移動先かのどちらかが敵陣であれば成れる)
+inline bool canPromote(const Color c, const Square from, const Square to)
+{
+  return canPromote(c, from) || canPromote(c, to);
 }
 
 // 盤面を180°回したときの升目を返す
@@ -259,7 +266,10 @@ namespace Effect8
   // bit0..右上、bit1..右、bit2..右下、bit3..上、bit4..下、bit5..左上、bit6..左、bit7..左下
   // 同時に複数のbitが1であることがありうる。
   enum Directions : uint8_t { DIRECTIONS_ZERO = 0 , DIRECTIONS_RU = 1, DIRECTIONS_R = 2 , DIRECTIONS_RD = 4,
-    DIRECTIONS_U = 8, DIRECTIONS_D = 16 , DIRECTIONS_LU = 32 , DIRECTIONS_L = 64 , DIRECTIONS_LD = 128 };
+    DIRECTIONS_U = 8, DIRECTIONS_D = 16 , DIRECTIONS_LU = 32 , DIRECTIONS_L = 64 , DIRECTIONS_LD = 128 ,
+    DIRECTIONS_CROSS = DIRECTIONS_U | DIRECTIONS_D | DIRECTIONS_R | DIRECTIONS_L ,
+    DIRECTIONS_DIAG = DIRECTIONS_RU | DIRECTIONS_RD | DIRECTIONS_LU | DIRECTIONS_LD,
+  };
 
   // sq1にとってsq2がどのdirectionにあるか。
   extern Directions direc_table[SQ_NB_PLUS1][SQ_NB_PLUS1];
@@ -307,7 +317,11 @@ enum Depth : int32_t
   DEPTH_ZERO = 0,
 
   // Depthは1手をONE_PLY倍にスケーリングする。
+#ifdef ONE_PLY_EQ_1
+  ONE_PLY = 1 ,
+#else
   ONE_PLY = 2 ,
+#endif
 
   // 最大深さ
   DEPTH_MAX = MAX_PLY*(int)ONE_PLY ,
@@ -317,7 +331,7 @@ enum Depth : int32_t
   // 静止探索で王手がかかっていないとき。
   DEPTH_QS_NO_CHECKS = -1*(int)ONE_PLY,
   // 静止探索でこれより深い(残り探索深さが少ない)ところではRECAPTURESしか生成しない。
-  DEPTH_QS_RECAPTURES = -3*(int)ONE_PLY,
+  DEPTH_QS_RECAPTURES = -5*(int)ONE_PLY,
 
   // DEPTH_NONEは探索せずに値を求めたという意味に使う。
   DEPTH_NONE = -6 * (int)ONE_PLY
@@ -413,7 +427,9 @@ enum Piece : int32_t
 };
 
 // USIプロトコルで駒を表す文字列を返す。
-inline std::string usi_piece(Piece pc) { return std::string(". P L N S B R G K +P+L+N+S+B+R+G+.p l n s b r g k +p+l+n+s+b+r+g+k").substr(pc * 2, 2); }
+// 駒打ちの駒なら先頭に"D"。
+inline std::string usi_piece(Piece pc) { return std::string((pc & 32) ? "D":"")
+  + std::string(". P L N S B R G K +P+L+N+S+B+R+G+.p l n s b r g k +p+l+n+s+b+r+g+k").substr((pc & 31) * 2, 2); }
 
 // 駒に対して、それが先後、どちらの手番の駒であるかを返す。
 constexpr Color color_of(Piece pc) { return (pc & PIECE_WHITE) ? WHITE : BLACK; }
@@ -469,7 +485,8 @@ constexpr bool is_ok(PieceNo pn) { return PIECE_NO_ZERO <= pn && pn < PIECE_NO_N
 // --------------------
 
 // 指し手 bit0..6 = 移動先のSquare、bit7..13 = 移動元のSquare(駒打ちのときは駒種)、bit14..駒打ちか、bit15..成りか
-enum Move : uint16_t {
+// 上位16bitには、この指し手によってto(移動後の升)に来る駒。駒打ちのときは、さらに+32。
+enum Move : uint32_t {
 
   MOVE_NONE    = 0,             // 無効な移動
 
@@ -482,7 +499,11 @@ enum Move : uint16_t {
 };
 
 // 指し手の移動元の升を返す
-constexpr Square move_from(Move m) { return Square((m >> 7) & 0x7f); }
+constexpr Square move_from(Move m) {
+  // 駒打ちに対するmove_from()の呼び出しは不正。
+  // ASSERT_LV3(!(MOVE_DROP & m));
+  // ↑これを入れたいが、constexprにできなくなるのでやめておく。
+  return Square((m >> 7) & 0x7f); }
   
 // 指し手の移動先の升を返す
 constexpr Square move_to(Move m) { return Square(m & 0x7f); }
@@ -494,7 +515,7 @@ constexpr bool is_drop(Move m){ return (m & MOVE_DROP)!=0; }
 constexpr bool is_promote(Move m) { return (m & MOVE_PROMOTE)!=0; }
 
 // 駒打ち(is_drop()==true)のときの打った駒
-constexpr Piece move_dropped_piece(Move m) { return (Piece)move_from(m); }
+constexpr Piece move_dropped_piece(Move m) { return (Piece)((m >> 7) & 0x7f); }
 
 // fromからtoに移動する指し手を生成して返す
 constexpr Move make_move(Square from, Square to) { return (Move)(to + (from << 7)); }
@@ -536,18 +557,13 @@ inline std::ostream& operator<<(std::ostream& os, Move m) { os << to_usi_string(
 // オーダリングのときにスコアで並べ替えしたいが、一つになっているほうが並び替えがしやすいのでこうしてある。
 struct ExtMove {
 
-  Move move;   // 指し手
+  Move move;   // 指し手(32bit)
   Value value; // これはMovePickerが指し手オーダリングのために並び替えるときに用いる値(≠評価値)。
 
   // Move型とは暗黙で変換できていい。
 
   operator Move() const { return move; }
   void operator=(Move m) { move = m; }
-
-#ifdef KEEP_PIECE_IN_COUNTER_MOVE
-  // killerやcounter moveを32bit(Move32)で扱うときに、無理やりExtMoveに代入するためのhack
-  void operator=(Move32 m) { *(Move32*)this = m; }
-#endif
 };
 
 // ExtMoveの並べ替えを行なうので比較オペレーターを定義しておく。
@@ -786,6 +802,10 @@ namespace USI {
 
     Option(OnChange f = nullptr) : type("button"), min(0), max(0), on_change(f) {}
 
+    // 文字列
+    Option(const char* v, OnChange f = nullptr) : type("string"), min(0), max(0), on_change(f)
+    { defaultValue = currentValue = v; }
+
     // bool型のoption デフォルト値が v
     Option(bool v, OnChange f = nullptr) : type("check"),min(0),max(0),on_change(f)
     { defaultValue = currentValue = v ? "true" : "false"; }
@@ -864,6 +884,8 @@ extern USI::OptionsMap Options;
 Move move_from_usi(const Position& pos, const std::string& str);
 
 // 合法かのテストはせずにともかく変換する版。
+// 返ってくるのは16bitのMoveなので、これを32bitのMoveに変換するには
+// Position::move16_to_move()を呼び出す必要がある。
 Move move_from_usi(const std::string& str);
 
 // --------------------

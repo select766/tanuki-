@@ -47,8 +47,8 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -203,11 +203,11 @@
     <ClInclude Include="engine\kifu-generator-engine\parameters.h" />
     <ClInclude Include="engine\mate-engine\mate_engine.h" />
     <ClInclude Include="evaluate.h" />
+    <ClInclude Include="eval\kppt_evalsum.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book.h" />
     <ClInclude Include="extra\config.h" />
-    <ClInclude Include="extra\evalsum.h" />
     <ClInclude Include="extra\long_effect.h" />
     <ClInclude Include="extra\key128.h" />
     <ClInclude Include="extra\macros.h" />
@@ -216,6 +216,8 @@
     <ClInclude Include="kifu_reader.h" />
     <ClInclude Include="kifu_writer.h" />
     <ClInclude Include="learner.h" />
+    <ClInclude Include="extra\move_picker_2015.h" />
+    <ClInclude Include="extra\move_picker_2016Q2.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
     <ClInclude Include="search.h" />
@@ -247,7 +249,9 @@
     <ClCompile Include="extra\book.cpp" />
     <ClCompile Include="extra\entering_king_win.cpp" />
     <ClCompile Include="extra\long_effect.cpp" />
-    <ClCompile Include="extra\mate1ply.cpp" />
+    <ClCompile Include="extra\mate1ply_with_effect.cpp" />
+    <ClCompile Include="extra\mate1ply_without_effect.cpp" />
+    <ClCompile Include="extra\move_picker_2016Q2.cpp" />
     <ClCompile Include="extra\see.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
@@ -264,11 +268,15 @@
     <ClCompile Include="usi.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="..\docs\old\更新履歴2016Q2まで.txt" />
+    <Text Include="..\docs\ToDoのリスト.txt" />
     <Text Include="..\docs\USI拡張コマンド.txt" />
+    <Text Include="..\docs\実験記録.txt" />
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
     <Text Include="..\exe\eval\readme.txt" />
-    <Text Include="..\exe\YaneuraOu-classic-2016-mid.txt" />
+    <Text Include="..\exe\YaneuraOu-2016-mid.txt" />
+    <Text Include="..\exe\YaneuraOu-2016-mid_ja.txt" />
     <Text Include="..\exe\YaneuraOu-classic-readme.txt" />
     <Text Include="..\exe\YaneuraOu-classic-tce-readme.txt" />
     <Text Include="..\exe\YaneuraOu-classic-tce_ja.txt" />
@@ -282,12 +290,20 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\exe\book\standard_book.db" />
+    <None Include="..\exe\YaneuraOu-2016-mid-nosse.exe" />
+    <None Include="..\exe\YaneuraOu-2016-mid-sse2.exe" />
+    <None Include="..\exe\YaneuraOu-2016-mid-sse4.exe" />
+    <None Include="..\exe\YaneuraOu-2016-mid-sse42.exe" />
+    <None Include="..\exe\YaneuraOu-2016-mid.exe" />
+    <None Include="..\exe\YaneuraOu-2016-Mid_gcc.exe" />
     <None Include="..\exe\YaneuraOu-classic-tce.exe" />
     <None Include="..\exe\YaneuraOu-classic.exe" />
+    <None Include="..\exe\YaneuraOu-local-server.exe" />
     <None Include="..\exe\YaneuraOu-mini.exe" />
     <None Include="..\exe\YaneuraOu-nano-plus.exe" />
     <None Include="..\exe\YaneuraOu-nano.exe" />
     <None Include="..\README.md" />
+    <None Include="Makefile" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

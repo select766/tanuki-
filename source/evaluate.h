@@ -5,7 +5,7 @@
 
 // 手番込みの評価関数であれば手番を込みで値を計算するhelper classを使う。
 #ifdef EVAL_KPPT
-#include "extra\evalsum.h"
+#include "eval\kppt_evalsum.h"
 #endif
 
 // --------------------
@@ -25,6 +25,12 @@ namespace Eval {
 
   // 評価関数本体
   Value evaluate(const Position& pos);
+
+  // 評価関数本体
+  // このあとのdo_move()のあとのevaluate()で差分計算ができるように、
+  // 現在の前局面から差分計算ができるときだけ計算しておく。
+  // 評価値自体は返さない。
+  void evaluate_with_no_return(const Position& pos);
 
   // 駒割り以外の全計算して、その合計を返す。Position::set()で一度だけ呼び出される。
   // あるいは差分計算が不可能なときに呼び出される。
@@ -59,6 +65,11 @@ namespace Eval {
     KingValue = 15000,
   };
 #elif defined (EVAL_KPPT)
+
+  // null move後のevaluate()
+  // 手番を反転させたときの評価値を返す。
+  Value evaluate_nullmove(const Position& pos);
+
   // Aperyの駒割り
   enum {
     PawnValue = 90,
@@ -84,10 +95,11 @@ namespace Eval {
   // 駒の交換値(＝捕獲したときの価値の上昇値)
   // 例)「と」を取ったとき、評価値の変動量は手駒歩+盤面の「と」。
   // MovePickerとSEEの計算で用いる。
-  extern int PieceValueCapture[PIECE_NB];
+  extern int CapturePieceValue[PIECE_NB];
 
   // 駒を成ったときの成る前との価値の差。SEEで用いる。
   // 駒の成ったものと成っていないものとの価値の差
+  // ※　PAWNでもPRO_PAWNでも　と金 - 歩 の価値が返る。
   extern int ProDiffPieceValue[PIECE_NB];
 
   // --- 評価関数で使う定数 KPP(玉と任意2駒)のPに相当するenum
@@ -237,7 +249,8 @@ namespace Eval {
         p = BONA_PIECE_ZERO;
       for (auto& p : pieceListFw)
         p = BONA_PIECE_ZERO;
-      memset(piece_no_list, -1, sizeof(PieceNo));
+      for (auto& v : piece_no_list)
+        v = PieceNo(-1);
     }
 
   protected:

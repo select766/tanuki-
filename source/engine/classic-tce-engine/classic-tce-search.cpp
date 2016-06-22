@@ -238,18 +238,15 @@ namespace YaneuraOuClassicTce
   inline void update_stats(const Position& pos, Stack* ss, Move move,
     Depth depth, Move* quiets, int quietsCnt)
   {
-    // 今回の指し手の32bit化
-    Move32 move32 = make_move32(move);
-
     // IID、null move、singular extensionの判定のときは浅い探索なのでこのときに
     // killer等を更新するのは有害である。
     if (ss->skipEarlyPruning)
     {
       // しかしkillerがないときはkillerぐらいは登録したほうが少しだけ得かも。
       if (ss->killers[0] == MOVE_NONE)
-        ss->killers[0] = move32;
+        ss->killers[0] = move;
       else if (ss->killers[1] == MOVE_NONE)
-        ss->killers[1] = move32;
+        ss->killers[1] = move;
 
       return;
     }
@@ -257,10 +254,10 @@ namespace YaneuraOuClassicTce
     //   killerのupdate
 
     // killer 2本しかないので[0]と違うならいまの[0]を[1]に降格させて[0]と差し替え
-    if (ss->killers[0] != move32)
+    if (ss->killers[0] != move)
     {
       ss->killers[1] = ss->killers[0];
-      ss->killers[0] = move32;
+      ss->killers[0] = move;
     }
 
     //   historyのupdate
@@ -288,7 +285,7 @@ namespace YaneuraOuClassicTce
     if (is_ok((ss - 1)->currentMove))
     {
       // counter moveだが、移動させた駒を上位16バイトのほうに保持しておく。
-      thisThread->counterMoves.update(prevPc, prevSq, move32 );
+      thisThread->counterMoves.update(prevPc, prevSq, move );
       cmh.update(mpc, move_to(move), bonus);
     }
 
@@ -422,17 +419,8 @@ namespace YaneuraOuClassicTce
     ss->ply = (ss - 1)->ply + 1;
 
     // -----------------------
-    //    千日手等の検出
+    //    最大手数へ到達したか？
     // -----------------------
-
-    // 連続王手による千日手、および通常の千日手、優等局面・劣等局面。
-
-    // 連続王手による千日手に対してdraw_value()は、詰みのスコアを返すので、rootからの手数を考慮したスコアに変換する必要がある。
-    // そこで、value_from_tt()で変換してから返すのが正解。
-
-    auto draw_type = pos.is_repetition();
-    if (draw_type != REPETITION_NONE)
-      return value_from_tt(draw_value(draw_type, pos.side_to_move()),ss->ply);
 
     if (pos.game_ply() > Limits.max_game_ply)
       return draw_value(REPETITION_DRAW, pos.side_to_move());
@@ -448,7 +436,7 @@ namespace YaneuraOuClassicTce
 
     posKey  = pos.state()->key();
     tte     = TT.probe(posKey, ttHit);
-    ttMove  = ttHit ? tte->move() : MOVE_NONE;
+    ttMove  = ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
     ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     // nonPVでは置換表の指し手で枝刈りする
@@ -591,8 +579,7 @@ namespace YaneuraOuClassicTce
 
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
-    if (pos.state()->sumKKP == INT_MAX)
-      evaluate(pos);
+    evaluate_with_no_return(pos);
 
     while ((move = mp.next_move()) != MOVE_NONE)
     {
@@ -614,7 +601,7 @@ namespace YaneuraOuClassicTce
       {
         // moveが成りの指し手なら、その成ることによる価値上昇分もここに乗せたほうが正しい見積りになる。
 
-        Value futilityValue = futilityBase + (Value)PieceValueCapture[pos.piece_on(move_to(move))]
+        Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(move_to(move))]
           + (is_promote(move) ? (Value)ProDiffPieceValue[pos.piece_on(move_from(move))]  : VALUE_ZERO) ;
 
         // futilityValueは今回捕獲するであろう駒の価値の分を上乗せしているのに
@@ -827,6 +814,11 @@ namespace YaneuraOuClassicTce
       //     千日手等の検出
       // -----------------------
 
+      // 連続王手による千日手、および通常の千日手、優等局面・劣等局面。
+
+      // 連続王手による千日手に対してdraw_value()は、詰みのスコアを返すので、rootからの手数を考慮したスコアに変換する必要がある。
+      // そこで、value_from_tt()で変換してから返すのが正解。
+
       auto draw_type = pos.is_repetition();
       if (draw_type != REPETITION_NONE)
         return value_from_tt(draw_value(draw_type, pos.side_to_move()),ss->ply);
@@ -888,7 +880,7 @@ namespace YaneuraOuClassicTce
     // RootNodeであるなら、(MultiPVなどでも)現在注目している1手だけがベストの指し手と仮定できるから、
     // それが置換表にあったものとして指し手を進める。
     Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
-                : ttHit    ? tte->move() : MOVE_NONE;
+                : ttHit    ? pos.move16_to_move(tte->move()) : MOVE_NONE;
 
     // 置換表の値による枝刈り
 
@@ -1132,7 +1124,7 @@ namespace YaneuraOuClassicTce
 
       // このnodeの指し手としては置換表の指し手を返したあとは、直前の指し手で捕獲された駒による評価値の上昇を
       // 上回るようなcaptureの指し手のみを生成する。
-      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::PieceValueCapture[pos.captured_piece_type()]);
+      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::CapturePieceValue[pos.captured_piece_type()]);
 
       while ((move = mp.next_move()) != MOVE_NONE)
         if (pos.legal(move))
@@ -1164,7 +1156,7 @@ namespace YaneuraOuClassicTce
       ss->skipEarlyPruning = false;
 
       tte = TT.probe(posKey, ttHit);
-      ttMove = ttHit ? tte->move() : MOVE_NONE;
+      ttMove = ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
     }
 
     // -----------------------
@@ -1228,8 +1220,7 @@ namespace YaneuraOuClassicTce
     // このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
     // evaluate()を呼び出していないなら呼び出しておく。
     // ss->staticEvalに代入するとimprovingの判定間違うのでそれはしないほうがよさげ。
-    if (pos.state()->sumKKP == INT_MAX)
-      evaluate(pos);
+    evaluate_with_no_return(pos);
 
     MovePicker mp(pos, ttMove, depth, thisThread->history, cmh, fmh, cm, ss);
 
@@ -1807,7 +1798,7 @@ void Thread::search()
   //   反復深化のループ
   // ---------------------
 
-  while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || rootDepth <= Limits.depth))
+  while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || Threads.main()->rootDepth <= Limits.depth))
   {
     // ------------------------
     // lazy SMPのための初期化
@@ -1869,12 +1860,6 @@ void Thread::search()
         // 用いないと前回の反復深化の結果によって得た並び順を変えてしまうことになるのでまずい。
         std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
 
-        // 探索中に置換表のPV lineを破壊した可能性があるので、PVを置換表に
-        // 書き戻しておいたほうが良い。(PV lineが一番価値があるので)
-
-        for (size_t i = 0; i <= PVIdx; ++i)
-          rootMoves[i].insert_pv_in_tt(rootPos);
-
         if (Signals.stop)
           break;
 
@@ -1923,9 +1908,8 @@ void Thread::search()
       // (二番目だと思っていたほうの指し手のほうが評価値が良い可能性があるので…)
       std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
-      // メインスレッド以外はMultiPVの2番目以降の指し手の探索には加わらない。
       if (!mainThread)
-        break;
+        continue;
 
       // メインスレッド以外はPVを出力しない。
       // また、silentモードの場合もPVは出力しない。
@@ -2093,7 +2077,7 @@ void MainThread::think()
     int book_ply = Options["BookMoves"];
     if (rootPos.game_ply() <= book_ply)
     {
-      auto it = book.find(rootPos.sfen());
+      auto it = book.find(rootPos);
       if (it != book.end() && it->second.size() != 0) {
         // 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
         // また、it->second->size()!=0をチェックしておかないと指し手のない定跡が登録されていたときに困る。

@@ -48,8 +48,8 @@ const string engine_info() {
   ss << ENGINE_NAME << ' '
      << EVAL_TYPE_NAME << ' '
      << ENGINE_VERSION << setfill('0')
-     << (Is64Bit ? " 64" : "32")
-     << (use_avx2 ? " AVX2" : (use_sse42 ? " SSE4.2" : "")) << endl
+     << (Is64Bit ? " 64" : " 32")
+     << TARGET_CPU << endl
      << "id author by yaneurao" << endl;
 
   return ss.str();

@@ -23,13 +23,17 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 // ----------------------------
-//      64bit environment
+//      inline化の強制
 // ----------------------------
 
-// 64bit環境のときにはIS_64BITがdefinedになるのでこのシンボルが定義されていなければ
-// 32bit環境用のemulation codeを書く。
-#if defined(_WIN64) && defined(_MSC_VER)
-#define IS_64BIT
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#define FORCE_INLINE __forceinline
+#elif defined(__INTEL_COMPILER)
+#define FORCE_INLINE inline
+#elif defined(__GNUC__)
+#define FORCE_INLINE __attribute__((always_inline)) inline
+#else
+#define FORCE_INLINE inline
 #endif
 
 // ----------------------------
@@ -37,7 +41,6 @@ typedef uint64_t u64;
 // ----------------------------
 
 #ifdef USE_AVX2
-const bool use_avx2 = true;
 
 // for SSE,AVX,AVX2
 #include <immintrin.h>
@@ -52,8 +55,6 @@ const bool use_avx2 = true;
 #endif
 
 #else
-
-const bool use_avx2 = false;
 
 // for non-AVX2 : software emulationによるpext実装(やや遅い。とりあえず動くというだけ。)
 inline uint64_t pext(uint64_t val, uint64_t mask)
@@ -79,31 +80,23 @@ inline uint64_t PEXT64(uint64_t a, uint64_t b) { return pext(a, b); }
 // ----------------------------
 
 #ifdef USE_SSE42
-const bool use_sse42 = true;
 
 // for SSE4.2
-#include <intrin.h>
-#define POPCNT8(a) __popcnt8(a)
+#include <nmmintrin.h>
+
 #ifdef IS_64BIT
-#define POPCNT32(a) __popcnt32(a)
-#define POPCNT64(a) __popcnt64(a)
+#define POPCNT32(a) _mm_popcnt_u32(a)
+#define POPCNT64(a) _mm_popcnt_u64(a)
 #else
-// 32bit版だと、何故かこれ関数名に"32"がついてない。
-#define POPCNT32(a) __popcnt(uint32_t(a))
+#define POPCNT32(a) _mm_popcnt_u32(a)
 // 32bit環境では32bitのpop_count 2回でemulation。
 #define POPCNT64(a) (POPCNT32((a)>>32) + POPCNT32(a))
 #endif
 
 #else
-const bool use_sse42 = false;
 
 // software emulationによるpopcnt(やや遅い)
-inline int32_t POPCNT8(uint32_t a) {
-  a = (a & UINT32_C(0x55)) + (a >> 1 & UINT32_C(0x55));
-  a = (a & UINT32_C(0x33)) + (a >> 2 & UINT32_C(0x33));
-  a = (a & UINT32_C(0x0f)) + (a >> 4 & UINT32_C(0x0f));
-  return (int32_t)a;
-}
+
 inline int32_t POPCNT32(uint32_t a) {
   a = (a & UINT32_C(0x55555555)) + (a >> 1 & UINT32_C(0x55555555));
   a = (a & UINT32_C(0x33333333)) + (a >> 2 & UINT32_C(0x33333333));
@@ -126,21 +119,33 @@ inline int32_t POPCNT64(uint64_t a) {
 //     BSF(bitscan forward)
 // ----------------------------
 
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER) && defined(_WIN64)
+#include <intrin.h>
+
 #ifdef IS_64BIT
 // 1である最下位のbitのbit位置を得る。0を渡してはならない。
-inline int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
-inline int LSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward64(&index, v); return index; }
+FORCE_INLINE int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
+FORCE_INLINE int LSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward64(&index, v); return index; }
 
 // 1である最上位のbitのbit位置を得る。0を渡してはならない。
-inline int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
-inline int MSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse64(&index, v); return index; }
+FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
+FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse64(&index, v); return index; }
 #else
 // 32bit環境では64bit版を要求されたら2回に分けて実行。
-inline int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
-inline int LSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v) ? LSB32(uint32_t(v)) : 32 + LSB32(uint32_t(v >> 32)); }
+FORCE_INLINE int LSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanForward(&index, v); return index; }
+FORCE_INLINE int LSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v) ? LSB32(uint32_t(v)) : 32 + LSB32(uint32_t(v >> 32)); }
 
-inline int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
-inline int MSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v >> 32) ? 32 + MSB32(uint32_t(v >> 32)) : MSB32(uint32_t(v)); }
+FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _BitScanReverse(&index, v); return index; }
+FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v >> 32) ? 32 + MSB32(uint32_t(v >> 32)) : MSB32(uint32_t(v)); }
+#endif
+
+#elif defined(__GNUC__) && ( defined(__i386__) || defined(__x86_64__) )
+
+FORCE_INLINE int LSB32(const u32 v) { ASSERT_LV3(v != 0); return __builtin_ctzll(v); }
+FORCE_INLINE int LSB64(const u64 v) { ASSERT_LV3(v != 0); return __builtin_ctzll(v); }
+FORCE_INLINE int MSB32(const u32 v) { ASSERT_LV3(v != 0); return 63 - __builtin_clzll(v); }
+FORCE_INLINE int MSB64(const u64 v) { ASSERT_LV3(v != 0); return 63 - __builtin_clzll(v); }
+
 #endif
 
 // ----------------------------
@@ -156,7 +161,9 @@ struct alignas(32) ymm
 
   // アライメント揃っていないところからの読み込みに対応させるためにloadではなくloaduのほうを用いる。
   ymm(const void* p) :m(_mm256_loadu_si256((__m256i*)p)) {}
-  ymm(const uint8_t t) { for (int i = 0; i < 32; ++i) m.m256i_u8[i] = t; }
+  ymm(const uint8_t t) { for (int i = 0; i < 32; ++i) ((u8*)this)[i] = t; }
+  //      /*  m.m256i_u8[i] = t; // これだとg++対応できない。 */
+
   ymm() {}
 
   // MSBが1なら1にする
@@ -258,7 +265,7 @@ private:
 // 1である最下位bitを1bit取り出して、そのbit位置を返す。0を渡してはならない。
 // sizeof(T)<=4 なら LSB32(b)で済むのだが、これをコンパイル時に評価させるの、どう書いていいのかわからん…。
 // デフォルトでLSB32()を呼ぶようにしてuint64_tのときだけ64bit版を用意しておく。
-template <typename T> int pop_lsb(T& b) {  int index = LSB32(b);  b = T(b & (b - 1)); return index; }
-inline int pop_lsb(uint64_t & b) { int index = LSB64(b);  b &= b - 1; return index; }
+template <typename T> FORCE_INLINE int pop_lsb(T& b) {  int index = LSB32(b);  b = T(b & (b - 1)); return index; }
+FORCE_INLINE int pop_lsb(uint64_t & b) { int index = LSB64(b);  b &= b - 1; return index; }
 
 #endif
