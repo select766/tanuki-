@@ -2457,6 +2457,12 @@ namespace Learner
 
     auto th = pos.this_thread();
     auto& rootMoves = th->rootMoves;
+    rootMoves.clear();
+    for (auto m : MoveList<LEGAL>(pos)) {
+      if (pos.legal(m)) {
+        rootMoves.push_back(Search::RootMove(m));
+      }
+    }
     th->rootDepth = 0;
 
     while (++th->rootDepth <= depth)

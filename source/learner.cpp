@@ -10,12 +10,12 @@
 #include "search.h"
 #include "thread.h"
 
-namespace KifuGenerator
+namespace Learner
 {
-  enum NodeType { PV, NonPV };
-  template <NodeType NT, bool InCheck>
-  Value qsearch(Position& pos, Search::Stack* ss, Value alpha, Value beta, Depth depth);
+  std::pair<Move, Value> search(Position& pos, Value alpha, Value beta, int depth);
+  std::pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta);
 }
+
 namespace Eval
 {
   typedef std::array<int16_t, 2> ValueKpp;
@@ -136,109 +136,11 @@ namespace
     // 符号の反転はしなくて良い
     value = Eval::evaluate(pos);
 #elif 0
-    // 1手読みを行う場合
-    pos.check_info_update();
-
-    // 浅い探索を行う
-    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
-    thread.rootMoves.clear();
-    for (auto m : MoveList<LEGAL>(pos)) {
-      if (pos.legal(m)) {
-        thread.rootMoves.push_back(Search::RootMove(m));
-      }
-    }
-
-    if (thread.rootMoves.empty()) {
-      // 現在の局面が静止している状態なのだと思う
-      // 現在の局面の評価値をそのまま使う
-      value = Eval::evaluate(pos);
-    }
-    else {
-      // 実際に探索する
-      thread.maxPly = 0;
-      thread.rootDepth = 0;
-
-      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
-      // こちらのほうが探索スレッドを起こさないので速いはず
-      thread.search();
-      value = thread.rootMoves[0].score;
-
-      // 静止した局面まで進める
-      StateInfo stateInfo[MAX_PLY];
-      int play = 0;
-      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-      // 全計算はPosition::set()の中で行われているので差分計算ができる
-      Value value_pv = Eval::evaluate(pos);
-      for (auto m : thread.rootMoves[0].pv) {
-        pos.do_move(m, stateInfo[play++]);
-        value_pv = Eval::evaluate(pos);
-      }
-
-      // Eval::evaluate()は常に手番から見た評価値を返すので
-      // 探索開始局面と手番が違う場合は符号を反転する
-      if (root_color != pos.side_to_move()) {
-        value_pv = -value_pv;
-      }
-
-      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-      // 処理に含めないようfalseを返す
-      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-      if (value != value_pv) {
-        return false;
-      }
-    }
+    // 0手読み+静止探索を行う場合
+    value = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE).second;
 #elif 0
-    // 1手読みを行う場合
-    pos.check_info_update();
-
-    // 浅い探索を行う
-    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
-    thread.rootMoves.clear();
-    for (auto m : MoveList<LEGAL>(pos)) {
-      if (pos.legal(m)) {
-        thread.rootMoves.push_back(Search::RootMove(m));
-      }
-    }
-
-    if (thread.rootMoves.empty()) {
-      // 現在の局面が静止している状態なのだと思う
-      // 現在の局面の評価値をそのまま使う
-      value = Eval::evaluate(pos);
-    }
-    else {
-      // 実際に探索する
-      thread.maxPly = 0;
-      thread.rootDepth = 0;
-
-      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
-      // こちらのほうが探索スレッドを起こさないので速いはず
-      thread.search();
-      value = thread.rootMoves[0].score;
-
-      // 静止した局面まで進める
-      StateInfo stateInfo[MAX_PLY];
-      int play = 0;
-      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-      // 全計算はPosition::set()の中で行われているので差分計算ができる
-      Value value_pv = Eval::evaluate(pos);
-      for (auto m : thread.rootMoves[0].pv) {
-        pos.do_move(m, stateInfo[play++]);
-        value_pv = Eval::evaluate(pos);
-      }
-
-      // Eval::evaluate()は常に手番から見た評価値を返すので
-      // 探索開始局面と手番が違う場合は符号を反転する
-      if (root_color != pos.side_to_move()) {
-        value_pv = -value_pv;
-      }
-
-      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-      // 処理に含めないようfalseを返す
-      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-      if (value != value_pv) {
-        return false;
-      }
-    }
+    // 1手読み+静止探索を行う場合
+    value = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 1).second;
 #else
     static_assert(false, "Choose a method to search shallowly.");
 #endif
