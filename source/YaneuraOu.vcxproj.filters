@@ -59,9 +59,6 @@
     <Filter Include="リソース ファイル\engine\2016-mid-engine">
       <UniqueIdentifier>{307735dd-d642-4bb7-a1c0-4b578152201a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="リソース ファイル\engine\kifu-generator-engine">
-      <UniqueIdentifier>{05f76b83-9c39-4d4c-bb0e-760d2d0c8288}</UniqueIdentifier>
-    </Filter>
     <Filter Include="doc\old">
       <UniqueIdentifier>{aefbe5b2-c4db-408d-b69f-3084701e0753}</UniqueIdentifier>
     </Filter>
@@ -132,9 +129,6 @@
     </ClInclude>
     <ClInclude Include="extra\move_picker_2015.h">
       <Filter>リソース ファイル\extra</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\kifu-generator-engine\parameters.h">
-      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
     </ClInclude>
     <ClInclude Include="kifu_generator.h">
       <Filter>リソース ファイル</Filter>
@@ -245,9 +239,6 @@
     </ClCompile>
     <ClCompile Include="eval\evaluate_kppt.cpp">
       <Filter>リソース ファイル\eval</Filter>
-    </ClCompile>
-    <ClCompile Include="engine\kifu-generator-engine\kifu-generator-engine.cpp">
-      <Filter>リソース ファイル\engine\kifu-generator-engine</Filter>
     </ClCompile>
     <ClCompile Include="kifu_generator.cpp">
       <Filter>リソース ファイル</Filter>

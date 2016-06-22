@@ -288,22 +288,6 @@
 #define EVAL_KPP
 #endif
 
-#ifdef KIFU_GENERATOR_ENGINE
-#define ENGINE_NAME "Kifu Generator"
-// 開発中なのでassertを有効に。
-#define ASSERT_LV 0
-#define ENABLE_TEST_CMD
-#define EVAL_KPPT
-#define USE_SEE
-#define USE_MOVE_PICKER
-#define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
-#define USE_ENTERING_KING_WIN
-#define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
-#define USE_DROPBIT_IN_STATS
-#endif
-
 // --------------------
 //      include
 // --------------------

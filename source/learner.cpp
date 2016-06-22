@@ -3,6 +3,7 @@
 #include <array>
 #include <ctime>
 #include <fstream>
+#include <direct.h>
 
 #include "kifu_reader.h"
 #include "position.h"
@@ -31,7 +32,7 @@ namespace Eval
 
 namespace
 {
-  using WeightType = double;
+  using WeightType = float;
 
   enum WeightKind {
     WEIGHT_KIND_COLOR,
@@ -61,7 +62,6 @@ namespace
   };
 
   constexpr char* kFolderName = "kifu";
-  constexpr char* kOutputFolderPathBase = "eval";
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -191,27 +191,12 @@ namespace
     // 1手読みを行う場合
     pos.check_info_update();
 
-    // qsearch()相当の探索を行う
-    // 本当はqsearch()を呼びたいが、呼んだらクラッシュしたので…。
+    // 浅い探索を行う
+    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
     thread.rootMoves.clear();
-    // 王手が掛かっているかどうかに応じてrootMovesの種類を変える
-    if (pos.in_check()) {
-      for (auto m : MoveList<EVASIONS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
-      }
-    }
-    else {
-      for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
-      }
-      for (auto m : MoveList<QUIET_CHECKS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
+    for (auto m : MoveList<LEGAL>(pos)) {
+      if (pos.legal(m)) {
+        thread.rootMoves.push_back(Search::RootMove(m));
       }
     }
 
@@ -280,10 +265,29 @@ namespace
     std::strftime(buffer, sizeof(buffer), "%Y-%m-%d-%H-%M-%S", tm);
     return buffer;
   }
+
+  void save_eval(const std::string& output_folder_path_base, int64_t position_index) {
+    _mkdir(output_folder_path_base.c_str());
+
+    char buffer[1024];
+    sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
+    fprintf(stderr, "Writing eval files: %s\n", buffer);
+    Options["EvalDir"] = buffer;
+    _mkdir(buffer);
+    Eval::save_eval();
+  }
 }
 
-void Learner::learn()
+void Learner::learn(std::istringstream& iss)
 {
+  std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
+  std::string token;
+  while (iss >> token) {
+    if (token == "output_folder_path_base") {
+      iss >> output_folder_path_base;
+    }
+  }
+
   ASSERT_LV3(
     kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
@@ -340,7 +344,7 @@ void Learner::learn()
   std::vector<std::thread> threads;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_position_index, &threads, &weights, thread_index] {
+    auto procedure = [&global_position_index, &threads, &weights, thread_index, output_folder_path_base] {
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
@@ -432,10 +436,7 @@ void Learner::learn()
         }
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
-          char buffer[1024];
-          sprintf(buffer, "%s/%I64d", ((std::string)Options["EvalDir"]).c_str(), position_index);
-          fprintf(stderr, "Writing eval files: %s\n", buffer);
-          Eval::save_eval();
+          save_eval(output_folder_path_base, position_index);
         }
 
         // 局面は元に戻さなくても問題ない
@@ -475,10 +476,7 @@ void Learner::learn()
     }
   }
 
-  char buffer[1024];
-  sprintf(buffer, "%s/%I64d", ((std::string)Options["EvalDir"]).c_str(), global_position_index);
-  fprintf(stderr, "Writing eval files: %s\n", buffer);
-  Eval::save_eval();
+  save_eval(output_folder_path_base, global_position_index);
 }
 
 void Learner::error_measurement()

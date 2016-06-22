@@ -76,8 +76,6 @@ namespace Eval
   // 評価関数ファイルを保存する
   void save_eval() {
     do {
-      _mkdir(((string)Options["EvalDir"]).c_str());
-
       // KK
       std::ofstream ofsKK((string)Options["EvalDir"] + KK_BIN, std::ios::binary);
       if (ofsKK) ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
