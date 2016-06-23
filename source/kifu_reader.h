@@ -32,7 +32,7 @@ namespace Learner {
   private:
     const std::string folder_name_;
     std::vector<std::string> file_paths_;
-    std::ifstream file_stream_;
+    FILE* file_;
     int loop_ = 0;
     int file_index_ = 0;
     int record_index_ = 0;

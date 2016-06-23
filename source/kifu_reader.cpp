@@ -11,6 +11,7 @@ namespace {
   constexpr int kBatchSize = 10000000; // 100万
   constexpr int kMaxLoop = 1;
   constexpr Value kCloseOutValueThreshold = Value(2000);
+  constexpr int kBufferSize = 1 << 24; // 16MB
 }
 
 Learner::KifuReader::KifuReader(const std::string& folder_name)
@@ -33,8 +34,8 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
     if (record_index_ >= static_cast<int>(records_.size())) {
       records_.clear();
       while (records_.size() < kBatchSize) {
-        std::string line;
-        if (!std::getline(file_stream_, line)) {
+        char line[1024];
+        if (!fgets(line, sizeof(line), file_)) {
           // ファイルの終端に辿り着いた
           if (++file_index_ >= static_cast<int>(file_paths_.size())) {
             // ファイルリストの終端にたどり着いた
@@ -50,10 +51,12 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
           }
 
           // 次のファイルを開く
-          file_stream_.close();
-          file_stream_.open(file_paths_[file_index_]);
+          if (fclose(file_)) {
+            sync_cout << "info string Failed to close a kifu file." << sync_endl;
+          }
 
-          if (!file_stream_.is_open()) {
+          file_ = std::fopen(file_paths_[file_index_].c_str(), "rt");
+          if (!file_) {
             // ファイルを開くのに失敗したら
             // 読み込みを終了する
             sync_cout << "into string Failed to open a kifu file: "
@@ -61,22 +64,28 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
             return false;
           }
 
-          if (!std::getline(file_stream_, line)) {
+          if (std::setvbuf(file_, nullptr, _IOFBF, kBufferSize)) {
+            sync_cout << "into string Failed to set a file buffer: "
+              << file_paths_[0] << sync_endl;
+          }
+
+          if (!fgets(line, sizeof(line), file_)) {
             // 空のファイルの場合はここに来る
             // とりあえずcontinueしてつぎのファイルを試す
             continue;
           }
         }
 
-        size_t offset = line.find(',');
-        int value = std::atoi(line.substr(offset + 1).c_str());
+        char* sfen_ptr = std::strtok(line, ",");
+        char* value_ptr = std::strtok(nullptr, ",");
+        int value = std::atoi(value_ptr);
         if (abs(value) > kCloseOutValueThreshold) {
           // 評価値の絶対値が大きすぎる場合は使用しない
           continue;
         }
 
         records_.push_back({
-          line.substr(0, offset),
+          sfen_ptr,
           static_cast<Value>(value) });
       }
 
@@ -99,7 +108,10 @@ bool Learner::KifuReader::Read(Position& pos, Value& value) {
 }
 
 bool Learner::KifuReader::Close() {
-  file_stream_.close();
+  if (fclose(file_)) {
+    return false;
+  }
+  file_ = nullptr;
   return true;
 }
 
@@ -136,12 +148,17 @@ bool Learner::KifuReader::EnsureOpen() {
     return false;
   }
 
-  file_stream_.open(file_paths_[0]);
+  file_ = std::fopen(file_paths_[0].c_str(), "rt");
 
-  if (!file_stream_.is_open()) {
+  if (!file_) {
     sync_cout << "into string Failed to open a kifu file: " << file_paths_[0]
       << sync_endl;
     return false;
+  }
+
+  if (std::setvbuf(file_, nullptr, _IOFBF, kBufferSize)) {
+    sync_cout << "into string Failed to set a file buffer: "
+      << file_paths_[0] << sync_endl;
   }
 
   return true;
