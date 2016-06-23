@@ -194,7 +194,7 @@ namespace YaneuraOuNanoPlus
 
     posKey = pos.state()->key();
     tte = TT.probe(posKey, ttHit);
-    ttMove = ttHit ? tte->move() : MOVE_NONE;
+    ttMove = ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
     ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     // 置換表に登録するdepthは、あまりマイナスの値が登録されてもおかしいので、
@@ -490,7 +490,7 @@ namespace YaneuraOuNanoPlus
     // RootNodeであるなら、(MultiPVなどでも)現在注目している1手だけがベストの指し手と仮定できるから、
     // それが置換表にあったものとして指し手を進める。
     Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
-      : ttHit ? tte->move() : MOVE_NONE;
+      : ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
 
     // 置換表の値による枝刈り
 
@@ -946,7 +946,7 @@ void MainThread::think()
   // ---------------------
 
   {
-    auto it = book.find(rootPos.sfen());
+    auto it = book.find(rootPos);
     if (it != book.end()) {
       // 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
       const auto& move_list = it->second;
@@ -1021,7 +1021,7 @@ void MainThread::think()
     //   反復深化のループ
     // ---------------------
 
-    while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || rootDepth <= Limits.depth))
+    while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || Threads.main()->rootDepth <= Limits.depth))
     {
       // 本当はもっと探索窓を絞ったほうが効率がいいのだが…。
       alpha = -VALUE_INFINITE;

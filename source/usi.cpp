@@ -65,7 +65,7 @@ namespace USI
   // 入玉ルールがGUIから変更されたときのハンドラ
   void set_entering_king_rule(const std::string& rule)
   {
-    for (int i = 0; i < ekr_rules.size(); ++i)
+    for (size_t i = 0; i < ekr_rules.size(); ++i)
       if (ekr_rules[i] == rule)
       {
         ekr = (EnteringKingRule)i;
@@ -165,7 +165,7 @@ namespace USI
           bool found;
           auto tte = TT.probe(pos.state()->key(), found);
           ply++;
-          moves[ply] = found ? tte->move() : MOVE_NONE;
+          moves[ply] = found ? pos.move16_to_move((tte->move()) : MOVE_NONE;
         }
         while (ply > 0)
           pos_->undo_move(moves[--ply]);
@@ -222,18 +222,18 @@ namespace USI
     // ネットワークの平均遅延時間[ms]
     // この時間だけ早めに指せばだいたい間に合う。
     // 切れ負けの瞬間は、NetworkDelayのほうなので大丈夫。
-    o["NetworkDelay"] << Option(200, 0, 10000);
+    o["NetworkDelay"] << Option(120, 0, 10000);
 
     // ネットワークの最大遅延時間[ms]
     // 切れ負けの瞬間だけはこの時間だけ早めに指す。
     // 1.2秒ほど早く指さないとfloodgateで切れ負けしかねない。
-    o["NetworkDelay2"] << Option(1200, 0, 10000);
+    o["NetworkDelay2"] << Option(1120, 0, 10000);
 
     // 最小思考時間[ms]
     o["MinimumThinkingTime"] << Option(2000, 1000, 100000);
 
     // 引き分けまでの最大手数。256手ルールのときに256。0なら無制限。
-    o["MaxMovesToDraw"] << Option(0, 0, 100000, [](auto& o) { max_game_ply = (o == 0) ? INT_MAX : o; });
+    o["MaxMovesToDraw"] << Option(0, 0, 100000, [](const Option& o) { max_game_ply = (o == 0) ? INT_MAX : (int)o; });
 
     // 引き分けを受け入れるスコア
     // 歩を100とする。例えば、この値を100にすると引き分けの局面は評価値が -100とみなされる。
@@ -243,6 +243,8 @@ namespace USI
     // 入玉ルール
     o["EnteringKingRule"] << Option(ekr_rules, ekr_rules[EKR_27_POINT], [](auto& o) { set_entering_king_rule(o); });
 #endif
+
+    o["EvalDir"] << Option("eval");
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
@@ -741,6 +743,9 @@ Move move_from_usi(const Position& pos, const std::string& str)
 
   // usi文字列をmoveに変換するやつがいるがな..
   Move move = move_from_usi(str);
+
+  // 上位bitに駒種を入れておかないとpseudo_legal()で引っかかる。
+  move = pos.move16_to_move(move);
 
   // pseudo_legal(),legal()チェックのためにはCheckInfoのupdateが必要。
   const_cast<Position*>(&pos)->check_info_update();

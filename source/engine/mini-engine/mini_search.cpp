@@ -286,7 +286,7 @@ namespace YaneuraOuMini
 
     posKey  = pos.state()->key();
     tte     = TT.probe(posKey, ttHit);
-    ttMove  = ttHit ? tte->move() : MOVE_NONE;
+    ttMove  = ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
     ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     // nonPVでは置換表の指し手で枝刈りする
@@ -421,7 +421,7 @@ namespace YaneuraOuMini
       {
         // moveが成りの指し手なら、その成ることによる価値上昇分もここに乗せたほうが正しい見積りになるのだが…。
 
-        Value futilityValue = futilityBase + (Value)PieceValueCapture[pos.piece_on(move_to(move))];
+        Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(move_to(move))];
 
         // futilityValueは今回捕獲するであろう駒の価値の分を上乗せしているのに
         // それでもalpha値を超えないというとってもひどい指し手なので枝刈りする。
@@ -662,7 +662,7 @@ namespace YaneuraOuMini
     // RootNodeであるなら、(MultiPVなどでも)現在注目している1手だけがベストの指し手と仮定できるから、
     // それが置換表にあったものとして指し手を進める。
     Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
-                : ttHit    ? tte->move() : MOVE_NONE;
+                : ttHit    ? pos.move16_to_move(tte->move()) : MOVE_NONE;
 
     // 置換表の値による枝刈り
 
@@ -853,7 +853,7 @@ namespace YaneuraOuMini
       pos.check_info_update();
       // このnodeの指し手としては置換表の指し手を返したあとは、直前の指し手で捕獲された駒による評価値の上昇を
       // 上回るようなcaptureの指し手のみを生成する。
-      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::PieceValueCapture[pos.captured_piece_type()]);
+      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::CapturePieceValue[pos.captured_piece_type()]);
 
       while ((move = mp.next_move()) != MOVE_NONE)
         if (pos.legal(move))
@@ -1286,7 +1286,7 @@ void Thread::search()
   //   反復深化のループ
   // ---------------------
 
-  while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || rootDepth <= Limits.depth))
+  while (++rootDepth < MAX_PLY && !Signals.stop && (!Limits.depth || Threads.main()->rootDepth <= Limits.depth))
   {
 
     // aspiration window searchのために反復深化の前回のiterationのスコアをコピーしておく
@@ -1342,12 +1342,6 @@ void Thread::search()
         // 用いないと前回の反復深化の結果によって得た並び順を変えてしまうことになるのでまずい。
         std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
 
-        // 探索中に置換表のPV lineを破壊した可能性があるので、PVを置換表に
-        // 書き戻しておいたほうが良い。(PV lineが一番価値があるので)
-
-        for (size_t i = 0; i <= PVIdx; ++i)
-          rootMoves[i].insert_pv_in_tt(rootPos);
-
         if (Signals.stop)
           break;
 
@@ -1392,9 +1386,8 @@ void Thread::search()
       // (二番目だと思っていたほうの指し手のほうが評価値が良い可能性があるので…)
       std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
-      // メインスレッド以外はMultiPVの2番目以降の指し手の探索には加わらない。
       if (!mainThread)
-        break;
+        continue;
 
       // メインスレッド以外はPVを出力しない。
       // また、silentモードの場合もPVは出力しない。
@@ -1463,7 +1456,7 @@ void MainThread::think()
   // ---------------------
 
   {
-    auto it = book.find(rootPos.sfen());
+    auto it = book.find(rootPos);
     if (it != book.end() && it->second.size() != 0) {
       // 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
       // また、it->second->size()!=0をチェックしておかないと指し手のない定跡が登録されていたときに困る。

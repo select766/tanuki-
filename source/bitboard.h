@@ -16,6 +16,7 @@ namespace Bitboards{
 
 struct alignas(16) Bitboard
 {
+#ifdef  USE_SSE2
   union
   {
     // 64bitずつとして扱いとき用
@@ -28,16 +29,22 @@ struct alignas(16) Bitboard
     // Aperyを始めとするmagic bitboard派によって考案された。
     __m128i m;
   };
+#else // no SSE
+  u64 p[2];
+#endif
+
+#ifdef  USE_SSE2
+  // SSE2が使えるときは代入等においてはSSE2を使ったコピーがなされて欲しい。
 
   Bitboard& operator = (const Bitboard& rhs) { _mm_store_si128(&this->m, rhs.m); return *this; }
+
+  Bitboard(const Bitboard& bb) { _mm_store_si128(&this->m, bb.m); }
+#endif
 
   // --- ctor
 
   // 初期化しない。このとき中身は不定。
   Bitboard() {}
-
-  // 代入等においてはSSEを使ったコピーがなされて欲しい
-  Bitboard(const Bitboard& bb) { _mm_store_si128(&this->m, bb.m); }
 
   // p[0],p[1]の値を直接指定しての初期化。(Bitboard定数の初期化のときのみ用いる)
   Bitboard(uint64_t p0, uint64_t p1) { p[0] = p0; p[1] = p1; }
@@ -51,7 +58,13 @@ struct alignas(16) Bitboard
   // --- property
 
   // Stockfishのソースとの互換性がよくなるようにboolへの暗黙の型変換書いておく。
-  operator bool() const { return !(_mm_testz_si128(m, _mm_set1_epi8(static_cast<char>(0xffu)))); }
+  operator bool() const {
+#ifdef USE_SSE4
+    return !(_mm_testz_si128(m, _mm_set1_epi8(static_cast<char>(0xffu))));
+#else
+    return (this->merge() ? true : false);
+#endif
+  }
 
   // p[0]とp[1]をorしたものを返す。toU()相当。
   uint64_t merge() const { return p[0] | p[1]; }
@@ -73,20 +86,21 @@ struct alignas(16) Bitboard
   // while(to = bb.pop())
   //  make_move(from,to);
   // のように用いる。
-  Square pop() { return (p[0] != 0) ? Square(pop_lsb(p[0])) : Square(pop_lsb(p[1]) + 63); }
+  FORCE_INLINE Square pop() { return (p[0] != 0) ? Square(pop_lsb(p[0])) : Square(pop_lsb(p[1]) + 63); }
 
   // このBitboardの値を変えないpop()
-  Square pop_c() const { return (p[0] != 0) ? Square(LSB64(p[0])) : Square(LSB64(p[1]) + 63); }
+  FORCE_INLINE Square pop_c() const { return (p[0] != 0) ? Square(LSB64(p[0])) : Square(LSB64(p[1]) + 63); }
 
   // pop()をp[0],p[1]に分けて片側ずつする用
-  Square pop_from_p0() { ASSERT_LV3(p[0] != 0);  return Square(pop_lsb(p[0])); }
-  Square pop_from_p1() { ASSERT_LV3(p[1] != 0);  return Square(pop_lsb(p[1]) + 63); }
+  FORCE_INLINE Square pop_from_p0() { ASSERT_LV3(p[0] != 0);  return Square(pop_lsb(p[0])); }
+  FORCE_INLINE Square pop_from_p1() { ASSERT_LV3(p[1] != 0);  return Square(pop_lsb(p[1]) + 63); }
 
   // 1のbitを数えて返す。
   int pop_count() const { return (int)(POPCNT64(p[0]) + POPCNT64(p[1])); }
 
   // 代入型演算子
 
+#ifdef USE_SSE2
   Bitboard& operator |= (const Bitboard& b1) { this->m = _mm_or_si128( m, b1.m); return *this; }
   Bitboard& operator &= (const Bitboard& b1) { this->m = _mm_and_si128(m, b1.m); return *this; }
   Bitboard& operator ^= (const Bitboard& b1) { this->m = _mm_xor_si128(m, b1.m); return *this; }
@@ -100,15 +114,30 @@ struct alignas(16) Bitboard
   // 右シフト(縦型Bitboardでは右1回シフトで1段上の升に移動する)
   Bitboard& operator >>= (int shift) { ASSERT_LV3(shift == 1); m = _mm_srli_epi64(m, shift); return *this; }
 
+#else
+  Bitboard& operator |= (const Bitboard& b1) { this->p[0] |= b1.p[0]; this->p[1] |= b1.p[1]; return *this; }
+  Bitboard& operator &= (const Bitboard& b1) { this->p[0] &= b1.p[0]; this->p[1] &= b1.p[1]; return *this; }
+  Bitboard& operator ^= (const Bitboard& b1) { this->p[0] ^= b1.p[0]; this->p[1] ^= b1.p[1]; return *this; }
+  Bitboard& operator += (const Bitboard& b1) { this->p[0] += b1.p[0]; this->p[1] += b1.p[1]; return *this; }
+  Bitboard& operator -= (const Bitboard& b1) { this->p[0] -= b1.p[0]; this->p[1] -= b1.p[1]; return *this; }
+
+  Bitboard& operator <<= (int shift) { ASSERT_LV3(shift == 1); this->p[0] <<= shift; this->p[1] <<= shift; return *this; }
+  Bitboard& operator >>= (int shift) { ASSERT_LV3(shift == 1); this->p[0] <<= shift; this->p[1] <<= shift; return *this; }
+#endif
+
+
   // 比較演算子
 
   bool operator == (const Bitboard& rhs) const {
+#ifdef USE_SSE4
     // 以下のようにすると2命令で済むらしい。
-
     // testing equality between two __m128i variables
     // cf.http://stackoverflow.com/questions/26880863/sse-testing-equality-between-two-m128i-variables
     __m128i neq = _mm_xor_si128(this->m, rhs.m);
     return _mm_test_all_zeros(neq, neq) ? true : false;
+#else
+    return (this->p[0] == rhs.p[0]) && (this->p[1] == rhs.p[1]);
+#endif
   }
 
   bool operator != (const Bitboard& rhs) const { return !(*this == rhs); }
@@ -145,7 +174,7 @@ inline Bitboard operator^(const Bitboard& b, Square s) { return b ^ SquareBB[s];
 
 // 単項演算子
 // →　NOTで書くと、使っていないbit(p[0]のbit63)がおかしくなるのでALL_BBでxorしないといけない。
-inline Bitboard operator ~ (const Bitboard& a) { Bitboard t;  t.m = _mm_xor_si128(a.m, ALL_BB.m); return t; }
+inline Bitboard operator ~ (const Bitboard& a) { return a ^ ALL_BB; }
 
 // range-forで回せるようにするためのhack(少し遅いので速度が要求されるところでは使わないこと)
 inline const Bitboard begin(const Bitboard& b) { return b; }
@@ -375,9 +404,9 @@ Bitboard effects_from(Piece pc, Square sq, const Bitboard& occ);
 //   Bitboard tools
 // --------------------
 
+
 // 2bit以上あるかどうかを判定する。縦横斜め方向に並んだ駒が2枚以上であるかを判定する。この関係にないと駄目。
 // この関係にある場合、Bitboard::merge()によって被覆しないことがBitboardのレイアウトから保証されている。
 inline bool more_than_one(const Bitboard& bb) { ASSERT_LV2(!bb.cross_over()); return POPCNT64(bb.merge()) > 1; }
-
 
 #endif // #ifndef _BITBOARD_H_

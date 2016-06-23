@@ -563,6 +563,52 @@ Bitboard Position::check_blockers(Color c, Color kingColor) const
   return result;
 }
 
+Bitboard Position::pinned_pieces(Color c, Square avoid) const {
+  Bitboard b, pinners, result = ZERO_BB;
+  Square ksq = king_square(c);
+
+  // avoidを除外して考える。
+  Bitboard avoid_bb = ~Bitboard(avoid);
+
+  pinners = (
+    (pieces(~c, PIECE_TYPE_BITBOARD_ROOK) & rookStepEffect(ksq))
+    | (pieces(~c, PIECE_TYPE_BITBOARD_BISHOP) & bishopStepEffect(ksq))
+    | (pieces(~c, PIECE_TYPE_BITBOARD_LANCE) & lanceStepEffect(c, ksq))
+    ) & avoid_bb;
+
+  while (pinners)
+  {
+    b = between_bb(ksq, pinners.pop()) & pieces() & avoid_bb;
+    if (!more_than_one(b))
+      result |= b & pieces(c);
+  }
+  return result;
+}
+
+Bitboard Position::pinned_pieces(Color c, Square from, Square to) const {
+  Bitboard b, pinners, result = ZERO_BB;
+  Square ksq = king_square(c);
+
+  // avoidを除外して考える。
+  Bitboard avoid_bb = ~Bitboard(from);
+
+  pinners = (
+    (pieces(~c, PIECE_TYPE_BITBOARD_ROOK) & rookStepEffect(ksq))
+    | (pieces(~c, PIECE_TYPE_BITBOARD_BISHOP) & bishopStepEffect(ksq))
+    | (pieces(~c, PIECE_TYPE_BITBOARD_LANCE) & lanceStepEffect(c, ksq))
+    ) & avoid_bb;
+
+  // fromからは消えて、toの地点に駒が現れているものとして
+  Bitboard new_pieces = (pieces() & avoid_bb) | to;
+  while (pinners)
+  {
+    b = between_bb(ksq, pinners.pop()) & new_pieces;
+    if (!more_than_one(b))
+      result |= b & pieces(c);
+  }
+  return result;
+}
+
 // 現局面で指し手がないかをテストする。指し手生成ルーチンを用いるので速くない。探索中には使わないこと。
 bool Position::is_mated() const
 {
@@ -691,6 +737,12 @@ bool Position::pseudo_legal_s(const Move m) const {
     // 置換表から取り出してきている以上、一度は指し手生成ルーチンで生成した指し手のはずであり、
     // KING打ちのような値であることはないものとする。
 
+#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+    // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
+    if (moved_piece_after_ex(m) != Piece(pr + ((us == WHITE) ? PIECE_WHITE : 0) + 32))
+      return false;
+#endif
+
     ASSERT_LV3(PAWN <= pr && pr < KING);
 
     // 打つ先の升が埋まっていたり、その手駒を持っていなかったりしたら駄目。
@@ -724,36 +776,9 @@ bool Position::pseudo_legal_s(const Move m) const {
     // 置換表のhash衝突で、後手の指し手が先手の指し手にならないことは保証されている。
     // (先手の手番の局面と後手の手番の局面とのhash keyはbit0で区別しているので)
 
-#ifndef KEEP_PIECE_IN_COUNTER_MOVE
     // しかし、Counter Moveの手は手番に関係ないので(駒種を保持していないなら)取り違える可能性があるため
     // (しかも、その可能性はそこそこ高い)、ここで合法性をチェックする必要がある。
-    switch (pr)
-    {
-    case PAWN:
-    case LANCE:
-      if ((us == BLACK && rank_of(to) == RANK_1) || (us == WHITE && rank_of(to) == RANK_9))
-        return false;
-      break;
-    case KNIGHT:
-      if ((us == BLACK && rank_of(to) < RANK_3) || (us == WHITE && rank_of(to) > RANK_7))
-        return false;
-      break;
-    }
-#else
-    // 変な指し手を渡していないか、assertを入れて調べておく。(ASSERT_LV4以上のとき用)
-    switch (pr)
-    {
-    case PAWN:
-    case LANCE:
-      if ((us == BLACK && rank_of(to) == RANK_1) || (us == WHITE && rank_of(to) == RANK_9))
-        ASSERT_LV4(false);
-      break;
-    case KNIGHT:
-      if ((us == BLACK && rank_of(to) < RANK_3) || (us == WHITE && rank_of(to) > RANK_7))
-        ASSERT_LV4(false);
-      break;
-    }
-#endif
+    // →　指し手生成の段階で駒種を保存するようにしたのでこのテスト不要。
 
   } else {
 
@@ -782,6 +807,12 @@ bool Position::pseudo_legal_s(const Move m) const {
       if (pt >= GOLD)
         return false;
 
+#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+      // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
+      if (moved_piece_after_ex(m) != Piece(pc + PIECE_PROMOTE) )
+        return false;
+#endif
+
       // 移動先が敵陣でないと成れない。先手が置換表衝突で後手の指し手を引いてきたら、こういうことになりかねない。
       if (!(enemy_field(us) & (Bitboard(from) | Bitboard(to))))
         return false;
@@ -789,6 +820,13 @@ bool Position::pseudo_legal_s(const Move m) const {
     } else {
 
       // --- 成らない指し手
+
+#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+      // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
+      if (moved_piece_after_ex(m) != pc )
+        return false;
+#endif
+
 
       // 駒打ちのところに書いた理由により、不成で進めない升への指し手のチェックも不要。
       // 間違い　→　駒種をmoveに含めていないならこのチェック必要だわ。
@@ -940,7 +978,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
     // 移動先の升は空のはず
     ASSERT_LV2(piece_on(to) == NO_PIECE);
 
-    Piece pr = Piece(move_from(m));
+    Piece pr = move_dropped_piece(m);
     ASSERT_LV2(PAWN <= pr && pr < PIECE_HAND_NB);
 
     Piece pc = make_piece(Us, pr);
@@ -1072,7 +1110,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 #ifndef EVAL_NO_USE
       // 評価関数で使う駒割りの値も更新
-      materialDiff += Eval::PieceValueCapture[to_pc];
+      materialDiff += Eval::CapturePieceValue[to_pc];
 #endif
 
     } else {

@@ -21,7 +21,7 @@ void TranspositionTable::resize(size_t mbSize) {
   if (!mem)
   {
     std::cout << "info string Error : Failed to allocate " << mbSize
-      << "MB for transposition table." << std::endl;
+      << "MB for transposition table. ClusterCount = " << newClusterCount << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -47,7 +47,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
     // 1. keyが合致しているentryを見つけた。(found==trueにしてそのTT_ENTRYのアドレスを返す)
     // 2. 空のエントリーを見つけた(そこまではkeyが合致していないので、found==falseにして新規TT_ENTRYのアドレスとして返す)
     if (!tte[i].key16)
-      return found = false, &tte[i];
+      return found = false, &tte[i];      // このケースにおいてrefreshは必要ない。save()のときにgenerationを書き出すため。
 
     if (tte[i].key16 == key16)
     {
@@ -68,7 +68,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
     // 以上の合計が一番小さいTTEntryを使う。
 
     if (replace->depth8 - ((259 + generation8 - replace->genBound8) & 0xFC) * 2 * ONE_PLY
-      >   tte[i].depth8 - ((259 + generation8 - tte[i].genBound8  ) & 0xFC) * 2 * ONE_PLY)
+      >   tte[i].depth8 - ((259 + generation8 -   tte[i].genBound8) & 0xFC) * 2 * ONE_PLY)
       replace = &tte[i];
 
   // generationは256になるとオーバーフローして0になるのでそれをうまく処理できなければならない。

@@ -3,7 +3,6 @@
 #include <array>
 #include <ctime>
 #include <fstream>
-#include <sstream>
 #include <direct.h>
 
 #include "kifu_reader.h"
@@ -11,12 +10,12 @@
 #include "search.h"
 #include "thread.h"
 
-namespace KifuGenerator
+namespace Learner
 {
-  enum NodeType { PV, NonPV };
-  template <NodeType NT, bool InCheck>
-  Value qsearch(Position& pos, Search::Stack* ss, Value alpha, Value beta, Depth depth);
+  std::pair<Move, Value> search(Position& pos, Value alpha, Value beta, int depth);
+  std::pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta, Move pv[MAX_PLY + 1]);
 }
+
 namespace Eval
 {
   typedef std::array<int16_t, 2> ValueKpp;
@@ -28,7 +27,7 @@ namespace Eval
   extern ValueKk kk[SQ_NB][SQ_NB];
   extern const int FV_SCALE = 32;
 
-  void save_eval(const std::string& folderPath);
+  void save_eval();
 }
 
 namespace
@@ -67,7 +66,7 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kLearningRate = 1.0;
+  constexpr WeightType kLearningRate = 0.1;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kWriteEvalPerPosition = 100000000; // 1億
   constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1千万
@@ -131,130 +130,84 @@ namespace
     Thread& thread = *pos.this_thread();
     root_color = pos.side_to_move();
 
-#if 1
+#if 0
     // evaluate()の値を直接使う場合
     // evaluate()は手番から見た評価値を返すので
     // 符号の反転はしなくて良い
     value = Eval::evaluate(pos);
-#elif 0
-    // 1手読みを行う場合
-    pos.check_info_update();
 
-    // 浅い探索を行う
-    // 本当はqsearch()で行いたいが、直接呼んだらクラッシュしたので…。
-    thread.rootMoves.clear();
-    for (auto m : MoveList<LEGAL>(pos)) {
-      if (pos.legal(m)) {
-        thread.rootMoves.push_back(Search::RootMove(m));
-      }
+#elif 1
+    // 0手読み+静止探索を行う場合
+    Move pv[MAX_PLY + 1];
+    value = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE, pv).second;
+
+    // 静止した局面まで進める
+    StateInfo stateInfo[MAX_PLY];
+    for (int play = 0; pv[play] != MOVE_NONE; ++play) {
+      pos.do_move(pv[play], stateInfo[play]);
     }
 
-    if (thread.rootMoves.empty()) {
-      // 現在の局面が静止している状態なのだと思う
-      // 現在の局面の評価値をそのまま使う
-      value = Eval::evaluate(pos);
-    }
-    else {
-      // 実際に探索する
-      thread.maxPly = 0;
-      thread.rootDepth = 0;
+    // TODO(nodchip): extract_pv_from_tt()を実装して使う
 
-      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
-      // こちらのほうが探索スレッドを起こさないので速いはず
-      thread.search();
-      value = thread.rootMoves[0].score;
+    // qsearch()の返した評価値とPVの末端の評価値が正しいかどうかを
+    // 調べる場合は以下をコメントアウトする
 
-      // 静止した局面まで進める
-      StateInfo stateInfo[MAX_PLY];
-      int play = 0;
-      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-      // 全計算はPosition::set()の中で行われているので差分計算ができる
-      Value value_pv = Eval::evaluate(pos);
-      for (auto m : thread.rootMoves[0].pv) {
-        pos.do_move(m, stateInfo[play++]);
-        value_pv = Eval::evaluate(pos);
-      }
+    //// Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+    //// 全計算はPosition::set()の中で行われているので差分計算ができる
+    //Value value_pv = Eval::evaluate(pos);
+    //for (int play = 0; pv[play] != MOVE_NONE; ++play) {
+    //  pos.do_move(pv[play], stateInfo[play]);
+    //  value_pv = Eval::evaluate(pos);
+    //}
 
-      // Eval::evaluate()は常に手番から見た評価値を返すので
-      // 探索開始局面と手番が違う場合は符号を反転する
-      if (root_color != pos.side_to_move()) {
-        value_pv = -value_pv;
-      }
+    //// Eval::evaluate()は常に手番から見た評価値を返すので
+    //// 探索開始局面と手番が違う場合は符号を反転する
+    //if (root_color != pos.side_to_move()) {
+    //  value_pv = -value_pv;
+    //}
 
-      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-      // 処理に含めないようfalseを返す
-      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-      if (value != value_pv) {
-        return false;
-      }
-    }
-#elif 0
-    // 1手読みを行う場合
-    pos.check_info_update();
+    //// 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
+    //// 処理に含めないようfalseを返す
+    //// 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
+    //if (value != value_pv) {
+    //  return false;
+    //}
 
-    // qsearch()相当の探索を行う
-    // 本当はqsearch()を呼びたいが、呼んだらクラッシュしたので…。
-    thread.rootMoves.clear();
-    // 王手が掛かっているかどうかに応じてrootMovesの種類を変える
-    if (pos.in_check()) {
-      for (auto m : MoveList<EVASIONS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
-      }
-    }
-    else {
-      for (auto m : MoveList<CAPTURES_PRO_PLUS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
-      }
-      for (auto m : MoveList<QUIET_CHECKS>(pos)) {
-        if (pos.legal(m)) {
-          thread.rootMoves.push_back(Search::RootMove(m));
-        }
-      }
+#elif 1
+    // 1手読み+静止探索を行う場合
+    value = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 1).second;
+
+    // 静止した局面まで進める
+    StateInfo stateInfo[MAX_PLY];
+    int play = 0;
+    for (auto m : thread.rootMoves[0].pv) {
+      pos.do_move(m, stateInfo[play++]);
     }
 
-    if (thread.rootMoves.empty()) {
-      // 現在の局面が静止している状態なのだと思う
-      // 現在の局面の評価値をそのまま使う
-      value = Eval::evaluate(pos);
-    }
-    else {
-      // 実際に探索する
-      thread.maxPly = 0;
-      thread.rootDepth = 0;
+    // TODO(nodchip): extract_pv_from_tt()を実装して使う
 
-      // 探索スレッドを使わずに直接Thread::search()を呼び出して探索する
-      // こちらのほうが探索スレッドを起こさないので速いはず
-      thread.search();
-      value = thread.rootMoves[0].score;
+    //int play = 0;
+    //// Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+    //// 全計算はPosition::set()の中で行われているので差分計算ができる
+    //Value value_pv = Eval::evaluate(pos);
+    //for (auto m : thread.rootMoves[0].pv) {
+    //  pos.do_move(m, stateInfo[play++]);
+    //  value_pv = Eval::evaluate(pos);
+    //}
 
-      // 静止した局面まで進める
-      StateInfo stateInfo[MAX_PLY];
-      int play = 0;
-      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-      // 全計算はPosition::set()の中で行われているので差分計算ができる
-      Value value_pv = Eval::evaluate(pos);
-      for (auto m : thread.rootMoves[0].pv) {
-        pos.do_move(m, stateInfo[play++]);
-        value_pv = Eval::evaluate(pos);
-      }
+    //// Eval::evaluate()は常に手番から見た評価値を返すので
+    //// 探索開始局面と手番が違う場合は符号を反転する
+    //if (root_color != pos.side_to_move()) {
+    //  value_pv = -value_pv;
+    //}
 
-      // Eval::evaluate()は常に手番から見た評価値を返すので
-      // 探索開始局面と手番が違う場合は符号を反転する
-      if (root_color != pos.side_to_move()) {
-        value_pv = -value_pv;
-      }
+    //// 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
+    //// 処理に含めないようfalseを返す
+    //// 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
+    //if (value != value_pv) {
+    //  return false;
+    //}
 
-      // 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-      // 処理に含めないようfalseを返す
-      // 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-      if (value != value_pv) {
-        return false;
-      }
-    }
 #else
     static_assert(false, "Choose a method to search shallowly.");
 #endif
@@ -281,11 +234,22 @@ namespace
     std::strftime(buffer, sizeof(buffer), "%Y-%m-%d-%H-%M-%S", tm);
     return buffer;
   }
+
+  void save_eval(const std::string& output_folder_path_base, int64_t position_index) {
+    _mkdir(output_folder_path_base.c_str());
+
+    char buffer[1024];
+    sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
+    fprintf(stderr, "Writing eval files: %s\n", buffer);
+    Options["EvalDir"] = buffer;
+    _mkdir(buffer);
+    Eval::save_eval();
+  }
 }
 
-void Learner::learn(std::istringstream& iss) {
+void Learner::learn(std::istringstream& iss)
+{
   std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
-
   std::string token;
   while (iss >> token) {
     if (token == "output_folder_path_base") {
@@ -347,9 +311,11 @@ void Learner::learn(std::istringstream& iss) {
 
   std::atomic_int64_t global_position_index = 0;
   std::vector<std::thread> threads;
+  std::atomic_int64_t num_valid_positions = 0;
   while (threads.size() < Threads.size()) {
     int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_position_index, &threads, &weights, thread_index, output_folder_path_base] {
+    auto procedure = [&global_position_index, &threads, &weights, thread_index,
+      output_folder_path_base, &num_valid_positions] {
       Thread& thread = *Threads[thread_index];
 
       Position& pos = thread.rootPos;
@@ -363,6 +329,7 @@ void Learner::learn(std::istringstream& iss) {
         if (!search_shallowly(pos, value, rootColor)) {
           continue;
         }
+        ++num_valid_positions;
 
 #if 1
         // 深い探索の評価値と浅い探索の評価値の二乗誤差を最小にする
@@ -441,11 +408,7 @@ void Learner::learn(std::istringstream& iss) {
         }
 
         if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
-          _mkdir(output_folder_path_base.c_str());
-          char buffer[1024];
-          sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
-          fprintf(stderr, "Writing eval files: %s\n", buffer);
-          Eval::save_eval(buffer);
+          save_eval(output_folder_path_base, position_index);
         }
 
         // 局面は元に戻さなくても問題ない
@@ -485,11 +448,11 @@ void Learner::learn(std::istringstream& iss) {
     }
   }
 
-  _mkdir(output_folder_path_base.c_str());
-  char buffer[1024];
-  sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), global_position_index);
-  fprintf(stderr, "Writing eval files: %s\n", buffer);
-  Eval::save_eval(buffer);
+  save_eval(output_folder_path_base, global_position_index);
+  fprintf(stderr, "Num valid positions: %I64d/%I64d (%f%%)\n",
+    num_valid_positions.load(),
+    global_position_index.load(),
+    num_valid_positions.load() / static_cast<double>(global_position_index.load()));
 }
 
 void Learner::error_measurement()
