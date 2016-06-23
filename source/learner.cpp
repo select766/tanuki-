@@ -240,7 +240,7 @@ namespace
 
     char buffer[1024];
     sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
-    fprintf(stderr, "Writing eval files: %s\n", buffer);
+    printf("Writing eval files: %s\n", buffer);
     Options["EvalDir"] = buffer;
     _mkdir(buffer);
     Eval::save_eval();
@@ -393,7 +393,7 @@ void Learner::learn(std::istringstream& iss)
             value_after = -value_after;
           }
 
-          fprintf(stderr,
+          printf(
             "position_index=%I64d record=%5d (%.2f)\n"
             "    before=%5d (%.2f)  diff=%5d\n"
             "     after=%5d (%.2f) delta=%5d error=%s\n",
@@ -421,7 +421,7 @@ void Learner::learn(std::istringstream& iss)
     thread.join();
   }
 
-  fprintf(stderr, "Finalizing weights\n");
+  printf("Finalizing weights\n");
   for (Square k : SQ) {
     for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
       for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
@@ -449,7 +449,7 @@ void Learner::learn(std::istringstream& iss)
   }
 
   save_eval(output_folder_path_base, global_position_index);
-  fprintf(stderr, "Num valid positions: %I64d/%I64d (%f%%)\n",
+  printf("Num valid positions: %I64d/%I64d (%f%%)\n",
     num_valid_positions.load(),
     global_position_index.load(),
     num_valid_positions.load() / static_cast<double>(global_position_index.load()));
@@ -509,7 +509,7 @@ void Learner::error_measurement()
             value_after = -value_after;
           }
 
-          fprintf(stderr, "index=%I64d\n", position_index);
+          printf("index=%I64d\n", position_index);
         }
       }
 
