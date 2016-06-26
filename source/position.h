@@ -238,28 +238,17 @@ struct Position
       : piece_on(move_from(m));
   }
 
-  // moved_piece_before()の移動後の駒が返る版。
-  Piece moved_piece_after(Move m) const {
-#ifdef    KEEP_PIECE_IN_GENERATE_MOVES
-    // 上位16bitにそのまま格納されているはず。
-    return Piece((m >> 16) & ~32); // DROP BITを飛ばす
-#else
-    return is_drop(m)
-      ? (move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE))
-      : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m));
-#endif
-  }
-
-  // moved_pieceの拡張版。駒打ちのときは、打ち駒(+32)を加算した駒種を返す。
+  // moved_pieceの拡張版。駒打ちのときは、打ち駒(+32 == PIECE_DROP)を加算した駒種を返す。
   // historyなどでUSE_DROPBIT_IN_STATSを有効にするときに用いる。
   // 成りの指し手のときは成りの指し手を返す。(移動後の駒)
-  Piece moved_piece_after_ex(Move m) const {
+  // KEEP_PIECE_IN_GENERATE_MOVESのときは単にmoveの上位16bitを返す。
+  Piece moved_piece_after(Move m) const {
 #ifdef    KEEP_PIECE_IN_GENERATE_MOVES
     // 上位16bitにそのまま格納されているはず。
     return Piece(m >> 16);
 #else
     return is_drop(m)
-      ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + 32 )
+      ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + PIECE_DROP)
       : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m));
 #endif
   }
@@ -267,8 +256,8 @@ struct Position
   // 置換表から取り出したMoveを32bit化する。
   Move move16_to_move(Move m) const {
     return Move(u16(m) +
-      (( is_drop(m) ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + 32)
-      : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m))) << 16)
+      (( is_drop(m) ? Piece(move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE) + PIECE_DROP)
+                    : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m))) << 16)
     );
   }
 
@@ -442,7 +431,7 @@ struct Position
   const Eval::EvalList* eval_list() const { return &evalList; }
 #endif
 
-#ifdef  USE_SEE
+#if defined (USE_SEE) || defined (USE_SIMPLE_SEE)
   // 指し手mの(Static Exchange Evaluation : 静的取り合い評価)の値を返す。
   Value see(Move m) const;
 
@@ -511,7 +500,14 @@ struct Position
 
   // 捕獲する指し手か、歩の成りの指し手であるかを返す。
   bool capture_or_pawn_promotion(Move m) const
-  { return ((m & MOVE_PROMOTE) && type_of(piece_on(move_from(m)))==PAWN) || capture(m); }
+  {
+#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+    // 移動させる駒が歩かどうかは、Moveの上位16bitを見れば良い
+    return (is_promote(m) && raw_type_of(moved_piece_after(m)) == PAWN) || capture(m);
+#else
+    return (is_promote(m) && type_of(piece_on(move_from(m)))==PAWN) || capture(m);
+#endif
+  }
 
   // 捕獲する指し手であるか。
   bool capture(Move m) const { return !is_drop(m) && piece_on(move_to(m)) != NO_PIECE; }
@@ -521,8 +517,17 @@ struct Position
   // 現局面で1手詰めであるかを判定する。1手詰めであればその指し手を返す。
   // ただし1手詰めであれば確実に詰ませられるわけではなく、簡単に判定できそうな近接王手による
   // 1手詰めのみを判定する。(要するに判定に漏れがある。)
-  // 先行して、CheckInfo.pinnedを更新しておく必要がある。(LONG_EFFECT_LIBRARYを用いる場合)
+  // 
+  // 前提条件
+  // 1) LONG_EFFECT_LIBRARYを用いる場合、先行して、CheckInfo.pinnedを更新しておく必要がある。
   // →　check_info_update_pinned()を利用するのが吉。
+  // 2) LONG_EFFECT_LIBRARYを用いない場合、CheckInfo.dcCandidatesを更新しておく必要がある。
+  // →　素直にcheck_info_update()を呼び出すのが吉。
+  // 
+
+  // 返し値は、16bitのMove。このあとpseudo_legal()等を使いたいなら、
+  // pos.move16_to_move()を使って32bitのMoveに変換すること。
+
   Move mate1ply() const;
 
   // ↑の先後別のバージョン。(内部的に用いる)

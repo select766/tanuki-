@@ -225,7 +225,7 @@ void effect_check(Position& pos)
 //#define EFFECT_CHECK
 
 // 1手詰め判定のテスト
-//#define MATE1PLY_CHECK
+// #define MATE1PLY_CHECK
 
 // 評価関数の差分計算等のチェック
 //#define EVAL_VALUE_CHECK
@@ -288,6 +288,8 @@ void random_player(Position& pos,uint64_t loop_max)
           if (m != MOVE_NONE)
           {
   //          cout << pos << m;
+            m = pos.move16_to_move(m);
+
             if (!pos.pseudo_legal(m) || !pos.legal(m))
             {
               cout << endl << pos << "not legal , mate1ply() = " << m << endl;
@@ -1001,63 +1003,113 @@ void unit_test(Position& pos, istringstream& is)
 #if defined (YANEURAOU_2016_MID_ENGINE)
 namespace Learner
 {
-  extern pair<Move, Value> search(Position& pos, Value alpha, Value beta, int depth);
-  extern pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta);
+  extern pair<Value, vector<Move> >  search(Position& pos, Value alpha, Value beta, int depth);
+  extern pair<Value, vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
 }
 #endif
 
 void gen_sfen(Position& pos, istringstream& is)
 {
 #if defined (YANEURAOU_2016_MID_ENGINE)
-  int loop_max = 1;
+  int loop_max = 10;
   is >> loop_max;
 
-  cout << "gen_sfen : loop_max = " << loop_max << endl;
+  std::cout << "gen_sfen : loop_max = " << loop_max << endl;
 
   // 評価関数の読み込み等
   is_ready(pos);
 
-  pos.set_hirate();
   const int MAX_PLY = 256; // 256手までテスト
 
-  StateInfo state[MAX_PLY]; // StateInfoを最大手数分だけ
+  StateInfo state[MAX_PLY + 10]; // StateInfoを最大手数分 + SearchのPVでleafにまで進めるbuffer
   Move moves[MAX_PLY]; // 局面の巻き戻し用に指し手を記憶
   int ply; // 初期局面からの手数
 
   PRNG prng(20160101);
 
+  pos.set_hirate();
+
+  // Positionに対して従属スレッドの設定が必要。
+  // 並列化するときは、Threads (これが実体が vector<Thread*>なので、
+  // Threads[0]...Threads[thread_num-1]までに対して同じようにすれば良い。
+  auto th = Threads.main();
+  pos.set_this_thread(th);
+
   for (int i = 0; i < loop_max; ++i)
   {
     for (ply = 0; ply < MAX_PLY; ++ply)
     {
-
-      // Positionに対して従属スレッドの設定が必要。
-      // 並列化するときは、Threads (これが実体が vector<Thread*>なので、Threads[0]...Threads[thread_num-1]までに対して
-      // 同じようにすれば良い。
-      auto th = Threads.main();
-      pos.set_this_thread(th);
-      th->rootMoves.clear();
-      for (auto m : MoveList<LEGAL>(pos))
-        th->rootMoves.push_back(Search::RootMove(m));
-
-      // 合法な指し手がなかった == 詰み
-      if (th->rootMoves.size() == 0)
-        break;
-
-//      cout << pos;
-
+      // mate1ply()の呼び出しのために必要。
       pos.check_info_update();
 
-      // 3手読み
-      auto mv1 = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 3);
-      // 0手読み(静止探索のみ)
-      auto mv2 = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+      if (pos.is_mated())
+        break;
 
-      // 局面のsfen,3手読みでの最善手,3手読みでの評価値、0手読みでの評価値
-      cout << pos.sfen() << "," << mv1.first << "," << mv1.second << "," << mv2.second << endl;
+      // 3手読みの評価値とPV(最善応手列)
+      auto pv_value1 = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 3);
+      auto value1 = pv_value1.first;
+      auto pv1 = pv_value1.second;
+
+      // 0手読み(静止探索のみ)の評価値とPV(最善応手列)
+      auto pv_value2 = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+      auto value2 = pv_value2.first;
+      auto pv2 = pv_value2.second;
+
+      // 上のように、search()の直後にqsearch()をすると、search()で置換表に格納されてしまって、
+      // qsearch()が置換表にhitして、search()と同じ評価値が返るので注意。
+
+      // 局面のsfen,3手読みでの最善手,0手読みでの評価値
+      // これをファイルか何かに書き出すと良い。
+//      cout << pos.sfen() << "," << value1 << "," << value2 << "," << endl;
+
+#if 0
+      // デバッグ用に局面と読み筋を表示させてみる。
+      cout << pos;
+      cout << "search() PV = ";
+      for (auto pv_move : pv1)
+        cout << pv_move << " ";
+      cout << endl;
+
+      // 静止探索のpvは存在しないことがある。(駒の取り合いがない場合など)　その場合は、現局面がPVのleafである。
+      cout << "qsearch() PV = ";
+      for (auto pv_move : pv2)
+        cout << pv_move << " ";
+      cout << endl;
+
+#endif
+
+#if 1
+      // デバッグ用の検証として、
+      // PVの指し手でleaf nodeまで進めて、非合法手が混じっていないかをテストする。
+      auto go_leaf_test = [&](auto pv) {
+        int ply2 = ply;
+        for (auto m : pv)
+        {
+          // 非合法手はやってこないはずなのだが。
+          if (!pos.pseudo_legal(m) || !pos.legal(m))
+          {
+            cout << pos << m << endl;
+            ASSERT_LV3(false);
+          }
+          pos.do_move(m, state[ply2++]);
+          pos.check_info_update();
+        }
+        // leafに到達
+        //      cout << pos;
+
+        // 巻き戻す
+        auto pv_r = pv;
+        std::reverse(pv_r.begin(), pv_r.end());
+        for (auto m : pv_r)
+          pos.undo_move(m);
+      };
+
+      go_leaf_test(pv1);
+      go_leaf_test(pv2);
+#endif
 
       // 3手読みの指し手で局面を進める。
-      auto m = mv1.first;
+      auto m = pv1[0];
 
       pos.do_move(m, state[ply]);
       moves[ply] = m;
@@ -1070,11 +1122,11 @@ void gen_sfen(Position& pos, istringstream& is)
     }
 
     // 1000回に1回ごとに'.'を出力(進んでいることがわかるように)
-    if ((i % 1000) == 0)
-      cout << ".";
+    if ((i % 100) == 0)
+      std::cout << ".";
   }
 
-  cout << "gen_sfen finished." << endl;
+  std::cout << "gen_sfen finished." << endl;
 #endif
 }
 

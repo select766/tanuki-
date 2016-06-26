@@ -3,6 +3,7 @@
 
 #include "position.h"
 #include "misc.h"
+#include "tt.h"
 
 using namespace std;
 using namespace Effect8;
@@ -674,10 +675,10 @@ bool Position::legal_drop(const Square to) const
   //          角
 
   // 例3)
-	// ^玉
-	//  歩
-	// ^飛
-	//  香
+  // ^玉
+  //  歩
+  // ^飛
+  //  香
 
   // 玉の退路を探す
   // 自駒がなくて、かつ、to(はすでに調べたので)以外の地点
@@ -739,7 +740,7 @@ bool Position::pseudo_legal_s(const Move m) const {
 
 #ifdef KEEP_PIECE_IN_GENERATE_MOVES
     // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
-    if (moved_piece_after_ex(m) != Piece(pr + ((us == WHITE) ? PIECE_WHITE : 0) + 32))
+    if (moved_piece_after(m) != Piece(pr + ((us == WHITE) ? PIECE_WHITE : 0) + PIECE_DROP))
       return false;
 #endif
 
@@ -809,7 +810,7 @@ bool Position::pseudo_legal_s(const Move m) const {
 
 #ifdef KEEP_PIECE_IN_GENERATE_MOVES
       // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
-      if (moved_piece_after_ex(m) != Piece(pc + PIECE_PROMOTE) )
+      if (moved_piece_after(m) != Piece(pc + PIECE_PROMOTE) )
         return false;
 #endif
 
@@ -823,7 +824,7 @@ bool Position::pseudo_legal_s(const Move m) const {
 
 #ifdef KEEP_PIECE_IN_GENERATE_MOVES
       // 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
-      if (moved_piece_after_ex(m) != pc )
+      if (moved_piece_after(m) != pc )
         return false;
 #endif
 
@@ -1339,6 +1340,10 @@ void Position::do_null_move(StateInfo& newSt) {
   st = &newSt;
 
   st->board_key_ ^= Zobrist::side;
+
+  // このタイミングでアドレスが確定するのでprefetchしたほうが良い。
+  prefetch(TT.first_entry(st->key()));
+
   st->pliesFromNull = 0;
 
   sideToMove = ~sideToMove;

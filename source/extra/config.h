@@ -7,28 +7,35 @@
 
 // --- ターゲットCPUの選択
 
-// ターゲットCPUを選ぶ。
+#ifndef USE_MAKEFILE
 
-// USE_AVX2  : AVX2(Haswell以降)でサポートされた命令を使うか。pextなど。
-// USE_SSE42 : SSE4.2でサポートされた命令を使うか。popcnt命令など。
-// USE_SSE4  : SSE4　でサポートされた命令を使うか。_mm_testz_si128など。
-// USE_SSE2  : SSE2  でサポートされた命令を使うか。
+// USE_AVX512 : AVX-512(サーバー向けSkylake以降)でサポートされた命令を使うか。
+// USE_AVX2   : AVX2(Haswell以降)でサポートされた命令を使うか。pextなど。
+// USE_SSE42  : SSE4.2でサポートされた命令を使うか。popcnt命令など。
+// USE_SSE41  : SSE4.1でサポートされた命令を使うか。_mm_testz_si128など。
+// USE_SSE2   : SSE2  でサポートされた命令を使うか。
 // すべてdefineしなければSSEは使用しない。
-// (Windowsの64bit環境だと自動的にSSE2は使えるはず？)
+// (Windowsの64bit環境だと自動的にSSE2は使えるはず)
+// noSSE ⊂ SSE2 ⊂ SSE4.1 ⊂ SSE4.2 ⊂ AVX2 ⊂  AVX-512
 
-// Visual Studioのプロジェクト設定で
-// 「構成のプロパティ」→「C / C++」→「コード生成」→「拡張命令セットを有効にする」
+// Visual Studioのプロジェクト設定で「構成のプロパティ」→「C / C++」→「コード生成」→「拡張命令セットを有効にする」
 // のところの設定の変更も忘れずに。
 
-// noSSE ⊂ SSE2 ⊂ SSE4 ⊂ SSE4.2 ⊂ AVX2
-// なので、例えば、SSE4.2を選択するときは、
-// USE_SSE4.2をdefineして、そこ以降である、USE_SSE4とUSE_SSE2もdefineしてください。
+// ターゲットCPUのところだけdefineしてください。(残りは自動的にdefineされます。)
 
-
+//#define USE_AVX512
 #define USE_AVX2
-#define USE_SSE42
-#define USE_SSE4
-#define USE_SSE2
+//#define USE_SSE42
+//#define USE_SSE41
+//#define USE_SSE2
+
+#else
+
+// Makefileを使ってbuildするときは、
+// $ make avx2
+// のようにしてビルドすれば自動的にAVX2用がビルドされます。
+
+#endif
 
 
 // 通例hash keyは64bitだが、これを128にするとPosition::state()->long_key()から128bit hash keyが
@@ -101,10 +108,11 @@
 //#define USE_MATE_1PLY
 
 // Position::see()を用いるか。これはSEE(Static Exchange Evaluation : 静的取り合い評価)の値を返す関数。
-//#define USE_SEE
+// これは比較的厳密な計算を行うSEE()で、この下にあるUSE_SIMPLE_SEEのほうが少し軽い。
+// というか、このsee()、少し計算バグっているのかも知れない。USE_SIMPLE_SEEのほうを使うこと推奨。
+// #define USE_SEE
 
 // Apery風の単純化されたSEE()を用いる場合
-// これを指定しないときは、厳密な計算を行うSEE()で、そちらのほうが少し重い。
 // #define USE_SIMPLE_SEE
 
 // PV(読み筋)を表示するときに置換表の指し手をかき集めてきて表示するか。
@@ -209,13 +217,28 @@
 
 #ifdef YANEURAOU_2016_MID_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Mid"
+//#define ASSERT_LV 3
+#define ENABLE_TEST_CMD
+#define EVAL_KPPT
+#define USE_EVAL_HASH
+#define USE_SIMPLE_SEE
+#define USE_MOVE_PICKER_2016Q2
+//#define LONG_EFFECT_LIBRARY
+#define USE_MATE_1PLY
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+#endif
+
+#ifdef YANEURAOU_2016_LATE_ENGINE
+#define ENGINE_NAME "YaneuraOu 2016 Late"
 // 開発中なのでassertを有効に。
 //#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
-#define USE_SEE
-//#define USE_SIMPLE_SEE
+#define USE_SIMPLE_SEE
 #define USE_MOVE_PICKER_2016Q2
 //#define LONG_EFFECT_LIBRARY
 #define USE_MATE_1PLY
@@ -224,21 +247,6 @@
 #define USE_DROPBIT_IN_STATS
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
-#endif
-
-#ifdef YANEURAOU_2016_LATE_ENGINE
-#define ENGINE_NAME "YaneuraOu 2016 Late"
-// 開発中なのでassertを有効に。
-#define ASSERT_LV 3
-#define ENABLE_TEST_CMD
-#define EVAL_KPPT
-#define USE_SEE
-#define USE_MOVE_PICKER_2016Q2
-//#define LONG_EFFECT_LIBRARY
-#define USE_MATE_1PLY
-#define USE_ENTERING_KING_WIN
-#define USE_TIME_MANAGEMENT
-#define USE_DROPBIT_IN_STATS
 #endif
 
 
@@ -301,7 +309,9 @@
 #include <map>
 #include <iostream>
 #include <cstring>  // std::memcpy()
-#include <cmath>    // log()
+#include <cmath>    // log(),std::round()
+#include <climits>  // INT_MAX
+#include <cstddef>  // offsetof
 
 // --------------------
 //   diable warnings
@@ -317,14 +327,16 @@
 #pragma warning(disable : 4800)
 #endif
 
+// for GCC
+#if defined(__GNUC__)
+#endif
+
 // for Clang
 //#pragma clang diagnostic ignored "-Wunused-value"     // 未使用な変数に対する警告
 //#pragma clang diagnostic ignored "-Wnull-dereference" // *(int*)0 = 0; のようにnullptrに対する参照に対する警告
 //#pragma clang diagnostic ignored "-Wparentheses"      // while (m = mp.next()) {.. } みたいな副作用についての警告
 //#pragma clang diagnostic ignored "-Wmicrosoft"        // 括弧のなかからの gotoでの警告
 
-// for GCC
-// かきかけ
 
 // --------------------
 //      configure
@@ -389,6 +401,14 @@ const bool pretty_jp = false;
 #define HASH_KEY Key256
 #endif
 
+// --- Dropbit
+
+// USE_DROPBIT_IN_STATSがdefineされているときは、Moveの上位16bitに格納するPieceとして駒打ちは +32(PIECE_DROP)　にする。
+#ifdef USE_DROPBIT_IN_STATS
+#define PIECE_DROP 32
+#else
+#define PIECE_DROP 0
+#endif
 
 // ----------------------------
 //      CPU environment
@@ -402,16 +422,36 @@ const bool Is64Bit = true;
 const bool Is64Bit = false;
 #endif
 
-#if defined(USE_AVX2)
+#if defined(USE_AVX512)
+#define TARGET_CPU "AVX-512"
+#elif defined(USE_AVX2)
 #define TARGET_CPU "AVX2"
-#elif defined(USE_SSE41)
+#elif defined(USE_SSE42)
 #define TARGET_CPU "SSE4.2"
-#elif defined(USE_SSE4)
-#define TARGET_CPU "SSE4"
+#elif defined(USE_SSE41)
+#define TARGET_CPU "SSE4.1"
 #elif defined(USE_SSE2)
 #define TARGET_CPU "SSE2"
 #else
 #define TARGET_CPU "noSSE"
+#endif
+
+// 上位のCPUをターゲットとするなら、その下位CPUの命令はすべて使えるはずなので…。
+
+#ifdef USE_AVX512
+#define USE_AVX2
+#endif
+
+#ifdef USE_AVX2
+#define USE_SSE42
+#endif
+
+#ifdef USE_SSE42
+#define USE_SSE41
+#endif
+
+#ifdef USE_SSE41
+#define USE_SSE2
 #endif
 
 // ----------------------------

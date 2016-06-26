@@ -165,7 +165,7 @@ namespace USI
           bool found;
           auto tte = TT.probe(pos.state()->key(), found);
           ply++;
-          moves[ply] = found ? pos.move16_to_move((tte->move()) : MOVE_NONE;
+          moves[ply] = found ? pos.move16_to_move(tte->move()) : MOVE_NONE;
         }
         while (ply > 0)
           pos_->undo_move(moves[--ply]);
@@ -548,6 +548,9 @@ void USI::loop(int argc,char* argv[])
       // 積んであるコマンドがあるならそれを実行する。
       // 尽きれば"quit"だと解釈してdoループを抜ける仕様にすることはできるが、
       // そうしてしまうとgoコマンド(これはノンブロッキングなので)の最中にquitが送られてしまう。
+      // ただ、
+      // YaneuraOu-mid.exe bench,quit
+      // のようなことは出来るのでPGOの役には立ちそうである。
       cmd = cmds.front();
       cmds.pop();
     }

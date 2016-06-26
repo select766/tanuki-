@@ -16,13 +16,13 @@ namespace Eval
 {
 
 // KKファイル名
-#define KK_BIN "\\KK_synthesized.bin"
+#define KK_BIN "/KK_synthesized.bin"
   
 // KKPファイル名
-#define KKP_BIN "\\KKP_synthesized.bin"
+#define KKP_BIN "/KKP_synthesized.bin"
 
 // KPPファイル名
-#define KPP_BIN "\\KPP_synthesized.bin"
+#define KPP_BIN "/KPP_synthesized.bin"
 
   // 手番込みの評価値。[0]が手番に無縁な部分。[1]が手番があるときの上乗せ
   //  (これは先手から見たものではなく先後に依存しないボーナス)。
@@ -145,12 +145,13 @@ namespace Eval
         l0 = list_fb[j];
         l1 = list_fw[j];
 
-#if defined(SSE2)
+#if defined(USE_SSE41)
         // SSEによる実装
 
         // pkppw[l1][0],pkppw[l1][1],pkppb[l0][0],pkppb[l0][1]の16bit変数4つを整数拡張で32bit化して足し合わせる
         __m128i tmp;
         tmp = _mm_set_epi32(0, 0, *reinterpret_cast<const int32_t*>(&pkppw[l1][0]), *reinterpret_cast<const int32_t*>(&pkppb[l0][0]));
+        // この命令SSE4.1の命令のはず..
         tmp = _mm_cvtepi16_epi32(tmp);
         sum.m[0] = _mm_add_epi32(sum.m[0], tmp);
 #else
@@ -178,7 +179,7 @@ namespace Eval
     // 過去に遡って差分を計算していく。
     auto st = pos.state();
 
-    // すでに計算されている。rootか？
+    // すでに計算されている。rootか、null move。
     EvalSum sum;
     if (st->sum.p[2][0] != INT_MAX)
     {
@@ -506,12 +507,13 @@ namespace Eval
         l0 = list_fb[j];
         l1 = list_fw[j];
 
-#if defined(USE_SSE2)
+#if defined(USE_SSE41)
         // SSEによる実装
 
         // pkppw[l1][0],pkppw[l1][1],pkppb[l0][0],pkppb[l0][1]の16bit変数4つを整数拡張で32bit化して足し合わせる
         __m128i tmp;
         tmp = _mm_set_epi32(0, 0, *reinterpret_cast<const int32_t*>(&pkppw[l1][0]), *reinterpret_cast<const int32_t*>(&pkppb[l0][0]));
+        // この命令SSE4.1の命令のはず
         tmp = _mm_cvtepi16_epi32(tmp);
         sum.m[0] = _mm_add_epi32(sum.m[0], tmp);
 

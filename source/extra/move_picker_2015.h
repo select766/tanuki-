@@ -154,7 +154,7 @@ enum Stages : int {
 
   STOP,                         // 終端
 };
-ENABLE_OPERATORS_ON(Stages); // 次の状態にするためにインクリメントを使いたい。
+ENABLE_FULL_OPERATORS_ON(Stages); // 次の状態にするためにインクリメントを使いたい。
 
 // 指し手オーダリング器
 struct MovePicker
@@ -463,11 +463,7 @@ private:
   {
     for (auto& m : *this)
     {
-#ifndef USE_DROPBIT_IN_STATS
       Piece mpc = pos.moved_piece_after(m);
-#else
-      Piece mpc = pos.moved_piece_after_ex(m);
-#endif
       m.value = history[move_to(m)][mpc]
         + (*counterMoveHistory)[move_to(m)][mpc]
         + (*followupMoveHistory)[move_to(m)][mpc];
@@ -500,13 +496,9 @@ private:
       // 価値が高いので(例えば合駒に安い駒を使う的な…)
       if (pos.capture(m))
         m.value = (Value)Eval::CapturePieceValue[pos.piece_on(move_to(m))]
-                  - Value(type_of(pos.moved_piece_before(m))) + HistoryStats::Max;
+                  - Value(type_of(pos.moved_piece_after(m))) + HistoryStats::Max;
       else
-#ifndef USE_DROPBIT_IN_STATS
         m.value = history[move_to(m)][pos.moved_piece_after(m)];
-#else
-        m.value = history[move_to(m)][pos.moved_piece_after_ex(m)];
-#endif
   }
 
   const Position& pos;

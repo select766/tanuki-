@@ -12,8 +12,8 @@
 
 namespace Learner
 {
-  std::pair<Move, Value> search(Position& pos, Value alpha, Value beta, int depth);
-  std::pair<Move, Value> qsearch(Position& pos, Value alpha, Value beta, Move pv[MAX_PLY + 1]);
+  std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
+  std::pair<Value, std::vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
 }
 
 namespace Eval
@@ -32,7 +32,7 @@ namespace Eval
 
 namespace
 {
-  using WeightType = double;
+  using WeightType = float;
 
   enum WeightKind {
     WEIGHT_KIND_COLOR,
@@ -40,7 +40,7 @@ namespace
     WEIGHT_KIND_ZERO = 0,
     WEIGHT_KIND_NB = 2,
   };
-  ENABLE_OPERATORS_ON(WeightKind);
+  ENABLE_FULL_OPERATORS_ON(WeightKind);
 
   struct Weight
   {
@@ -138,12 +138,13 @@ namespace
 
 #elif 1
     // 0éËì«Ç›+ê√é~íTçıÇçsÇ§èÍçá
-    Move pv[MAX_PLY + 1];
-    value = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE, pv).second;
+    auto valueAndPv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+    value = valueAndPv.first;
 
     // ê√é~ÇµÇΩã«ñ Ç‹Ç≈êiÇﬂÇÈ
     StateInfo stateInfo[MAX_PLY];
-    for (int play = 0; pv[play] != MOVE_NONE; ++play) {
+    const std::vector<Move>& pv = valueAndPv.second;
+    for (int play = 0; play < static_cast<int>(pv.size()); ++play) {
       pos.do_move(pv[play], stateInfo[play]);
     }
 
@@ -173,15 +174,16 @@ namespace
     //  return false;
     //}
 
-#elif 1
+#elif 0
     // 1éËì«Ç›+ê√é~íTçıÇçsÇ§èÍçá
-    value = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 1).second;
+    auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 1);
+    value = valueAndPv.first;
 
     // ê√é~ÇµÇΩã«ñ Ç‹Ç≈êiÇﬂÇÈ
     StateInfo stateInfo[MAX_PLY];
-    int play = 0;
-    for (auto m : thread.rootMoves[0].pv) {
-      pos.do_move(m, stateInfo[play++]);
+    const std::vector<Move>& pv = valueAndPv.second;
+    for (int play = 0; play < static_cast<int>(pv.size()); ++play) {
+      pos.do_move(pv[play], stateInfo[play]);
     }
 
     // TODO(nodchip): extract_pv_from_tt()Çé¿ëïÇµÇƒégÇ§
@@ -449,7 +451,7 @@ void Learner::learn(std::istringstream& iss)
   }
 
   save_eval(output_folder_path_base, global_position_index);
-  printf("Num valid positions: %I64d/%I64d (%f%%)\n",
+  printf("Num valid positions: %I64d/%I64d (%f)\n",
     num_valid_positions.load(),
     global_position_index.load(),
     num_valid_positions.load() / static_cast<double>(global_position_index.load()));

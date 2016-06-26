@@ -1,4 +1,840 @@
 ﻿
+■　2016/06/26
+
+] V3.23
+
+	V3.23a
+	-    // IID、null move、singular extensionの判定のときは浅い探索なのでこのときに
+	-    // killer等を更新するのは有害である。
+	-    if (ss->skipEarlyPruning)
+	-      return;
+	
+	これ、もはやないほうがいいのか…。
+
+
+		// fail lowを引き起こした前nodeでのcounter moveに対してボーナスを加点する。
+		else if (depth >= 3 * ONE_PLY
+		  && !bestMove                        // bestMoveが無い == fail low
+		  && !InCheck
+		  && !pos.captured_piece_type()
+		  && is_ok((ss - 1)->currentMove)
+	-      && is_ok((ss - 2)->currentMove))
+		{
+
+	fail low bonusも修正したほうがいいな。
+
+		秒読み300[ms]
+
+		50.1%	
+		#249
+		やねうら王2016mid V323a
+		update_stats()変更。
+		#248
+		やねうら王2016mid V323
+		新基準
+
+		578-21-576(47.7% R0.6)	
+
+	短い時間において弱くはなっていないので採用。
+
+	move_to → to_sq()にしたほうがStockfishと互換性が上がるのでは…。
+	変な独自性出さないほうがいいような…。
+	→　これはまだいいか..
+
+	V3.23b
+	ehash、bench値は上がらないが、2手前の局面で考えた結果が生きるので
+	やったほうがいいのでは。有効にして比較する。
+
+		秒読み300[ms]
+
+		49.6%	
+		#250
+		やねうら王2016mid V323b
+		ehash有効。
+		#248
+		やねうら王2016mid V323
+		新基準
+
+		408-16-414(59.6% R-2.5)	
+
+
+		秒読み2000[ms]
+
+		50.7%	
+		#250
+		やねうら王2016mid V323b
+		ehash有効。
+		#248
+		やねうら王2016mid V323
+		新基準
+
+		106-5-103(39.1% R5.0)	
+
+
+		→　よくわからない。スレッド数が多いなら他のスレッドの計算結果が使えていいのかも。
+		互角ぐらいなら入れたい気はする。入れる。
+
+
+	V3.23c
+		-	PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN = 170;
+		+	PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN = 256;
+		いったん元に戻したほうが良いのでは..
+
+			value = search<NonPV>(pos, ss, rBeta - 1, rBeta, depth * PARAM_SINGULAR_SEARCH_DEPTH / 256, cutNode);
+			ss->skipEarlyPruning = false;
+			ss->excludedMove = MOVE_NONE;
+
+		-	ss->moveCount = moveCount; // 破壊したと思うので修復しておく。
+
+
+		  if (givesCheck
+		-	&& moveCount == 1
+		+	&& !moveCountPruning
+			&& pos.see_sign(move) >= VALUE_ZERO)
+			extension = ONE_PLY;
+
+
+			else if (depth >= 3 * ONE_PLY
+			  && !bestMove                        // bestMoveが無い == fail low
+		-	  && !InCheck
+			  && !pos.captured_piece_type()
+			  && is_ok((ss - 1)->currentMove))
+			{
+			  // 指し手のなかに移動後の駒が格納されているのでこれで取得できる。
+			  Piece prevPc = pos.moved_piece_after((ss - 1)->currentMove);
+
+		  if (  givesCheck
+			-   && moveCount == 1
+	   		+	&& !moveCountPruning
+			&&  pos.see_sign(move) >= VALUE_ZERO)
+			extension = ONE_PLY;
+
+			これやはり、やりすぎであったか…。
+
+				秒読み1000[ms]
+
+				53.3%	
+				#251
+				やねうら王2016mid V323c
+				see parant nodeでのmargin変更など。
+				#248
+				やねうら王2016mid V323
+				新基準
+
+				313-11-274(4.9% R23.1)	
+
+			少し上がったか。
+
+	V3.23d
+			  // 捕獲する指し手か、歩の成りの指し手であるかを返す。
+			  bool capture_or_pawn_promotion(Move m) const
+			  {
+	+		#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+	+			// 移動させる駒が歩かどうかは、Moveの上位16bitを見れば良い
+	+			return (is_promote(m) && raw_type_of(moved_piece_after(m)) == PAWN) || capture(m);
+	+		#else
+				return (is_promote(m) && type_of(piece_on(move_from(m)))==PAWN) || capture(m);
+	+		#endif
+			  }
+
+			少し高速化。
+
+
+			null moveのとき、stateEval + 2*Tempo、良くないのでは..
+
+	-		  if ((ss - 1)->currentMove == MOVE_NULL)
+	-		    eval = ss->staticEval = -(ss - 1)->staticEval + 2 * Tempo;
+
+	-		ss->staticEval = bestValue =
+	-		  (ss - 1)->currentMove != MOVE_NULL ? evaluate(pos)
+			                                     : -(ss - 1)->staticEval + 2 * Tempo;
+	+		ss->staticEval = bestValue = evaluate(pos);
+
+			秒読み300[ms]
+
+			45.1%	
+			#252
+			やねうら王2016mid V323d
+			null moveのときのevaluate()変更。
+			#251
+			やねうら王2016mid V323c
+			see parant nodeでのmargin変更など。
+
+			246-8-299(99.0% R-33.9)	
+
+			なぜか弱くなった。npsも少し落ちたような感じ。
+			null move、なんでこんななるのん..。
+
+	+	  // この処理、入れたほうがいいようだ。一見するとevaluate()は上で手番つきで求めているから
+	+	  // これをやると不正確になるだけのようであるが、null moveした局面で手番つきの評価関数を呼ぶと
+	+	  // 駒に当たっているものがプラス評価されて、評価値として大きく出すぎて悪作用があるようだ。
+
+		という結論になった。
+
+
+		魔女公式と比較。
+
+
+			秒読み3000[ms]
+
+			50.5%	
+			#254
+			やねうら王2016mid V323e gcc
+			戻した。
+			#0
+			silent_majority_V1.1公式
+			1スレッド
+
+			204-10-200(40.2% R3.4)	
+
+
+	V3.23f
+	test gensfenコマンドのデバッグ中に気づいたが、
+	金相当のMoveの上位16bitに駒を金としていたのでこれがkillerとかcountermoveになったときは
+	非合法手と扱いになるバグがあるようだ。
+
+		  auto from = pieces.pop();
+		  // fromの升にある駒をfromの升においたときの利き
+		- const auto Pt0 = pos.piece_on(from);
+		- const auto Pt = type_of(Pt0);
+		- auto target2 = effects_from(Pt0, from, occ) & target;
+		- MAKE_MOVE_TARGET(target2);
+		+  const auto Pt = pos.piece_on(from);
+		+  auto target2 = effects_from(Pt, from, occ) & target;
+		+  MAKE_MOVE_TARGET_UNKNOWN(target2);
+	
+	あとQUIET_CHECKSか。そうか。
+
+		-  case PRO_PAWN  :
+		-  case PRO_LANCE :
+		-  case PRO_KNIGHT:
+		-  case PRO_SILVER:
+		+  case PRO_PAWN  : GEN_MOVE_GOLD_CHECK     (PRO_PAWN  , goldEffect  ); break;
+		+  case PRO_LANCE : GEN_MOVE_GOLD_CHECK     (PRO_LANCE , goldEffect  ); break;
+		+  case PRO_KNIGHT: GEN_MOVE_GOLD_CHECK     (PRO_KNIGHT, goldEffect  ); break;
+		+  case PRO_SILVER: GEN_MOVE_GOLD_CHECK     (PRO_SILVER, goldEffect  ); break;
+		  case GOLD      : GEN_MOVE_GOLD_CHECK     (GOLD      , goldEffect  ); break;
+
+
+		pseudo_legal()で落ちたときのデバッグ用のコード
+
+            for (auto m2 : pv)
+              cout << m2 << " ";
+            cout << endl;
+
+            if (!pos.pseudo_legal(m) || !pos.legal(m))
+            {
+              auto mg = MoveList<NON_EVASIONS>(pos);
+              for (auto move : mg)
+              {
+                cout << move << " : " << Piece(move >> 16) << " : " ;
+                if (!pos.pseudo_legal(move))
+                  cout << "not pseudo_legal →　" << move;
+                cout << endl;
+              }
+
+              cout << endl;
+            }
+
+			  if (!pos.pseudo_legal(move))
+			  {
+				cout << pos << move;
+			  }
+
+				秒読み300[ms]
+
+				61.3%	
+				#255
+				やねうら王2016mid V323f gcc
+				genmove修正。
+				#254
+				やねうら王2016mid V323e gcc
+				戻した。
+
+				111-1-70(0.1% R80.1)	
+
+			ひどいバグであった模様。
+
+
+
+
+] V3.22
+
+・futilityとrazoringのパラメーター、元に戻してみる。
+
+		秒読み3000[ms]
+
+		49.7%	
+		#246
+		やねうら王2016mid V322a
+		futilityとrazoringパラメーター戻した
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		357-24-361(57.4% R-1.9)	
+
+	ほぼ互角。
+
+	V3.22b
+	LONG_EFFECT_LIBRARY利用でどれくらいの勝率になるのか。
+	→　nps5%程度ダウン＋1手詰め発見率5%程度ダウンのコンボなので
+	強くなるはずがないが…。1手詰めを3手詰めに変更するなら意味があるかも。
+	
+	long_effect.cpp、g++でbuild通らない。修正。
+
+		long effect有効、gcc
+		===========================
+		Total time (ms) : 63803
+		Nodes searched  : 42028435
+		Nodes/second    : 658721
+
+	そこまで遅くはない印象。
+
+		秒読み3000[ms]
+
+		45.6%	
+		#247
+		やねうら王2016mid V322b
+		利き利用
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		169-12-202(96.1% R-31.0)	
+
+	mate1()の発見率が5%落ちることと、nps 5%ダウン。結構勝率に影響するんだな…。
+	同種ソフト対決なのも影響してるのかも知れないが。
+
+
+		秒読み15000[ms]
+
+		45.3%	
+		#246
+		やねうら王2016mid V322a
+		futilityとrazoringパラメーター戻した
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		377-49-456(99.7% R-33.0)	
+
+	まだ何らか負けているようだ。
+
+
+	moved_piece_after()やめて、移動させる駒になっていてもどうせ歩のpromoteは除外されるので
+	あまり変わらないのかも。桂を成る場合と成らない場合とが同一視されるのがちょっと嫌だな。
+	やはり、魔女のこの部分の実装は良いとは思えないのだが…。
+
+
+] V3.21
+
+	V3.21a
+・history、整理
+
+		秒読み300[ms]
+
+		51.8%	
+		#242
+		やねうら王2016mid V321a
+		history整理
+		#241
+		やねうら王2016mid V321
+		新基準
+
+		298-6-277(17.9% R12.7)	
+
+
+		秒読み10000[ms]
+
+		50.0%	
+		#243
+		やねうら王2016mid V321b
+		history整理
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		79-9-79(53.2% R0.0)	
+
+		魔女と互角ぐらい？
+
+
+移動させる駒にしたものと比較
+
+	V3.21b
+
+			#define USE_DROPBIT_IN_STATS
+			#define KEEP_PIECE_IN_GENERATE_MOVES
+
+		これ、USE_DROPBIT_IN_STATSをundefするとすごく弱くなる。(-R170ぐらい)
+		何か修正忘れているのだと思う。この弱くなる原因をよく調べたほうがいい。
+
+			  // Moveの上位16bitのvaridation
+		#if 1
+			  if (is_drop(move))
+			  {
+				if (move_dropped_piece(move) + Piece(pos.side_to_move()==BLACK ? 0 : PIECE_WHITE) + PIECE_DROP  != Piece(move >> 16))
+				{
+				  cout << pos << move << ":" << move_dropped_piece(move);
+
+				}
+			  } else if (!is_promote(move)) {
+				if (pos.moved_piece_after_ex(move) != pos.piece_on(move_from(move)))
+				{
+				  cout << pos << move;
+				}
+			  } else {
+				if (pos.moved_piece_after_ex(move) != pos.piece_on(move_from(move)) + PIECE_PROMOTE)
+				{
+				  cout << pos << move;
+				}
+			  }
+		#endif
+
+
+		→　わかった。move16_to_move()で復元するときに+32してしまっていた。これで範囲外の配列壊していたのか。
+
+		  // moved_piece_before()の移動後の駒が返る版。
+		  // KEEP_PIECE_IN_GENERATE_MOVESのときは単にmoveの上位16bitを返す。
+		  Piece moved_piece_after(Move m) const {
+		#ifdef    KEEP_PIECE_IN_GENERATE_MOVES
+			// 上位16bitにそのまま格納されているはず。
+		//    return Piece((m >> 16) & ~32); // DROP BITを飛ばす
+			return Piece(m >> 16);
+		#else
+			return is_drop(m)
+			  ? (move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE))
+			  : is_promote(m) ? Piece(piece_on(move_from(m)) + PIECE_PROMOTE) : piece_on(move_from(m));
+		#endif
+		  }
+
+		  moved_piece_after_ex()これ、要らないな。消そう。
+
+		  pseudo_legal_s()でdropのとき+32してた。これか。
+
+			rtime 100[ms]
+
+			49.1%	
+			#243
+			やねうら王2016mid V321b
+			history整理
+			#242
+			やねうら王2016mid V321a
+			DROPBITなし
+
+			279-6-289(67.8% R-6.1)	
+
+	互角ぐらいになった。短い時間だとhistoryが小さくなるとCPU cacheの効率が良くなるからか？
+	1000回ぐらいまわしてから判断しよう。
+
+			rtime 1000[ms]
+
+			50.2%	
+			#242
+			やねうら王2016mid V321a
+			DROPBITなし
+			#243
+			やねうら王2016mid V321b
+			history整理
+
+			1084-47-1074(41.5% R1.6)	
+
+	DROPBIT、やはりなくてもいいぐらいだな…。なしにする。
+
+		秒読み10000[ms]
+
+		47.6%	
+		#244
+		やねうら王2016mid V321a
+		Dropなし、gcc
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		175-21-193(83.9% R-17.0)	
+
+	まだわずかに負けているようだ。この原因をよく調べる。
+
+
+■　2016/06/25
+
+] V3.20
+
+・PVの出力の抑制機能追加。(出力が詰まるため)
+
+・新SEE周り、見直す。
+
+		秒読み3000[ms]
+
+		37.0%	
+		#236
+		やねうら王2016mid V320a
+		新see()
+		#235
+		やねうら王2016mid V320
+		新基準
+
+		91-4-155(100.0% R-92.5)	
+
+	新seeひどすぎ。
+
+	旧see()、少し簡略化できた。
+
+	新see()
+	-		Bitboard occupied = pieces();
+	+		Bitboard occupied;
+	この初期化必要だった。
+
+
+		秒読み500[ms]
+
+		49.8%	
+		#236
+		やねうら王2016mid V320a
+		新see()
+		#235
+		やねうら王2016mid V320
+		新基準
+
+		141-8-142(54.7% R-1.2)	
+
+
+		秒読み3000[ms]
+
+		57.5%	
+		#236
+		やねうら王2016mid V320a
+		新see()
+		#235
+		やねうら王2016mid V320
+		新基準
+
+		61-2-45(4.9% R52.8)	
+
+	→　新しいほうのsee()のほうがかなり優秀っぽい。前のsee()とは何だったのだ…。
+	前のsee()バグっている可能性が微レ存。
+
+	もう少し長い時間で実験してみる。
+
+		秒読み5000[ms]
+
+		51.3%	
+		#236
+		やねうら王2016mid V320a
+		新see()
+		#235
+		やねうら王2016mid V320
+		新基準
+
+		471-23-448(21.4% R8.7)	
+
+		強くはなっていそう。
+
+
+	V3.20b
+
+	    attackers = (stmAttackers | attackers_to(~stm, to, occupied)) & occupied;
+
+	この & occupied、不要のはずなのだがこれを無くすとbenchの探索node数が変わる。おかしい。
+	よく調べる。
+
+		===========================
+		Total time (ms) : 58766
+		Nodes searched  : 34588434
+		Nodes/second    : 588579
+
+		gcc
+		===========================
+		Total time (ms) : 53064
+		Nodes searched  : 34588434
+		Nodes/second    : 651824
+
+	→　理由わかった。KINGをcaptureしたときに、stmAttackersが有ることになってしまうから
+	attackers & occupiedみたいな処理が必要になるのか。minAttackersでKINGを返すときに & occupied して返すべきなのか。
+	(Aperyはそうなっている)	Stockfishのコードと等価にするにはいまのコードが正しいな。そうか…。
+
+	Aperyのコードがわずかに無駄があるということなんだな。平岡さんに報告しよう。
+	https://github.com/HiraokaTakuya/apery/issues/6
+
+	see_sign()、いい加減にするのやめておいたほうがいいのでは…。
+
+	#if 0
+	  if (capture(move))
+	  {
+		// 捕獲する指し手で、移動元の駒の価値のほうが移動先の駒の価値より低い場合、これでプラスになるはず。
+		// (取り返されたあとの成りを考慮しなければ)
+		const Piece ptFrom = type_of(piece_on(move_from(move)));
+		const Piece ptTo = type_of(piece_on(move_to(move)));
+		if (CapturePieceValue[ptFrom] <= CapturePieceValue[ptTo])
+		  return static_cast<Value>(1);
+	  }
+	#endif
+
+		秒読み1000[ms]
+
+		47.2%	
+		#237
+		やねうら王2016mid V320b
+		新see()改良
+		#236
+		やねうら王2016mid V320a
+		新see()
+
+		258-6-289(91.4% R-19.7)	
+
+	よくなってない。もう少し長い時間で回してみる。
+
+		秒読み4000[ms]
+
+		49.2%	
+		#237
+		やねうら王2016mid V320b
+		新see()改良
+		#236
+		やねうら王2016mid V320a
+		新see()
+
+		127-11-131(62.2% R-5.4)	
+
+	変わらず。Stockfishでもこの判定になっているから、ここ変えても変わらないのかも知れない。
+
+	see_sign()の判定、kingでcaptureするときは常にプラスを返して良いのでは…。うーん..
+
+    // KINGで取る手は合法手であるなら取り返されないということだから、ここではプラスを返して良い。
+    // ゆえに、中盤用のCapturePieceValue[KING]はゼロを返して良いのでは。
+
+	-   if (CapturePieceValue[ptFrom] <= CapturePieceValue[ptTo])
+	+   if (CapturePieceValue[ptFrom] <= CapturePieceValue[ptTo] || ptFrom == KING)
+
+	こうするか。
+
+			秒読み300[ms]
+
+			51.6%	
+			#238
+			やねうら王2016mid V320c
+			新see()改良
+			#236
+			やねうら王2016mid V320a
+			新see()
+
+			489-11-458(14.9% R11.4)	
+
+	勝率が上がったが、この実装おかしいなぁ…。
+
+	CapturePieceValue、やはりKINGはゼロにするのが正しいのでは。
+
+		// KINGの場合、プラスが返るが、その場合、moveは非合法手であるから、そのあと引っかかるはずなので
+		// この判定、入れなくてもいいかも。
+		//if (captured == KING)
+		//  return Value(-CapturePieceValue[KING]);
+
+
+		秒読み300[ms]
+
+		51.3%	
+		#239
+		やねうら王2016mid V320d
+		CapturePieceValue[KING]=0
+		#238
+		やねうら王2016mid V320c
+		新see()改良
+
+		401-11-381(22.6% R8.9)	
+
+	弱くはなってなさそうなのでおk。
+
+	gccでコンパイルして1手5秒で魔女と対戦させておく。
+
+		秒読み5000[ms]
+
+		50.0%	
+		#240
+		やねうら王2016mid V320d gcc
+		CapturePieceValue[KING]=0
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		112-12-112(52.7% R0.0)	
+
+	ほぼ互角っぽい。
+
+		gcc PGO
+		===========================
+		Total time (ms) : 48621
+		Nodes searched  : 32357232
+		Nodes/second    : 665499
+
+	1,2%速くなった程度？
+
+	魔女と10秒でテスト。
+
+		秒読み10000[ms]
+
+		45.5%	
+		#240
+		やねうら王2016mid V320d gcc
+		CapturePieceValue[KING]=0
+		#0
+		silent_majority_V1.1公式
+		1スレッド
+
+		438-52-525(99.8% R-31.5)	
+
+	まだ少し負けているのか。
+
+・ASSERT外して何故速くならないのか調べる。
+	→　assert()、探索の時間のかかるところにはあまり入ってないからかな。
+・プロファイラで調べる。
+	
+	Eval::calc_diff_kpp             40.29%
+	Position::attackers_to          10.82%
+	TranspositionTable::probe       10.81%
+	is_mate_in_1ply                  3.79%
+	MovePicker::generate_next_stage  2.69%
+
+	なにこれ。
+	評価関数40%でかすぎ。
+	probe時間かかりすぎ。
+	attackers_toも重すぎ。
+
+	attackers_to、template<Color us>とかに分けるとか..。
+
+	NullMoveのときにprefetchしたほうがいいのでは。
+	misc.cppにprefetch追加。
+	TTのfirst_entry()追加。
+	→　どちらが速いかほぼ計測不能。
+
+	利きを使わないmate1ply()はテーブル使ってもう少し速く出来るはず＆mate3にすれば
+	もうちょっと強くなるはず。
+
+
+■　2016/06/24
+
+] V3.19
+
+	gccでコンパイル
+	===========================
+	Total time (ms) : 48419
+	Nodes searched  : 34145554
+	Nodes/second    : 705209
+
+	めっちゃ速くなった。AVX用のinclude header整理したのが良かったのか…？
+	evaluate()でcompute_evalのときにSSE使えてなかったとか？	うーん。それが原因ではなさげなのだが。
+
+	VC++2015
+	===========================
+	Total time (ms) : 52424
+	Nodes searched  : 34145554
+	Nodes/second    : 651334
+
+
+
+■　2016/06/23
+
+] V3.18
+
+・mate間違う局面を見つけた。
+
+	position startpos moves 7g7f 3c3d 6g6f 8c8d 7i6h 7a6b 5g5f 5c5d 3i4h 3a4b 4i5h 4a3b 5h6g 5a4a 6i7h 7c7d 6h7g 6b5c 2g2f 5d5e 5f5e 2b5e 2f2e 5c5d 5i6i 4b3c 4h5g 8b5b 6f6e 5d6e 5g6f 6e6f 7g6f 5e8b P*5e 4a3a S*8c 8b7a 8c7d+ 6a7b 6i7i 3a2b 8h7g 7b7c 7d7c 8a7c 7g6h 7c8e 8g8f P*7g 8i7g 8e7g+ 6h7g 7a3e G*4f 3e7a N*4e 3c4d 5e5d 5b5d 6f5e 5d7d 5e4d 4c4d S*6e 7d7b P*6b 7a6b 6e5d P*7e P*5c S*4c 5d4c 3b4c S*6a 7b7a 6a5b 4c5d 5b6c 7e7f 6g7f 7a7f 6c5d+ N*6f 2e2d 2c2d 7g6f 7f6f 5d4d B*5g P*6h P*6g 2h2d P*2c G*3c 2b3a N*4c 3a4a 3c3b 4a3b 2d3d
+
+	静止探索絡みだな、これ。
+	evasionですべての指し手を生成していない可能性とかも…。
+
+	setoption name Threads value 1
+	position startpos moves 7g7f 3c3d 6g6f 8c8d 7i6h 7a6b 5g5f 5c5d 3i4h 3a4b 4i5h 4a3b 5h6g 5a4a 6i7h 7c7d 6h7g 6b5c 2g2f 5d5e 5f5e 2b5e 2f2e 5c5d 5i6i 4b3c 4h5g 8b5b 6f6e 5d6e 5g6f 6e6f 7g6f 5e8b P*5e 4a3a S*8c 8b7a 8c7d+ 6a7b 6i7i 3a2b 8h7g 7b7c 7d7c 8a7c 7g6h 7c8e 8g8f P*7g 8i7g 8e7g+ 6h7g 7a3e G*4f 3e7a N*4e 3c4d 5e5d 5b5d 6f5e 5d7d 5e4d 4c4d S*6e 7d7b P*6b 7a6b 6e5d P*7e P*5c S*4c 5d4c 3b4c S*6a 7b7a 6a5b 4c5d 5b6c 7e7f 6g7f 7a7f 6c5d+ N*6f 2e2d 2c2d 7g6f 7f6f 5d4d B*5g P*6h P*6g 2h2d P*2c G*3c 2b3a N*4c 3a4a 3c3b 4a3b 2d3d
+	go infinite
+
+	利きを使わない1手詰め判定、バグがあった。とほほ。
+
+	敵の合駒が歩以外にないという条件を間違えて自駒が歩以外ないという条件になっていた。とほほ。
+	-  if (hand_count(ourHand , PAWN) == (int)ourHand)
+
+		秒読み300[ms]
+
+		48.4%	
+		#231
+		やねうら王2016mid V318
+		mate1ply()バグ修正。
+		#228
+		やねうら王2016mid V317
+		基準。
+
+		266-7-284(79.1% R-11.4)	
+
+	バグ取ったのに弱くなった気がする。
+	razor margin変えたのとcheck_info_update()のタイミングが早くなったからか…。つらい..。
+
+		秒読み300[ms]
+
+		51.2%	
+		#231
+		やねうら王2016mid V318
+		mate1ply()バグ修正。
+		#228
+		やねうら王2016mid V317
+		基準。
+
+		262-4-250(28.3% R8.1)	
+
+	まあいいや、ほぼ互角ということで。
+
+	V3.18a
+	mate1ply()、ランダムプレイヤーでテストする。
+
+	歩の移動による不成の王手による詰み、間違えてた。
+		-    to = sq_king + (us == BLACK ? SQ_U : SQ_D);
+		+    to = sq_king + (us == BLACK ? SQ_D : SQ_U);
+
+	歩の移動による成りの王手による詰み、間違えてた。
+
+		mate found = 10000 , mate miss = 89 , mate found rate  = 99.1179%
+		mate found = 20000 , mate miss = 154 , mate found rate  = 99.2359%
+		mate found = 30000 , mate miss = 235 , mate found rate  = 99.2228%
+		mate found = 40000 , mate miss = 322 , mate found rate  = 99.2014%
+		mate found = 50000 , mate miss = 438 , mate found rate  = 99.1316%
+		mate found = 60000 , mate miss = 536 , mate found rate  = 99.1146%
+		mate found = 70000 , mate miss = 632 , mate found rate  = 99.1052%
+		mate found = 80000 , mate miss = 746 , mate found rate  = 99.0761%
+		mate found = 90000 , mate miss = 854 , mate found rate  = 99.06%
+		mate found = 100000 , mate miss = 940 , mate found rate  = 99.0688%
+
+	いっぱい引っかかってワロタ。
+	mate foundは99%付近か。利きによる詰みmate1ply()は93%ちょいだったのでかなりいいみたい…。
+
+	こんな重大なバグ修正したのに0.3秒では差がほとんどつかない…。不思議なものだ。
+
+		秒読み300[ms]
+
+		50.5%	
+		#232
+		やねうら王2016mid V318a
+		mate1ply()バグ修正。
+		#230
+		やねうら王2016mid V317b
+		razoring改善。
+
+		196-2-192(40.0% R3.6)	
+
+
+		秒読み3000[ms]
+
+		53.8%	
+		#232
+		やねうら王2016mid V318a
+		mate1ply()バグ修正。
+		#230
+		やねうら王2016mid V317b
+		razoring改善。
+
+		98-5-84(13.3% R26.8)	
+	
+	長い時間になるにつれて、探索node数が増えるのでmate1ply()で間違う局面が増えるから、
+	それによる負けが増える…はず。つまり長い時間においてはこれが差がつく一因であった…はず。
+
+
 ■　2016/06/22
 
 ] V3.17
@@ -6,6 +842,49 @@
 ・razoring margin 0.1秒で12時間ほどチューンして、そのあと秒数を広げながらチューンしなおして、
 　最終的に強くなったかどうかを長い持ち時間で検証する。
 
+	V3.17a
+
+	・王手延長の単純化	
+		-          || ( !moveCountPruning && pos.see_sign(move) >= VALUE_ZERO)))
+		+          ||  pos.see_sign(move) >= VALUE_ZERO)))
+
+	・IIDのとき、常にcut nodeにするのではなく、そのnodeのcutNodeを伝播させる
+		-  search<NT>(pos, ss, alpha, beta, d, true);
+		+  search<NT>(pos, ss, alpha, beta, d, cutNode);
+
+			秒読み1000[ms]
+
+			50.3%	
+			#229
+			やねうら王2016mid V317a
+			simplify check extension
+			#228
+			やねうら王2016mid V317
+			基準。
+
+			332-13-328(42.3% R2.1)	
+
+		ほぼ変わらない。簡単に計測できる量ではない。
+
+	V3.17b
+	PARAM_RAZORING_MARGIN4 : 570 → 586(53.33%) : ←←(値554,勝率49.96%,1872局,有意51.14%) ,←(値562,勝率49.35%,1872局,有意67.61%) ,→(値578,勝率50.77%,1872局,有意29.44%) ,→→(値586,勝率53.33%,1872局,有意0.97%) ,
+	PARAM_RAZORING_MARGIN3 : 619 → 619(50.00%) : ←←(値603,勝率49.84%,1872局,有意54.54%) ,←(値611,勝率49.15%,1872局,有意72.51%) ,→(値627,勝率49.63%,1872局,有意60.14%) ,→→(値635,勝率49.23%,1872局,有意70.56%) ,
+	PARAM_RAZORING_MARGIN2 : 578 → 578(50.00%) : ←←(値562,勝率49.39%,1872局,有意66.52%) ,←(値570,勝率50.65%,1872局,有意32.43%) ,→(値586,勝率49.76%,1872局,有意56.78%) ,→→(値594,勝率50.20%,1872局,有意44.35%) ,
+	PARAM_RAZORING_MARGIN1 : 483 → 483(50.00%) : ←←(値467,勝率48.48%,3744局,有意90.41%) ,←(値475,勝率47.33%,1872局,有意96.98%) ,→(値491,勝率49.39%,1872局,有意66.54%) ,→→(値499,勝率50.61%,1872局,有意33.45%) ,
+
+			秒読み1000[ms]
+
+			51.4%	
+			#230
+			やねうら王2016mid V317b
+			razoring改善。
+			#228
+			やねうら王2016mid V317
+			基準。
+
+			323-10-306(23.6% R9.4)	
+	
+	弱くはなっていなさそうなので良しとする。
 
 
 ] V3.16

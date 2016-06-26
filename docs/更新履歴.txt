@@ -2,16 +2,87 @@
 やねうら王 更新履歴
 
 
-■　2016/06/22 V3.17
+■　2016/06/26 V3.21～V3.23
 
+・Position::moved_piece_after_ex()廃止。
+・やねうら王2016MidではUSE_DROPBIT_IN_STATSなしに変更。
+・ソースコード中にtabが混じっていたの修正。
+・MakefileのPGO版のビルドプロセスで、quitコマンドの手打ちが必要だと
+　ビルドプロセスを自動化出来ないので、bench終了後にquitするようにMakefile修正。
+・improvingの値比較、ひとつの条件をコメントアウト。(ひとつ前の式が暗黙的に含んでいるので)
+・PV nodeをcutnodeで呼ぶことはなくなったのでpv && cutNodeという条件式は無駄なので省略。
+・探索部、cmh,fmhまわりにコメント追加。
+・long_effect.cppがg++でbuildが通らなかったの修正。
+・mate1ply_with_effect.cppがg++でwarningが出ていたの修正。
+・nanoがbuild通らなくなっていたの修正。
+・棋譜の自動生成ルーチンを書く。(新学習メソッドで用いるので)
+　→　searchのrootMovesのセット、Learner::search()に移動させる。
+・test gensfenのqsearch()のPVがきちんと得られるようにした。
+・ENABLE_OPERATORS_ONをENABLE_BASE_OPERATORS_ONとENABLE_FULL_OPERATORS_ONに分離
+・ENABLE_FULL_OPERATORS_ONにintとの割り算追加。depth / ONE_PLYが出来るように。
+・fail low時のbonusを与える条件、変更。
+・PARAM_IID_MARGIN_ALPHA追加。
+・PARAM_FUTILITY_AT_PARENT_NODE_MARGIN、256に戻す。
+・check extensionの条件、単純化。
+・やねうら王2016Midでehash有効にする。
+・capture_or_pawn_promotion() 高速化
+・movegenで金相当の駒の指し手、Moveの上位16bitに金としてしまっていたバグ修正。
+・gensfenコマンド、修正。
+
+
+■　2016/06/25 V3.20
+
+・PVの出力の抑制。(出力が詰まるため)
+・USIオプションに"PvInterval"追加。
+・旧SEE、min_attacker()をtemplate化。min_attacker()での馬と龍の式を簡略化。
+・新SEE周り、occupiedの初期化がされてない実行経路があったの修正。
+・やねうら王2016Mid、新see()を使うように変更。
+・_mm_alloc()を使うのにg++では*intrin.hをincludeしないときにmm_alloc.hをincludeする必要があるので修正。
+・CapturePieceValue[KING]=VALUE_ZEROに変更。これで問題ない。
+・Makefile PGOがかけられるように修正。
+・misc.cppにprefetch()追加。
+・do_null_move()のときにはprefetch()するように変更。
+
+
+■　2016/06/24 V3.19
+
+・Macのg++でbuild出来るようにbitop.hにSSE/AVX用のincludeを集めた。
+・USE_SSE4廃止。USE_SSE41追加。
+・kpptのevaluate()でSSE4の命令をUSE_SSE2で使っていたの修正。
+・std::round()、C++11では使えるが、C++14だと使えない…？！msys64でコンパイルしたのがいけないのか…そうか。
+・g++でコンパイルしたほう、2割ぐらい速くなった。
+・SSE4.2用のinclude headerは<nmmintrin.h>か。追加した。実行ファイル差し替え。
+・AVX512対応考える。
+・extra/config.hでターゲットCPUの選択、下位CPUのdefineは自動的に選択されるようにした。
+・Makefileを使ってビルドするときは、config.hを変更しなくともターゲットCPU用の実行ファイルがビルド出来るように。
+・やねうら王2016Mid以外もmakeでbuild出来るようにする。
+・探索部のファイル名、*-search.cppで統一する。
+
+
+■　2016/06/23 V3.18
+
+・利きを用いないmate1ply()、離し飛車・角に対して合駒判定間違えていたの修正。
+・利きを用いないmate1ply()、歩の移動による詰み、歩の開き王手による詰みを間違えていたの修正。
+・#includeするときのfolder separatorが"\"になっていたものを"/"に修正。(thx.もりたにさん)
+・文字コードがcp932になっていたファイルをutf8に修正。(thx.もりたにさん)
+・INT_MAXにclimits、offsetofにはcstddefが必要だそうで追加。(thx.ingkさん)
+・評価関数の未計算値をINT_MAXにしているの、VALUE_NOT_INITとかにしたほうがわかりやすい気はしなくもないが..。まあいいか。
+・g++でvalueが未初期化かもというwarningが出るのを回避するコードを追加。
+・Ubuntu16.04でmake avx2が通ることは確認した。
+・parameters.h →　2016-mid-param.hにリネーム
+
+
+■　2016/06/22 V3.16～V3.17
+
+・razoring margin調整。
+・王手延長の単純化	
+・IIDのとき、常にcut nodeにするのではなく、そのnodeのcutNodeを伝播させる
+・Makefile、フォルダを自動的に掘るように修正。(thx. tanuki-さん)
 ・Moveが32bitにともない、MemoryBookが16bitでMoveを持っていると合致しないことになる。
 	MemoryBookをstructに変更して、なんとかする。
-
-
-■　2016/06/22 V3.16
-
 ・noSSE/SSE2/SSE4/SSE4.1/AVXの命令を分けた。SSEなしでも動くはず。
 ・gcc用の64bit環境の判定、一箇所抜けてた。そこを使わないようにリファクタリングした。
+・評価関数の格納されているフォルダ名のセパレータ、"\"ではなく"/"を使うように変更。(Linux/Mac対応)
 
 
 ■　2016/06/21 V3.12～V3.14

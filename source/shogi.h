@@ -7,7 +7,7 @@
 //
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列
-#define ENGINE_VERSION "3.16"
+#define ENGINE_VERSION "3.23"
 
 // --------------------
 // コンパイル時の設定
@@ -23,18 +23,26 @@
 // オリジナルの思考エンジンをユーザーが作成する場合は、USER_ENGINE を defineして 他のエンジンのソースコードを参考に
 //  engine/user-engine/ フォルダの中身を書くべし。
 
+#ifndef USE_MAKEFILE
+
 //#define YANEURAOU_NANO_ENGINE        // やねうら王nano        (完成2016/01/31)
 //#define YANEURAOU_NANO_PLUS_ENGINE   // やねうら王nano plus   (完成2016/02/25)
 //#define YANEURAOU_MINI_ENGINE        // やねうら王mini        (完成2016/02/29)
 //#define YANEURAOU_CLASSIC_ENGINE     // やねうら王classic     (完成2016/04/03)
 //#define YANEURAOU_CLASSIC_TCE_ENGINE // やねうら王classic tce (完成2016/04/15)
-#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (完成2016/06/22)
+#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (完成2016/06/24)
 //#define YANEURAOU_2016_LATE_ENGINE   // やねうら王2016(LATE)  (開発中)
 //#define RANDOM_PLAYER_ENGINE         // ランダムプレイヤー
 //#define MATE_ENGINE                  // 詰め将棋solverとしてリリースする場合。(開発中)
 //#define HELP_MATE_ENGINE             // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
 //#define LOCAL_GAME_SERVER            // 連続自動対局フレームワーク
 //#define USER_ENGINE                  // ユーザーの思考エンジン
+
+#else
+
+// Makefileを使ってビルドをするときは、Makefile側で選択する。
+
+#endif
 
 // --------------------
 // release configurations
@@ -419,10 +427,11 @@ enum Piece : int32_t
   HDK = KING,       // Position::pieces()で使うときの定数。H=Horse,D=Dragon,K=Kingの合体したBitboardが返る。
 
   // 指し手生成(GeneratePieceMove = GPM)でtemplateの引数として使うマーカー的な値。変更する可能性があるのでユーザーは使わないでください。
-  GPM_BR   = 100 ,     // Bishop Rook
-  GPM_GBR  = 101 ,     // Gold Bishop Rook
-  GPM_GHD  = 102 ,     // Gold Horse Dragon
-  GPM_GHDK = 103 ,     // Gold Horse Dragon King
+  // 値はマイナスにしておくことで、連続的な値になり、テーブルジャンプしやすくする。
+  GPM_BR   = -1 ,     // Bishop Rook
+  GPM_GBR  = -2 ,     // Gold Bishop Rook
+  GPM_GHD  = -3 ,     // Gold Horse Dragon
+  GPM_GHDK = -4 ,     // Gold Horse Dragon King
 };
 
 // USIプロトコルで駒を表す文字列を返す。
@@ -660,8 +669,8 @@ enum MOVE_GEN_TYPE
 {
   // LEGAL/LEGAL_ALL以外は自殺手が含まれることがある(pseudo-legal)ので、do_moveの前にPosition::legal()でのチェックが必要。
 
-  NON_CAPTURES,	// 駒を取らない指し手
-  CAPTURES,			// 駒を取る指し手
+  NON_CAPTURES,           // 駒を取らない指し手
+  CAPTURES,               // 駒を取る指し手
 
   CAPTURES_PRO_PLUS,      // CAPTURES + 価値のかなりあると思われる成り(歩だけ)
   NON_CAPTURES_PRO_MINUS, // NON_CAPTURES - 価値のかなりあると思われる成り(歩だけ)

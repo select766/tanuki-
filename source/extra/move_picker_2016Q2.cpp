@@ -83,7 +83,7 @@ enum Stages : int {
 
   STOP,                         // 終端
 };
-ENABLE_OPERATORS_ON(Stages); // 次の状態にするためにインクリメントを使いたい。
+ENABLE_FULL_OPERATORS_ON(Stages); // 次の状態にするためにインクリメントを使いたい。
 
 
 // 指し手オーダリング器
@@ -96,12 +96,7 @@ MovePicker::MovePicker(const Position& pos_,Move ttMove_,Depth depth_, Search::S
   ASSERT_LV3(depth_ > DEPTH_ZERO);
 
   Square prevSq = move_to((ss - 1)->currentMove);
-  Piece prevPc =
-#ifndef USE_DROPBIT_IN_STATS   
-      pos.piece_on(prevSq);
-#else
-      pos.piece_on(prevSq) + Piece(is_drop((ss-1)->currentMove) ? 32 : 0);
-#endif
+  Piece prevPc = pos.moved_piece_after((ss - 1)->currentMove);
 
   countermove =
     is_ok((ss - 1)->currentMove)
@@ -287,7 +282,7 @@ Move MovePicker::next_move() {
       move = pick_best(currentMoves++, endMoves);
       if (move != ttMove)
       {
-#ifdef USE_SEE
+#if defined (USE_SEE) || defined (USE_SIMPLE_SEE)
         // ここでSSEの符号がマイナスならbad captureのほうに回す。
         // ToDo: moveは駒打ちではないからsee()の内部での駒打ち判定不要なのだが。
         if (pos.see_sign(move) >= VALUE_ZERO)
@@ -443,11 +438,7 @@ void MovePicker::score_quiets()
   {
     const Move move = m;
 
-#ifndef USE_DROPBIT_IN_STATS
     Piece mpc = pos.moved_piece_after(move);
-#else
-    Piece mpc = pos.moved_piece_after_ex(move);
-#endif
     m.value = history[move_to(move)][mpc]
         + (cm ? (*cm)[move_to(move)][mpc] : VALUE_ZERO)
         + (fm ? (*fm)[move_to(move)][mpc] : VALUE_ZERO)
@@ -463,8 +454,8 @@ void MovePicker::score_evasions()
 
   for (auto& m : *this)
 
-#ifdef USE_SEE
-
+#if defined (USE_SEE) || defined (USE_SIMPLE_SEE)
+  
     // see()が負の指し手ならマイナスの値を突っ込んで後回しにする
     // 王手を防ぐためだけのただで取られてしまう駒打ちとかがここに含まれるであろうから。
     // evasion自体は指し手の数が少ないのでここでsee()を呼び出すコストは無視できる。
@@ -484,19 +475,17 @@ void MovePicker::score_evasions()
     // LVAするときに王が10000だから、これが大きすぎる可能性がなくはないが…。
     if (pos.capture_or_promotion(m))
     {
+
       m.value = (Value)Eval::CapturePieceValue[pos.piece_on(move_to(m))]
         - Value(LVA(type_of(pos.moved_piece_before(m)))) + HistoryStats::Max;
 
       // 成るなら、その成りの価値を加算
       if (is_promote(m))
-        m.value += (Eval::ProDiffPieceValue[pos.piece_on(move_from(m))]);
+        m.value += (Eval::ProDiffPieceValue[raw_type_of(pos.moved_piece_after(m))]);
     }
     else
-#ifndef USE_DROPBIT_IN_STATS
+
       m.value = history[move_to(m)][pos.moved_piece_after(m)];
-#else
-      m.value = history[move_to(m)][pos.moved_piece_after_ex(m)];
-#endif
 }
 
 #endif // ifdef USE_MOVE_PICKER_2016Q2
