@@ -32,7 +32,7 @@ namespace Eval
 
 namespace
 {
-  using WeightType = float;
+  using WeightType = double;
 
   enum WeightKind {
     WEIGHT_KIND_COLOR,
