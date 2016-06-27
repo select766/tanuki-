@@ -333,13 +333,14 @@ void Learner::learn(std::istringstream& iss)
         }
         ++num_valid_positions;
 
-#if 1
+#if 0
         // [‚¢’Tõ‚Ì•]‰¿’l‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
         WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
-#elif 0
+#elif 1
         // [‚¢[‚³‚Ì•]‰¿’l‚©‚ç‹‚ß‚½Ÿ—¦‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
-        WeightType delta = (sigmoid(static_cast<int>(value) / 600.0) - sigmoid(static_cast<int>(record_value) / 600.0))
-          * dsigmoid(static_cast<int>(value) / 600.0);
+        double y = static_cast<int>(value) / 600.0;
+        double t = static_cast<int>(record_value) / 600.0;
+        WeightType delta = (sigmoid(y) - sigmoid(t)) * dsigmoid(y);
 #else
         static_assert(false, "Choose a loss function.");
 #endif
