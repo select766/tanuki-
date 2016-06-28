@@ -338,8 +338,8 @@ void Learner::learn(std::istringstream& iss)
         WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
 #elif 1
         // [‚¢[‚³‚Ì•]‰¿’l‚©‚ç‹‚ß‚½Ÿ—¦‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
-        double y = static_cast<int>(value) / 600.0;
-        double t = static_cast<int>(record_value) / 600.0;
+        double y = static_cast<int>(record_value) / 600.0;
+        double t = static_cast<int>(value) / 600.0;
         WeightType delta = (sigmoid(y) - sigmoid(t)) * dsigmoid(y);
 #else
         static_assert(false, "Choose a loss function.");
