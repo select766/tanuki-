@@ -70,6 +70,7 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kWriteEvalPerPosition = 100000000; // 1â≠
   constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1êÁñú
+  constexpr int64_t kMaxPositionsForLearning = 500000000; // 5â≠
 
   std::unique_ptr<Learner::KifuReader> kifu_reader;
 
@@ -322,7 +323,8 @@ void Learner::learn(std::istringstream& iss)
 
       Position& pos = thread.rootPos;
       Value record_value;
-      while (kifu_reader->Read(pos, record_value)) {
+      while (global_position_index < kMaxPositionsForLearning &&
+          kifu_reader->Read(pos, record_value)) {
         int64_t position_index = global_position_index++;
 
         Value value;
