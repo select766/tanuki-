@@ -61,7 +61,6 @@ namespace
     void finalize(int64_t position_index, T& eval_weight);
   };
 
-  constexpr char* kFolderName = "kifu";
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -268,7 +267,7 @@ void Learner::learn(std::istringstream& iss)
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  kifu_reader = std::make_unique<Learner::KifuReader>(kFolderName);
+  kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"]);
 
   Eval::load_eval();
 
@@ -335,10 +334,10 @@ void Learner::learn(std::istringstream& iss)
         }
         ++num_valid_positions;
 
-#if 0
+#if 1
         // [‚¢’Tõ‚Ì•]‰¿’l‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
         WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
-#elif 1
+#elif 0
         // [‚¢[‚³‚Ì•]‰¿’l‚©‚ç‹‚ß‚½Ÿ—¦‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
         double y = static_cast<int>(record_value) / 600.0;
         double t = static_cast<int>(value) / 600.0;
@@ -470,7 +469,7 @@ void Learner::error_measurement()
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  kifu_reader = std::make_unique<KifuReader>(kFolderName);
+  kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"]);
 
   Eval::load_eval();
 

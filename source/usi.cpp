@@ -245,6 +245,7 @@ namespace USI
 #endif
 
     o["EvalDir"] << Option("eval");
+    o["KifuDir"] << Option("kifu");
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);

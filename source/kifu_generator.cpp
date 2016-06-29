@@ -16,10 +16,10 @@ using Search::RootMove;
 namespace
 {
   constexpr int kNumGames = 100000000;
-  constexpr char* kOutputFilePathFormat =
-    "kifu/kifu.2016-06-12.3.100000000.%03d.csv";
+  constexpr char* kOutputFileNameFormat =
+    "kifu.2016-06-29.3.100000000.%03d.csv";
   constexpr char* kBookFileName = "book.sfen";
-  constexpr int kMinBookMove = 0;
+  constexpr int kMinBookMove = 32;
   constexpr int kMaxBookMove = 32;
   constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
@@ -263,11 +263,11 @@ void Learner::GenerateKifu()
     return;
   }
 
-  kifu_writer = std::make_unique<Learner::KifuWriter>(kOutputFilePathFormat);
+  std::string output_file_path_format =
+      (std::string)Options["KifuDir"] + "/" + kOutputFileNameFormat;
+  kifu_writer = std::make_unique<Learner::KifuWriter>(output_file_path_format);
 
   Eval::load_eval();
-
-  Options["Hash"] = 1024;
 
   Search::LimitsType limits;
   limits.max_game_ply = kMaxGamePlay;
