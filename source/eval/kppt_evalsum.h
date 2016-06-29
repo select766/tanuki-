@@ -34,7 +34,7 @@ namespace Eval {
   // (それぞれに手番は加味されているものとする)
   // sum.sum() == ΣBKPP - ΣWKPP + ΣKK
 
-  struct EvalSum {
+  struct alignas(32) EvalSum {
 
 #if defined(USE_AVX2)
     EvalSum(const EvalSum& es) {
@@ -58,7 +58,7 @@ namespace Eval {
 
     EvalSum() {}
 
-    // 先手から見た評価値を返す。この局面の手番は c側にあるものとする。c側から見た評価値を返す。
+    // この局面の手番は c側にあるものとする。c側から見た評価値を返す。
     int32_t sum(const Color c) const {
 
       // NDF(2014)の手番評価の手法。
@@ -68,7 +68,7 @@ namespace Eval {
       // p[1][0]はΣWKPPなので符号はマイナス。
       const int32_t scoreBoard = p[0][0] - p[1][0] + p[2][0];
       // 手番に依存する評価値合計
-      const int32_t scoreTurn = p[0][1] + p[1][1] + p[2][1];
+      const int32_t scoreTurn  = p[0][1] + p[1][1] + p[2][1];
 
       // この関数は手番側から見た評価値を返すのでscoreTurnは必ずプラス
 
@@ -120,8 +120,14 @@ namespace Eval {
     // decode()はencode()の逆変換だが、xorなので逆変換も同じ変換。
     void decode() { encode(); }
 
+    // 評価値が計算済みであるかを判定する。
+    // このEvalSumに値が入っていないときはp[0][0]をVALUE_NOT_EVALUATEDを設定することになっている。
+    bool evaluated() const { return p[0][0] != VALUE_NOT_EVALUATED; }
+
     union {
-      std::array<std::array<int32_t, 2>, 3> p;
+      // array<.. , 3>でいいが、この下のstructに合わせてpaddingしておく。
+      std::array<std::array<int32_t, 2>, 4> p;
+      
       struct {
         uint64_t data[3];
         uint64_t key; // ehash用。

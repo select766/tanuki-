@@ -2,6 +2,30 @@
 やねうら王 更新履歴
 
 
+■　2016/06/28 V3.25
+
+・EVAL_KPPT_FAST導入。
+・KPPT型の超高速な評価関数、開発開始。(とりあえず非公開)
+・Makefileに2016Late用の記述追加。
+・Mid以外がbuildできなくなっていたの修正。VALUE_NOE_VALUATE→VALUE_NOT_EVALUATED
+・nano/nano plusでassertで落ちるの修正。
+・USE_TT_PVのときに置換表の指し手をpseudo_legal()でチェックしていなかったの修正。(nano/nano plus)
+・MIDでMovePickerから取得した指し手に対してpsudo_legal()のassert追加。
+・nono plusでdraw_value返すときにvalue_from_tt通してなかったの修正。
+・miniでOptions["Param1"]をextra_option()で追加していなかったの修正。
+
+
+■　2016/06/27 V3.24
+
+・捕獲から逃れる指し手のところ、コメント追記。
+・to_sq()をmove_to()のaliasとして、いまあるto_sqはsqww_to_sqに名前変更。
+・HashTableにaligned_as(32)追加。
+・KPPTの評価値の未計算値、VALUE_NOT_EVALUATEDに変更。フラグ位置をp[2][0]ではなくp[0][0]に変更。
+・evaluate_nullmove()削除。
+・KPPTの評価関数、リファクタリング。(Apery、魔女風にした)
+・s32、s64等のtypedef追加。
+
+
 ■　2016/06/26 V3.21～V3.23
 
 ・Position::moved_piece_after_ex()廃止。

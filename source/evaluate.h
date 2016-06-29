@@ -4,7 +4,7 @@
 #include "shogi.h"
 
 // 手番込みの評価関数であれば手番を込みで値を計算するhelper classを使う。
-#ifdef EVAL_KPPT
+#if defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST)
 #include "eval/kppt_evalsum.h"
 #endif
 
@@ -64,11 +64,7 @@ namespace Eval {
     DragonValue = 942,
     KingValue = 15000,
   };
-#elif defined (EVAL_KPPT)
-
-  // null move後のevaluate()
-  // 手番を反転させたときの評価値を返す。
-  Value evaluate_nullmove(const Position& pos);
+#elif defined (EVAL_KPPT) || defined (EVAL_KPPT_FAST)
 
   // Aperyの駒割り
   enum {
@@ -106,7 +102,12 @@ namespace Eval {
 
   // BonanzaのようにKPPを求めるときに、39の地点の歩のように、
   // 升×駒種に対して一意な番号が必要となる。これをBonaPiece型と呼ぶことにする。
+#ifndef EVAL_KPPT_FAST
+  enum BonaPiece: int16_t
+#else
+  // KPPT_FASTでは、高速化のためにVPGATHERDDを用いる関係で4バイトのほうが好都合。
   enum BonaPiece : int32_t
+#endif
   {
     // f = friend(≒先手)の意味。e = enemy(≒後手)の意味
 
@@ -132,7 +133,7 @@ namespace Eval {
     e_hand_rook = f_hand_rook + 2,
     fe_hand_end = e_hand_rook + 2,
 
-#elif defined (EVAL_KPPT)
+#elif defined (EVAL_KPPT) || defined(EVAL_KPPT_FAST)
     // Apery(WCSC26)方式。0枚目の駒があるので少し隙間がある。
     // 定数自体は1枚目の駒のindexなので、KPPの時と同様の処理で問題ない。
 
