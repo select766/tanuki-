@@ -65,6 +65,9 @@ using namespace std;
 using namespace Search;
 using namespace Eval;
 
+// 定跡ファイル名
+string book_name;
+
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
@@ -89,6 +92,18 @@ void USI::extra_option(USI::OptionsMap & o)
   //  PVの出力の抑制のために前回出力時間からの間隔を指定できる。
 
   o["PvInterval"] << Option(300, 0, 100000);
+
+
+  // 定跡ファイル名
+
+  //  standard_book.db 標準定跡
+  //  yaneura_book1.db やねうら定跡1(公開用1)
+  //  yaneura_book2.db やねうら定跡2(公開用2)
+  //  yaneura_book3.db やねうら定跡3(大会用)
+
+  std::vector<std::string> book_list = { "standard_book.db", "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db" };
+  o["BookFile"] << Option(book_list, book_list[0], [](auto& o) { book_name = o; });
+  book_name = book_list[0];
 
 }
 
@@ -746,7 +761,10 @@ namespace YaneuraOu2016Mid
     }
 
     // 置換表には abs(value) < VALUE_INFINITEの値しか書き込まないし、この関数もこの範囲の値しか返さない。
-    ASSERT_LV3(-VALUE_INFINITE < bestValue && bestValue < VALUE_INFINITE);
+    // このassertを書くべきだし、Stockfishではこのassertが書かれているが、
+    // このnodeはrootからss->ply手進めた局面なのでここでss->plyより短い詰みがあるのはおかしい。
+    // この事実を利用したほうが、より厳しいassertが書ける。
+    ASSERT_LV3(abs(bestValue) <= mate_in(ss->ply));
 
     return bestValue;
   }
@@ -1920,12 +1938,7 @@ void Search::clear()
   // -----------------------
   //   定跡の読み込み
   // -----------------------
-  static bool first = true;
-  if (first)
-  {
-    Book::read_book("book/standard_book.db", book);
-    first = false;
-  }
+  Book::read_book("book/" + book_name, book);
 
   // -----------------------
   //   置換表のクリアなど
@@ -2532,7 +2545,9 @@ namespace Learner
   // のようにすべし。
   // v.firstに評価値、v.secondにPVが得られる。
 
-  pair<Value, vector<Move> > search(Position& pos, Value alpha, Value beta, int depth)
+  // MultiPVが有効のときは、pos.this_thread()->rootMoves[N].pvにそのPV(読み筋)の配列が得られる。
+
+  pair<Value, vector<Move> > search(Position& pos, Value alpha , Value beta , int depth)
   {
     Stack stack[MAX_PLY + 7], *ss = stack + 5;
     memset(ss - 5, 0, 8 * sizeof(Stack));
@@ -2540,16 +2555,59 @@ namespace Learner
     init_for_search(pos);
     auto th = pos.this_thread();
 
-    Value bestValue;
-    while (++th->rootDepth <= depth)
+    auto& rootDepth = th->rootDepth;
+    auto& PVIdx = th->PVIdx;
+    auto& rootMoves = th->rootMoves;
+
+    Value bestValue, delta;
+    bestValue = delta = -VALUE_INFINITE;
+
+    // bestmoveとしてしこの局面の上位N個を探索する機能
+    size_t multiPV = Options["MultiPV"];
+    // この局面での指し手の数を上回ってはいけない
+    multiPV = std::min(multiPV, rootMoves.size());
+
+    while (++rootDepth <= depth)
     {
-      bestValue = YaneuraOu2016Mid::search<PV>(pos, ss, alpha, beta, th->rootDepth * ONE_PLY, false);
-      std::stable_sort(th->rootMoves.begin(), th->rootMoves.end());
+
+      // MultiPVのためにこの局面の候補手をN個選出する。
+      for (PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx)
+      {
+        // aspiration search
+        if (rootDepth >= 5)
+        {
+          delta = Value(18);
+          alpha = std::max(rootMoves[PVIdx].previousScore - delta, -VALUE_INFINITE);
+          beta = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
+        }
+
+        while (true)
+        {
+          bestValue = YaneuraOu2016Mid::search<PV>(pos, ss, alpha, beta, rootDepth * ONE_PLY, false);
+          std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
+
+          if (bestValue <= alpha)
+          {
+            beta = (alpha + beta) / 2;
+            alpha = std::max(bestValue - delta, -VALUE_INFINITE);
+          } else if (bestValue >= beta)
+          {
+            alpha = (alpha + beta) / 2;
+            beta = std::min(bestValue + delta, VALUE_INFINITE);
+          } else {
+            break;
+          }
+          delta += delta / 4 + 5;
+
+          ASSERT_LV3(-VALUE_INFINITE <= alpha && beta <= VALUE_INFINITE);
+        }
+        std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
+      } // multi PV
     }
 
     // このPV、途中でNULL_MOVEの可能性があるかも知れないので排除するためにis_ok()を通す。
     vector<Move> pvs;
-    for (Move move : th->rootMoves[0].pv)
+    for (Move move : rootMoves[0].pv)
     {
       if (!is_ok(move))
         break;
