@@ -461,7 +461,7 @@ namespace Eval
 
     // nodeごとにevaluate()は呼び出しているので絶対に差分計算できるはず。
     // 一つ前のnodeでevaluate()されているはず。
-    if (!prev->sum.evaluated())
+    if (prev == nullptr || !prev->sum.evaluated())
     {
       // 全計算
       compute_eval(pos);
