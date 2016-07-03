@@ -687,3 +687,41 @@ void Learner::error_measurement()
     sqrt(sum_error / kMaxPositionsForErrorMeasurement),
     sum_norm / kMaxPositionsForErrorMeasurement);
 }
+
+void Learner::kifu_reader_benchmark()
+{
+  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+  auto start = std::chrono::system_clock::now();
+
+  std::vector<Record> records;
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
+    // Žc‚èŽžŠÔ•\Ž¦
+    if (num_processed_positions) {
+      auto current = std::chrono::system_clock::now();
+      auto elapsed = current - start;
+      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForLearning - num_processed_positions));
+      int h = remaining_sec / 3600;
+      int m = remaining_sec / 60 % 60;
+      int s = remaining_sec % 60;
+
+      time_t     current_time;
+      struct tm  *local_time;
+
+      time(&current_time);
+      local_time = localtime(&current_time);
+      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+        num_processed_positions, kMaxPositionsForLearning,
+        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
+        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+    }
+
+    int num_records = static_cast<int>(std::min(
+      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+
+    num_processed_positions += num_records;
+  }
+}

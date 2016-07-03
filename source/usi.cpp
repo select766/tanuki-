@@ -676,6 +676,10 @@ void USI::loop(int argc,char* argv[])
       Learner::error_measurement();
       break;
     }
+    else if (token == "kifu_reader_benchmark") {
+      Learner::kifu_reader_benchmark();
+      break;
+    }
     ;
 
   } while (token != "quit" );
