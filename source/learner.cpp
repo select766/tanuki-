@@ -4,6 +4,7 @@
 #include <ctime>
 #include <fstream>
 #include <direct.h>
+#include <omp.h>
 
 #include "kifu_reader.h"
 #include "position.h"
@@ -44,21 +45,21 @@ namespace
 
   struct Weight
   {
+    // 勾配の和
+    WeightType sum_gradient = 0.0;
     // 重み
     WeightType w = 0.0;
     // Adam用変数
     WeightType m = 0.0;
     WeightType v = 0.0;
-    WeightType adam_beta1_t = 1.0;
-    WeightType adam_beta2_t = 1.0;
     // 平均化確率的勾配降下法用変数
     WeightType sum_w = 0.0;
-    int64_t last_update_index = 0.0;
 
+    void AddGradient(double gradient);
     template<typename T>
-    void update(int64_t position_index, double dt, T& eval_weight);
+    void UpdateWeight(double adam_beta1_t, double adam_beta2_t, T& eval_weight);
     template<typename T>
-    void finalize(int64_t position_index, T& eval_weight);
+    void Finalize(int num_mini_batches, T& eval_weight);
   };
 
   constexpr int kFvScale = 32;
@@ -67,53 +68,108 @@ namespace
   constexpr WeightType kAdamBeta2 = 0.999;
   constexpr WeightType kLearningRate = 0.1;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kWriteEvalPerPosition = 100000000; // 1億
+  constexpr int64_t kWriteEvalPerPosition = 10000000; // 1千万
   constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1千万
-  constexpr int64_t kMaxPositionsForLearning = 500000000; // 5億
+  constexpr int64_t kMaxPositionsForLearning = 100000000; // 1億
+  constexpr int64_t kMiniBatchSize = 10000;
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader;
-
-  int kpp_index_to_raw_index(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
+  int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
   }
 
-  int kkp_index_to_raw_index(Square k0, Square k1, Eval::BonaPiece p, WeightKind weight_kind) {
-    return kpp_index_to_raw_index(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_NB) +
+  int KkpIndexToRawIndex(Square k0, Square k1, Eval::BonaPiece p, WeightKind weight_kind) {
+    return KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO) +
       static_cast<int>(static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * Eval::fe_end + p) * COLOR_NB + weight_kind;
   }
 
-  int kk_index_to_raw_index(Square k0, Square k1, WeightKind weight_kind) {
-    return kkp_index_to_raw_index(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_NB) +
+  int KkIndexToRawIndex(Square k0, Square k1, WeightKind weight_kind) {
+    return KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO) +
       (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + weight_kind;
   }
 
-  template<typename T>
-  void Weight::update(int64_t position_index, double dt, T& eval_weight)
-  {
-    // 平均化確率的勾配降下法
-    sum_w += w * (position_index - last_update_index);
-    last_update_index = position_index;
+  bool IsKppIndex(int index) {
+    return 0 <= index &&
+      index < KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
+  }
 
+  bool IsKkpIndex(int index) {
+    return 0 <= index &&
+      !IsKppIndex(index) &&
+      index < KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
+  }
+
+  bool IsKkIndex(int index) {
+    return 0 <= index &&
+      !IsKppIndex(index) &&
+      !IsKkpIndex(index) &&
+      index < KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
+  }
+
+  void RawIndexToKppIndex(int dimension_index, Square& k, Eval::BonaPiece& p0, Eval::BonaPiece& p1, WeightKind& weight_kind) {
+    ASSERT_LV3(IsKppIndex(dimension_index));
+    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
+    dimension_index /= WEIGHT_KIND_NB;
+    p1 = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
+    dimension_index /= Eval::fe_end;
+    p0 = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
+    dimension_index /= Eval::fe_end;
+    k = static_cast<Square>(dimension_index);
+    ASSERT_LV3(k < SQ_NB);
+    ASSERT_LV3(KppIndexToRawIndex(k, p0, p1, weight_kind) == dimension_index);
+  }
+
+  void RawIndexToKkpIndex(int dimension_index, Square& k0, Square& k1, Eval::BonaPiece& p, WeightKind& weight_kind) {
+    ASSERT_LV3(IsKkpIndex(dimension_index));
+    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
+    dimension_index /= WEIGHT_KIND_NB;
+    p = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
+    dimension_index /= Eval::fe_end;
+    k1 = static_cast<Square>(dimension_index % SQ_NB);
+    dimension_index /= SQ_NB;
+    k0 = static_cast<Square>(dimension_index % SQ_NB);
+    ASSERT_LV3(k0 < SQ_NB);
+    ASSERT_LV3(KkpIndexToRawIndex(k0, k1, p, weight_kind) == dimension_index);
+  }
+
+  void RawIndexToKkIndex(int dimension_index, Square& k0, Square& k1, WeightKind& weight_kind) {
+    ASSERT_LV3(IsKkIndex(dimension_index));
+    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
+    dimension_index /= WEIGHT_KIND_NB;
+    k1 = static_cast<Square>(dimension_index % SQ_NB);
+    dimension_index /= SQ_NB;
+    k0 = static_cast<Square>(dimension_index % SQ_NB);
+    ASSERT_LV3(k0 < SQ_NB);
+    ASSERT_LV3(KkIndexToRawIndex(k0, k1, weight_kind) == dimension_index);
+  }
+
+  void Weight::AddGradient(double gradient) {
+    sum_gradient += gradient;
+  }
+
+  template<typename T>
+  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, T& eval_weight) {
     // Adam
-    m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * dt;
-    v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * dt * dt;
+    m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient;
+    v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient * sum_gradient;
     // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
-    adam_beta1_t *= kAdamBeta1;
-    adam_beta2_t *= kAdamBeta2;
     WeightType mm = m / (1.0 - adam_beta1_t);
     WeightType vv = v / (1.0 - adam_beta2_t);
     WeightType delta = kLearningRate * mm / (sqrt(vv) + kEps);
     w += delta;
 
+    // 平均化確率的勾配降下法
+    sum_w += w;
+
     // 重みテーブルに書き戻す
     eval_weight = static_cast<T>(std::round(w));
+
+    sum_gradient = 0.0;
   }
 
   template<typename T>
-  void Weight::finalize(int64_t position_index, T& eval_weight)
+  void Weight::Finalize(int num_mini_batches, T& eval_weight)
   {
-    sum_w += w * (position_index - last_update_index);
-    int64_t value = static_cast<int64_t>(std::round(sum_w / position_index));
+    int64_t value = static_cast<int64_t>(std::round(sum_w / num_mini_batches));
     //int64_t value = static_cast<int64_t>(std::round(w));
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
@@ -251,6 +307,8 @@ namespace
 
 void Learner::learn(std::istringstream& iss)
 {
+  omp_set_num_threads((int)Options["Threads"]);
+
   std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
   std::string token;
   while (iss >> token) {
@@ -260,48 +318,57 @@ void Learner::learn(std::istringstream& iss)
   }
 
   ASSERT_LV3(
-    kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
+    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"]);
+  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
 
   Eval::load_eval();
 
-  int vector_length = kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
+  int vector_length = KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
 
   std::vector<Weight> weights(vector_length);
   memset(&weights[0], 0, sizeof(weights[0]) * weights.size());
 
-  for (Square k : SQ) {
-    for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
-      for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
-        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-          weights[kpp_index_to_raw_index(k, p0, p1, weight_kind)].w =
-            static_cast<WeightType>(Eval::kpp[k][p0][p1][weight_kind]);
-        }
-      }
+  // 評価関数テーブルから重みベクトルへ重みをコピーする
+  // 並列化を効かせたいのでdimension_indexで回す
+#pragma omp parallel for
+  for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+    if (IsKppIndex(dimension_index)) {
+      Square k;
+      Eval::BonaPiece p0;
+      Eval::BonaPiece p1;
+      WeightKind weight_kind;
+      RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
+      weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].w =
+        static_cast<WeightType>(Eval::kpp[k][p0][p1][weight_kind]);
+
     }
-  }
-  for (Square k0 : SQ) {
-    for (Square k1 : SQ) {
-      for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
-        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-          weights[kkp_index_to_raw_index(k0, k1, p, weight_kind)].w =
-            static_cast<WeightType>(Eval::kkp[k0][k1][p][weight_kind]);
-        }
-      }
+    else if (IsKkpIndex(dimension_index)) {
+      Square k0;
+      Square k1;
+      Eval::BonaPiece p;
+      WeightKind weight_kind;
+      RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
+      weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].w =
+        static_cast<WeightType>(Eval::kkp[k0][k1][p][weight_kind]);
+
     }
-  }
-  for (Square k0 : SQ) {
-    for (Square k1 : SQ) {
-      for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-        weights[kk_index_to_raw_index(k0, k1, weight_kind)].w =
-          static_cast<WeightType>(Eval::kk[k0][k1][weight_kind]);
-      }
+    else if (IsKkIndex(dimension_index)) {
+      Square k0;
+      Square k1;
+      WeightKind weight_kind;
+      RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
+      weights[KkIndexToRawIndex(k0, k1, weight_kind)].w =
+        static_cast<WeightType>(Eval::kk[k0][k1][weight_kind]);
+
+    }
+    else {
+      ASSERT_LV3(false);
     }
   }
 
@@ -311,165 +378,241 @@ void Learner::learn(std::istringstream& iss)
   limits.silent = true;
   Search::Limits = limits;
 
-  std::atomic_int64_t global_position_index = 0;
-  std::vector<std::thread> threads;
-  std::atomic_int64_t num_valid_positions = 0;
-  while (threads.size() < Threads.size()) {
-    int thread_index = static_cast<int>(threads.size());
-    auto procedure = [&global_position_index, &threads, &weights, thread_index,
-      output_folder_path_base, &num_valid_positions] {
+  int64_t next_num_processed_position = kWriteEvalPerPosition;
+
+  // 作成・破棄のコストが高いためループの外に宣言する
+  std::vector<Record> records;
+
+  // 全学習データに対してループを回す
+  auto start = std::chrono::system_clock::now();
+  double adam_beta1_t = 1.0;
+  double adam_beta2_t = 1.0;
+  int num_mini_batches = 0;
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
+    // 残り時間表示
+    if (num_processed_positions) {
+      auto current = std::chrono::system_clock::now();
+      auto elapsed = current - start;
+      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForLearning - num_processed_positions));
+      int h = remaining_sec / 3600;
+      int m = remaining_sec / 60 % 60;
+      int s = remaining_sec % 60;
+
+      time_t     current_time;
+      struct tm  *local_time;
+
+      time(&current_time);
+      local_time = localtime(&current_time);
+      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+        num_processed_positions, kMaxPositionsForLearning,
+        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
+        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+    }
+
+    adam_beta1_t *= kAdamBeta1;
+    adam_beta2_t *= kAdamBeta2;
+    ++num_mini_batches;
+
+    int num_records = static_cast<int>(std::min(
+      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+
+    // ミニバッチ
+    // num_records個の学習データの勾配の和を求めて重みを更新する
+#pragma omp parallel for
+    for (int record_index = 0; record_index < num_records; ++record_index) {
+      int thread_index = omp_get_thread_num();
       Thread& thread = *Threads[thread_index];
-
       Position& pos = thread.rootPos;
-      Value record_value;
-      while (global_position_index < kMaxPositionsForLearning &&
-          kifu_reader->Read(pos, record_value)) {
-        int64_t position_index = global_position_index++;
+      pos.set_this_thread(&thread);
 
-        Value value;
-        Color rootColor;
-        pos.set_this_thread(&thread);
-        if (!search_shallowly(pos, value, rootColor)) {
-          continue;
-        }
-        ++num_valid_positions;
+      pos.set(records[record_index].sfen);
+      Value record_value = records[record_index].value;
+
+      Value value;
+      Color rootColor;
+      pos.set_this_thread(&thread);
+      if (!search_shallowly(pos, value, rootColor)) {
+        continue;
+      }
 
 #if 1
-        // 深い探索の評価値と浅い探索の評価値の二乗誤差を最小にする
-        WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
+      // 深い探索の評価値と浅い探索の評価値の二乗誤差を最小にする
+      WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
 #elif 0
-        // 深い深さの評価値から求めた勝率と浅い探索の評価値の二乗誤差を最小にする
-        double y = static_cast<int>(record_value) / 600.0;
-        double t = static_cast<int>(value) / 600.0;
-        WeightType delta = (sigmoid(y) - sigmoid(t)) * dsigmoid(y);
+      // 深い深さの評価値から求めた勝率と浅い探索の評価値の二乗誤差を最小にする
+      double y = static_cast<int>(record_value) / 600.0;
+      double t = static_cast<int>(value) / 600.0;
+      WeightType delta = (sigmoid(y) - sigmoid(t)) * dsigmoid(y);
 #else
-        static_assert(false, "Choose a loss function.");
+      static_assert(false, "Choose a loss function.");
 #endif
-        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
-        WeightType delta_color = (rootColor == BLACK ? delta : -delta);
-        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
-        WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
+      // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+      WeightType delta_color = (rootColor == BLACK ? delta : -delta);
+      // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+      WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
 
-        // 値を更新する
-        Square sq_bk = pos.king_square(BLACK);
-        Square sq_wk = pos.king_square(WHITE);
-        const auto& list0 = pos.eval_list()->piece_list_fb();
-        const auto& list1 = pos.eval_list()->piece_list_fw();
+      // 値を更新する
+      Square sq_bk = pos.king_square(BLACK);
+      Square sq_wk = pos.king_square(WHITE);
+      const auto& list0 = pos.eval_list()->piece_list_fb();
+      const auto& list1 = pos.eval_list()->piece_list_fw();
 
-        // KK
-        weights[kk_index_to_raw_index(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kk[sq_bk][sq_wk][WEIGHT_KIND_COLOR]);
-        weights[kk_index_to_raw_index(sq_bk, sq_wk, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kk[sq_bk][sq_wk][WEIGHT_KIND_TURN]);
+      // 勾配の値を加算する
 
-        for (int i = 0; i < PIECE_NO_KING; ++i) {
-          Eval::BonaPiece k0 = list0[i];
-          Eval::BonaPiece k1 = list1[i];
-          for (int j = 0; j < i; ++j) {
-            Eval::BonaPiece l0 = list0[j];
-            Eval::BonaPiece l1 = list1[j];
+      // KK
+      weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+      weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-            // KPP
-            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_COLOR]);
-            weights[kpp_index_to_raw_index(sq_bk, l0, k0, WEIGHT_KIND_COLOR)] = weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
-            Eval::kpp[sq_bk][l0][k0][WEIGHT_KIND_COLOR] = Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_COLOR];
+      for (int i = 0; i < PIECE_NO_KING; ++i) {
+        Eval::BonaPiece k0 = list0[i];
+        Eval::BonaPiece k1 = list1[i];
+        for (int j = 0; j < i; ++j) {
+          Eval::BonaPiece l0 = list0[j];
+          Eval::BonaPiece l1 = list1[j];
 
-            weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_TURN]);
-            weights[kpp_index_to_raw_index(sq_bk, l0, k0, WEIGHT_KIND_TURN)] = weights[kpp_index_to_raw_index(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
-            Eval::kpp[sq_bk][l0][k0][WEIGHT_KIND_TURN] = Eval::kpp[sq_bk][k0][l0][WEIGHT_KIND_TURN];
+          // 常にp0 < p1となるようにアクセスする
 
-            // KPP
-            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)].update(position_index, -delta_color, Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_COLOR]);
-            weights[kpp_index_to_raw_index(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)] = weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
-            Eval::kpp[Inv(sq_wk)][l1][k1][WEIGHT_KIND_COLOR] = Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_COLOR];
+          // KPP
+          Eval::BonaPiece p0b = std::min(k0, l0);
+          Eval::BonaPiece p1b = std::max(k0, l0);
+          weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+          weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-            weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_TURN]);
-            weights[kpp_index_to_raw_index(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)] = weights[kpp_index_to_raw_index(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
-            Eval::kpp[Inv(sq_wk)][l1][k1][WEIGHT_KIND_TURN] = Eval::kpp[Inv(sq_wk)][k1][l1][WEIGHT_KIND_TURN];
-          }
-
-          // KKP
-          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].update(position_index, delta_color, Eval::kkp[sq_bk][sq_wk][k0][WEIGHT_KIND_COLOR]);
-          weights[kkp_index_to_raw_index(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].update(position_index, delta_turn, Eval::kkp[sq_bk][sq_wk][k0][WEIGHT_KIND_TURN]);
+          // KPP
+          Eval::BonaPiece p0w = std::min(k0, l0);
+          Eval::BonaPiece p1w = std::max(k0, l0);
+          weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
+          weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
         }
 
-        if (position_index % 10000 == 0) {
-          Value value_after = Eval::compute_eval(pos);
-          if (rootColor != pos.side_to_move()) {
-            value_after = -value_after;
-          }
-
-          printf(
-            "position_index=%I64d record=%5d (%.2f)\n"
-            "    before=%5d (%.2f)  diff=%5d\n"
-            "     after=%5d (%.2f) delta=%5d error=%s\n",
-            position_index,
-            static_cast<int>(record_value), winning_percentage(record_value),
-            static_cast<int>(value), winning_percentage(value),
-            static_cast<int>(record_value - value),
-            static_cast<int>(value_after), winning_percentage(value_after),
-            static_cast<int>(value_after - value),
-            abs(record_value - value) > abs(record_value - value_after) ? "↓" :
-            abs(record_value - value) == abs(record_value - value_after) ? "＝" : "↑");
-        }
-
-        if (position_index > 0 && position_index % kWriteEvalPerPosition == 0) {
-          save_eval(output_folder_path_base, position_index);
-        }
-
-        // 局面は元に戻さなくても問題ない
+        // KKP
+        weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+        weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
       }
-    };
 
-    threads.emplace_back(procedure);
-  }
-  for (auto& thread : threads) {
-    thread.join();
+      // 局面は元に戻さなくても問題ない
+    }
+
+    // 重みを更新する
+    // 並列化を効かせたいのでdimension_indexで回す
+#pragma omp parallel for
+    for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+      if (IsKppIndex(dimension_index)) {
+        Square k;
+        Eval::BonaPiece p0;
+        Eval::BonaPiece p1;
+        WeightKind weight_kind;
+        RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
+
+        // 常にp0 < p1となるようにアクセスする
+        if (p0 > p1) {
+          continue;
+        }
+        
+        weights[KppIndexToRawIndex(k, p0, p1, weight_kind)]
+          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kpp[k][p0][p1][weight_kind]);
+        Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
+
+      }
+      else if (IsKkpIndex(dimension_index)) {
+        Square k0;
+        Square k1;
+        Eval::BonaPiece p;
+        WeightKind weight_kind;
+        RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
+        weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)]
+          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kkp[k0][k1][p][weight_kind]);
+
+      }
+      else if (IsKkIndex(dimension_index)) {
+        Square k0;
+        Square k1;
+        WeightKind weight_kind;
+        RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
+        weights[KkIndexToRawIndex(k0, k1, weight_kind)]
+          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kk[k0][k1][weight_kind]);
+
+      }
+      else {
+        ASSERT_LV3(false);
+      }
+
+    }
+
+    num_processed_positions += num_records;
+
+    if (next_num_processed_position <= num_processed_positions) {
+      save_eval(output_folder_path_base, num_processed_positions);
+      next_num_processed_position += kWriteEvalPerPosition;
+    }
   }
 
   printf("Finalizing weights\n");
-  for (Square k : SQ) {
-    for (Eval::BonaPiece p0 = Eval::BONA_PIECE_ZERO; p0 < Eval::fe_end; ++p0) {
-      for (Eval::BonaPiece p1 = Eval::BONA_PIECE_ZERO; p1 < Eval::fe_end; ++p1) {
-        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-          weights[kpp_index_to_raw_index(k, p0, p1, weight_kind)].finalize(global_position_index, Eval::kpp[k][p0][p1][weight_kind]);
-        }
+
+  // 平均化法をかけた後、評価関数テーブルに重みを書き出す
+#pragma omp parallel for
+  for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+    if (IsKppIndex(dimension_index)) {
+      Square k;
+      Eval::BonaPiece p0;
+      Eval::BonaPiece p1;
+      WeightKind weight_kind;
+      RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
+
+      // 常にp0 < p1となるようにアクセスする
+      if (p0 > p1) {
+        continue;
       }
+
+      weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].Finalize(
+        num_mini_batches, Eval::kpp[k][p0][p1][weight_kind]);
+      Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
+
     }
-  }
-  for (Square k0 : SQ) {
-    for (Square k1 : SQ) {
-      for (Eval::BonaPiece p = Eval::BONA_PIECE_ZERO; p < Eval::fe_end; ++p) {
-        for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-          weights[kkp_index_to_raw_index(k0, k1, p, weight_kind)].finalize(global_position_index, Eval::kkp[k0][k1][p][weight_kind]);
-        }
-      }
+    else if (IsKkpIndex(dimension_index)) {
+      Square k0;
+      Square k1;
+      Eval::BonaPiece p;
+      WeightKind weight_kind;
+      RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
+      weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].Finalize(
+        num_mini_batches, Eval::kkp[k0][k1][p][weight_kind]);
+
     }
-  }
-  for (Square k0 : SQ) {
-    for (Square k1 : SQ) {
-      for (WeightKind weight_kind = WEIGHT_KIND_ZERO; weight_kind < WEIGHT_KIND_NB; ++weight_kind) {
-        weights[kk_index_to_raw_index(k0, k1, weight_kind)].finalize(global_position_index, Eval::kk[k0][k1][weight_kind]);
-      }
+    else if (IsKkIndex(dimension_index)) {
+      Square k0;
+      Square k1;
+      WeightKind weight_kind;
+      RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
+      weights[KkIndexToRawIndex(k0, k1, weight_kind)].Finalize(
+        num_mini_batches, Eval::kk[k0][k1][weight_kind]);
+
+    }
+    else {
+      ASSERT_LV3(false);
     }
   }
 
-  save_eval(output_folder_path_base, global_position_index);
-  printf("Num valid positions: %I64d/%I64d (%f)\n",
-    num_valid_positions.load(),
-    global_position_index.load(),
-    num_valid_positions.load() / static_cast<double>(global_position_index.load()));
+  save_eval(output_folder_path_base, -1);
 }
 
 void Learner::error_measurement()
 {
+  omp_set_num_threads((int)Options["Threads"]);
+
   ASSERT_LV3(
-    kk_index_to_raw_index(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
+    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"]);
+  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
 
   Eval::load_eval();
 
@@ -479,58 +622,68 @@ void Learner::error_measurement()
   limits.silent = true;
   Search::Limits = limits;
 
-  std::atomic_int64_t global_position_index = 0;
-  std::vector<std::thread> threads;
-  double global_error = 0.0;
-  double global_norm = 0.0;
-  while (threads.size() < Threads.size()) {
-    int thread_index = static_cast<int>(threads.size());
-    auto procedure = [thread_index, &global_position_index, &threads, &global_error, &global_norm] {
-      double error = 0.0;
-      double norm = 0.0;
+  // 作成・破棄のコストが高いためループの外に宣言する
+  std::vector<Record> records;
+
+  auto start = std::chrono::system_clock::now();
+  double sum_error = 0.0;
+  double sum_norm = 0.0;
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
+    // 残り時間表示
+    if (num_processed_positions) {
+      auto current = std::chrono::system_clock::now();
+      auto elapsed = current - start;
+      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForErrorMeasurement - num_processed_positions));
+      int h = remaining_sec / 3600;
+      int m = remaining_sec / 60 % 60;
+      int s = remaining_sec % 60;
+
+      time_t     current_time;
+      struct tm  *local_time;
+
+      time(&current_time);
+      local_time = localtime(&current_time);
+      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+        num_processed_positions, kMaxPositionsForErrorMeasurement,
+        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
+        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+    }
+
+    int num_records = static_cast<int>(std::min(
+      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+
+    // ミニバッチ
+#pragma omp parallel for reduction(+:sum_error) reduction(+:sum_norm)
+    for (int record_index = 0; record_index < num_records; ++record_index) {
+      int thread_index = omp_get_thread_num();
       Thread& thread = *Threads[thread_index];
-
       Position& pos = thread.rootPos;
-      Value record_value;
-      while (global_position_index < kMaxPositionsForErrorMeasurement &&
-        kifu_reader->Read(pos, record_value)) {
-        int64_t position_index = global_position_index++;
+      pos.set_this_thread(&thread);
 
-        Value value;
-        Color rootColor;
-        pos.set_this_thread(&thread);
-        if (!search_shallowly(pos, value, rootColor)) {
-          continue;
-        }
+      pos.set(records[record_index].sfen);
+      Value record_value = records[record_index].value;
 
-        double diff = record_value - value;
-        error += diff * diff;
-        norm += abs(value);
-
-        if (position_index % 100000 == 0) {
-          Value value_after = Eval::compute_eval(pos);
-          if (rootColor != pos.side_to_move()) {
-            value_after = -value_after;
-          }
-
-          printf("index=%I64d\n", position_index);
-        }
+      Value value;
+      Color rootColor;
+      pos.set_this_thread(&thread);
+      if (!search_shallowly(pos, value, rootColor)) {
+        continue;
       }
 
-      static std::mutex mutex;
-      std::lock_guard<std::mutex> lock_guard(mutex);
-      global_error += error;
-      global_norm += abs(static_cast<int>(norm));
-    };
+      double diff = record_value - value;
+      sum_error += diff * diff;
+      sum_norm += abs(value);
+    }
 
-    threads.emplace_back(procedure);
-  }
-  for (auto& thread : threads) {
-    thread.join();
+    num_processed_positions += num_records;
   }
 
   printf(
     "info string mse=%f norm=%f\n",
-    sqrt(global_error / global_position_index),
-    global_norm / global_position_index);
+    sqrt(sum_error / kMaxPositionsForErrorMeasurement),
+    sum_norm / kMaxPositionsForErrorMeasurement);
 }
