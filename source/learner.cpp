@@ -68,10 +68,10 @@ namespace
   constexpr WeightType kAdamBeta2 = 0.999;
   constexpr WeightType kLearningRate = 0.1;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kWriteEvalPerPosition = 10000000; // 1êÁñú
-  constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000; // 1êÁñú
-  constexpr int64_t kMaxPositionsForLearning = 100000000; // 1â≠
-  constexpr int64_t kMiniBatchSize = 10000;
+  constexpr int64_t kWriteEvalPerPosition = 10000000;  // 1êÁñú
+  constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000;  // 1êÁñú
+  constexpr int64_t kMaxPositionsForLearning = 100000000;  // 1â≠
+  constexpr int64_t kMiniBatchSize = 100000;  //10ñú
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -597,7 +597,7 @@ void Learner::learn(std::istringstream& iss)
     }
   }
 
-  save_eval(output_folder_path_base, -1);
+  save_eval(output_folder_path_base, 99999999999LL);
 }
 
 void Learner::error_measurement()
