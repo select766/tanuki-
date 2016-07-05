@@ -62,16 +62,16 @@ namespace
     void Finalize(int num_mini_batches, T& eval_weight);
   };
 
+
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
   constexpr WeightType kLearningRate = 0.1;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kWriteEvalPerPosition = 10000000;  // 1千万
-  constexpr int64_t kMaxPositionsForErrorMeasurement = 10000000;  // 1千万
-  constexpr int64_t kMaxPositionsForLearning = 100000000;  // 1億
-  constexpr int64_t kMiniBatchSize = 100000;  //10万
+  constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;  // 1千万
+  constexpr int64_t kMaxPositionsForLearning = 1'0000'0000LL;  // 100億
+  constexpr int64_t kMiniBatchSize = 10'0000LL;  //10万
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -154,7 +154,7 @@ namespace
     // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
     WeightType mm = m / (1.0 - adam_beta1_t);
     WeightType vv = v / (1.0 - adam_beta2_t);
-    WeightType delta = kLearningRate * mm / (sqrt(vv) + kEps);
+    WeightType delta = kLearningRate * mm / (std::sqrt(vv) + kEps);
     w += delta;
 
     // 平均化確率的勾配降下法
@@ -323,6 +323,30 @@ void Learner::learn(std::istringstream& iss)
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
+  std::vector<int64_t> write_eval_per_positions = {
+      9999'9999'9999LL,
+      20'0000LL,
+      40'0000LL,
+      60'0000LL,
+      80'0000LL,
+      100'0000LL,
+      200'0000LL,
+      400'0000LL,
+      600'0000LL,
+      800'0000LL,
+      1000'0000LL,
+      2000'0000LL,
+      4000'0000LL,
+      6000'0000LL,
+      8000'0000LL,
+      1'0000'0000LL,
+  };
+  for (int64_t write_eval_per_position = 1'0000'0000LL; write_eval_per_position < kMaxPositionsForLearning; write_eval_per_position += 1'0000'0000LL) {
+      write_eval_per_positions.push_back(write_eval_per_position);
+  }
+  std::sort(write_eval_per_positions.begin(), write_eval_per_positions.end());
+  int write_eval_per_positions_index = 0;
+
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
@@ -378,15 +402,11 @@ void Learner::learn(std::istringstream& iss)
   limits.silent = true;
   Search::Limits = limits;
 
-  int64_t next_num_processed_position = kWriteEvalPerPosition;
-
   // 作成・破棄のコストが高いためループの外に宣言する
   std::vector<Record> records;
 
   // 全学習データに対してループを回す
   auto start = std::chrono::system_clock::now();
-  double adam_beta1_t = 1.0;
-  double adam_beta2_t = 1.0;
   int num_mini_batches = 0;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
     // 残り時間表示
@@ -409,10 +429,6 @@ void Learner::learn(std::istringstream& iss)
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
     }
-
-    adam_beta1_t *= kAdamBeta1;
-    adam_beta2_t *= kAdamBeta2;
-    ++num_mini_batches;
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
@@ -483,8 +499,8 @@ void Learner::learn(std::istringstream& iss)
           weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
           // KPP
-          Eval::BonaPiece p0w = std::min(k0, l0);
-          Eval::BonaPiece p1w = std::max(k0, l0);
+          Eval::BonaPiece p0w = std::min(k1, l1);
+          Eval::BonaPiece p1w = std::max(k1, l1);
           weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
           weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
         }
@@ -498,6 +514,10 @@ void Learner::learn(std::istringstream& iss)
     }
 
     // 重みを更新する
+    ++num_mini_batches;
+    double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
+    double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
+
     // 並列化を効かせたいのでdimension_indexで回す
 #pragma omp parallel for
     for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
@@ -545,9 +565,9 @@ void Learner::learn(std::istringstream& iss)
 
     num_processed_positions += num_records;
 
-    if (next_num_processed_position <= num_processed_positions) {
+    if (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
       save_eval(output_folder_path_base, num_processed_positions);
-      next_num_processed_position += kWriteEvalPerPosition;
+      ++write_eval_per_positions_index;
     }
   }
 
@@ -674,7 +694,13 @@ void Learner::error_measurement()
         continue;
       }
 
+#if 1
       double diff = record_value - value;
+#elif 0
+      double diff = winning_percentage(record_value) - winning_percentage(value);
+#else
+      static_assert(false, "Choose an error function.");
+#endif
       sum_error += diff * diff;
       sum_norm += abs(value);
     }
