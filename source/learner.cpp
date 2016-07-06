@@ -67,10 +67,10 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kLearningRate = 0.1;
+  constexpr WeightType kLearningRate = 1.0;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;  // 1ç–œ
-  constexpr int64_t kMaxPositionsForLearning = 1'0000'0000LL;  // 100‰­
+  constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;  // 100‰­
   constexpr int64_t kMiniBatchSize = 10'0000LL;  //10–œ
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
@@ -155,7 +155,7 @@ namespace
     WeightType mm = m / (1.0 - adam_beta1_t);
     WeightType vv = v / (1.0 - adam_beta2_t);
     WeightType delta = kLearningRate * mm / (std::sqrt(vv) + kEps);
-    w += delta;
+    w -= delta;
 
     // •½‹Ï‰»Šm—¦“IŒù”z~‰º–@
     sum_w += w;
@@ -303,6 +303,58 @@ namespace
     _mkdir(buffer);
     Eval::save_eval();
   }
+
+  // ‘¹¸ŠÖ”
+#if 1
+  // •]‰¿’l‚Ì·‚Ì“ñæ˜a
+  WeightType CalculateGradient(Value record_value, Value value) {
+      return static_cast<WeightType>((value - record_value) * kFvScale);
+  }
+
+  WeightType CalculateError(Value record_value, Value value) {
+      WeightType diff = value - record_value;
+      return diff * diff;
+  }
+
+  WeightType CalculateMeanError(WeightType sum_error) {
+      return sqrt(sum_error / kMaxPositionsForErrorMeasurement);
+  }
+#elif 0
+  // •]‰¿’l‚©‚ç„’è‚µ‚½Ÿ—¦‚Ì·‚Ì“ñæ˜a
+  WeightType CalculateGradient(Value record_value, Value value) {
+      double p = winning_percentage(record_value);
+      double q = winning_percentage(value);
+      return (q - p) * dsigmoid(static_cast<int>(value) / 600.0);
+  }
+
+  WeightType CalculateError(Value record_value, Value value) {
+      WeightType diff = winning_percentage(value) - winning_percentage(record_value);
+      return diff * diff;
+  }
+
+  WeightType CalculateMeanError(WeightType sum_error) {
+      return sqrt(sum_error / kMaxPositionsForErrorMeasurement);
+  }
+#elif 0
+  // •]‰¿’l‚©‚ç„’è‚µ‚½Ÿ—¦‚Ì•ª•z‚ÌŒğ·ƒGƒ“ƒgƒƒs[
+  WeightType CalculateGradient(Value record_value, Value value) {
+      double p = winning_percentage(record_value);
+      double q = winning_percentage(value);
+      return q - p;
+  }
+
+  WeightType CalculateError(Value record_value, Value value) {
+      double p = winning_percentage(record_value);
+      double q = winning_percentage(value);
+      return -p * std::log(q) - (1.0 - p) * std::log(1.0 - q);
+  }
+
+  WeightType CalculateMeanError(WeightType sum_error) {
+      return sum_error / kMaxPositionsForErrorMeasurement;
+  }
+#else
+  static_assert(false, "Select a loss function.");
+#endif
 }
 
 void Learner::learn(std::istringstream& iss)
@@ -324,7 +376,7 @@ void Learner::learn(std::istringstream& iss)
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   std::vector<int64_t> write_eval_per_positions = {
-      9999'9999'9999LL,
+      std::numeric_limits<int64_t>::max(),
       20'0000LL,
       40'0000LL,
       60'0000LL,
@@ -340,10 +392,21 @@ void Learner::learn(std::istringstream& iss)
       6000'0000LL,
       8000'0000LL,
       1'0000'0000LL,
+      2'0000'0000LL,
+      4'0000'0000LL,
+      6'0000'0000LL,
+      8'0000'0000LL,
+      10'0000'0000LL,
+      20'0000'0000LL,
+      30'0000'0000LL,
+      40'0000'0000LL,
+      50'0000'0000LL,
+      60'0000'0000LL,
+      70'0000'0000LL,
+      80'0000'0000LL,
+      90'0000'0000LL,
+      100'0000'0000LL,
   };
-  for (int64_t write_eval_per_position = 1'0000'0000LL; write_eval_per_position < kMaxPositionsForLearning; write_eval_per_position += 1'0000'0000LL) {
-      write_eval_per_positions.push_back(write_eval_per_position);
-  }
   std::sort(write_eval_per_positions.begin(), write_eval_per_positions.end());
   int write_eval_per_positions_index = 0;
 
@@ -455,17 +518,7 @@ void Learner::learn(std::istringstream& iss)
         continue;
       }
 
-#if 1
-      // [‚¢’Tõ‚Ì•]‰¿’l‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
-      WeightType delta = static_cast<WeightType>((record_value - value) * kFvScale);
-#elif 0
-      // [‚¢[‚³‚Ì•]‰¿’l‚©‚ç‹‚ß‚½Ÿ—¦‚Æó‚¢’Tõ‚Ì•]‰¿’l‚Ì“ñæŒë·‚ğÅ¬‚É‚·‚é
-      double y = static_cast<int>(record_value) / 600.0;
-      double t = static_cast<int>(value) / 600.0;
-      WeightType delta = (sigmoid(y) - sigmoid(t)) * dsigmoid(y);
-#else
-      static_assert(false, "Choose a loss function.");
-#endif
+      WeightType delta = CalculateGradient(record_value, value);
       // æè‚©‚çŒ©‚½•]‰¿’l‚Ì·•ªBsum.p[?][0]‚É‘«‚µ‚½‚èˆø‚¢‚½‚è‚·‚éB
       WeightType delta_color = (rootColor == BLACK ? delta : -delta);
       // è”Ô‚©‚çŒ©‚½•]‰¿’l‚Ì·•ªBsum.p[?][1]‚É‘«‚µ‚½‚èˆø‚¢‚½‚è‚·‚éB
@@ -694,14 +747,7 @@ void Learner::error_measurement()
         continue;
       }
 
-#if 1
-      double diff = record_value - value;
-#elif 0
-      double diff = winning_percentage(record_value) - winning_percentage(value);
-#else
-      static_assert(false, "Choose an error function.");
-#endif
-      sum_error += diff * diff;
+      sum_error += CalculateError(record_value, value);
       sum_norm += abs(value);
     }
 
@@ -710,7 +756,7 @@ void Learner::error_measurement()
 
   printf(
     "info string mse=%f norm=%f\n",
-    sqrt(sum_error / kMaxPositionsForErrorMeasurement),
+    CalculateMeanError(sum_error),
     sum_norm / kMaxPositionsForErrorMeasurement);
 }
 
