@@ -165,7 +165,16 @@ namespace USI
           bool found;
           auto tte = TT.probe(pos.state()->key(), found);
           ply++;
-          moves[ply] = found ? pos.move16_to_move(tte->move()) : MOVE_NONE;
+          if (found)
+          {
+            // 置換表にはpsudo_legalではない指し手が含まれるのでそれを弾く。
+            Move m = pos.move16_to_move(tte->move());
+            if (pos.pseudo_legal(m))
+              moves[ply] = m;
+            else
+              moves[ply] = MOVE_NONE;
+          } else
+            moves[ply] = MOVE_NONE;
         }
         while (ply > 0)
           pos_->undo_move(moves[--ply]);
@@ -245,6 +254,7 @@ namespace USI
 #endif
 
     o["EvalDir"] << Option("eval");
+    o["KifuDir"] << Option("kifu");
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
@@ -664,6 +674,10 @@ void USI::loop(int argc,char* argv[])
     }
     else if (token == "error_measurement" || token == "e") {
       Learner::error_measurement();
+      break;
+    }
+    else if (token == "kifu_reader_benchmark") {
+      Learner::kifu_reader_benchmark();
       break;
     }
     ;

@@ -940,11 +940,11 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 #ifdef EVAL_KPP
   // KPPのとき差分計算は遅延させるのでここではKPPの値を未計算であることを意味するINT_MAXを代入しておく。
   // これVALUNE_NONEにするとsumKKPが32bitなので偶然一致することがある。
-  st->sumKKP = INT_MAX;
+  st->sumKKP = VALUE_NOT_EVALUATED;
 #endif
-#ifdef EVAL_KPPT
+#if defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST)
   // 上と同じ意味。
-  st->sum.p[2][0] = INT_MAX;
+  st->sum.p[0][0] = VALUE_NOT_EVALUATED;
 #endif
 
   // 直前の指し手を保存するならばここで行なう。
@@ -1341,8 +1341,11 @@ void Position::do_null_move(StateInfo& newSt) {
 
   st->board_key_ ^= Zobrist::side;
 
-  // このタイミングでアドレスが確定するのでprefetchしたほうが良い。
-  prefetch(TT.first_entry(st->key()));
+  // このタイミングでアドレスが確定するのでprefetchしたほうが良い。(かも)
+  // →　将棋では評価関数の計算時のメモリ帯域がボトルネックになって、ここでprefetchしても
+  // 　prefetchのスケジューラーが処理しきれない可能性が…。
+
+  // prefetch(TT.first_entry(st->key()));
 
   st->pliesFromNull = 0;
 

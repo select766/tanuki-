@@ -267,6 +267,9 @@
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp">
       <Filter>リソース ファイル\engine\help-mate-engine</Filter>
     </ClCompile>
+    <ClCompile Include="eval\evaluate_kppt_fast.cpp">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
@@ -316,9 +319,6 @@
     </Text>
     <Text Include="..\docs\old\更新履歴2016Q2まで.txt">
       <Filter>doc\old</Filter>
-    </Text>
-    <Text Include="..\docs\ToDoのリスト.txt">
-      <Filter>doc</Filter>
     </Text>
     <Text Include="..\exe\YaneuraOu-2016-mid.txt">
       <Filter>exe</Filter>

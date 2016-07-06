@@ -22,7 +22,9 @@ LOCAL_GAME_SERVER_TXT_TEMPLATE = '''setoption name Threads value 1
 go btime 1
 '''
 ERROR_MEASUREMENT_TXT_FILE_NAME = 'Yaneuraou-error-measurement.txt'
-ERROR_MEASUREMENT_TXT_TEMPLATE = '''setoption name EvalDir value {0}
+ERROR_MEASUREMENT_TXT_TEMPLATE = '''setoption name Threads value 8
+setoption name EvalDir value {0}
+setoption name KifuDir value kifu_for_test
 setoption name KifuDir value kifu_for_test
 setoption name Threads value 48
 error_measurement

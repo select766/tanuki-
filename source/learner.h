@@ -7,6 +7,7 @@ namespace Learner
 {
   void learn(std::istringstream& iss);
   void error_measurement();
+  void kifu_reader_benchmark();
 }
 
 #endif

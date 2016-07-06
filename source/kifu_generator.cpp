@@ -13,13 +13,19 @@
 
 using Search::RootMove;
 
+namespace Learner
+{
+  std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
+  std::pair<Value, std::vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
+}
+
 namespace
 {
   constexpr int kNumGames = 100000000;
-  constexpr char* kOutputFilePathFormat =
-    "kifu/kifu.2016-06-12.3.100000000.%03d.csv";
+  constexpr char* kOutputFileNameFormat =
+    "kifu.2016-06-29.3.100000000.%03d.csv";
   constexpr char* kBookFileName = "book.sfen";
-  constexpr int kMinBookMove = 0;
+  constexpr int kMinBookMove = 32;
   constexpr int kMaxBookMove = 32;
   constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
@@ -223,24 +229,20 @@ namespace
           }
         }
 
-        thread.rootMoves.clear();
-        for (auto m : MoveList<LEGAL>(pos)) {
-          thread.rootMoves.push_back(RootMove(m));
-        }
-
-        if (thread.rootMoves.empty()) {
-          break;
-        }
-        thread.maxPly = 0;
-        thread.rootDepth = 0;
         pos.set_this_thread(&thread);
-
-        //std::cerr << pos << std::endl;
-
-        thread.Thread::search();
+        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, kSearchDepth);
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-        Value value = thread.rootMoves[0].score;
+        Value value = valueAndPv.first;
+        if (value < -VALUE_MATE) {
+          // 詰みの局面なので書き出さない
+          break;
+        }
+
+        const std::vector<Move>& pv = valueAndPv.second;
+        if (pv.empty()) {
+          break;
+        }
 
         // 局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
@@ -248,7 +250,7 @@ namespace
         }
 
         SetupStates->push(StateInfo());
-        pos.do_move(thread.rootMoves[0].pv[0], SetupStates->top());
+        pos.do_move(pv[0], SetupStates->top());
       }
     }
   }
@@ -263,11 +265,11 @@ void Learner::GenerateKifu()
     return;
   }
 
-  kifu_writer = std::make_unique<Learner::KifuWriter>(kOutputFilePathFormat);
+  std::string output_file_path_format =
+      (std::string)Options["KifuDir"] + "/" + kOutputFileNameFormat;
+  kifu_writer = std::make_unique<Learner::KifuWriter>(output_file_path_format);
 
   Eval::load_eval();
-
-  Options["Hash"] = 1024;
 
   Search::LimitsType limits;
   limits.max_game_ply = kMaxGamePlay;

@@ -7,7 +7,7 @@
 //
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列
-#define ENGINE_VERSION "3.23"
+#define ENGINE_VERSION "3.27"
 
 // --------------------
 // コンパイル時の設定
@@ -30,7 +30,7 @@
 //#define YANEURAOU_MINI_ENGINE        // やねうら王mini        (完成2016/02/29)
 //#define YANEURAOU_CLASSIC_ENGINE     // やねうら王classic     (完成2016/04/03)
 //#define YANEURAOU_CLASSIC_TCE_ENGINE // やねうら王classic tce (完成2016/04/15)
-#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (完成2016/06/24)
+#define YANEURAOU_2016_MID_ENGINE    // やねうら王2016(MID)   (完成2016/06/28)
 //#define YANEURAOU_2016_LATE_ENGINE   // やねうら王2016(LATE)  (開発中)
 //#define RANDOM_PLAYER_ENGINE         // ランダムプレイヤー
 //#define MATE_ENGINE                  // 詰め将棋solverとしてリリースする場合。(開発中)
@@ -210,6 +210,9 @@ inline bool canPromote(const Color c, const Square from, const Square to)
 // 盤面を180°回したときの升目を返す
 inline Square Inv(Square sq) { return (Square)((SQ_NB - 1) - sq); }
 
+// 盤面をミラーしたときの升目を返す
+inline Square Mir(Square sq) { return File(8-file_of(sq)) | rank_of(sq); }
+
 // Squareを綺麗に出力する(USI形式ではない)
 // "PRETTY_JP"をdefineしていれば、日本語文字での表示になる。例 → ８八
 // "PRETTY_JP"をdefineしていなければ、数字のみの表示になる。例 → 88
@@ -247,7 +250,7 @@ enum SquareWithWall : int32_t {
 };
 
 // 型変換。下位8bit == Square
-inline Square to_sq(SquareWithWall sqww) { return Square(sqww & 0xff); }
+inline Square sqww_to_sq(SquareWithWall sqww) { return Square(sqww & 0xff); }
 
 extern SquareWithWall sqww_table[SQ_NB_PLUS1];
 
@@ -258,7 +261,7 @@ inline SquareWithWall to_sqww(Square sq) { return sqww_table[sq]; }
 inline bool is_ok(SquareWithWall sqww) { return (sqww & SQWW_BORROW_MASK) == 0; }
 
 // 単にSQの升を出力する。
-inline std::ostream& operator<<(std::ostream& os, SquareWithWall sqww) { os << to_sq(sqww); return os; }
+inline std::ostream& operator<<(std::ostream& os, SquareWithWall sqww) { os << sqww_to_sq(sqww); return os; }
 
 // --------------------
 //        方角
@@ -390,6 +393,9 @@ enum Value : int32_t
 
   // 評価関数の返す値の最大値(2**14ぐらいに収まっていて欲しいところだが..)
   VALUE_MAX_EVAL             = 25000,
+
+  // 評価関数がまだ呼び出されていないということを示すのに使う特殊な定数
+  VALUE_NOT_EVALUATED        = 32003,
 };
 
 // ply手で詰ませるときのスコア
@@ -513,8 +519,9 @@ constexpr Square move_from(Move m) {
   // ↑これを入れたいが、constexprにできなくなるのでやめておく。
   return Square((m >> 7) & 0x7f); }
   
-// 指し手の移動先の升を返す
+// 指し手の移動先の升を返す。to_sq()はStockfishとの互換性を高めるためのalias。
 constexpr Square move_to(Move m) { return Square(m & 0x7f); }
+constexpr Square to_sq(Move m) { return Square(m & 0x7f); }
 
 // 指し手が駒打ちか？
 constexpr bool is_drop(Move m){ return (m & MOVE_DROP)!=0; }
@@ -788,9 +795,18 @@ inline Value draw_value(RepetitionState rs, Color c) { ASSERT_LV3(is_ok(rs)); re
 //      評価関数
 // --------------------
 
-namespace Eval {
-  enum BonaPiece : int32_t;
+namespace Eval
+{
+#ifndef EVAL_KPPT_FAST
+  enum BonaPiece: int16_t;
+#else
+  enum BonaPiece: int32_t;
+#endif
 
+  // 評価関数本体。
+  // 戻り値は、
+  //  abs(value) < VALUE_MAX_EVAL
+  // を満たす。
   Value evaluate(const Position& pos);
 }
 

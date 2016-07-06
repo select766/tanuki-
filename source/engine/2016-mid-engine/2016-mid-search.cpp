@@ -65,6 +65,9 @@ using namespace std;
 using namespace Search;
 using namespace Eval;
 
+// 定跡ファイル名
+string book_name;
+
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
@@ -89,6 +92,18 @@ void USI::extra_option(USI::OptionsMap & o)
   //  PVの出力の抑制のために前回出力時間からの間隔を指定できる。
 
   o["PvInterval"] << Option(300, 0, 100000);
+
+
+  // 定跡ファイル名
+
+  //  standard_book.db 標準定跡
+  //  yaneura_book1.db やねうら定跡1(公開用1)
+  //  yaneura_book2.db やねうら定跡2(公開用2)
+  //  yaneura_book3.db やねうら定跡3(大会用)
+
+  std::vector<std::string> book_list = { "standard_book.db", "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db" };
+  o["BookFile"] << Option(book_list, book_list[0], [](auto& o) { book_name = o; });
+  book_name = book_list[0];
 
 }
 
@@ -287,7 +302,7 @@ namespace YaneuraOu2016Mid
     Value bonus = Value((depth / ONE_PLY) * (depth / ONE_PLY) + 2 * depth / ONE_PLY - 2);
 
     // 直前に移動させた升(その升に移動させた駒がある。今回の指し手はcaptureではないはずなので)
-    Square prevSq = move_to((ss - 1)->currentMove);
+    Square prevSq = to_sq((ss - 1)->currentMove);
 
     // Moveのなかに移動後の駒が格納されているからそれを取り出すだけ。
     Piece prevPc = pos.moved_piece_after((ss - 1)->currentMove);
@@ -303,7 +318,7 @@ namespace YaneuraOu2016Mid
     // 今回のmoveで動かした局面ではないので、pos.piece_on()では移動後の駒は得られないが、
     // moveの上位16bitに移動させたあとの駒が入っているので、それをmoved_piece_after()で取り出す。
 
-    Square mto = move_to(move);
+    Square mto = to_sq(move);
     Piece mpc = pos.moved_piece_after(move);
 
     thisThread->history.update(mpc, mto, bonus);
@@ -323,7 +338,7 @@ namespace YaneuraOu2016Mid
     // このnodeのベストの指し手以外の指し手はボーナス分を減らす
     for (int i = 0; i < quietsCnt; ++i)
     {
-      Square qto = move_to(quiets[i]);
+      Square qto = to_sq(quiets[i]);
       Piece qpc = pos.moved_piece_after(quiets[i]);
 
       thisThread->history.update(qpc, qto , -bonus);
@@ -592,7 +607,7 @@ namespace YaneuraOu2016Mid
     // 取り合いの指し手だけ生成する
     // searchから呼び出された場合、直前の指し手がMOVE_NULLであることがありうるが、
     // 静止探索の1つ目の深さではrecaptureを生成しないならこれは問題とならない。
-    MovePicker mp(pos, ttMove, depth, move_to((ss - 1)->currentMove));
+    MovePicker mp(pos, ttMove, depth, to_sq((ss - 1)->currentMove));
     Move move;
     Value value;
 
@@ -604,6 +619,8 @@ namespace YaneuraOu2016Mid
 
     while ((move = mp.next_move()) != MOVE_NONE)
     {
+      // MovePickerで生成された指し手はpseudo_legalであるはず。
+      ASSERT_LV3(pos.pseudo_legal(move));
 
       // -----------------------
       //  局面を進める前の枝刈り
@@ -626,7 +643,7 @@ namespace YaneuraOu2016Mid
       {
         // moveが成りの指し手なら、その成ることによる価値上昇分もここに乗せたほうが正しい見積りになる。
 
-        Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(move_to(move))]
+        Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(to_sq(move))]
           + (is_promote(move) ? (Value)ProDiffPieceValue[pos.piece_on(move_from(move))]  : VALUE_ZERO) ;
 
         // futilityValueは今回捕獲するであろう駒の価値の分を上乗せしているのに
@@ -744,7 +761,10 @@ namespace YaneuraOu2016Mid
     }
 
     // 置換表には abs(value) < VALUE_INFINITEの値しか書き込まないし、この関数もこの範囲の値しか返さない。
-    ASSERT_LV3(-VALUE_INFINITE < bestValue && bestValue < VALUE_INFINITE);
+    // このassertを書くべきだし、Stockfishではこのassertが書かれているが、
+    // このnodeはrootからss->ply手進めた局面なのでここでss->plyより短い詰みがあるのはおかしい。
+    // この事実を利用したほうが、より厳しいassertが書ける。
+    ASSERT_LV3(abs(bestValue) <= mate_in(ss->ply));
 
     return bestValue;
   }
@@ -1172,10 +1192,13 @@ namespace YaneuraOu2016Mid
       MovePicker mp(pos, ttMove, (Value)Eval::CapturePieceValue[pos.captured_piece_type()]);
 
       while ((move = mp.next_move()) != MOVE_NONE)
+      {
+        ASSERT_LV3(pos.pseudo_legal(move));
+
         if (pos.legal(move))
         {
           ss->currentMove = move;
-          ss->counterMoves = &CounterMoveHistory[move_to(move)][pos.moved_piece_after(move)];
+          ss->counterMoves = &CounterMoveHistory[to_sq(move)][pos.moved_piece_after(move)];
 
           pos.do_move(move, st, pos.gives_check(move));
           value = -search<NonPV>(pos, ss + 1, -rbeta, -rbeta + 1, rdepth, !cutNode);
@@ -1183,6 +1206,7 @@ namespace YaneuraOu2016Mid
           if (value >= rbeta)
             return value;
         }
+      }
     }
 
     //
@@ -1399,7 +1423,7 @@ namespace YaneuraOu2016Mid
 
 
       // このあと、この指し手のhistoryの値などを調べたいのでいま求めてしまう。
-      Square moved_sq = move_to(move);
+      Square moved_sq = to_sq(move);
       Piece moved_pc = pos.moved_piece_after(move);
 
       if (!RootNode
@@ -1497,21 +1521,26 @@ namespace YaneuraOu2016Mid
           r += 2 * ONE_PLY;
 
 #if 0
+
         // 捕獲から逃れる指し手はreduction量を減らす。
-        // ※　捕獲から逃れる = この移動先にある駒で移動元の駒が取れる。
-        //    すなわち、moveのfromとtoを入れ替えて、その指し手でsee_sign() < 0
+
+        // do_moveしたあとなのでtoの位置には今回移動させた駒が来ている。
+        // fromの位置は空(NO_PIECE)の升となっている。
+
+        // 例えばtoの位置に金があるとして、これをfromに動かす。
+        // 仮にこれが歩で取られるならsee() < 0 となる。
+
+        // ただ、KPPT型の評価関数では駒の当たりは評価されているので
+        // ここでreduction量を減らすのはあまり良くない。
+        // see()のコストが割にあわない。このコードは使わないほうがいいはず。
+
         else if (!is_drop(move) // type_of(move)== NORMAL
-//        && type_of(pos.piece_on(move_to(move))) != PAWN
-          // →　captureOrPawnPromotionではないので、移動先に歩があるはずはないが
-          // StockfishではPAWNの捕獲はcapture moveではないのかも。
+          && type_of(pos.piece_on(to_sq(move))) != PAWN
 
-          // toの升はNO_PIECEであり、そこに価値のない駒が置かれていると考える。
-          // その駒でfromの駒を取ったときに取り返せないかを判定。
-
-          // see_sign()だと、toの升の駒(NO_PIECE)でfromの升の駒を取るから
+          // see_sign()だと、toの升の駒でfromの升の駒(NO_PIECE)を取るから
           // 必ず正になってしまうため、see_sign()ではなくsee()を用いる。
 
-          && pos.see(make_move(move_to(move), move_from(move))) < VALUE_ZERO)
+          && pos.see(make_move(to_sq(move), move_from(move))) < VALUE_ZERO)
           r -= 2 * ONE_PLY;
 #endif
 
@@ -1709,7 +1738,7 @@ namespace YaneuraOu2016Mid
       && !pos.captured_piece_type()
       && is_ok((ss - 1)->currentMove))
     {
-      const Square prevSq = move_to((ss - 1)->currentMove);
+      const Square prevSq = to_sq((ss - 1)->currentMove);
 
       // 指し手のなかに移動後の駒が格納されているのでこれで取得できる。
       Piece prevPc = pos.moved_piece_after((ss - 1)->currentMove);
@@ -1909,12 +1938,7 @@ void Search::clear()
   // -----------------------
   //   定跡の読み込み
   // -----------------------
-  static bool first = true;
-  if (first)
-  {
-    Book::read_book("book/standard_book.db", book);
-    first = false;
-  }
+  Book::read_book("book/" + book_name, book);
 
   // -----------------------
   //   置換表のクリアなど
@@ -2521,7 +2545,9 @@ namespace Learner
   // のようにすべし。
   // v.firstに評価値、v.secondにPVが得られる。
 
-  pair<Value, vector<Move> > search(Position& pos, Value alpha, Value beta, int depth)
+  // MultiPVが有効のときは、pos.this_thread()->rootMoves[N].pvにそのPV(読み筋)の配列が得られる。
+
+  pair<Value, vector<Move> > search(Position& pos, Value alpha , Value beta , int depth)
   {
     Stack stack[MAX_PLY + 7], *ss = stack + 5;
     memset(ss - 5, 0, 8 * sizeof(Stack));
@@ -2529,16 +2555,59 @@ namespace Learner
     init_for_search(pos);
     auto th = pos.this_thread();
 
-    Value bestValue;
-    while (++th->rootDepth <= depth)
+    auto& rootDepth = th->rootDepth;
+    auto& PVIdx = th->PVIdx;
+    auto& rootMoves = th->rootMoves;
+
+    Value bestValue, delta;
+    bestValue = delta = -VALUE_INFINITE;
+
+    // bestmoveとしてしこの局面の上位N個を探索する機能
+    size_t multiPV = Options["MultiPV"];
+    // この局面での指し手の数を上回ってはいけない
+    multiPV = std::min(multiPV, rootMoves.size());
+
+    while (++rootDepth <= depth)
     {
-      bestValue = YaneuraOu2016Mid::search<PV>(pos, ss, alpha, beta, th->rootDepth * ONE_PLY, false);
-      std::stable_sort(th->rootMoves.begin(), th->rootMoves.end());
+
+      // MultiPVのためにこの局面の候補手をN個選出する。
+      for (PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx)
+      {
+        // aspiration search
+        if (rootDepth >= 5)
+        {
+          delta = Value(18);
+          alpha = std::max(rootMoves[PVIdx].previousScore - delta, -VALUE_INFINITE);
+          beta = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
+        }
+
+        while (true)
+        {
+          bestValue = YaneuraOu2016Mid::search<PV>(pos, ss, alpha, beta, rootDepth * ONE_PLY, false);
+          std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
+
+          if (bestValue <= alpha)
+          {
+            beta = (alpha + beta) / 2;
+            alpha = std::max(bestValue - delta, -VALUE_INFINITE);
+          } else if (bestValue >= beta)
+          {
+            alpha = (alpha + beta) / 2;
+            beta = std::min(bestValue + delta, VALUE_INFINITE);
+          } else {
+            break;
+          }
+          delta += delta / 4 + 5;
+
+          ASSERT_LV3(-VALUE_INFINITE <= alpha && beta <= VALUE_INFINITE);
+        }
+        std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
+      } // multi PV
     }
 
     // このPV、途中でNULL_MOVEの可能性があるかも知れないので排除するためにis_ok()を通す。
     vector<Move> pvs;
-    for (Move move : th->rootMoves[0].pv)
+    for (Move move : rootMoves[0].pv)
     {
       if (!is_ok(move))
         break;
