@@ -1,2 +1,2 @@
-setoption name Threads value 1
-go btime 1
+setoption name Threads value 12
+go btime 100
