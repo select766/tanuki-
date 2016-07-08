@@ -331,7 +331,7 @@ namespace
   WeightType CalculateError(Value record_value, Value value) {
       double p = winning_percentage(record_value);
       double q = winning_percentage(value);
-      return -p * std::log(q) - (1.0 - p) * std::log(1.0 - q);
+      return -p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps);
   }
 
   WeightType CalculateMeanError(WeightType sum_error) {
