@@ -57,7 +57,8 @@ namespace
 
     void AddGradient(double gradient);
     template<typename T>
-    void UpdateWeight(double adam_beta1_t, double adam_beta2_t, T& eval_weight);
+    void UpdateWeight(
+        double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight);
     template<typename T>
     void Finalize(int num_mini_batches, T& eval_weight);
   };
@@ -67,7 +68,9 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kLearningRate = 1.0;
+  constexpr WeightType kInitialLearningRate = 1.0;
+  constexpr WeightType kLearningRateDecayRate = 0.5;
+  constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;  // 5億
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;  // 1千万
   constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;  // 100億
@@ -147,14 +150,14 @@ namespace
   }
 
   template<typename T>
-  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, T& eval_weight) {
+  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
     // Adam
     m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient;
     v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient * sum_gradient;
     // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
     WeightType mm = m / (1.0 - adam_beta1_t);
     WeightType vv = v / (1.0 - adam_beta2_t);
-    WeightType delta = kLearningRate * mm / (std::sqrt(vv) + kEps);
+    WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
     w -= delta;
 
     // 平均化確率的勾配降下法
@@ -471,6 +474,8 @@ void Learner::learn(std::istringstream& iss)
   // 全学習データに対してループを回す
   auto start = std::chrono::system_clock::now();
   int num_mini_batches = 0;
+  double learning_rate = kInitialLearningRate;
+  int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
     // 残り時間表示
     if (num_processed_positions) {
@@ -586,8 +591,8 @@ void Learner::learn(std::istringstream& iss)
           continue;
         }
         
-        weights[KppIndexToRawIndex(k, p0, p1, weight_kind)]
-          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kpp[k][p0][p1][weight_kind]);
+        weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].UpdateWeight(
+            adam_beta1_t, adam_beta2_t, learning_rate, Eval::kpp[k][p0][p1][weight_kind]);
         Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
 
       }
@@ -597,8 +602,8 @@ void Learner::learn(std::istringstream& iss)
         Eval::BonaPiece p;
         WeightKind weight_kind;
         RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-        weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)]
-          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kkp[k0][k1][p][weight_kind]);
+        weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].UpdateWeight(
+            adam_beta1_t, adam_beta2_t, learning_rate, Eval::kkp[k0][k1][p][weight_kind]);
 
       }
       else if (IsKkIndex(dimension_index)) {
@@ -606,8 +611,8 @@ void Learner::learn(std::istringstream& iss)
         Square k1;
         WeightKind weight_kind;
         RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-        weights[KkIndexToRawIndex(k0, k1, weight_kind)]
-          .UpdateWeight(adam_beta1_t, adam_beta2_t, Eval::kk[k0][k1][weight_kind]);
+        weights[KkIndexToRawIndex(k0, k1, weight_kind)].UpdateWeight(
+            adam_beta1_t, adam_beta2_t, learning_rate, Eval::kk[k0][k1][weight_kind]);
 
       }
       else {
@@ -621,6 +626,12 @@ void Learner::learn(std::istringstream& iss)
     if (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
       save_eval(output_folder_path_base, num_processed_positions);
       ++write_eval_per_positions_index;
+    }
+
+    if (num_processed_positions >= next_record_index_to_decay_learning_rate) {
+        learning_rate *= kLearningRateDecayRate;
+        next_record_index_to_decay_learning_rate += kNumPositionsToDecayLearningRate;
+        printf("Decayed the learning rate: learning_rate=%f\n", learning_rate);
     }
   }
 
