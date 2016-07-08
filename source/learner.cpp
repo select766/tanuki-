@@ -198,40 +198,22 @@ namespace
 #elif 1
     // 0手読み+静止探索を行う場合
     auto valueAndPv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
-    value = valueAndPv.first;
 
-    // 静止した局面まで進める
+    // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+    // 全計算はPosition::set()の中で行われているので差分計算ができる
+    value = Eval::evaluate(pos);
     StateInfo stateInfo[MAX_PLY];
     const std::vector<Move>& pv = valueAndPv.second;
-    for (int play = 0; play < static_cast<int>(pv.size()); ++play) {
+    for (int play = 0; play < static_cast<int>(pv.size()) &&  pv[play] != MOVE_NONE; ++play) {
       pos.do_move(pv[play], stateInfo[play]);
+      value = Eval::evaluate(pos);
     }
 
-    // TODO(nodchip): extract_pv_from_tt()を実装して使う
-
-    // qsearch()の返した評価値とPVの末端の評価値が正しいかどうかを
-    // 調べる場合は以下をコメントアウトする
-
-    //// Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-    //// 全計算はPosition::set()の中で行われているので差分計算ができる
-    //Value value_pv = Eval::evaluate(pos);
-    //for (int play = 0; pv[play] != MOVE_NONE; ++play) {
-    //  pos.do_move(pv[play], stateInfo[play]);
-    //  value_pv = Eval::evaluate(pos);
-    //}
-
-    //// Eval::evaluate()は常に手番から見た評価値を返すので
-    //// 探索開始局面と手番が違う場合は符号を反転する
-    //if (root_color != pos.side_to_move()) {
-    //  value_pv = -value_pv;
-    //}
-
-    //// 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-    //// 処理に含めないようfalseを返す
-    //// 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-    //if (value != value_pv) {
-    //  return false;
-    //}
+    // Eval::evaluate()は常に手番から見た評価値を返すので
+    // 探索開始局面と手番が違う場合は符号を反転する
+    if (root_color != pos.side_to_move()) {
+      value = -value;
+    }
 
 #elif 0
     // 1手読み+静止探索を行う場合
