@@ -32,8 +32,6 @@ bool Learner::KifuReader::Read(int num_records, std::vector<Record>& records) {
 }
 
 bool Learner::KifuReader::Read(Record& record) {
-  std::string sfen;
-
   if (!EnsureOpen()) {
     return false;
   }
@@ -41,8 +39,7 @@ bool Learner::KifuReader::Read(Record& record) {
   if (record_index_ >= static_cast<int>(records_.size())) {
     records_.clear();
     while (records_.size() < kBatchSize) {
-      char line[1024];
-      if (!fgets(line, sizeof(line), file_)) {
+      if (std::fread(&record, sizeof(record), 1, file_) != 1) {
         // ファイルの終端に辿り着いた
         if (++file_index_ >= static_cast<int>(file_paths_.size())) {
           // ファイルリストの終端にたどり着いた
@@ -60,7 +57,7 @@ bool Learner::KifuReader::Read(Record& record) {
           sync_cout << "info string Failed to close a kifu file." << sync_endl;
         }
 
-        file_ = std::fopen(file_paths_[file_index_].c_str(), "rt");
+        file_ = std::fopen(file_paths_[file_index_].c_str(), "rb");
         if (!file_) {
           // ファイルを開くのに失敗したら
           // 読み込みを終了する
@@ -74,24 +71,19 @@ bool Learner::KifuReader::Read(Record& record) {
             << file_paths_[0] << sync_endl;
         }
 
-        if (!fgets(line, sizeof(line), file_)) {
+        if (std::fread(&record, sizeof(record), 1, file_) != 1) {
           // 空のファイルの場合はここに来る
           // とりあえずcontinueしてつぎのファイルを試す
           continue;
         }
       }
 
-      char* sfen_ptr = std::strtok(line, ",");
-      char* value_ptr = std::strtok(nullptr, ",");
-      int value = std::atoi(value_ptr);
-      if (abs(value) > kCloseOutValueThreshold) {
+      if (abs(record.value) > kCloseOutValueThreshold) {
         // 評価値の絶対値が大きすぎる場合は使用しない
         continue;
       }
 
-      records_.push_back({
-        sfen_ptr,
-        static_cast<Value>(value) });
+      records_.push_back(record);
     }
 
     std::random_shuffle(records_.begin(), records_.end());
@@ -151,7 +143,7 @@ bool Learner::KifuReader::EnsureOpen() {
 
   std::random_shuffle(file_paths_.begin(), file_paths_.end());
 
-  file_ = std::fopen(file_paths_[0].c_str(), "rt");
+  file_ = std::fopen(file_paths_[0].c_str(), "rb");
 
   if (!file_) {
     sync_cout << "into string Failed to open a kifu file: " << file_paths_[0]

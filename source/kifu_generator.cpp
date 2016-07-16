@@ -6,6 +6,7 @@
 #include <memory>
 #include <random>
 #include <sstream>
+#include <omp.h>
 
 #include "kifu_writer.h"
 #include "search.h"
@@ -21,9 +22,8 @@ namespace Learner
 
 namespace
 {
-  constexpr int kNumGames = 100000000;
-  constexpr char* kOutputFileNameFormat =
-    "kifu.2016-06-29.3.100000000.%03d.csv";
+  constexpr int kNumGames = 10'0000;
+  constexpr char* kOutputFileNameDate = "2016-07-16";
   constexpr char* kBookFileName = "book.sfen";
   constexpr int kMinBookMove = 32;
   constexpr int kMaxBookMove = 32;
@@ -32,12 +32,10 @@ namespace
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
 
-  std::atomic_int global_game_index = 0;
   std::vector<std::string> book;
   std::random_device random_device;
   std::mt19937_64 mt19937_64(random_device());
   std::uniform_int_distribution<> swap_distribution(0, 9);
-  std::unique_ptr<Learner::KifuWriter> kifu_writer;
   std::uniform_int_distribution<> num_book_move_distribution(kMinBookMove, kMaxBookMove);
 
   bool ReadBook()
@@ -65,19 +63,50 @@ namespace
     std::cout << std::endl;
     return true;
   }
+}
 
-  void GenerateKifuProcedure(int thread_id)
+void Learner::GenerateKifu()
+{
+  std::srand(std::time(nullptr));
+
+  // 定跡の読み込み
+  if (!ReadBook()) {
+    return;
+  }
+
+  Eval::load_eval();
+
+  Search::LimitsType limits;
+  limits.max_game_ply = kMaxGamePlay;
+  limits.depth = kSearchDepth;
+  limits.silent = true;
+  Search::Limits = limits;
+
+  auto start = std::chrono::system_clock::now();
+  ASSERT_LV3(book.size());
+  std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
+  // スレッド間で共有する
+  std::atomic_int global_game_index = 0;
+#pragma omp parallel
   {
-    auto start = std::chrono::system_clock::now();
-    ASSERT_LV3(book.size());
-    std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
-    for (int game_index = global_game_index++; game_index < kNumGames; game_index = global_game_index++)
-    {
-      if (game_index && game_index % 1000 == 0) {
+    int thread_index = ::omp_get_thread_num();
+    char output_file_path[1024];
+    std::sprintf(output_file_path, "%s/kifu.%s.%d.%d.%03d.bin",
+      ((std::string)Options["KifuDir"]).c_str(), kOutputFileNameDate, kSearchDepth, kNumGames,
+      thread_index);
+    // 各スレッドに持たせる
+    std::unique_ptr<Learner::KifuWriter> kifu_writer =
+      std::make_unique<Learner::KifuWriter>(output_file_path);
+
+#pragma omp for schedule(guided)
+    for (int game_index = 0; game_index < kNumGames; ++game_index) {
+      int current_game_index = global_game_index++;
+      if (current_game_index && current_game_index % 1000 == 0) {
         auto current = std::chrono::system_clock::now();
         auto elapsed = current - start;
-        double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / game_index * (kNumGames - game_index));
+        double elapsed_sec =
+          static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (kNumGames - current_game_index));
         int h = remaining_sec / 3600;
         int m = remaining_sec / 60 % 60;
         int s = remaining_sec % 60;
@@ -87,13 +116,14 @@ namespace
 
         time(&current_time);
         local_time = localtime(&current_time);
-        printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-          game_index, kNumGames,
+        std::printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+          current_game_index, kNumGames,
           local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
           local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+        std::fflush(stdout);
       }
 
-      Thread& thread = *Threads[thread_id];
+      Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;
       pos.set_hirate();
       auto SetupStates = Search::StateStackPtr(new aligned_stack<StateInfo>);
@@ -126,7 +156,6 @@ namespace
         // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
         if (swap_distribution(mt19937_64) == 0 &&
           pos.pos_is_ok() &&
-          !pos.mate1ply() &&
           !pos.is_mated() &&
           !pos.in_check() &&
           !pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
@@ -230,6 +259,9 @@ namespace
         }
 
         pos.set_this_thread(&thread);
+        if (pos.is_mated()) {
+          break;
+        }
         auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, kSearchDepth);
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
@@ -246,7 +278,10 @@ namespace
 
         // 局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
-          kifu_writer->Write(pos, value);
+          Learner::Record record;
+          pos.sfen_pack(record.packed);
+          record.value = value;
+          kifu_writer->Write(record);
         }
 
         SetupStates->push(StateInfo());
@@ -254,39 +289,4 @@ namespace
       }
     }
   }
-}
-
-void Learner::GenerateKifu()
-{
-  std::srand(std::time(nullptr));
-
-  // 定跡の読み込み
-  if (!ReadBook()) {
-    return;
-  }
-
-  std::string output_file_path_format =
-      (std::string)Options["KifuDir"] + "/" + kOutputFileNameFormat;
-  kifu_writer = std::make_unique<Learner::KifuWriter>(output_file_path_format);
-
-  Eval::load_eval();
-
-  Search::LimitsType limits;
-  limits.max_game_ply = kMaxGamePlay;
-  limits.depth = kSearchDepth;
-  limits.silent = true;
-  Search::Limits = limits;
-
-  //generate_procedure(0);
-
-  std::vector<std::thread> threads;
-  while (threads.size() < Options["Threads"]) {
-    int thread_id = static_cast<int>(threads.size());
-    threads.push_back(std::thread([thread_id] {GenerateKifuProcedure(thread_id); }));
-  }
-  for (auto& thread : threads) {
-    thread.join();
-  }
-
-  kifu_writer.reset();
 }

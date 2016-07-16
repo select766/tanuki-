@@ -1,28 +1,22 @@
 #ifndef _KIFU_WRITER_H_
 #define _KIFU_WRITER_H_
 
-#include <mutex>
-
+#include "experimental_learner.h"
 #include "position.h"
 #include "shogi.h"
 
 namespace Learner {
 
-  class KifuWriter
-  {
+  class KifuWriter {
   public:
-    KifuWriter(const std::string& output_file_path_format);
+    KifuWriter(const std::string& output_file_path);
     virtual ~KifuWriter();
-    bool Write(Position& pos, Value value);
+    bool Write(const Record& record);
     bool Close();
 
   private:
-    const std::string output_file_path_format_;
+    const std::string output_file_path_;
     FILE* file_ = nullptr;
-    int file_index_ = 0;
-    int64_t position_index_ = 0;
-    std::mutex mutex_;
-    std::string file_path_;
 
     bool EnsureOpen();
   };

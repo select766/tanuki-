@@ -6,18 +6,13 @@
 #include <string>
 #include <vector>
 
+#include "experimental_learner.h"
 #include "position.h"
 #include "shogi.h"
 
 namespace Learner {
 
-  struct Record {
-    std::string sfen;
-    Value value;
-  };
-
-  class KifuReader
-  {
+  class KifuReader {
   public:
     KifuReader(const std::string& folder_name, bool shuffle);
     virtual ~KifuReader();

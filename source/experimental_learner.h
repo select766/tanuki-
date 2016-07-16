@@ -5,9 +5,14 @@
 
 namespace Learner
 {
-  void learn(std::istringstream& iss);
-  void error_measurement();
-  void kifu_reader_benchmark();
+  struct Record {
+    uint8_t packed[32];
+    int16_t value;
+  };
+
+  void Learn(std::istringstream& iss);
+  void MeasureError();
+  void BenchmarkKifuReader();
 }
 
 #endif
