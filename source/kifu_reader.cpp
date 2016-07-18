@@ -19,7 +19,7 @@ Learner::KifuReader::KifuReader(const std::string& folder_name, bool shuffle)
     permutation_.push_back(i);
   }
   if (shuffle) {
-    std::random_shuffle(permutation_.begin(), permutation_.end());
+    std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::random_device()()));
   }
 }
 
@@ -51,7 +51,7 @@ bool Learner::KifuReader::Read(Record& record) {
           // ファイルリストの終端にたどり着いた
           if (shuffle_) {
             // ファイルリストをシャッフルする
-            std::random_shuffle(file_paths_.begin(), file_paths_.end());
+            std::shuffle(file_paths_.begin(), file_paths_.end(), std::mt19937_64(std::random_device()()));
           }
 
           // ファイルインデクスをリセットする
