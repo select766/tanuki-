@@ -67,6 +67,10 @@ namespace
 
 void Learner::GenerateKifu()
 {
+#ifdef USE_FALSE_PROBE_IN_TT
+  ASSERT_LV_3(false);
+#endif
+
   std::srand(std::time(nullptr));
 
   // ’èÕ‚Ì“Ç‚İ‚İ
