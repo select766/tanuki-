@@ -15,6 +15,12 @@ namespace {
 
 Learner::KifuReader::KifuReader(const std::string& folder_name, bool shuffle)
   : folder_name_(folder_name), shuffle_(shuffle) {
+  for (int i = 0; i < kBatchSize; ++i) {
+    permutation_.push_back(i);
+  }
+  if (shuffle) {
+    std::random_shuffle(permutation_.begin(), permutation_.end());
+  }
 }
 
 Learner::KifuReader::~KifuReader() {
@@ -86,7 +92,6 @@ bool Learner::KifuReader::Read(Record& record) {
       records_.push_back(record);
     }
 
-    std::random_shuffle(records_.begin(), records_.end());
     record_index_ = 0;
   }
 
@@ -94,7 +99,7 @@ bool Learner::KifuReader::Read(Record& record) {
     return false;
   }
 
-  record = records_[record_index_];
+  record = records_[permutation_[record_index_]];
   ++record_index_;
 
   return true;

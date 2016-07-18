@@ -76,7 +76,8 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 50'0000'0000LL;
+  constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
   constexpr double kGradientNoiseEta = 0.01;
@@ -324,7 +325,18 @@ namespace
 }
 
 void Learner::Learn(std::istringstream& iss) {
-  Eval::eval_learn_init();
+  sync_cout << "Learner::Learn()" << sync_endl;
+
+  ASSERT_LV3(
+    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
+    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
+    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
+#ifndef USE_FALSE_PROBE_IN_TT
+  ASSERT_LV3(false)
+#endif
+
+    Eval::eval_learn_init();
 
   omp_set_num_threads((int)Options["Threads"]);
 
@@ -335,12 +347,6 @@ void Learner::Learn(std::istringstream& iss) {
       iss >> output_folder_path_base;
     }
   }
-
-  ASSERT_LV3(
-    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
-    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
   std::vector<int64_t> write_eval_per_positions = {
       std::numeric_limits<int64_t>::max(),
@@ -625,6 +631,8 @@ void Learner::Learn(std::istringstream& iss) {
 }
 
 void Learner::MeasureError() {
+  sync_cout << "Learner::MeasureError()" << sync_endl;
+
   Eval::eval_learn_init();
 
   omp_set_num_threads((int)Options["Threads"]);
@@ -725,19 +733,27 @@ void Learner::MeasureError() {
 }
 
 void Learner::BenchmarkKifuReader() {
+  sync_cout << "Learner::BenchmarkKifuReader()" << sync_endl;
+
   Eval::eval_learn_init();
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
   auto start = std::chrono::system_clock::now();
 
+  sync_cout << "Initializing kifu reader..." << sync_endl;
+  std::unique_ptr<Learner::KifuReader> kifu_reader =
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+
+  sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
-  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
     // Žc‚èŽžŠÔ•\Ž¦
-    if (num_processed_positions) {
+    if (num_processed_positions && num_processed_positions % 100'0000LL == 0) {
       auto current = std::chrono::system_clock::now();
       auto elapsed = current - start;
-      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForLearning - num_processed_positions));
+      double elapsed_sec = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions *
+        (kMaxPositionsForBenchmark - num_processed_positions));
       int h = remaining_sec / 3600;
       int m = remaining_sec / 60 % 60;
       int s = remaining_sec % 60;
@@ -747,19 +763,23 @@ void Learner::BenchmarkKifuReader() {
 
       time(&current_time);
       local_time = localtime(&current_time);
-      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-        num_processed_positions, kMaxPositionsForLearning,
+      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+        num_processed_positions, kMaxPositionsForBenchmark,
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-      std::fflush(stdout);
     }
 
     int num_records = static_cast<int>(std::min(
-      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+      kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
 
     num_processed_positions += num_records;
   }
+
+  auto elapsed = std::chrono::system_clock::now() - start;
+  double elapsed_sec = static_cast<double>(
+    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
 }

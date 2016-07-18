@@ -35,6 +35,7 @@ namespace Learner {
     int file_index_ = 0;
     int record_index_ = 0;
     std::vector<Record> records_;
+    std::vector<int> permutation_;
     bool shuffle_;
 
     bool EnsureOpen();
