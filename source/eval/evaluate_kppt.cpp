@@ -205,17 +205,17 @@ namespace Eval
   void save_eval() {
     do {
       // KK
-      std::ofstream ofsKK((string)Options["EvalDir"] + KK_BIN, std::ios::binary);
+      std::ofstream ofsKK((string)Options["EvalDir"] + "/" + KK_BIN, std::ios::binary);
       if (ofsKK) ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
       else goto Error;
 
       // KKP
-      std::ofstream ofsKKP((string)Options["EvalDir"] + KKP_BIN, std::ios::binary);
+      std::ofstream ofsKKP((string)Options["EvalDir"] + "/" + KKP_BIN, std::ios::binary);
       if (ofsKKP) ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp));
       else goto Error;
 
       // KPP
-      std::ofstream ofsKPP((string)Options["EvalDir"] + KPP_BIN, std::ios::binary);
+      std::ofstream ofsKPP((string)Options["EvalDir"] + "/" + KPP_BIN, std::ios::binary);
       if (ofsKPP) ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp));
       else goto Error;
 
