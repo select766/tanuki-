@@ -22,9 +22,7 @@ LOCAL_GAME_SERVER_TXT_TEMPLATE = '''setoption name Threads value 1
 go btime 1
 '''
 ERROR_MEASUREMENT_TXT_FILE_NAME = 'Yaneuraou-error-measurement.txt'
-ERROR_MEASUREMENT_TXT_TEMPLATE = '''setoption name Threads value 8
-setoption name EvalDir value {0}
-setoption name KifuDir value kifu_for_test
+ERROR_MEASUREMENT_TXT_TEMPLATE = '''setoption name EvalDir value {0}
 setoption name KifuDir value kifu_for_test
 setoption name Threads value 48
 error_measurement
@@ -85,6 +83,7 @@ def CalculateMeanSquaredError(learner_output_folder_path, learner_exe_file_path)
   output_cvs_file_path = os.path.join(learner_output_folder_path, 'mean_squared_error.' + GetDateTimeString() + '.csv')
   with open(output_cvs_file_path, 'wb') as output_file:
     csvwriter = csv.writer(output_file)
+    csvwriter.writerow(['subfolder', 'rmse_value', 'rmse_winning_percentage', 'mean_cross_entropy', 'norm'])
     for subfolder in subfolders:
       print(subfolder)
 
@@ -100,10 +99,12 @@ def CalculateMeanSquaredError(learner_output_folder_path, learner_exe_file_path)
       except subprocess.CalledProcessError:
         pass
       print(output)
-      matched = re.compile('info string mse=(.+) norm=(.+)').search(output)
-      mean_squared_error = float(matched.group(1))
-      norm = float(matched.group(2))
-      csvwriter.writerow([subfolder, mean_squared_error, norm])
+      matched = re.compile('info string rmse_value=(.+) rmse_winning_percentage=(.+) mean_cross_entropy=(.+) norm=(.+)').search(output)
+      rmse_value = float(matched.group(1))
+      rmse_winning_percentage = float(matched.group(2))
+      mean_cross_entropy = float(matched.group(3))
+      norm = float(matched.group(4))
+      csvwriter.writerow([subfolder, rmse_value, rmse_winning_percentage, mean_cross_entropy, norm])
 
 
 def main():

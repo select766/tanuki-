@@ -290,56 +290,24 @@ namespace
   }
 
   // 損失関数
-#if 1
-  // 評価値の差の二乗和
   WeightType CalculateGradient(Value record_value, Value value) {
-      return static_cast<WeightType>((value - record_value) * kFvScale);
-  }
-
-  WeightType CalculateError(Value record_value, Value value) {
-      WeightType diff = value - record_value;
-      return diff * diff;
-  }
-
-  WeightType CalculateMeanError(WeightType sum_error) {
-      return sqrt(sum_error / kMaxPositionsForErrorMeasurement);
-  }
+#if 0
+    // 評価値の差の二乗和
+    return static_cast<WeightType>((value - record_value) * kFvScale);
 #elif 0
-  // 評価値から推定した勝率の差の二乗和
-  WeightType CalculateGradient(Value record_value, Value value) {
-      double p = winning_percentage(record_value);
-      double q = winning_percentage(value);
-      return (q - p) * dsigmoid(static_cast<int>(value) / 600.0);
-  }
-
-  WeightType CalculateError(Value record_value, Value value) {
-      WeightType diff = winning_percentage(value) - winning_percentage(record_value);
-      return diff * diff;
-  }
-
-  WeightType CalculateMeanError(WeightType sum_error) {
-      return sqrt(sum_error / kMaxPositionsForErrorMeasurement);
-  }
-#elif 0
-  // 評価値から推定した勝率の分布の交差エントロピー
-  WeightType CalculateGradient(Value record_value, Value value) {
-      double p = winning_percentage(record_value);
-      double q = winning_percentage(value);
-      return q - p;
-  }
-
-  WeightType CalculateError(Value record_value, Value value) {
-      double p = winning_percentage(record_value);
-      double q = winning_percentage(value);
-      return -p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps);
-  }
-
-  WeightType CalculateMeanError(WeightType sum_error) {
-      return sum_error / kMaxPositionsForErrorMeasurement;
-  }
+    // 評価値から推定した勝率の差の二乗和
+    double p = winning_percentage(record_value);
+    double q = winning_percentage(value);
+    return (q - p) * dsigmoid(static_cast<int>(value) / 600.0);
+#elif 1
+    // 評価値から推定した勝率の分布の交差エントロピー
+    double p = winning_percentage(record_value);
+    double q = winning_percentage(value);
+    return q - p;
 #else
-  static_assert(false, "Select a loss function.");
+    static_assert(false, "Select a loss function.");
 #endif
+  }
 }
 
 void Learner::learn(std::istringstream& iss)
@@ -694,8 +662,10 @@ void Learner::error_measurement()
   std::vector<Record> records;
 
   auto start = std::chrono::system_clock::now();
-  double sum_error = 0.0;
+  double sum_squared_error_of_value = 0.0;
   double sum_norm = 0.0;
+  double sum_squared_error_of_winning_percentage = 0.0;
+  double sum_cross_entropy = 0.0;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
     // 残り時間表示
     if (num_processed_positions) {
@@ -725,7 +695,7 @@ void Learner::error_measurement()
     }
 
     // ミニバッチ
-#pragma omp parallel for reduction(+:sum_error) reduction(+:sum_norm)
+#pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy)
     for (int record_index = 0; record_index < num_records; ++record_index) {
       int thread_index = omp_get_thread_num();
       Thread& thread = *Threads[thread_index];
@@ -742,7 +712,13 @@ void Learner::error_measurement()
         continue;
       }
 
-      sum_error += CalculateError(record_value, value);
+      double diff_value = record_value - value;
+      sum_squared_error_of_value += diff_value * diff_value;
+      double p = winning_percentage(record_value);
+      double q = winning_percentage(value);
+      double diff_winning_percentage = p - q;
+      sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
+      sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
       sum_norm += abs(value);
     }
 
@@ -750,8 +726,10 @@ void Learner::error_measurement()
   }
 
   printf(
-    "info string mse=%f norm=%f\n",
-    CalculateMeanError(sum_error),
+    "info string rmse_value=%f rmse_winning_percentage=%f mean_cross_entropy=%f norm=%f\n",
+    std::sqrt(sum_squared_error_of_value / kMaxPositionsForErrorMeasurement),
+    std::sqrt(sum_squared_error_of_winning_percentage / kMaxPositionsForErrorMeasurement),
+    sum_cross_entropy / kMaxPositionsForErrorMeasurement,
     sum_norm / kMaxPositionsForErrorMeasurement);
 }
 
