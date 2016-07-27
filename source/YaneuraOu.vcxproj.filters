@@ -65,6 +65,9 @@
     <Filter Include="リソース ファイル\engine\2016-late-engine">
       <UniqueIdentifier>{340f8b93-a0de-4836-a164-61971b2d3ce6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="リソース ファイル\learn">
+      <UniqueIdentifier>{d7ca69f7-bd83-40ce-89c2-fe2d730b80be}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="evaluate.h">
@@ -147,6 +150,15 @@
     </ClInclude>
     <ClInclude Include="experimental_learner.h">
       <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="learn\multi_think.h">
+      <Filter>リソース ファイル\learn</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\evaluate_kppt.h">
+      <Filter>リソース ファイル\eval</Filter>
+    </ClInclude>
+    <ClInclude Include="learn\learn.h">
+      <Filter>リソース ファイル\learn</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -270,6 +282,18 @@
     <ClCompile Include="experimental_learner.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="learn\learner.cpp">
+      <Filter>リソース ファイル\learn</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\sfen_packer.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="learn\multi_think.cpp">
+      <Filter>リソース ファイル\learn</Filter>
+    </ClCompile>
+    <ClCompile Include="learn\evaluate_kppt_learn.cpp">
+      <Filter>リソース ファイル\learn</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
@@ -326,6 +350,9 @@
     <Text Include="..\exe\YaneuraOu-2016-mid_ja.txt">
       <Filter>exe</Filter>
     </Text>
+    <Text Include="..\docs\やねうら大定跡.txt">
+      <Filter>doc</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md">
@@ -356,9 +383,6 @@
       <Filter>doc</Filter>
     </None>
     <None Include="..\exe\YaneuraOu-2016-mid.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-Mid_gcc.exe">
       <Filter>exe</Filter>
     </None>
     <None Include="..\exe\YaneuraOu-2016-mid-nosse.exe">

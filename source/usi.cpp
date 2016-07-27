@@ -40,6 +40,19 @@ namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 #include "cooperate_mate/cooperative_mate_solver.h"
 #endif
 
+// 棋譜を自動生成するコマンド
+#ifdef EVAL_LEARN
+namespace Learner
+{
+  // 棋譜の自動生成。
+  void gen_sfen(Position& pos, istringstream& is);
+
+  // 生成した棋譜からの学習
+  void learn(Position& pos, istringstream& is);
+}
+#endif
+
+
 // Option設定が格納されたglobal object。
 USI::OptionsMap Options;
 
@@ -256,6 +269,11 @@ namespace USI
     o["EvalDir"] << Option("eval");
     o["KifuDir"] << Option("kifu");
 
+#if defined(EVAL_KPPT) && defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
+	// 評価関数パラメーターを共有するか
+	o["EvalShare"] << Option(true);
+#endif
+
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
   }
@@ -316,7 +334,7 @@ namespace USI
 // --------------------
 
 // is_ready_cmd()を外部から呼び出せるようにしておく。(benchコマンドなどから呼び出したいため)
-void is_ready(Position& pos)
+void is_ready()
 {
   static bool first = true;
 
@@ -330,17 +348,18 @@ void is_ready(Position& pos)
     first = false;
   }
 
-  // Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
-  // evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
-  pos.set(SFEN_HIRATE);
-
   Search::clear();
 }
 
 // isreadyコマンド処理部
 void is_ready_cmd(Position& pos)
 {
-  is_ready(pos);
+  is_ready();
+
+  // Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
+  // evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
+  pos.set(SFEN_HIRATE);
+
   ponder_mode = false;
   sync_cout << "readyok" << sync_endl;
 }
@@ -622,7 +641,7 @@ void USI::loop(int argc,char* argv[])
     else if (token == "log") start_logger(true);
 
     // 現在の局面について評価関数を呼び出して、その値を返す。
-    else if (token == "eval") cout << "eval = " << Eval::evaluate(pos) << endl;
+    else if (token == "eval") cout << "eval = " << Eval::compute_eval(pos) << endl;
     else if (token == "evalstat") Eval::print_eval_stat(pos);
 
     // この局面での指し手をすべて出力
@@ -664,6 +683,15 @@ void USI::loop(int argc,char* argv[])
     // 定跡を作るコマンド
     else if (token == "makebook") Book::makebook_cmd(pos, is);
 #endif
+
+#ifdef EVAL_LEARN
+    else if (token == "gensfen") Learner::gen_sfen(pos, is);
+    else if (token == "learn") Learner::learn(pos, is);
+#endif
+    // "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
+    // 我々はこれに関知しないので単に無視すれば良い。
+    else if (token == "usinewgame") continue; 
+
     else if (token == "generate_kifu") {
       Learner::GenerateKifu();
       break;
@@ -680,7 +708,35 @@ void USI::loop(int argc,char* argv[])
       Learner::kifu_reader_benchmark();
       break;
     }
-    ;
+
+    else
+    {
+      //    簡略表現として、
+      //> threads 1
+      //      のように指定したとき、
+      //> setoption name Threads value 1
+      //      と等価なようにしておく。
+      
+      if (!token.empty())
+      {
+        string value;
+        is >> value;
+
+        for (auto& o : Options)
+        {
+          // 大文字、小文字を無視して比較。
+          if (!_stricmp(token.c_str(), o.first.c_str()))
+          {
+            Options[o.first] = value;
+            sync_cout << "Options[" << o.first << "] = " << value << sync_endl;
+
+            goto OPTION_FOUND;
+          }
+        }
+        sync_cout << "No such option: " << token << sync_endl;
+      OPTION_FOUND:;
+      }
+    }
 
   } while (token != "quit" );
   

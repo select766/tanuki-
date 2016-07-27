@@ -2,6 +2,317 @@
 やねうら王 更新履歴
 
 
+■　2016/07/26 V3.46
+
+・Jenkins対応を進めていく。
+・gensfenコマンド、生成するファイル名を指定する手段を用意。
+・kpptファイルのファイル名のほうにもスラッシュつけてたのでpath_combine()失敗していたの修正。
+・gensfenのときに最後、finalizeしてないから指定局面数だけファイルに書きだされていないの修正。
+・gensfenでloop回数を指定してもそのループ回数で終了しなかったの修正。(loop_count初期化忘れ)
+・TEST_LEGAL_LEAF、デフォルトではundefinedに。
+・EvalSaveDir optionを用意。learnコマンドのときに保存先フォルダはこれで変更することに。
+・learnコマンドの保存の間隔を1億局面に1回に変更。
+・learnコマンドのときファイル名出力したほうがいいや。(入力は、見えないと仮定すると)
+・learnコマンドでのsaveのときにpath_combineするの忘れていたの修正。
+
+
+■　2016/07/25 V3.45
+
+・learnコマンド使ったときに更新式を表示するように変更。
+・epochの初期化忘れていたの修正。
+・Adamでコンパイラ周りのバグ(?)回避。
+・目的関数をlearnコマンド実行時に表示するようにした。
+・learnコマンドでmini-batch sizeを指定できるようにした。
+・YaneGrad、mini-batch sizeで学習率ηを変えるようにした。
+・SGDのパラメーターもlearn.hではなく、自動的に計算して設定するように変更。
+・learnコマンドにloop,dirの指定が出来るようにした。
+・misc.hにpath_combine()を追加。
+・evaluate_kppt.cppでは、EvalDirの末尾に'/'が指定されていても良いようにこれを用いるように変更。
+・learnコマンドのdirオプションもpath_combine()を用いるように変更。
+・learnでフォルダを掘るときにもpath_combine()を用いるように変更。
+・SGD、mini-batchのサイズで学習率変える必要ない気がしたので修正。
+
+
+■　2016/07/24 V3.44
+
+・learnコマンドのために置換表をオフにしているときは起動時に警告が出るように。
+・プロジェクト設定、AVX2に戻していなかったの修正。
+・gensfenコマンド、lockしてファイル書き出しているのが気持ち悪いのでworker別に作った。
+・README.mdに電王トーナメントの参加者向けの情報追加。
+・評価関数を共有メモリに配置する件、EvalDirが異なる場合は共有しないようにした。
+　　YaneuraOu + USI version番号 + EvalDir名
+　が合致したときにのみ共有するようにした。
+・evaluate_kppt_learn.cpp、ValueKkFloatとか、要らなかった。整理した。
+・学習時のKK配列のlimitの緩和。
+・学習時の更新式にAdam追加。
+・定跡のバイナリサーチのバグ修正。(thx. merom686さん)
+・Adamの学習率調整。
+・Linux環境用のmkdirのwrapper書いた。(learnコマンドで用いる)
+・makefile、Linux環境だと_LINUXというシンボルを定義するようにした。
+・g++でbitop.hで警告が出ていたの修正。
+
+
+■　2016/07/23 V3.43
+
+・評価関数バイナリ28種公開。README.mdに追記。やねうら王2016Midのreadme.txtに追記。
+・KPPT評価関数において評価関数の共有をしない設定オプションを追加。
+・↑の件YaneuraOu-2016-mid_ja.txtに反映。
+・config.hにNO_SSE追加。
+・やねうら王2016Mid、各CPU向けの実行ファイルビルドしなおして、exe/ に保存。
+
+
+■　2016/07/22 V3.42
+
+・学習時に置換表を参照しないオプション追加。learn.hで書けるようにした。
+・教師局面ファイル45億局面分、公開した。
+・ミニバッチサイズをlearn.hに移動。
+・learn.hで学習オプションのconfigureが出来るように。
+・棋譜からの学習、ネットワーク上のファイルの読み込みに時間がかかるのでもう一段、バッファリングする。
+・save_eval()で、Windows環境ならDirectoryを掘るように。
+・棋譜からの学習、ファイルの保存でディレクトリ名変えるのは10億局面ごとに変更。
+・update_weights()を呼び出すタイミング、調整した。
+・LEARN_READ_SFEN_SIZE、learn.hに移動。
+・棋譜からの学習のときにバックグラウンドでファイルを読み込むスレッドを追加。
+・AdaGradとYaneGrad、5回目ぐらいまではg2のupdateのみにするようにした。
+・save_eval()のときにフォルダ名を表示するようにした。
+・learnコマンド、40HTでスケールアウトするように改良。
+・learnコマンド、gensfenコマンド、出力を抑制するようにした。learn.hで設定可能。
+・file_read_workerのjoin()忘れていたの修正。
+
+	
+■　2016/07/21 V3.41
+
+・sfenのunpacker、高速化。Position::set_from_packed_sfen()を作った。
+・Position::set()のvalidation、ASSERT_LV3以上のときのみするように変更した。(ここが遅いと棋譜からの学習でボトルネックになるため。)
+・SGDでのupdateのときの係数、目的関数に合わせて調整するようにした。
+・学習の最後にも評価関数パラメーターをファイルに保存するコード追加。
+・学習率η2導入。rateをlearn.hで設定できるようにした。
+・評価関数パラメーターの各値にリミットをかける。
+・AdaGradに最初のほうの更新量を抑制するε項を追加。
+・AdaGradのkkpの更新式、タイプミスしてたの修正。
+・10億局面ごとではなく5億局面ごとに評価関数ファイルに保存するように変更。
+　→　保存間隔、learn.hに移動。
+・SGDのηなどもlearn.hに移動。
+・1万局面ごとに'.'を出力するかどうかもlearn.hで設定できるようにした。
+・棋譜生成時の評価値の上限をlearn.hで設定できるようにした。またこの値を2000→3000に変更した。
+・更新式にYaneGrad追加。learn.hで選択可能に。
+・YaneGradによる更新式を実装。
+・g++でlearner.cppでwarningが出ていたの修正。
+
+
+■　2016/07/20 V3.40
+
+・学習のときにkppの次元下げを用いるように実装。
+・Eval::save_eval()追加。
+・2000万局面ごとに保存するコード追加。
+・学習時にmean_error出力するように。
+・rmse計算のときに置換表世代を新しくするコード追加。
+・256手引き分けになるスコアは学習の妨げになるので棋譜生成のときにMAX_PLY-16までにしておく。
+・棋譜からの学習のときに浅い探索の結果としてevaluate()とqsearch()を選択可能に。
+・learn.h追加。学習時のオプションはここにまとめた。
+・AdaGradの更新式においてサンプル数で割り算するのをやめる。
+・updateのときにmax_kkpを表示するようにした。
+・AdaGradで最初のほうは値を動かさないように改良。
+・AdaGradの学習率調整。
+・目的関数として交差エントロピーを実装。
+・交差エントロピーの目的関数の導出式をソースコード上に書いた。
+・評価関数のファイル名、evaluate_kppt.hに移動。
+・save_eval()、evaluate_kppt_learn.cppに移動。
+・学習のときに、10億局面ごとに保存する評価関数ファイル名を変更するようにした。
+
+
+■　2016/07/17 - 2016/07/19 V3.39
+
+・learnコマンド少し実装。packed sfenファイルの読み込みとshuffle～unpackのコードは書けた。
+・learnでmse計算するコード追加。
+・learnで∂J/∂Wiを計算するコードまで書けた。
+・Eval::add_grad(),update_ada_grad(),init_grad()を追加。
+・学習時の損失関数を選べるようにした。
+・Evall::add_grad()でrootでの手番を考慮してなかったので修正。
+・Eval::update_grad()→update_weight()とリネーム。
+・Eval::update_weight()にweight配列に関するassert追加。
+・AdaGrad以外にSDGでのupdateも追加。
+・EvalのLEARN関連、learnに移動させる。
+・evaluate_kppt.h , evaluate_kppt_learn.cpp追加。
+・勾配計算するときにshallowとdeep、逆にして関数に渡してた。修正。
+
+
+■　2016/07/16 V3.38
+
+・USI原案に従い、sfen化文字列を修正する。
+・定跡にも影響が出るので定跡ファイルを修正する。
+・makebook sortコマンドを実行したときにsfen文字列を再構築するように変更する。
+・inv_piece[]について質問があったのでソースコード上にコメントを追記。
+・やねうら王標準定跡V1.01公開。
+・やねうら大定跡V1.01公開。
+・exeフォルダのやねうら王2016Mid差し替え。
+
+
+■　2016/07/15 V3.37
+
+・kpp_mirror_write()まわり、盛大にバグっていたので修正。
+・mir_piece[]の初期化コード、バグっていたので修正。
+・kkp_mirror_write()、盤面180度回転させたときの符号が違ったので修正。
+・bookのsfen文字列の比較部分のコード、少し改良。
+・makebook sortコマンドのときに局面のsfenを正規化するように修正。
+・ソースコードが2TAB(TAB=スペース2つ)だと、他の環境と合わせるの難しいので、
+  VS2015標準の4TABに変更していく。
+・Linux環境でgetline()が'\r'まで残すので定跡にhitしない問題修正。
+・ShogiGUIの検討モードで定跡の指し手が複数表示されない問題を修正。(multipvで定跡を出力するように変更)
+・解説.txtにShogiGUIの検討モードのことを追記。
+・開発者のために、depth 6でgensfenした10億局面を配布。
+
+
+■　2016/07/14 V3.36
+
+・gensfenで圧縮棋譜を生成するときは拡張子をbinに変更。
+・定跡を書き出すときにfinalizeで落ちるバグ修正。
+・gensfenコマンドで評価値の絶対値が2000を超えたら出力しないように変更。
+・exe/フォルダのやねうら王2016Mid差し替え。
+・BookDepthLimitとしてゼロが指定されていたときに無視されてしたの修正。
+・解説.txtに定跡DBにhitしたときに表示されるメッセージの説明追加。
+・やねうら大定跡V1、公開。
+
+
+■　2016/07/12 V3.35
+
+・gen_sfen()にis_ready()が抜けてた(気がする)ので修正。
+	→　MultiThinkが持っているので良いのか…。
+・makebook thinkのときに終了時にコマンドのusageが出ていたの修正。
+・makebook thinkでのDB上の出現頻度は、バージョンナンバーにしておく。→　やねうら大定跡も。
+・やねうら大定跡はNarrowBookを必ずオフにする件、説明追記。
+・MultiThinkでworker threadの終了を待つ方法がよろしくないので修正。
+・gensfenコマンド、進捗がわかりにくいので改善。
+・gensfenコマンドで定跡の局面は書き出さない＆思考しないように修正。
+・gensfenコマンドで書き出すときに時刻を出力するように修正。
+・gensfenでファイルを作るときにios::appでopenするように変更。
+・やねうら大定跡では、手番側から見たスコアの良い順に指し手をソートしてあることを保証するようにした。
+
+
+■　2016/07/10 V3.34
+
+・少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
+　評価関数をshared memoryを用いて他のプロセスと共有するための改造開始。(作業中)
+・Positionのコンストラクタで平手に初期化すると、compute_eval()が呼び出され、このときに
+  評価関数テーブルを参照するが、isready()が呼び出されていないのでこの初期化が出来ない。
+  ゆえに、この処理はやめたほうが良い。
+・KPPT評価関数でcoutを用いていたところ、sync_coutにしたほうが無難なので修正。
+・ALIGNED()マクロ追加。
+・g++でbook.cpp , learner.cpp にてwarningが出ていたの修正。
+・評価関数テーブルを共有メモリを用いて実現するの、実装完了。→　Windows版はデフォルトでこの設定に。
+ →　説明を解説.txtに追記。
+・makebook、処理が終わったときにusageが出ていたの修正。
+・_stricmp()がlinux系では存在しないらしくその場合、strcasecmp()で置き換えるように修正。
+・makebookのときisready()を呼び出しておかないとPosition::set()などが出来ないので修正。
+
+
+■　2016/07/09 V3.33
+
+・置換表のprobeを行わない設定追加。USE_FALSE_PROBE_IN_TT
+(自己生成棋譜からの学習でqsearch()のPVが欲しいときに置換表にhitして枝刈りされたときにPVが得られないの悔しいので)
+・benchのときに、複数スレッドだとmain threadの探索のnode数が表示されていた問題修正。
+・benchで複数スレッドのときはmain threadとトータルの情報とどちらも表示することに。
+・makebookコマンドに並び替え機能追加。
+	例)> makebook sort book_src.db book_sorted.db
+・定跡をメモリに丸読みせずに指す機能追加。BookOnTheFlyオプション。
+・exe/book/standard_book.dbをsort済みのものと差し替え。
+・MemoryBookにon the fly機能追加。
+・"usinewgame"に対してNo such optionと表示するようになっていたの修正。
+・定跡を途中で選び直したときに前の定跡のclear()をしていなかったの修正。
+
+
+■　2016/07/05 V3.32
+
+・探索による定跡生成、一定時間経過ごとに保存するようにした。
+・makebook mergeコマンド追加。定跡ファイルのマージが可能に。
+・book_write()で空のentryは書き出さないように修正。
+・makebook thinkコマンドのときに思考対象node数を表示することに。
+・定跡生成depth18で32手目ぐらいまで。→やねうら大定跡として公開する(かも)。
+・makemove thinkコマンドに思考対象とする開始手数(startmoves)の指定を出来るようにした。
+・やねうら王2016Midに新定跡を対応させる。USI option、定跡絡みの指定を大量追加。
+		  o["BookEvalDiff"]       << Option(100  , 0, 99999);
+		  o["BookEvalBlackLimit"] << Option(0    , 0, 99999);
+		  o["BookEvalWhiteLimit"] << Option(-140 , 0, 99999);
+		  o["BookDepthLimit"]     << Option(16   , 0, 99999);
+・あまりBookEvalDiffを大きくすると、すぐに定跡DBにない局面に行ってしまう…。30ぐらいでいいや。
+・Visual Studio 2015 Update3後、g++版とnpsがあまり大差ないようなのでg++版の実行ファイルをexe/から削除。
+・思考エンジンの説明に、doc/解説などを読むように誘導。
+・makebookコマンドでstartmovesの値が反映されてなかったの修正。
+・makebook thinkコマンドで新たな指し手を追加していないときはSではなくsを出力してファイルの
+　書き出しはしないように変更。
+
+
+■　2016/07/04 V3.31
+
+・スレッドにまたがってsearchを個別に呼び出すworker用のclass追加。extra/multi_think.cpp
+・APRNG、意味ない気がしてきた。削除。
+・gensfenまわり、MultiThinkクラスを用いて書き直し。そこそこ綺麗に書き直せた。
+・bookまわりもMultiThinkクラスを用いて書き直した。そこそこ綺麗に書き直せた。
+・Mid2016のsearch/qsearchのスタブ、デフォルトでsilentモードとした。
+・is_ready()のほう、引数にPosition&を取るのやめる。これがあると余計な依存性が発生する。
+・g++でbuild出来なくなっていたの修正。
+・g++でbuildするとCFLAGS   += -fltoをつけるとセグフォで落ちるので、Makefileからこのオブション、削除。
+  →　shogi.cppでSearch::init() (やねうら王2016Mid)が呼び出された瞬間に落ちている模様。g++のbugくさい。
+・やねうら王2016Midにユーザー定跡機能追加。(user_book1.db～user_book3.dbまで)
+・gensfenの動作テスト →　gensfenうまく動いている。
+・makebook thinkのときに思考対象局面のsfenを表示するように。
+・makebookコマンドで無効なパラメーターが来たときのエラー出力追加。
+・解説.txtのmakebookコマンドの説明がmoveとなっていたのでmovesに修正。
+・makebookコマンドでMOVE_WIN/MOVE_RESIGNの処理してなかったので追加。
+・局後学習機能 →　対局中にsfenを出力しておけばいいのだが、将棋所等でcsaファイル出力すればいいから…要らないか…。
+・bookの生成モード動作テスト → うまく動くようになった。
+・2016Midがconfig.hでLONG_EFFECT_LIBRARYをdefineしたままだったので修正。
+・探索による定跡を生成して配布する。(準備中)
+	→　4手目までdepth 24,MultiPV = 7
+	    8手目までdepth 18,MultiPV = 5
+		の定跡ファイル作った。
+
+
+■　2016/07/03 V3.30
+
+・gensfenで定跡を用いる機能追加。→　うまく動いている。
+・ASYNC_PRNG追加。
+・Mutexのtypedefをconfig.hに移動。
+・gensfenで任意二駒をときどき入れ替える機能追加。USE_SWAPPING_PIECES →　動いてるっぽい。
+・Position::do_move_by_swapping_pieces()追加。→　書けた。うまく動いている。
+・USIオプションの簡略入力のときに大文字小文字の区別をしないように変更。
+・gensfenしたファイルを読み込む機能追加。(learnコマンドの一部)　→　テストコードはうまく動いているようだ。
+・learnコマンド追加。→　作業中
+・定跡の自動生成機能追加。
+・makebook from_sfen のほうのコマンド、from_sfenを指定せずに動いていたの修正。
+・sfenを与えて思考させるためのmakebookコマンド追加。
+	> makebook think 2016.sfen yaneura_book.db move 16 depth 32 multipv 3
+	→　コード書けた。デバッグまだ。
+
+
+■　2016/07/02 V3.29
+
+・sfen圧縮機能追加。(かきかけ)
+・Position::sfen_from_rawdata()追加。
+・sfen packer、misc/に移動。
+・USE_SFEN_PACKER追加。
+・USIで直接 Threads 1 とやったとき、setoption name Threads value 1と等価なようにする。
+・公式のトップページに書いていた更新履歴、邪魔なので消す。
+・sfen packer完成。
+・gensfenコマンド、とりあえず完成。
+・gensfenコマンド、packed_sfenで書き出す機能追加。
+
+
+■　2016/07/01 V3.28
+
+・evalコマンドで呼び出すのをcompute_eval()に変更。
+	(root nodeではStateInfo::previousがnullptrなので差分計算できない)
+・StateInfo::previousのところのコメント修正。
+・YANEURAOU_2016_MID_ENGINE_LEARN 追加。
+・learn/learner.cpp追加。
+・test gensfenコマンド削除。gensfenコマンド追加。
+・sfenのpacker/unpacker書いた。
+・BitStreamクラス書いた。
+・sfenの圧縮出力追加。(かきかけ)
+・2016Midの定跡選択部がgccでコンパイルエラーが出るようになっていたの修正。
+・Makefile修正。CFLAGSに-flto追加。
+
+
 ■　2016/06/30 V3.27
 
 ・KPPTの評価関数、学習のときに使うのでKPPのmirrorを考慮したKPP配列の要素を参照するモードを用意。

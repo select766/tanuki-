@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include <vector>
 #include <string>
 
@@ -179,17 +180,13 @@ inline uint64_t get_thread_id()
 }
 
 // 擬似乱数生成器
-// Stockfishで用いられているもの
+// Stockfishで用いられているもの + random_deviceによるseedの初期化機能。
 // UniformRandomNumberGenerator互換にして、std::shuffle()等でも使えるようにするべきか？
 struct PRNG {
   PRNG(uint64_t seed) : s(seed) { ASSERT_LV1(seed); }
 
-  // 乱数seedを指定しなければ現在時刻をseedとする。ただし、自己対戦のときに同じ乱数seedになる可能性が濃厚になるので
-  // このときにthisのアドレスなどを加味してそれを乱数seedとする。(by yaneurao)
-  PRNG() : s(now() ^ uint64_t(this) + get_thread_id() * 7) {
-    int n = (int)get_thread_id() & 1024; // 最大1024回、乱数を回してみる
-    for (int i = 0; i < n; ++i) rand<uint64_t>();
-  }
+  // C++11のrandom_device()によるseedの初期化
+  PRNG() { std::random_device rd; s = (u64)rd() + ((u64)rd() << 32); }
 
   // 乱数を一つ取り出す。
   template<typename T> T rand() { return T(rand64()); }
@@ -204,6 +201,20 @@ private:
     return s * 2685821657736338717LL;
   }
 };
+
+// --------------------
+//       Path
+// --------------------
+
+// path名とファイル名を結合して、それを返す。
+// folder名のほうは空文字列でないときに、末尾に'/'か'\\'がなければそれを付与する。
+inline std::string path_combine(const std::string& folder, const std::string& filename)
+{
+	if (folder.length() >= 1 && *folder.rbegin() != '/' && *folder.rbegin() != '\\')
+		return folder + "/" + filename;
+
+	return folder + filename;
+}
 
 // --------------------
 //  prefetch命令

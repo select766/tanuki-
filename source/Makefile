@@ -8,11 +8,14 @@
 #YANEURAOU_EDITION = YANEURAOU_CLASSIC_ENGINE
 #YANEURAOU_EDITION = YANEURAOU_CLASSIC_TCE_ENGINE
 YANEURAOU_EDITION = YANEURAOU_2016_MID_ENGINE
+#YANEURAOU_EDITION = YANEURAOU_2016_MID_ENGINE_LEARN
 #YANEURAOU_EDITION = YANEURAOU_2016_LATE_ENGINE
 
 COMPILER = g++
 #COMPILER = mpicxx
 CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64
+# ltoオプションを指定すると実行同時にSegmentation Faultで落ちるときがあるので、そのときは、コメントアウトしてください。
+# CFLAGS   += -flto
 CFLAGS   += -march=native
 LDFLAGS  = -lpthread #-lboost_mpi -lboost_serialization
 LIBS     =
@@ -22,6 +25,7 @@ ifeq ($(OS),Windows_NT)
   LDFLAGS += -static
   TARGET = YaneuraOu-by-gcc.exe
 else
+  CFLAGS += -D_LINUX
   TARGET = YaneuraOu-by-gcc
 endif
 OBJDIR   = ../obj
@@ -46,6 +50,7 @@ SOURCES  = shogi.cpp                                                           \
 	extra/test_cmd.cpp                                                         \
 	extra/timeman.cpp                                                          \
 	extra/see.cpp                                                              \
+	extra/sfen_packer.cpp                                                      \
 	eval/evaluate_bona_piece.cpp                                               \
 	eval/evaluate_kpp.cpp                                                      \
 	eval/evaluate_kppt.cpp                                                     \
@@ -60,7 +65,10 @@ SOURCES  = shogi.cpp                                                           \
 	engine/classic-tce-engine/classic-tce-search.cpp                           \
 	engine/2016-mid-engine/2016-mid-search.cpp                                 \
 	engine/user-engine/user-search.cpp                                         \
-	engine/2016-late-engine/2016-late-search.cpp				               
+	engine/2016-late-engine/2016-late-search.cpp				               \
+	learn/learner.cpp				                                           \
+	learn/multi_think.cpp				                                       \
+	learn/evaluate_kppt_learn.cpp   
 																               
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_2016_LATE_ENGINE)				               
 	SOURCES += engine/2016-late-engine/2016-late-search.cpp                    \

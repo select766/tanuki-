@@ -14,7 +14,7 @@
 // USE_SSE42  : SSE4.2でサポートされた命令を使うか。popcnt命令など。
 // USE_SSE41  : SSE4.1でサポートされた命令を使うか。_mm_testz_si128など。
 // USE_SSE2   : SSE2  でサポートされた命令を使うか。
-// すべてdefineしなければSSEは使用しない。
+// NO_SSE     : SSEは使用しない。
 // (Windowsの64bit環境だと自動的にSSE2は使えるはず)
 // noSSE ⊂ SSE2 ⊂ SSE4.1 ⊂ SSE4.2 ⊂ AVX2 ⊂  AVX-512
 
@@ -28,6 +28,7 @@
 //#define USE_SSE42
 //#define USE_SSE41
 //#define USE_SSE2
+//#define NO_SSE
 
 #else
 
@@ -152,6 +153,20 @@
 // 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
 // #define USE_EVAL_HASH
 
+// sfenを256bitにpackする機能、unpackする機能を有効にする。
+// これをdefineするとPosition::packe_sfen(),unpack_sfen()が使えるようになる。
+// #define USE_SFEN_PACKER
+
+// 置換表のprobeに必ず失敗する設定
+// 自己生成棋譜からの学習でqsearch()のPVが欲しいときに
+// 置換表にhitして枝刈りされたときにPVが得られないの悔しいので
+ #define USE_FALSE_PROBE_IN_TT
+
+// 評価関数パラメーターを共有メモリを用いて他プロセスのものと共有する。
+// 少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
+// 評価関数をshared memoryを用いて他のプロセスと共有する機能。(対応しているのはいまのところKPPT評価関数のみ。かつWindows限定)
+// #define USE_SHARED_MEMORY_IN_EVAL
+
 
 // --------------------
 // release configurations
@@ -221,19 +236,25 @@
 
 #ifdef YANEURAOU_2016_MID_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Mid"
-//#define ASSERT_LV 3
-#define ENABLE_TEST_CMD
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
 #define USE_SIMPLE_SEE
 #define USE_MOVE_PICKER_2016Q2
-#define LONG_EFFECT_LIBRARY
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
-//#define EVAL_LEARN
+// デバッグ絡み
+#define ASSERT_LV 3
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+#define USE_SFEN_PACKER
+#define EVAL_LEARN
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+//#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
@@ -311,10 +332,16 @@
 #include <memory>
 #include <map>
 #include <iostream>
+#include <fstream>
+#include <mutex>
+#include <thread>   // このあとMutexをtypedefするので
+#include <condition_variable>
 #include <cstring>  // std::memcpy()
 #include <cmath>    // log(),std::round()
 #include <climits>  // INT_MAX
 #include <cstddef>  // offsetof
+#include <ctime>    // std::ctime()
+#include <random>   // random_device
 
 // --------------------
 //   diable warnings
@@ -328,7 +355,14 @@
 // C4800 : 'unsigned int': ブール値を 'true' または 'false' に強制的に設定します
 // →　static_cast<bool>(...)において出る。
 #pragma warning(disable : 4800)
+
+// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
+#pragma warning(disable : 4996)
 #endif
+
+// C4102 : ラベルは 1 度も参照されません。
+#pragma warning(disable : 4102)
+
 
 // for GCC
 #if defined(__GNUC__)
@@ -380,9 +414,37 @@
 #define UNREACHABLE ASSERT_LV3(false);
 #endif
 
-// --------------------
-//      configure
-// --------------------
+// --- alignment tools
+
+// 構造体などのアライメントを揃えるための宣言子
+
+#if defined(_MSC_VER)
+#define ALIGNED(X) __declspec(align(X))
+#elif defined(__GNUC__)
+#define ALIGNED(X) __attribute__ ((aligned(X)))
+#else
+#define ALIGNED(X) 
+#endif
+
+// --- for linux
+
+#if !defined(_MSC_VER)
+// stricmpはlinux系では存在しないらしく、置き換える。
+#define _stricmp strcasecmp
+
+// あと、getline()したときにテキストファイルが'\r\n'だと
+// '\r'が末尾に残るのでこの'\r'を除去するためにwrapperを書く。
+// そのため、fstreamに対してgetline()を呼び出すときは、
+// std::getline()ではなく単にgetline()と書いて、この関数を使うべき。
+inline bool getline(std::fstream& fs, std::string& s)
+{
+	bool b = (bool)std::getline(fs, s);
+	if (s.size() && s[s.size() - 1] == '\r')
+		s.erase(s.size() - 1);
+	return b;
+}
+
+#endif
 
 // --- output for Japanese notation
 
@@ -456,6 +518,56 @@ const bool Is64Bit = false;
 #ifdef USE_SSE41
 #define USE_SSE2
 #endif
+
+// ----------------------------
+//     mutex wrapper
+// ----------------------------
+
+// std::mutexをもっと速い実装に差し替えたい時のためにwrapしておく。
+typedef std::mutex Mutex;
+typedef std::condition_variable ConditionVariable;
+
+
+// ----------------------------
+//     mkdir wrapper
+// ----------------------------
+
+#if defined(_MSC_VER)
+
+// Windows用
+
+#include <codecvt>	// mkdirするのにwstringが欲しいのでこれが必要
+
+// フォルダを作成する。日本語は使っていないものとする。
+// カレントフォルダ相対で指定する。
+// 成功すれば0、失敗すれば非0が返る。
+inline int MKDIR(std::string dir_name)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+	return _wmkdir(cv.from_bytes(dir_name).c_str());
+}
+#elif defined(_LINUX)
+// linux環境において、この_LINUXというシンボルはmakefileにて定義されるものとする。
+
+// Linux用のmkdir実装。
+#include "sys/stat.h"
+
+inline int MKDIR(std::string dir_name)
+{
+	return ::mkdir(dir_name.c_str(), 0777);
+}
+
+#else
+
+// Linux環境かどうかを判定するためにはmakefileを分けないといけなくなってくるな..
+// linuxでフォルダ掘る機能は、とりあえずナシでいいや..。評価関数ファイルの保存にしか使ってないし…。
+inline int MKDIR(std::string dir_name)
+{
+	return 0;
+}
+
+#endif
+
 
 // ----------------------------
 //     evaluate function

@@ -203,6 +203,7 @@
     <ClInclude Include="engine\help-mate-engine\help-mate-search.h" />
     <ClInclude Include="engine\mate-engine\mate-search.h" />
     <ClInclude Include="evaluate.h" />
+    <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
@@ -218,6 +219,8 @@
     <ClInclude Include="experimental_learner.h" />
     <ClInclude Include="extra\move_picker_2015.h" />
     <ClInclude Include="extra\move_picker_2016Q2.h" />
+    <ClInclude Include="learn\learn.h" />
+    <ClInclude Include="learn\multi_think.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
     <ClInclude Include="search.h" />
@@ -254,12 +257,16 @@
     <ClCompile Include="extra\mate1ply_without_effect.cpp" />
     <ClCompile Include="extra\move_picker_2016Q2.cpp" />
     <ClCompile Include="extra\see.cpp" />
+    <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
     <ClCompile Include="kifu_generator.cpp" />
     <ClCompile Include="kifu_reader.cpp" />
     <ClCompile Include="kifu_writer.cpp" />
     <ClCompile Include="experimental_learner.cpp" />
+    <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
+    <ClCompile Include="learn\learner.cpp" />
+    <ClCompile Include="learn\multi_think.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
     <ClCompile Include="shogi.cpp" />
@@ -271,6 +278,7 @@
   <ItemGroup>
     <Text Include="..\docs\old\更新履歴2016Q2まで.txt" />
     <Text Include="..\docs\USI拡張コマンド.txt" />
+    <Text Include="..\docs\やねうら大定跡.txt" />
     <Text Include="..\docs\実験記録.txt" />
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
@@ -295,7 +303,6 @@
     <None Include="..\exe\YaneuraOu-2016-mid-sse41.exe" />
     <None Include="..\exe\YaneuraOu-2016-mid-sse42.exe" />
     <None Include="..\exe\YaneuraOu-2016-mid.exe" />
-    <None Include="..\exe\YaneuraOu-2016-Mid_gcc.exe" />
     <None Include="..\exe\YaneuraOu-classic-tce.exe" />
     <None Include="..\exe\YaneuraOu-classic.exe" />
     <None Include="..\exe\YaneuraOu-local-server.exe" />

@@ -23,9 +23,9 @@ namespace Eval
   typedef std::array<int32_t, 2> ValueKkp;
   typedef std::array<int32_t, 2> ValueKk;
   // FV_SCALE‚ÅŠ„‚é‘O‚Ì’l‚ª“ü‚é
-  extern ValueKpp kpp[SQ_NB][fe_end][fe_end];
-  extern ValueKkp kkp[SQ_NB][SQ_NB][fe_end];
-  extern ValueKk kk[SQ_NB][SQ_NB];
+  extern ALIGNED(32) ValueKk kk[SQ_NB][SQ_NB];
+  extern ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end][fe_end];
+  extern ALIGNED(32) ValueKkp kkp[SQ_NB][SQ_NB][fe_end];
   extern const int FV_SCALE = 32;
 
   void save_eval();

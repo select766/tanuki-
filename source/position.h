@@ -161,7 +161,14 @@ struct StateInfo {
   HASH_KEY hand_key_;
 
   // 一つ前の局面に遡るためのポインタ。
-  // NULL MOVEなどでそこより遡って欲しくないときはnullptrを設定しておく。
+  // この値としてnullptrが設定されているケースは、
+  // 1) root node
+  // 2) 直前がnull move
+  // のみである。
+  // 評価関数を差分計算するときに、
+  // 1)は、compute_eval()を呼び出して差分計算しないからprevious==nullで問題ない。
+  // 2)は、このnodeのEvalSum sum(これはdo_move_null()でコピーされている)から
+  //   計算出来るから問題ない。
   StateInfo* previous;
 
 };
@@ -176,7 +183,15 @@ struct Position
   // --- ctor
 
   // コンストラクタではおまけとして平手の開始局面にする。
-  Position() { clear(); set_hirate(); }
+  Position() { clear(); 
+#ifndef USE_SHARED_MEMORY_IN_EVAL
+    // Positionのコンストラクタで平手に初期化すると、compute_eval()が呼び出され、このときに
+    // 評価関数テーブルを参照するが、isready()が呼び出されていないのでこの初期化が出来ない。
+    // ゆえに、この処理は本来ならやめたほうが良い。
+    // (特にisready()が呼び出されるまでcompute_eval()が呼び出せない状況においては。)
+    set_hirate();
+#endif
+  }
 
   // コピー。startStateもコピーして、外部のデータに依存しないように(detach)する。
   // 積極的に使うべきではない。探索開始時にslaveに局面をコピーするときに仕方なく使っているだけ。
@@ -206,6 +221,7 @@ struct Position
   Color side_to_move() const { return sideToMove; }
 
   // (将棋の)開始局面からの手数を返す。
+  // 平手の開始局面なら1が返る。(0ではない)
   int game_ply() const { return gamePly; }
 
   // この局面クラスを用いて探索しているスレッドを返す。 
@@ -540,6 +556,30 @@ struct Position
   // 条件を満たしているとき、MOVE_WINや、玉を移動する指し手(トライルール時)が返る。さもなくば、MOVE_NONEが返る。
   // mate1ply()から内部的に呼び出す。(そうするとついでに処理出来て良い)
   Move DeclarationWin() const;
+#endif
+
+  // -- sfen化ヘルパ
+#ifdef USE_SFEN_PACKER
+  // packされたsfenを得る。引数に指定したバッファに返す。
+  // gamePlyはpackに含めない。
+  void sfen_pack(u8 data[32]);
+
+  // packされたsfenを解凍する。sfen文字列が返る。
+  // gamePly = 0となる。
+  static std::string sfen_unpack(u8 data[32]);
+
+  // ↑sfenを経由すると遅いので直接packされたsfenをセットする関数を作った。
+  // pos.set(sfen_unpack(data)); と等価。
+  void set_from_packed_sfen(u8 data[32]);
+
+  // 盤面と手駒、手番を与えて、そのsfenを返す。
+  static std::string sfen_from_rawdata(Piece board[81], Hand hands[2], Color turn, int gamePly);
+
+  // sq1,sq2の駒を入れ替える。(という指し手だと思うと良い)
+  // 棋譜生成のときなど特殊な用途に用いる。王手されている局面で呼び出してはならない。
+  // もし歩が1段目にあるなど、非合法局面に突入するなら2駒を入れ替えずにfalseを返す。
+  // ※　内部的に一端sfen()化するのだが、そのときにsfen_from_rawdata()を用いるのでsfen_packer.cppに依存。
+  bool do_move_by_swapping_pieces(Square sq1, Square sq2);
 #endif
 
   // -- 利き

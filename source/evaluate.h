@@ -39,6 +39,26 @@ namespace Eval {
   // 評価値の内訳表示(デバッグ用)
   void print_eval_stat(Position& pos);
 
+#if defined(EVAL_LEARN) && defined(EVAL_KPPT)
+  // 学習のための初期化(評価関数の読み込み時に行う。)
+  void eval_learn_init();
+
+  // 学習のときの勾配配列の初期化
+  void init_grad();
+
+  // 現在の局面で出現している特徴すべてに対して、勾配の差分値を勾配配列に加算する。
+  void add_grad(Position& pos , Color rootColor , double delt_grad);
+
+  // 現在の勾配をもとにSGDかAdaGradか何かする。
+  // epochは学習の反復回数が何回目であるか。
+  void update_weights(u64 mini_batch_size,u64 epoch);
+
+  // 評価関数パラメーターをファイルに保存する。
+  // ファイルの末尾につける拡張子を指定できる。
+  void save_eval(std::string suffix);
+
+#endif
+
 #ifdef EVAL_NO_USE
 
   // 評価関数を用いないときもValueを正規化するときに歩の価値は必要。
