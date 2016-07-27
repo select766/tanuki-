@@ -46,14 +46,14 @@ namespace
   struct Weight
   {
     // 勾配の和
-    WeightType sum_gradient = 0.0;
+    WeightType sum_gradient;
     // 重み
-    WeightType w = 0.0;
+    WeightType w;
     // Adam用変数
-    WeightType m = 0.0;
-    WeightType v = 0.0;
+    WeightType m;
+    WeightType v;
     // 平均化確率的勾配降下法用変数
-    WeightType sum_w = 0.0;
+    WeightType sum_w;
 
     void AddGradient(double gradient);
     template<typename T>
@@ -109,6 +109,7 @@ namespace
   }
 
   void RawIndexToKppIndex(int dimension_index, Square& k, Eval::BonaPiece& p0, Eval::BonaPiece& p1, WeightKind& weight_kind) {
+    int original_dimension_index = dimension_index;
     ASSERT_LV3(IsKppIndex(dimension_index));
     weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
     dimension_index /= WEIGHT_KIND_NB;
@@ -118,31 +119,35 @@ namespace
     dimension_index /= Eval::fe_end;
     k = static_cast<Square>(dimension_index);
     ASSERT_LV3(k < SQ_NB);
-    ASSERT_LV3(KppIndexToRawIndex(k, p0, p1, weight_kind) == dimension_index);
+    ASSERT_LV3(KppIndexToRawIndex(k, p0, p1, weight_kind) == original_dimension_index);
   }
 
   void RawIndexToKkpIndex(int dimension_index, Square& k0, Square& k1, Eval::BonaPiece& p, WeightKind& weight_kind) {
+    int original_dimension_index = dimension_index;
     ASSERT_LV3(IsKkpIndex(dimension_index));
+    dimension_index -= KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
     weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
     dimension_index /= WEIGHT_KIND_NB;
     p = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
     dimension_index /= Eval::fe_end;
     k1 = static_cast<Square>(dimension_index % SQ_NB);
     dimension_index /= SQ_NB;
-    k0 = static_cast<Square>(dimension_index % SQ_NB);
+    k0 = static_cast<Square>(dimension_index);
     ASSERT_LV3(k0 < SQ_NB);
-    ASSERT_LV3(KkpIndexToRawIndex(k0, k1, p, weight_kind) == dimension_index);
+    ASSERT_LV3(KkpIndexToRawIndex(k0, k1, p, weight_kind) == original_dimension_index);
   }
 
   void RawIndexToKkIndex(int dimension_index, Square& k0, Square& k1, WeightKind& weight_kind) {
+    int original_dimension_index = dimension_index;
     ASSERT_LV3(IsKkIndex(dimension_index));
+    dimension_index -= KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
     weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
     dimension_index /= WEIGHT_KIND_NB;
     k1 = static_cast<Square>(dimension_index % SQ_NB);
     dimension_index /= SQ_NB;
-    k0 = static_cast<Square>(dimension_index % SQ_NB);
+    k0 = static_cast<Square>(dimension_index);
     ASSERT_LV3(k0 < SQ_NB);
-    ASSERT_LV3(KkIndexToRawIndex(k0, k1, weight_kind) == dimension_index);
+    ASSERT_LV3(KkIndexToRawIndex(k0, k1, weight_kind) == original_dimension_index);
   }
 
   void Weight::AddGradient(double gradient) {
@@ -282,8 +287,9 @@ namespace
     _mkdir(output_folder_path_base.c_str());
 
     char buffer[1024];
-    sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
-    printf("Writing eval files: %s\n", buffer);
+    std::sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
+    std::printf("Writing eval files: %s\n", buffer);
+    std::fflush(stdout);
     Options["EvalDir"] = buffer;
     _mkdir(buffer);
     Eval::save_eval();
@@ -323,7 +329,7 @@ void Learner::learn(std::istringstream& iss)
   }
 
   ASSERT_LV3(
-    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_NB) ==
+    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
@@ -442,10 +448,11 @@ void Learner::learn(std::istringstream& iss)
 
       time(&current_time);
       local_time = localtime(&current_time);
-      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
         num_processed_positions, kMaxPositionsForLearning,
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+      std::fflush(stdout);
     }
 
     int num_records = static_cast<int>(std::min(
@@ -583,11 +590,13 @@ void Learner::learn(std::istringstream& iss)
     if (num_processed_positions >= next_record_index_to_decay_learning_rate) {
         learning_rate *= kLearningRateDecayRate;
         next_record_index_to_decay_learning_rate += kNumPositionsToDecayLearningRate;
-        printf("Decayed the learning rate: learning_rate=%f\n", learning_rate);
+        std::printf("Decayed the learning rate: learning_rate=%f\n", learning_rate);
+        std::fflush(stdout);
     }
   }
 
-  printf("Finalizing weights\n");
+  std::printf("Finalizing weights\n");
+  std::fflush(stdout);
 
   // 平均化法をかけた後、評価関数テーブルに重みを書き出す
 #pragma omp parallel for
@@ -682,10 +691,11 @@ void Learner::error_measurement()
 
       time(&current_time);
       local_time = localtime(&current_time);
-      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
         num_processed_positions, kMaxPositionsForErrorMeasurement,
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+      std::fflush(stdout);
     }
 
     int num_records = static_cast<int>(std::min(
@@ -725,12 +735,13 @@ void Learner::error_measurement()
     num_processed_positions += num_records;
   }
 
-  printf(
+  std::printf(
     "info string rmse_value=%f rmse_winning_percentage=%f mean_cross_entropy=%f norm=%f\n",
     std::sqrt(sum_squared_error_of_value / kMaxPositionsForErrorMeasurement),
     std::sqrt(sum_squared_error_of_winning_percentage / kMaxPositionsForErrorMeasurement),
     sum_cross_entropy / kMaxPositionsForErrorMeasurement,
     sum_norm / kMaxPositionsForErrorMeasurement);
+  std::fflush(stdout);
 }
 
 void Learner::kifu_reader_benchmark()
@@ -755,10 +766,11 @@ void Learner::kifu_reader_benchmark()
 
       time(&current_time);
       local_time = localtime(&current_time);
-      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
         num_processed_positions, kMaxPositionsForLearning,
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+      std::fflush(stdout);
     }
 
     int num_records = static_cast<int>(std::min(
