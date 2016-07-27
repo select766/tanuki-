@@ -215,7 +215,7 @@
     <ClInclude Include="kifu_generator.h" />
     <ClInclude Include="kifu_reader.h" />
     <ClInclude Include="kifu_writer.h" />
-    <ClInclude Include="learner.h" />
+    <ClInclude Include="experimental_learner.h" />
     <ClInclude Include="extra\move_picker_2015.h" />
     <ClInclude Include="extra\move_picker_2016Q2.h" />
     <ClInclude Include="misc.h" />
@@ -259,7 +259,7 @@
     <ClCompile Include="kifu_generator.cpp" />
     <ClCompile Include="kifu_reader.cpp" />
     <ClCompile Include="kifu_writer.cpp" />
-    <ClCompile Include="learner.cpp" />
+    <ClCompile Include="experimental_learner.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
     <ClCompile Include="shogi.cpp" />

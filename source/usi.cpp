@@ -2,7 +2,7 @@
 #include <queue>
 
 #include "kifu_generator.h"
-#include "learner.h"
+#include "experimental_learner.h"
 #include "misc.h"
 #include "position.h"
 #include "search.h"
