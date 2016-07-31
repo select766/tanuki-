@@ -11,6 +11,9 @@
 #include "search.h"
 #include "thread.h"
 
+// Gradient Noise
+#define GRADIENT_NOISE
+
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -75,6 +78,10 @@ namespace
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
+#ifdef GRADIENT_NOISE
+  constexpr double kGradientNoiseEta = 0.01;
+  constexpr double kGradientNoiseTau = 0.55;
+#endif
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -535,6 +542,12 @@ void Learner::learn(std::istringstream& iss)
         double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
         double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
 
+#ifdef GRADIENT_NOISE
+        std::random_device random_device;
+        std::mt19937_64 mt19937_64(random_device());
+        std::normal_distribution<> normal_distribution(0.0, kGradientNoiseEta / pow(1.0 + num_mini_batches, kGradientNoiseTau));
+#endif
+
         // •À—ñ‰»‚ðŒø‚©‚¹‚½‚¢‚Ì‚Ådimension_index‚Å‰ñ‚·
 #pragma omp for schedule(guided)
         for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
@@ -550,8 +563,12 @@ void Learner::learn(std::istringstream& iss)
                     continue;
                 }
 
-                weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].UpdateWeight(
-                    adam_beta1_t, adam_beta2_t, learning_rate, Eval::kpp[k][p0][p1][weight_kind]);
+                auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
+#ifdef GRADIENT_NOISE
+                weight.AddGradient(normal_distribution(mt19937_64));
+#endif
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+                  Eval::kpp[k][p0][p1][weight_kind]);
                 Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
 
             }
@@ -561,8 +578,12 @@ void Learner::learn(std::istringstream& iss)
                 Eval::BonaPiece p;
                 WeightKind weight_kind;
                 RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-                weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].UpdateWeight(
-                    adam_beta1_t, adam_beta2_t, learning_rate, Eval::kkp[k0][k1][p][weight_kind]);
+                auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
+#ifdef GRADIENT_NOISE
+                weight.AddGradient(normal_distribution(mt19937_64));
+#endif
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+                  Eval::kkp[k0][k1][p][weight_kind]);
 
             }
             else if (IsKkIndex(dimension_index)) {
@@ -570,8 +591,12 @@ void Learner::learn(std::istringstream& iss)
                 Square k1;
                 WeightKind weight_kind;
                 RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-                weights[KkIndexToRawIndex(k0, k1, weight_kind)].UpdateWeight(
-                    adam_beta1_t, adam_beta2_t, learning_rate, Eval::kk[k0][k1][weight_kind]);
+                auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
+#ifdef GRADIENT_NOISE
+                weight.AddGradient(normal_distribution(mt19937_64));
+#endif
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+                  Eval::kk[k0][k1][weight_kind]);
 
             }
             else {
