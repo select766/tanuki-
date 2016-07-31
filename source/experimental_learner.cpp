@@ -68,13 +68,13 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kInitialLearningRate = 1.0;
-  constexpr WeightType kLearningRateDecayRate = 0.5;
-  constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;  // 5â≠
+  constexpr WeightType kInitialLearningRate = 0.5;
+  constexpr WeightType kLearningRateDecayRate = 1.0;
+  constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
-  constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;  // 1êÁñú
-  constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;  // 100â≠
-  constexpr int64_t kMiniBatchSize = 10'0000LL;  //10ñú
+  constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 100'0000'0000LL;
+  constexpr int64_t kMiniBatchSize = 10'0000LL;
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;

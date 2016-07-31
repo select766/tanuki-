@@ -9,7 +9,7 @@
 
 namespace {
   constexpr int kBatchSize = 10000000; // 100–œ
-  constexpr Value kCloseOutValueThreshold = Value(2000);
+  constexpr Value kCloseOutValueThreshold = Value(VALUE_INFINITE);
   constexpr int kBufferSize = 1 << 24; // 16MB
 }
 
