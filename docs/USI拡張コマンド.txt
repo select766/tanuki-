@@ -63,6 +63,7 @@ set option name XXX value ...で設定できるoption
 	BookFile 定跡ファイル : 定跡ファイルの選択
 
 					# このコンボボックスの値
+					no_book          定跡なし
 					standard_book.db 標準定跡
 					yaneura_book1.db やねうら大定跡(公開用)
 					yaneura_book2.db やねうら超定跡(公開用)
@@ -109,6 +110,19 @@ set option name XXX value ...で設定できるoption
 	CM_Hash			: 協力詰め時の置換表サイズ(単位[MB])
 
 
+	// local-game-server時
+
+	EngineConfigDir			: "engine_configX.txt"が配置してあるフォルダ
+	
+	EngineNuma				: 子プロセスでEngineを実行するプロセッサグループ(Numa node)
+							  -1なら、指定なし。
+
+	BookSfenFile			: 連続自己対戦のときに定跡の局面まで進めるためのsfenファイル。
+							  このファイルの棋譜のまま32手目まで進める。
+							  book/book.sfen
+							  のように指定する。
+
+
 ■　USI拡張コマンド
 
 	d       : Debug デバッグ用に現在の局面を表示する。
@@ -123,16 +137,16 @@ set option name XXX value ...で設定できるoption
 	mate1   : 現在の局面に対してmate1ply()を呼び出す。
 
 	bench   : ベンチマーク
-		bench [置換表サイズ][スレッド数][LimitType = depth , nodes, time][←の指定][局面の指定]
+		bench [置換表サイズ][スレッド数][→の指定][LimitType = depth , nodes, time][局面の指定]
 		例)
-			bench 1024 1 depth 10
+			bench 1024 1 10 depth
 			※　パラメーター省略時は上記の設定
 		
 		[局面の指定]について
 		  "default"=デフォルトの局面、"current"=現在の局面、
 		  それ以外 = ファイル名とみなしてそのsfenファイルを読み込む
 
-		例) bench 1024 1 depth 10 current
+		例) bench 1024 1 10 depth current
 
 
 	test    : テスト用コマンド
@@ -157,8 +171,9 @@ set option name XXX value ...で設定できるoption
 
 	// やねうら王2016Mid LEARN版のみ
 
-	gensfen [depth 探索深さ] [loop 生成する棋譜の数] [file ファイル名]  : 学習用の自己対局棋譜の生成
+	gensfen [depth 探索深さ] [loop 生成する棋譜の数] [file ファイル名] [eval_limit 評価値]  : 学習用の自己対局棋譜の生成
 		例) gensfen depth 6  (残りは省略可)
+			eval_limitは、評価値の絶対値がこの値を上回った時点でその対局を終了するという値。
 
 	learn [ファイル名1] [ファイル名2] …   : 生成した棋譜から評価関数パラメーターの学習をさせる。
 
