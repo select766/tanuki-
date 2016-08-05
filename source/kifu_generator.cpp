@@ -2,11 +2,12 @@
 
 #include <atomic>
 #include <ctime>
+#include <direct.h>
 #include <fstream>
 #include <memory>
+#include <omp.h>
 #include <random>
 #include <sstream>
-#include <omp.h>
 
 #include "kifu_writer.h"
 #include "search.h"
@@ -86,6 +87,9 @@ void Learner::GenerateKifu()
   limits.silent = true;
   Search::Limits = limits;
 
+  std::string kifu_directory = (std::string)Options["KifuDir"];
+  _mkdir(kifu_directory.c_str());
+
   auto start = std::chrono::system_clock::now();
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
@@ -95,9 +99,8 @@ void Learner::GenerateKifu()
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
-    std::sprintf(output_file_path, "%s/kifu.%s.%d.%d.%03d.bin",
-      ((std::string)Options["KifuDir"]).c_str(), kOutputFileNameDate, kSearchDepth, kNumGames,
-      thread_index);
+    std::sprintf(output_file_path, "%s/kifu.%s.%d.%d.%03d.bin", kifu_directory.c_str(),
+      kOutputFileNameDate, kSearchDepth, kNumGames, thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
