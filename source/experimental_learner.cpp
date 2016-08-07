@@ -60,8 +60,11 @@ namespace
 
     void AddGradient(double gradient);
     template<typename T>
-    void UpdateWeight(
-      double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight);
+    void UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
+#ifdef GRADIENT_NOISE
+        double gradient_noise,
+#endif
+        T& eval_weight);
     template<typename T>
     void Finalize(int num_mini_batches, T& eval_weight);
   };
@@ -163,7 +166,11 @@ namespace
   }
 
   template<typename T>
-  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
+  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
+#ifdef GRADIENT_NOISE
+      double gradient_noise,
+#endif
+      T& eval_weight) {
     // Adam
     m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient;
     v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient * sum_gradient;
@@ -172,6 +179,10 @@ namespace
     WeightType vv = v / (1.0 - adam_beta2_t);
     WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
     w -= delta;
+
+#ifdef GRADIENT_NOISE
+    w += gradient_noise;
+#endif
 
     // 平均化確率的勾配降下法
     sum_w += w;
@@ -510,53 +521,53 @@ void Learner::Learn(std::istringstream& iss) {
 
       // 並列化を効かせたいのでdimension_indexで回す
 #pragma omp for schedule(guided)
-      for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
-        if (IsKppIndex(dimension_index)) {
-          Square k;
-          Eval::BonaPiece p0;
-          Eval::BonaPiece p1;
-          WeightKind weight_kind;
-          RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
+        for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+            if (IsKppIndex(dimension_index)) {
+                Square k;
+                Eval::BonaPiece p0;
+                Eval::BonaPiece p1;
+                WeightKind weight_kind;
+                RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
 
-          // 常にp0 < p1となるようにアクセスする
-          if (p0 > p1) {
-            continue;
-          }
+                // 常にp0 < p1となるようにアクセスする
+                if (p0 > p1) {
+                    continue;
+                }
 
-          auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
+                auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
+                    normal_distribution(mt19937_64),
 #endif
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kpp[k][p0][p1][weight_kind]);
-          Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
+                    Eval::kpp[k][p0][p1][weight_kind]);
+                Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
 
-        }
-        else if (IsKkpIndex(dimension_index)) {
-          Square k0;
-          Square k1;
-          Eval::BonaPiece p;
-          WeightKind weight_kind;
-          RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-          auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
+            }
+            else if (IsKkpIndex(dimension_index)) {
+                Square k0;
+                Square k1;
+                Eval::BonaPiece p;
+                WeightKind weight_kind;
+                RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
+                auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
+                    normal_distribution(mt19937_64),
 #endif
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kkp[k0][k1][p][weight_kind]);
+                  Eval::kkp[k0][k1][p][weight_kind]);
 
-        }
-        else if (IsKkIndex(dimension_index)) {
-          Square k0;
-          Square k1;
-          WeightKind weight_kind;
-          RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-          auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
+            }
+            else if (IsKkIndex(dimension_index)) {
+                Square k0;
+                Square k1;
+                WeightKind weight_kind;
+                RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
+                auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
+                    normal_distribution(mt19937_64),
 #endif
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kk[k0][k1][weight_kind]);
+                    Eval::kk[k0][k1][weight_kind]);
 
         }
         else {
