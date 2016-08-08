@@ -81,6 +81,8 @@ void Learner::GenerateKifu()
 
   Eval::load_eval();
 
+  omp_set_num_threads((int)Options["Threads"]);
+
   Search::LimitsType limits;
   limits.max_game_ply = kMaxGamePlay;
   limits.depth = kSearchDepth;
