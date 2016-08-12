@@ -40,8 +40,11 @@ def GenerateKifu(kifu_output_folder_path_base, eval_folder_path, generate_kifu_e
   print('-' * 80)
   print('GenerateKifu')
   kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
-  input = '''setoption name KifuDir value {0}
+  input = '''usi
+setoption name KifuDir value {0}
 setoption name Threads value {1}
+isready
+usinewgame
 generate_kifu
 '''.format(kifu_folder_path, num_threads).encode('utf-8')
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
@@ -52,9 +55,12 @@ def Learn(kifu_folder_path, learner_output_folder_path_base, learner_exe_file_pa
   print('-' * 80)
   print('Learn')
   eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
-  input = '''setoption name KifuDir value {0}
+  input = '''usi
+setoption name KifuDir value {0}
 setoption name Threads value {1}
 setoption name MaxMovesToDraw value 300
+isready
+usinewgame
 learn output_folder_path_base {2}
 '''.format(kifu_folder_path, num_threads, eval_folder_path_base).encode('utf-8')
   subprocess.run([learner_exe_file_path], input=input, check=True)
