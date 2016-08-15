@@ -22,6 +22,7 @@
     <ProjectGuid>{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>YaneuraOu</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -312,6 +313,7 @@
     <None Include="..\README.md" />
     <None Include="..\script\calc_rating.py" />
     <None Include="..\script\engine_invoker.py" />
+    <None Include="..\script\engine_invoker2.py" />
     <None Include="Makefile" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -14,6 +14,483 @@ ToDo:
 ・mate3()書く。
 
 
+・魔女と長い時間で対局させてチューニング
+・技巧と長い時間で対局させてチューニング
+
+
+■　2016/08/16
+
+・あー、別のプロセッサグループのほうで確保している共有メモリ上の評価関数バイナリにアクセスしてnps下がる問題があるのか…。
+	弱くなるのは、これかも知れん…。この問題、回避できるか考えるか…。
+	Numa指定しているので、これで回避するか。
+	→　そうした。
+
+		auto dir_name = (string)Options["EvalDir"] + "Numa" + (string)Options["EngineNuma"];
+
+
+・新Apery評価関数
+
+		engine1 = YaneuraOuV356.exe , eval = Apery20160812
+		engine2 = YaneuraOuV356.exe , eval = Apery20160815
+		play_time = R100 ,  459 - 9 - 532(46.32% R-25.64)
+
+		engine1 = YaneuraOuV355c.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160815
+		play_time = r100 ,  4608 - 88 - 5304(46.49% R-24.44)
+
+・
+	pythonの自己対戦スクリプトでこのモードを使うオプション追加。
+	R100と指定したときにnodes as timeモードでgo rtimeすればいい。
+
+・npmsec(nodes time)実装。
+
+	StockfishのこのコードだとavailableNodesマイナスになるな…。
+
+		if (Limits.npmsec)
+			Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
+
+			↓正しい
+
+		if (Limits.npmsec)
+			Time.availableNodes = std::max(Time.availableNodes + Limits.inc[us] - Threads.nodes_searched() , (s64)0);
+
+	→　うまく動くようになった。
+
+		nodestime 600
+		bookfile no_book
+		threads 1
+		isready
+		go btime 0 wtime 0 byoyomi 10000
+
+
+・棋譜生成中に一回落ちたようだ。まだ何かバグがあるのか？
+
+	王がいないのに駒を入れ替えようとしている気がする。修正。
+
+	-	  if (rand(5) == 0 && !pos.in_check())
+	+	  if (rand(5) == 0 && !pos.in_check() && pos.pieces(pos.side_to_move()).pop_count() >= 6)
+
+	→　局面生成、盤上に王が1枚しかないときに盤上の2駒を交換しようとするバグ修正。
+
+・結論的には論理コア数で対局させている部分が勝率が偏る原因なのかも。
+
+V3.55d
+・勝率が偏る何らかのバグがあるのではなかろうか。
+	・試合ごとに100%先後入れ替えを行うコードに変更。
+
+	・node timeを使うようにして実験して結果を比較する。
+	rtime 100、探索ノード数、えらくバラけるのな…。計測する。
+
+	r800でこんなにノード数がばらけるのか…。
+		[0]>[0]:nodes = 20363864
+		[1]>[1]:nodes = 20744891
+		[2]>[2]:nodes = 21874493
+		[3]>[3]:nodes = 21750293
+		[4]>[4]:nodes = 22399119
+		[5]>[5]:nodes = 21734169
+		[6]>[6]:nodes = 21752231
+		[7]>[7]:nodes = 21675186
+		[8]>[8]:nodes = 21572781
+		[9]>[9]:nodes = 21487627
+		[10]>[10]:nodes = 20881973
+		[11]>[11]:nodes = 20663296
+		[12]>[12]:nodes = 22916210
+		[13]>[13]:nodes = 22998869
+		[14]>[14]:nodes = 26664840
+		[15]>[15]:nodes = 26381428
+		[16]>[16]:nodes = 24247710
+		[17]>[17]:nodes = 24819605
+		[18]>[18]:nodes = 21067147
+		[19]>[19]:nodes = 21018924
+		[20]>[20]:nodes = 23893265
+		[21]>[21]:nodes = 24507673
+		[22]>[22]:nodes = 21255278
+		[23]>[23]:nodes = 20963676
+		[24]>[24]:nodes = 20965547
+		[25]>[25]:nodes = 21068620
+		[26]>[26]:nodes = 22536674
+		[27]>[27]:nodes = 22111534
+		[28]>[28]:nodes = 22879069
+		[29]>[29]:nodes = 22788974
+		[30]>[30]:nodes = 21381039
+		[31]>[31]:nodes = 21017634
+		[32]>[32]:nodes = 21315693
+		[33]>[33]:nodes = 21722500
+		[34]>[34]:nodes = 26349641
+		[35]>[35]:nodes = 26164092
+		[36]>[36]:nodes = 20930819
+		[37]>[37]:nodes = 20491492
+		[38]>[38]:nodes = 19211609
+		[39]>[39]:nodes = 18682395
+		[40]>[40]:nodes = 27855861
+		[41]>[41]:nodes = 27651489
+		[42]>[42]:nodes = 21556602
+		[43]>[43]:nodes = 21282200
+		[44]>[44]:nodes = 22478077
+		[45]>[45]:nodes = 22968655
+		[46]>[46]:nodes = 20460481
+		[47]>[47]:nodes = 19843664
+		[48]>[48]:nodes = 20870773
+		[49]>[49]:nodes = 20785280
+		[50]>[50]:nodes = 23068323
+		[51]>[51]:nodes = 23565440
+		[52]>[52]:nodes = 21320920
+		[53]>[53]:nodes = 21161635
+		[54]>[54]:nodes = 21115954
+		[55]>[55]:nodes = 20995289
+		[56]>[56]:nodes = 21724263
+		[57]>[57]:nodes = 21012110
+		[58]>[58]:nodes = 23672782
+		[59]>[59]:nodes = 22954859
+		[60]>[60]:nodes = 15097775
+		[61]>[61]:nodes = 15073528
+		[62]>[62]:nodes = 29348011
+		[63]>[63]:nodes = 28035943
+		[64]>[64]:nodes = 22817543
+		[65]>[65]:nodes = 22589792
+		[66]>[66]:nodes = 28242065
+		[67]>[67]:nodes = 27440958
+		[68]>[68]:nodes = 21412728
+		[69]>[69]:nodes = 20802815
+		[70]>[70]:nodes = 27630030
+		[71]>[71]:nodes = 27063267
+		[72]>[72]:nodes = 17403381
+		[73]>[73]:nodes = 17323907
+		[74]>[74]:nodes = 16034151
+		[75]>[75]:nodes = 15697004
+		[76]>[76]:nodes = 22112309
+		[77]>[77]:nodes = 21364827
+		[78]>[78]:nodes = 22952334
+		[79]>[79]:nodes = 22628834
+
+		15097775 - 27630030 : 1.83倍の差
+
+		→　物理コア数の対局に変更してみると？
+
+		[0]>[0]:nodes = 72778726
+		[1]>[1]:nodes = 71657256
+		[2]>[2]:nodes = 64666496
+		[3]>[3]:nodes = 63066345
+		[4]>[4]:nodes = 71414765
+		[5]>[5]:nodes = 73613827
+		[6]>[6]:nodes = 56565616
+		[7]>[7]:nodes = 58077844
+		[8]>[8]:nodes = 68926843
+		[9]>[9]:nodes = 69559993
+		[10]>[10]:nodes = 74962515
+		[11]>[11]:nodes = 74549508
+		[12]>[12]:nodes = 70282782
+		[13]>[13]:nodes = 68744785
+		[14]>[14]:nodes = 60240593
+		[15]>[15]:nodes = 61250890
+		[16]>[16]:nodes = 68752998
+		[17]>[17]:nodes = 69279530
+		[18]>[18]:nodes = 68655945
+		[19]>[19]:nodes = 66190164
+		[20]>[20]:nodes = 57567300
+		[21]>[21]:nodes = 56114884
+		[22]>[22]:nodes = 54486533
+		[23]>[23]:nodes = 52976596
+		[24]>[24]:nodes = 66878126
+		[25]>[25]:nodes = 68354855
+		[26]>[26]:nodes = 72467258
+		[27]>[27]:nodes = 72728019
+		[28]>[28]:nodes = 68099646
+		[29]>[29]:nodes = 67738500
+		[30]>[30]:nodes = 68910429
+		[31]>[31]:nodes = 68203175
+		[32]>[32]:nodes = 59719500
+		[33]>[33]:nodes = 59823454
+		[34]>[34]:nodes = 66506641
+		[35]>[35]:nodes = 65057131
+		[36]>[36]:nodes = 76214742
+		[37]>[37]:nodes = 77401322
+		[38]>[38]:nodes = 69462037
+		[39]>[39]:nodes = 69251546
+
+		56565616 vs 77401322 : 1.36倍の差。少しマシ。
+
+		// 対局は物理コア数にしたほうが安定するようだ。
+
+		Core i7 4771 HT8 vs PT4
+
+		[0]>[0]:nodes = 3711650
+		[1]>[1]:nodes = 3594807
+		[2]>[2]:nodes = 3527019
+		[3]>[3]:nodes = 3314408
+		[4]>[4]:nodes = 3838580
+		[5]>[5]:nodes = 3751745
+		[6]>[6]:nodes = 4198603
+		[7]>[7]:nodes = 4204947
+		[8]>[8]:nodes = 3484324
+		[9]>[9]:nodes = 3575383
+		[10]>[10]:nodes = 4398044
+		[11]>[11]:nodes = 4328146
+		[12]>[12]:nodes = 3596432
+		[13]>[13]:nodes = 3609833
+		[14]>[14]:nodes = 2979575
+		[15]>[15]:nodes = 2809125
+
+		[0]>[0]:nodes = 10579514
+		[1]>[1]:nodes = 10800451
+		[2]>[2]:nodes = 9133548
+		[3]>[3]:nodes = 8892816
+		[4]>[4]:nodes = 9813755
+		[5]>[5]:nodes = 9812529
+		[6]>[6]:nodes = 11102674
+		[7]>[7]:nodes = 10892339
+
+V3.55c
+	・2698bがおかしいとしたら評価関数の破壊はされていないわけだから、起動時からおかしいことになるのだが、
+	原因が思いつかない。起動時にすべておかしいということは、評価関数を共有していて、ネットワークからの
+	評価関数の読み込みに失敗している可能性が高いが、それを検知することは簡単には出来ない。
+	CreateしたときにのみevalのCheckSumの値を表示するか？
+	→　そんなことをせずともnodetimeにして結果が一致すれば、2698b、悪くないことになるのだが。
+	ときどきメモリが破損するとしたらそうでもないか。Createに対してなんとかするか。うむむ…。
+	"DISPLAY"の文字が含まれているときはpythonスクリプトのほうで表示することにするか。
+	→　2698b、やはりそんな問題ではなさげなのだが…。
+	
+		check_sum = 28137038
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  434 - 20 - 546(44.29% R-39.88)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  420 - 13 - 567(42.55% R-52.13)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  425 - 13 - 562(43.06% R-48.54)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  430 - 10 - 560(43.43% R-45.89)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  445 - 12 - 543(45.04% R-34.58)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r500 ,  458 - 13 - 529(46.4% R-25.04)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r600 ,  423 - 16 - 561(42.99% R-49.05)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r700 ,  473 - 11 - 516(47.83% R-15.12)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355c.exe , eval = Apery20160812
+		play_time = r800 ,  420 - 11 - 569(42.47% R-52.75)
+
+
+
+V3.55b
+
+・深いdepthでの枝刈り
+	cf. https://github.com/official-stockfish/Stockfish/commit/714329dbdc3c32af6e899c85409935dc3b6d799c
+			  // 次の子nodeにおいて浅い深さになる場合、負のSSE値を持つ指し手の枝刈り
+			  if (predictedDepth < PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
+				  continue;
+
+				  ↓
+
+			  // 浅いdepthで負のSSE値を持つ指し手と、深いdepthで減少する閾値を下回る指し手の枝刈り
+			  if (predictedDepth < 8 * ONE_PLY)
+			  {
+				  Value see_v = predictedDepth < PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH * ONE_PLY ? VALUE_ZERO
+					  : -PawnValue * 2 * Value(predictedDepth - 3 * ONE_PLY);
+
+				  if (pos.see_sign(move) < see_v)
+					  continue;
+			  }
+
+		engine1 = YaneuraOuV355a.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355b.exe , eval = Apery20160812
+		play_time = r100 ,  5571 - 83 - 4346(56.18% R43.14)
+
+		→　この枝刈り、長い持ち時間で効果がある可能性も…。
+
+		b2000 , 3987 - 151 - 3112(56.16% R43.04)
+
+		→　そうでもないような？
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355b.exe , eval = Apery20160812
+		3735 - 144 - 3411(52.27% R15.76)
+
+		トータルで弱くなってしまった…。
+
+V3.55a
+・depth 1でのnull pruning追加。
+	cf. https://github.com/official-stockfish/Stockfish/commit/f2f3a06a1acfa14b3054bfd73d6c3966c326a7cc
+
+・NMP(null move pruning)をstaticEvalの値に応じて段階的に適用する。
+	cf. https://github.com/official-stockfish/Stockfish/commit/76971d8acba4af1896cf94e1278f69ae2084d45d
+	cf.	https://github.com/official-stockfish/Stockfish/commit/ade3bb9a4e774aa9b760235f3b0ee42e0a0420d9
+
+		+        && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
+
+
+		engine1 = YaneuraOuV355.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355a.exe , eval = Apery20160812
+		play_time = r100 ,  4019 - 94 - 5887(40.57% R-66.31)
+
+		engine1 = YaneuraOuV355.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355a.exe , eval = Apery20160812
+		play_time = b2000 ,  1003 - 38 - 959(51.12% R7.79)
+
+		短い時間では効果があるが、長い時間だと効果不明。
+
+V3.55
+・ColorFromTo historyを追加。
+	cf.
+		Use Color-From-To history stats to help sort moves
+		https://github.com/official-stockfish/Stockfish/commit/b3525fa9ea88e230a38d72351826cbc16c282938
+
+	・from_sq()追加。
+	・FromToStats導入。
+		→　これを打ち駒を考慮するように拡張。
+
+		ASSERT_LV3(f < SQ_NB_PLUS1 + 7);
+		if (f >= SQ_NB_PLUS1 + 7)
+			std::cout << (int)f << " " << from_sq(m);
+
+
+		engine1 = YaneuraOuV354.exe , eval = Apery20160812
+		engine2 = YaneuraOuV355.exe , eval = Apery20160812
+		play_time = r100 ,  4916 - 67 - 5017(49.49% R-3.53)
+		わずかに強くはなっている模様。
+
+		play_time = r500 ,  864 - 36 - 1370(38.68% R-80.08) : 2698b何かおかしいのでは…。
+		？　異常値
+
+		b2000 , 3821 - 157 - 4012(48.78% R-8.47)
+
+		engine1 = YaneuraOuV355.exe , eval = Apery20160812
+		engine2 = YaneuraOuV354.exe , eval = Apery20160812
+		play_time = r500 ,  4970 - 125 - 4905(50.33% R2.29)
+
+V3.54
+・futility margin変更
+	cf. https://github.com/official-stockfish/Stockfish/commit/85924db496af2fb8d70b6c89b17fc8541339ca19
+
+	-  Value futility_margin(Depth d) { return Value(200 * d); }
+	+  Value futility_margin(Depth d) { return Value(150 * d); }
+
+		　PARAM_FUTILITY_MARGIN_ALPHA を200→150に。
+
+           if (   predictedDepth < 7 * ONE_PLY
+	-              && ss->staticEval + futility_margin(predictedDepth) + 256 <= alpha)
+ 	+              && ss->staticEval + 256 + 200 * predictedDepth / ONE_PLY <= alpha)
+
+		engine1 = YaneuraOuV353.exe , eval = Apery20160812
+		engine2 = YaneuraOuV354.exe , eval = Apery20160812
+		play_time = r100 ,  4602 - 73 - 5325(46.36% R-25.35)
+		play_time = b1000 , 1211 - 26 - 1423(45.98% R-28.02)
+
+
+■　2016/08/15
+
+・pythonフレームワークによる自己対戦
+
+	Apery20160505      vs Apery20160505 ,  r100 , 5008 - 83 - 4899(50.55% R3.82)
+
+	Apery20160505      vs haku20160729  ,  r100 , 3518 - 75 - 6397(35.48% R-103.87)
+	haku20160729no_ave vs haku20160729  ,  r100 , 4956 - 95 - 4939(50.09% R0.6)
+	haku20160729       vs Apery20160812 , b2000 , 1032 - 31 - 1507(40.65% R-65.77)
+	Apery20160505      vs haku20160729  , b2000 ,  952 - 33 - 1625(36.94% R-92.89)
+
+	Apery20160812      vs haku20160729  ,  r100 , 5227 - 52 - 4711(52.6% R18.06)
+
+	Apery20160812      vs Apery20160810 ,  r100 , 5014 - 71 - 4905(50.55% R3.82)
+	Apery20160810      vs Apery20160812 , b2000 ,  1041 - 35 - 1194(46.58% R-23.82)
+
+	Apery20160731      vs Apery20160810 ,  r100 , 5996 - 56 - 3938(60.36% R73.03)   ※3
+	Apery20160731      vs Apery20160810 ,  r500 ,  2100 - 34 - 2016(51.02% R7.09)   ※3
+	Apery20160731      vs Apery20160810 , b2000 ,  1128 - 25 - 1247(47.49% R-17.42) ※3
+	Apery20160810      vs Apery20160731 , b2000 ,  1284 - 17 - 1139(52.99% R20.82)  ※3
+
+	Apery20160505      vs Apery20160812 ,  r100 , 4282 - 52 - 5656(43.09% R-48.35)  ※2
+	Apery20160505      vs Apery20160812 , b2000 ,  935 - 30 - 1905(32.92% R-123.63)
+	Apery20160505      vs Apery20160812 , b2000 ,  960 - 31 - 1979(32.66% R-125.67)
+
+	Apery20160812      vs 179_0042G_V3  ,  r100 ,  5369 - 39 - 4592(53.9% R27.16)
+	Apery20160812      vs 179_0042G_V3  , b2000 ,   707 - 12 - 441(61.59% R81.99)
+
+	Apery20160505(non shared memory) vs Apery20160505(shared memory) , r100 thread4 , 4086 - 104 - 4000(50.53% R3.7)
+	
+
+	haku20160729       = finalize時の平均化あり
+	haku20160729no_ave = finalize時の平均化なし
+	r100 = rtime 100
+	b2000 = byoyomi 2000 (ただしNetworkDelay2 = 500)
+
+	※1 共有メモリを使用することによる勝率低下はなさげ。
+	※2 以前の自己対戦フレームワークと勝率はさほど違いはなさげ。
+	※3 短い時間では正確にでなさげ。Stockfish7では短い時間では枝刈りの性質が長い時間と違うのでは。
+
+・isready()のときのメモリチェックのコード追加。
+	→　追加した。
+
+
+
+■　2016/08/14
+
+・pythonによる連続自己対戦フレームワーク(仮)
+	→　script/engine_invoker2.py追加。
+
+	pythonのsubprocessだとreadがblockingする。Windowsだとこれを回避するのすごく難しい。
+	無駄なthread作りたくないというのに…。
+
+		# Non-blocking read on a subprocess.PIPE in python
+		# http://stackoverflow.com/questions/375427/non-blocking-read-on-a-subprocess-pipe-in-python
+	
+		fcntl indeed doesn't work on Windows
+
+		http://code.activestate.com/recipes/440554-module-to-allow-asynchronous-subprocess-use-on-win/
+
+		The portable way: letting the main thread block
+		https://repolinux.wordpress.com/2012/10/09/non-blocking-read-from-stdin-in-python/#windows
+
+	ああ、なんとかなった感じ。
+
+		# process is not done, wait a bit and check again.
+		time.sleep(0)
+
+	このsleep(0)を入れると1000対局超えたあたりからCPU負荷率が下がっていく。
+	OSのスレッドスケジューラーに絡む何かかも。
+
+	pythonのスクリプト側で定跡と時間制御を実装して、もう少し原因を調べてみる。
+
+	sleep(1)で反応ないの、sleep()の単位が1秒だからか…。そうか..
+	CPU負荷率下がるの、isreadyとかで待機待ちになっているっぽい？
+	→　対局スクリプトにfile loggingの機能追加。ログを精査する。
+
+	gameoverの変数名がgameoveに脱字してて、それゆえdrawのときにフラグが
+	適切にセットされていなかった。なんぞ、このバグ…。
+
+	→　pythonで変数宣言強制できたほうが良いのでは…。まあいいや。
+
+	pythonスクリプトに定跡と時間制御実装して、動作テストしよう。
+
+[1]<position startpos moves 2g2f 3c3d 7g7f 8c8d 6g6f 8d8e 8h7g 3a3b 4i5h 7a6b 3i4h 5a4b 5h6g 6a5b 2f2e 4b3a 7i7h 7c7d 2e2d 2c2d 2h2d 2b3c 2d2h P*2d 5i6h 3b2c 6h7i 4a3b 5g5f 9c9d 3g3f 6c6d 2i3g 6b6c 4h5g 8a7c 5g4f 4c4d P*2e 2d2e 1g1f 1c1d 3f3e 3c5a 2h2e 5b4c 2e2f P*2d 7g6h 3d3e 4f3e P*3d 3e2d 2c2d 2f2d 5a2d 6h2d 8e8f 8g8f R*2h 2d6h S*5h
+[1]<go btime 5000 wtime 5000 byoyomi 3000
+[1]>info nodes 3541614 time 6010
+[1]>bestmove 6i5h ponder 2h5h+
+	時間余ってる？あれれ？
+
+position startpos moves 2g2f 3c3d 7g7f 8c8d 6g6f 8d8e 8h7g 3a3b 4i5h 7a6b 3i4h 5a4b 5h6g 6a5b 2f2e 4b3a 7i7h 7c7d 2e2d 2c2d 2h2d 2b3c 2d2h P*2d 5i6h 3b2c 6h7i 4a3b 5g5f 9c9d 3g3f 6c6d 2i3g 6b6c 4h5g 8a7c 5g4f 4c4d P*2e 2d2e 1g1f 1c1d 3f3e 3c5a 2h2e 5b4c 2e2f P*2d 7g6h 3d3e 4f3e P*3d 3e2d 2c2d 2f2d 5a2d 6h2d 8e8f 8g8f R*2h 2d6h S*5h
+go btime 5000 wtime 5000 byoyomi 3000
+→　合ってる気がする…。NetworkDelay絡みか？
+
+
+
 ■　2016/08/09
 
 Position::is_mated()でstalemateを、玉以外に自駒がいない状態と定義してあるのは間違い。

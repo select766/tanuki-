@@ -1,14 +1,14 @@
 ﻿#include <sstream>
 #include <queue>
 
-#include "kifu_generator.h"
 #include "experimental_learner.h"
-#include "misc.h"
+#include "kifu_generator.h"
+#include "shogi.h"
 #include "position.h"
 #include "search.h"
-#include "shogi.h"
 #include "thread.h"
 #include "tt.h"
+#include "misc.h"
 
 using namespace std;
 
@@ -89,11 +89,11 @@ namespace USI
   EnteringKingRule ekr = EKR_NONE;
 #endif
 
-  // --------------------
-  //    読み筋の出力
-  // --------------------
+// --------------------
+//    読み筋の出力
+// --------------------
 
-    // スコアを歩の価値を100として正規化して出力する。
+  // スコアを歩の価値を100として正規化して出力する。
   std::string score_to_usi(Value v)
   {
     std::stringstream s;
@@ -109,12 +109,12 @@ namespace USI
 
     return s.str();
   }
-
+  
   std::string pv(const Position& pos, int iteration_depth, Value alpha, Value beta)
   {
     std::stringstream ss;
     int elapsed = Time.elapsed() + 1;
-
+    
     const auto& rootMoves = pos.this_thread()->rootMoves;
     size_t PVIdx = pos.this_thread()->PVIdx;
     size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
@@ -130,7 +130,7 @@ namespace USI
       if (iteration_depth == ONE_PLY && !updated)
         continue;
 
-      int d = updated ? iteration_depth : iteration_depth - 1;
+      int d   = updated ? iteration_depth : iteration_depth - 1;
       Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
       if (ss.rdbuf()->in_avail()) // 1行目でないなら連結のための改行を出力
@@ -160,7 +160,7 @@ namespace USI
         ss << " hashfull " << TT.hashfull();
 
       ss << " time " << elapsed
-        << " pv";
+         << " pv";
 
 #ifdef USE_TT_PV
       // 置換表からPVをかき集めてくるモード
@@ -186,8 +186,7 @@ namespace USI
               moves[ply] = m;
             else
               moves[ply] = MOVE_NONE;
-          }
-          else
+          } else
             moves[ply] = MOVE_NONE;
         }
         while (ply > 0)
@@ -205,11 +204,11 @@ namespace USI
   }
 
 
-  // --------------------
-  //     USI::Option
-  // --------------------
+// --------------------
+//     USI::Option
+// --------------------
 
-    // この関数はUSI::init()から起動時に呼び出されるだけ。
+  // この関数はUSI::init()から起動時に呼び出されるだけ。
   void Option::operator<<(const Option& o)
   {
     static size_t insert_order = 0;
@@ -234,7 +233,7 @@ namespace USI
     // ゆえにGUIでの対局設定は無視して、思考エンジンの設定ダイアログのところで
     // 個別設定が出来るようにする。
 
-    o["Hash"] << Option(16, 1, MaxHashMB, [](auto&o) { TT.resize(o); });
+    o["Hash"]    << Option(16, 1, MaxHashMB, [](auto&o) { TT.resize(o); });
 
     // その局面での上位N個の候補手を調べる機能
     o["MultiPV"] << Option(1, 1, 800);
@@ -268,11 +267,16 @@ namespace USI
 #endif
 
     o["EvalDir"] << Option("eval");
-    o["KifuDir"] << Option("kifu");
 
 #if defined(EVAL_KPPT) && defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
-    // 評価関数パラメーターを共有するか
-    o["EvalShare"] << Option(true);
+	// 評価関数パラメーターを共有するか
+	o["EvalShare"] << Option(true);
+#endif
+
+#if defined(LOCAL_GAME_SERVER) || (defined(USE_SHARED_MEMORY_IN_EVAL) && defined(EVAL_KPPT))
+	// 子プロセスでEngineを実行するプロセッサグループ(Numa node)
+	// -1なら、指定なし。
+	o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
@@ -305,8 +309,8 @@ namespace USI
   std::ostream& operator<<(std::ostream& os, const OptionsMap& om)
   {
     // idxの順番を守って出力する
-    for (size_t idx = 0; idx < om.size(); ++idx)
-      for (const auto& it : om)
+    for (size_t idx = 0; idx < om.size();++idx)
+      for(const auto& it:om)
         if (it.second.idx == idx)
         {
           const Option& o = it.second;
@@ -334,39 +338,55 @@ namespace USI
 // USI関係のコマンド処理
 // --------------------
 
+s32 eval_sum;
+
 // is_ready_cmd()を外部から呼び出せるようにしておく。(benchコマンドなどから呼び出したいため)
 void is_ready()
 {
-  static bool first = true;
+	static bool first = true;
 
-  // 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
-  // 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
-  if (first)
-  {
-    // 評価関数の読み込み
-    Eval::load_eval();
+	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
+	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
+	if (first)
+	{
+		// 評価関数の読み込み
+		Eval::load_eval();
+		eval_sum = Eval::calc_check_sum();
 
-    first = false;
-  }
+		first = false;
 
-  Search::clear();
+	} else {
+
+		if (eval_sum != Eval::calc_check_sum())
+			sync_cout << "Error! : evaluate memory is corrupted" << sync_endl;
+
+	}
+
+	Search::clear();
+
+	Time.availableNodes = 0;
 }
 
 // isreadyコマンド処理部
 void is_ready_cmd(Position& pos)
 {
-  is_ready();
+	// 対局ごとに"isready","usinewgame"の両方が来るはずだが、
+	// "isready"は起動後に1度だけしか来ないGUI実装がありうるかも知れない。
+	// 将棋では、"isready"が毎回来るようなので、"usinewgame"のほうは無視して、
+	// "isready"に応じて評価関数、定跡、探索部を初期化する。
 
-  // Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
-  // evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
-  pos.set(SFEN_HIRATE);
+	is_ready();
 
-  ponder_mode = false;
-  sync_cout << "readyok" << sync_endl;
+	// Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
+	// evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
+	pos.set(SFEN_HIRATE);
+
+	ponder_mode = false;
+	sync_cout << "readyok" << sync_endl;
 }
 
 // "position"コマンド処理部
-void position_cmd(Position& pos, istringstream& is)
+void position_cmd(Position& pos,istringstream& is)
 {
   Move m;
   string token, sfen;
@@ -416,13 +436,13 @@ void setoption_cmd(istringstream& is)
 
   // valueの後ろ。スペース区切りで複数文字列が来ることがある。
   while (is >> token)
-    value += (value.empty() ? "" : " ") + token;
+    value +=  (value.empty() ? "" : " ") + token;
 
   if (Options.count(name))
     Options[name] = value;
   else {
     // USI_HashとUSI_Ponderは無視してやる。
-    if (name != "USI_Hash" && name != "USI_Ponder")
+    if (name != "USI_Hash" && name != "USI_Ponder" )
       // この名前のoptionは存在しなかった
       sync_cout << "No such option: " << name << sync_endl;
   }
@@ -470,7 +490,7 @@ void go_cmd(const Position& pos, istringstream& is) {
 
       // USIプロトコルで送られてきた秒読み時間より少なめに思考する設定
       // ※　通信ラグがあるときに、ここで少なめに思考しないとタイムアップになる可能性があるので。
-
+    
       // t = std::max(t - Options["ByoyomiMinus"], Time::point(0));
 
       // USIプロトコルでは、これが先手後手同じ値だと解釈する。
@@ -522,12 +542,12 @@ void go_cmd(const Position& pos, istringstream& is) {
 // --------------------
 
 // USI応答部本体
-void USI::loop(int argc, char* argv[])
+void USI::loop(int argc,char* argv[])
 {
   // 探索開始局面(root)を格納するPositionクラス
   Position pos;
 
-  string cmd, token;
+  string cmd,token;
 
   // 先行入力されているコマンド
   // コマンドは前から取り出すのでqueueを用いる。
@@ -543,8 +563,7 @@ void USI::loop(int argc, char* argv[])
     for (auto c : cmds0)
       cmds.push(c);
 
-  }
-  else {
+  } else {
 
     // 引数として指定されたものを一つのコマンドとして実行する機能
     // ただし、','が使われていれば、そこでコマンドが区切れているものとして解釈する。
@@ -555,7 +574,7 @@ void USI::loop(int argc, char* argv[])
 
       // sから前後のスペースを除去しないといけない。
       while (*s.rbegin() == ' ') s.pop_back();
-      while (*s.begin() == ' ') s = s.substr(1, s.size() - 1);
+      while (*s.begin() == ' ') s = s.substr(1,s.size()-1);
 
       if (s != ",")
         cmd += s + " ";
@@ -575,8 +594,7 @@ void USI::loop(int argc, char* argv[])
     {
       if (!getline(cin, cmd)) // 入力が来るかEOFがくるまでここで待機する。
         cmd = "quit";
-    }
-    else {
+    } else {
       // 積んであるコマンドがあるならそれを実行する。
       // 尽きれば"quit"だと解釈してdoループを抜ける仕様にすることはできるが、
       // そうしてしまうとgoコマンド(これはノンブロッキングなので)の最中にquitが送られてしまう。
@@ -606,8 +624,7 @@ void USI::loop(int argc, char* argv[])
       // 思考を終えて寝てるかも知れないのでresume==trueにして呼び出してやる
       Threads.main()->start_searching(true);
 
-    }
-    else if (token == "ponderhit")
+    } else if (token == "ponderhit")
     {
       Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
       Search::Limits.ponder = 0; // 通常探索に切り替える。
@@ -630,7 +647,7 @@ void USI::loop(int argc, char* argv[])
     else if (token == "isready") is_ready_cmd(pos);
 
     // ユーザーによる実験用コマンド。user.cppのuser()が呼び出される。
-    else if (token == "user") user_test(pos, is);
+    else if (token == "user") user_test(pos,is);
 
     // 現在の局面を表示する。(デバッグ用)
     else if (token == "d") cout << pos << endl;
@@ -639,7 +656,7 @@ void USI::loop(int argc, char* argv[])
     else if (token == "matsuri") pos.set("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1");
 
     // "position sfen"の略。
-    else if (token == "sfen") position_cmd(pos, is);
+    else if (token == "sfen") position_cmd(pos,is);
 
     // ログファイルの書き出しのon
     else if (token == "log") start_logger(true);
@@ -694,7 +711,7 @@ void USI::loop(int argc, char* argv[])
 #endif
     // "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
     // 我々はこれに関知しないので単に無視すれば良い。
-    else if (token == "usinewgame") continue;
+    else if (token == "usinewgame") continue; 
 
     else if (token == "generate_kifu") {
       Learner::GenerateKifu();
@@ -720,7 +737,7 @@ void USI::loop(int argc, char* argv[])
       //      のように指定したとき、
       //> setoption name Threads value 1
       //      と等価なようにしておく。
-
+      
       if (!token.empty())
       {
         string value;
@@ -742,8 +759,8 @@ void USI::loop(int argc, char* argv[])
       }
     }
 
-  } while (token != "quit");
-
+  } while (token != "quit" );
+  
   // quitが来た時点ではまだ探索中かも知れないのでmain threadの停止を待つ。
   Threads.main()->wait_for_search_finished();
 }
@@ -783,7 +800,7 @@ Move move_from_usi(const string& str)
   Move move = MOVE_NONE;
   if (!drop)
   {
-    Square from = usi_to_sq(str[0], str[1]);
+    Square from = usi_to_sq(str[0],str[1]);
     if (is_ok(from))
       move = promote ? make_move_promote(from, to) : make_move(from, to);
   }

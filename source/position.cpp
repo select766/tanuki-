@@ -1063,10 +1063,6 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
       // 玉を取る指し手が実現することはない。この直前の局面で玉を逃げる指し手しか合法手ではないし、
       // 玉を逃げる指し手がないのだとしたら、それは詰みの局面であるから。
 
-      if (type_of(to_pc) == KING) {
-        std::cerr << *this << std::endl;
-      }
-
       ASSERT_LV1(type_of(to_pc) != KING);
 
       Piece pr = raw_type_of(to_pc);
@@ -1176,9 +1172,6 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
         }
 
         // 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
-        if (st->checkersBB != attackers_to(Us, king_square(~Us))) {
-          std::cerr << std::endl << *this << std::endl;
-        }
         ASSERT_LV3(st->checkersBB == attackers_to(Us, king_square(~Us)));
 
       }
