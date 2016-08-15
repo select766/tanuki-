@@ -47,6 +47,8 @@ isready
 usinewgame
 generate_kifu
 '''.format(kifu_folder_path, num_threads).encode('utf-8')
+  print(input.decode('utf-8'))
+  print(flush=True)
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
   return kifu_folder_path
 
@@ -63,6 +65,8 @@ isready
 usinewgame
 learn output_folder_path_base {2}
 '''.format(kifu_folder_path, num_threads, eval_folder_path_base).encode('utf-8')
+  print(input.decode('utf-8'))
+  print(flush=True)
   subprocess.run([learner_exe_file_path], input=input, check=True)
   return eval_folder_path_base
 
@@ -85,6 +89,8 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path_base, result_file_path, 
       input = '''setoption name Threads value {0}
 go btime {1}
 '''.format(num_threads, int(num_games / num_threads)).encode('utf-8')
+      print(input.decode('utf-8'))
+      print(flush=True)
       completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
       stdout = completed_process.stdout.decode('utf-8')
       print(stdout)
@@ -126,7 +132,7 @@ def main():
     help='Folder path of the inintial kifu files. ex) kifu')
   parser.add_argument(
     '--skip_first_kifu_generation',
-    action='store',
+    action='store_true',
     dest='skip_first_kifu_generation',
     help='Skip the first kifu generation')
   parser.add_argument(
