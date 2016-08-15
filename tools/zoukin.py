@@ -53,18 +53,19 @@ generate_kifu
   return kifu_folder_path
 
 
-def Learn(kifu_folder_path, learner_output_folder_path_base, learner_exe_file_path, num_threads):
+def Learn(eval_folder_path, kifu_folder_path, learner_output_folder_path_base, learner_exe_file_path, num_threads):
   print('-' * 80)
   print('Learn')
   eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
   input = '''usi
-setoption name KifuDir value {0}
-setoption name Threads value {1}
+setoption name EvalDir value {0}
+setoption name KifuDir value {1}
+setoption name Threads value {2}
 setoption name MaxMovesToDraw value 300
 isready
 usinewgame
-learn output_folder_path_base {2}
-'''.format(kifu_folder_path, num_threads, eval_folder_path_base).encode('utf-8')
+learn output_folder_path_base {3}
+'''.format(eval_folder_path, kifu_folder_path, num_threads, eval_folder_path_base).encode('utf-8')
   print(input.decode('utf-8'))
   print(flush=True)
   subprocess.run([learner_exe_file_path], input=input, check=True)
@@ -211,7 +212,7 @@ def main():
       previous_eval_folder_path = eval_folder_path
     skip_kifu_generation = False
 
-    new_eval_folder_path_base = Learn(kifu_folder_path, learner_output_folder_path_base, learner_exe_file_path, num_threads)
+    new_eval_folder_path_base = Learn(eval_folder_path, kifu_folder_path, learner_output_folder_path_base, learner_exe_file_path, num_threads)
     SelfPlay(original_eval_folder_path, new_eval_folder_path_base, vs_original_result_file_path, local_game_server_exe_file_path, num_threads, num_games)
     SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path, local_game_server_exe_file_path, num_threads, num_games)
 
