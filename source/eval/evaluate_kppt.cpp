@@ -107,23 +107,6 @@ namespace Eval
 	}
 
 
-	s32 calc_check_sum()
-	{
-		s32 sum = 0;
-		
-		auto add_sum = [&](s32*ptr , size_t t)
-		{
-			for (size_t i = 0; i < t; ++i)
-				sum += ptr[i];
-		};
-		
-		add_sum(reinterpret_cast<s32*>(kk) , sizeof(kk ) / sizeof(s32));
-		add_sum(reinterpret_cast<s32*>(kkp), sizeof(kkp) / sizeof(s32));
-		add_sum(reinterpret_cast<s32*>(kpp), sizeof(kpp) / sizeof(s32));
-
-		return sum;
-	}
-
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
 	// 評価関数の共有を行うための大掛かりな仕組み
@@ -148,9 +131,9 @@ namespace Eval
 		}
 
 		// エンジンのバージョンによって評価関数は一意に定まるものとする。
-		// Numaで確保する名前を変更しておく。
 
-		auto dir_name = (string)Options["EvalDir"] + "Numa" + (string)Options["EngineNuma"];
+
+		auto dir_name = (string)Options["EvalDir"];
 		// Mutex名にbackslashは使えないらしいので、escapeする。念のため'/'もescapeする。
 		replace(dir_name.begin(), dir_name.end(), '\\', '_');
 		replace(dir_name.begin(), dir_name.end(), '/', '_');
@@ -184,7 +167,6 @@ namespace Eval
 			kkp_ = &(shared_eval_ptr->kkp_);
 			kpp_ = &(shared_eval_ptr->kpp_);
 
-
 			if (!already_exists)
 			{
 				// 新規作成されてしまった
@@ -192,8 +174,7 @@ namespace Eval
 				// このタイミングで評価関数バイナリを読み込む
 				load_eval_impl();
 
-				auto check_sum = calc_check_sum();
-				sync_cout << "info string created shared eval memory. Display : check_sum = " << std::hex << check_sum << std::dec << sync_endl;
+				sync_cout << "info string created shared eval memory." << sync_endl;
 
 			} else {
 
@@ -246,8 +227,8 @@ namespace Eval
 Error:;
   std::cout << "\ninfo string save evaluation file failed.\n";
   }
-
-	// KP,KPP,KKPのスケール
+  
+  // KP,KPP,KKPのスケール
 	const int FV_SCALE = 32;
 
 	// 駒割り以外の全計算

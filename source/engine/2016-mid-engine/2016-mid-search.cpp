@@ -73,74 +73,68 @@ string book_name;
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
 {
-	// 
-	//   定跡設定
-	//
+  // 
+  //   定跡設定
+  //
 
-	// 実現確率の低い狭い定跡を選択しない
-	o["NarrowBook"] << Option(false);
+  // 実現確率の低い狭い定跡を選択しない
+  o["NarrowBook"] << Option(false);
 
-	// 定跡の指し手を何手目まで用いるか
-	o["BookMoves"] << Option(16, 0, 10000);
+  // 定跡の指し手を何手目まで用いるか
+  o["BookMoves"] << Option(16, 0, 10000);
 
 
-	//  PVの出力の抑制のために前回出力時間からの間隔を指定できる。
+  //  PVの出力の抑制のために前回出力時間からの間隔を指定できる。
 
-	o["PvInterval"] << Option(300, 0, 100000);
+  o["PvInterval"] << Option(300, 0, 100000);
 
-	// 定跡ファイル名
+  // 定跡ファイル名
 
-	//  no_book          定跡なし
-	//  standard_book.db 標準定跡
-	//  yaneura_book1.db やねうら大定跡(公開用1)
-	//  yaneura_book2.db やねうら超定跡(公開用2)
-	//  yaneura_book3.db やねうら裏定跡(大会用)
-	//  user_book1.db    ユーザー定跡1
-	//  user_book2.db    ユーザー定跡2
-	//  user_book3.db    ユーザー定跡3
+  //  no_book          定跡なし
+  //  standard_book.db 標準定跡
+  //  yaneura_book1.db やねうら大定跡(公開用1)
+  //  yaneura_book2.db やねうら超定跡(公開用2)
+  //  yaneura_book3.db やねうら裏定跡(大会用)
+  //  user_book1.db    ユーザー定跡1
+  //  user_book2.db    ユーザー定跡2
+  //  user_book3.db    ユーザー定跡3
 
-	std::vector<std::string> book_list = { "no_book" , "standard_book.db", "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db"
-	  , "user_book1.db", "user_book2.db", "user_book3.db" };
-	o["BookFile"] << Option(book_list, book_list[1], [](auto& o) { book_name = string(o); });
-	book_name = book_list[1];
+  std::vector<std::string> book_list = { "no_book" , "standard_book.db", "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db"
+    , "user_book1.db", "user_book2.db", "user_book3.db" };
+  o["BookFile"] << Option(book_list, book_list[1], [](auto& o) { book_name = string(o); });
+  book_name = book_list[1];
 
-	//  BookEvalDiff: 定跡の指し手で1番目の候補の指し手と、2番目以降の候補の指し手との評価値の差が、
-	//    この範囲内であれば採用する。(1番目の候補の指し手しか選ばれて欲しくないときは0を指定する)
-	//  BookEvalBlackLimit : 定跡の指し手のうち、先手のときの評価値の下限。これより評価値が低くなる指し手は選択しない。
-	//  BookEvalWhiteLimit : 同じく後手の下限。
-	//  BookDepthLimit : 定跡に登録されている指し手のdepthがこれを下回るなら採用しない。0を指定するとdepth無視。
+  //  BookEvalDiff: 定跡の指し手で1番目の候補の指し手と、2番目以降の候補の指し手との評価値の差が、
+  //    この範囲内であれば採用する。(1番目の候補の指し手しか選ばれて欲しくないときは0を指定する)
+  //  BookEvalBlackLimit : 定跡の指し手のうち、先手のときの評価値の下限。これより評価値が低くなる指し手は選択しない。
+  //  BookEvalWhiteLimit : 同じく後手の下限。
+  //  BookDepthLimit : 定跡に登録されている指し手のdepthがこれを下回るなら採用しない。0を指定するとdepth無視。
 
-	o["BookEvalDiff"] << Option(30, 0, 99999);
-	o["BookEvalBlackLimit"] << Option(0, -99999, 99999);
-	o["BookEvalWhiteLimit"] << Option(-140, -99999, 99999);
-	o["BookDepthLimit"] << Option(16, 0, 99999);
+  o["BookEvalDiff"]       << Option(  30 ,      0, 99999);
+  o["BookEvalBlackLimit"] << Option(   0 , -99999, 99999);
+  o["BookEvalWhiteLimit"] << Option(-140 , -99999, 99999);
+  o["BookDepthLimit"]     << Option(  16 ,      0, 99999);
 
-	// 定跡をメモリに丸読みしないオプション。(default = false)
-	o["BookOnTheFly"] << Option(false);
+  // 定跡をメモリに丸読みしないオプション。(default = false)
+  o["BookOnTheFly"] << Option(false);
 
-	// nodes as timeモード。
-	// ミリ秒あたりのノード数を設定する。goコマンドでbtimeが、ここで設定した値に掛け算されたノード数を探索の上限とする。
-	// 0を指定すればnodes as timeモードではない。
-	// 600knpsなら600を指定する。
-	o["nodestime"] << Option(0, 0, 99999);
+  //
+  //   パラメーターの外部からの自動調整
+  //
 
-	//
-	//   パラメーターの外部からの自動調整
-	//
-
-	o["Param1"] << Option(0, 0, 100000);
-	o["Param2"] << Option(0, 0, 100000);
+  o["Param1"] << Option(0, 0, 100000);
+  o["Param2"] << Option(0, 0, 100000);
 
 #ifdef EVAL_LEARN
-	// 評価関数の学習を行なうときは、評価関数の保存先のフォルダを変更できる。
-	// デフォルトではevalsave。このフォルダは事前に用意されているものとする。
-	// このフォルダ配下にフォルダを"0/","1/",…のように自動的に掘り、そこに評価関数ファイルを保存する。
-	o["EvalSaveDir"] << Option("evalsave");
+  // 評価関数の学習を行なうときは、評価関数の保存先のフォルダを変更できる。
+  // デフォルトではevalsave。このフォルダは事前に用意されているものとする。
+  // このフォルダ配下にフォルダを"0/","1/",…のように自動的に掘り、そこに評価関数ファイルを保存する。
+  o["EvalSaveDir"] << Option("evalsave");
 #endif
 
 #ifdef DISABLE_TT_PROBE
-	// 置換表がオフになっている場合、通常対局は出来ないと考えられるので警告を出す。
-	sync_cout << "info string warning!! disable TT.probe()." << sync_endl;
+  // 置換表がオフになっている場合、通常対局は出来ないと考えられるので警告を出す。
+  sync_cout << "info string warning!! disable TT.probe()." << sync_endl;
 #endif
 
 }
@@ -335,7 +329,6 @@ namespace YaneuraOu2016Mid
 	  }
 
 	  //   historyのupdate
-	  Color c = pos.side_to_move();
 
 	  // depthの二乗に比例したbonusをhistory tableに加算する。
 	  // d*d + 2*d - 2 のほうが d*d + d - 1より良いらしい。
@@ -362,7 +355,6 @@ namespace YaneuraOu2016Mid
 	  Piece mpc = pos.moved_piece_after(move);
 
 	  thisThread->history.update(mpc, mto, bonus);
-	  thisThread->fromTo.update(c, move, bonus);
 
 	  if (cmh)
 	  {
@@ -383,7 +375,6 @@ namespace YaneuraOu2016Mid
 		  Piece qpc = pos.moved_piece_after(quiets[i]);
 
 		  thisThread->history.update(qpc, qto, -bonus);
-		  thisThread->fromTo.update(c, quiets[i], -bonus);
 
 		  // 前の局面の指し手がMOVE_NULLでないならcounter moveもupdateしておく。
 
@@ -823,6 +814,14 @@ namespace YaneuraOu2016Mid
   }
 
 
+  // valueをlowerBoundからupperBoundの間でクランプする
+  Value clamp(Value value, Value lowerBound, Value upperBound)
+  {
+    value = std::max(value, lowerBound);
+    value = std::min(value, upperBound);
+    return value;
+  }
+
   // -----------------------
   //      通常探索
   // -----------------------
@@ -1183,9 +1182,8 @@ namespace YaneuraOu2016Mid
 	  //  null move探索。PV nodeではやらない。
 	  //  evalの見積りがbetaを超えているので1手パスしてもbetaは超えそう。
 	  if (!PvNode
-		  &&  eval >= beta
-		  && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
-		  )
+		  &&  depth >= 2 * ONE_PLY
+		  &&  eval >= beta)
 	  {
 		  ss->currentMove = MOVE_NULL;
 		  ss->counterMoves = nullptr;
@@ -1521,28 +1519,13 @@ namespace YaneuraOu2016Mid
 			  Depth predictedDepth = std::max(newDepth - reduction<PvNode>(improving, depth, moveCount), DEPTH_ZERO);
 
 			  if (predictedDepth < PARAM_FUTILITY_AT_PARENT_NODE_DEPTH * ONE_PLY
-				  && ss->staticEval + PARAM_FUTILITY_MARGIN_BETA * predictedDepth / ONE_PLY
+				  && ss->staticEval + futility_margin(predictedDepth, pos.game_ply())
 				  + PARAM_FUTILITY_AT_PARENT_NODE_MARGIN <= alpha)
 				  continue;
 
-#if 1
 			  // 次の子nodeにおいて浅い深さになる場合、負のSSE値を持つ指し手の枝刈り
 			  if (predictedDepth < PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
 				  continue;
-#else
-			  // ↓どうも、このコードにすると少し弱くなるようなのでとりあえずコメントアウト。
-
-			  // 浅いdepthで負のSSE値を持つ指し手と、深いdepthで減少する閾値を下回る指し手の枝刈り
-			  if (predictedDepth < 8 * ONE_PLY)
-			  {
-				  Value see_v = predictedDepth < PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH * ONE_PLY ? VALUE_ZERO
-					  : -PawnValue * 2 * Value(predictedDepth - 3 * ONE_PLY);
-
-				  if (pos.see_sign(move) < see_v)
-					  continue;
-			  }
-#endif
-
 		  }
 
 		  // -----------------------
@@ -1589,8 +1572,7 @@ namespace YaneuraOu2016Mid
 			  Value val = thisThread->history[moved_sq][moved_pc]
 				  + (cmh  ? (*cmh )[moved_sq][moved_pc] : VALUE_ZERO)
 				  + (fmh  ? (*fmh )[moved_sq][moved_pc] : VALUE_ZERO)
-				  + (fmh2 ? (*fmh2)[moved_sq][moved_pc] : VALUE_ZERO)
-				  + thisThread->fromTo.get(~pos.side_to_move(), move);
+				  + (fmh2 ? (*fmh2)[moved_sq][moved_pc] : VALUE_ZERO);
 
 			  // cut nodeにおいてhistoryの値が悪い指し手に対してはreduction量を増やす。
 			  // ※　PVnodeではIID時でもcutNode == trueでは呼ばないことにしたので、
@@ -1863,6 +1845,7 @@ namespace YaneuraOu2016Mid
   }
 }
 
+
 using namespace YaneuraOu2016Mid;
 
 // --- 以下に好きなように探索のプログラムを書くべし。
@@ -1879,7 +1862,7 @@ void Search::init() {
 #ifdef  USE_AUTO_TUNE_PARAMETERS
 	{
 		vector<string> param_names = {
-		  "PARAM_FUTILITY_MARGIN_ALPHA" , "PARAM_FUTILITY_MARGIN_BETA" , "PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
+		  "PARAM_FUTILITY_MARGIN_ALPHA" , "PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
 		  "PARAM_FUTILITY_AT_PARENT_NODE_DEPTH","PARAM_FUTILITY_AT_PARENT_NODE_MARGIN","PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH",
 		  "PARAM_NULL_MOVE_DYNAMIC_ALPHA","PARAM_NULL_MOVE_DYNAMIC_BETA","PARAM_NULL_MOVE_RETURN_DEPTH",
 		  "PARAM_PROBCUT_DEPTH","PARAM_SINGULAR_EXTENSION_DEPTH","PARAM_SINGULAR_MARGIN",
@@ -1889,7 +1872,7 @@ void Search::init() {
 		  "PARAM_QUIET_SEARCH_COUNT"
 		};
 		vector<int*> param_vars = {
-		  &PARAM_FUTILITY_MARGIN_ALPHA , &PARAM_FUTILITY_MARGIN_BETA, &PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
+		  &PARAM_FUTILITY_MARGIN_ALPHA , &PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
 		  &PARAM_FUTILITY_AT_PARENT_NODE_DEPTH, &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN, &PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH,
 		  &PARAM_NULL_MOVE_DYNAMIC_ALPHA, &PARAM_NULL_MOVE_DYNAMIC_BETA, &PARAM_NULL_MOVE_RETURN_DEPTH,
 		  &PARAM_PROBCUT_DEPTH, &PARAM_SINGULAR_EXTENSION_DEPTH, &PARAM_SINGULAR_MARGIN,
@@ -2036,7 +2019,6 @@ void Search::clear()
 	{
 		th->history.clear();
 		th->counterMoves.clear();
-		th->fromTo.clear();
 	}
 
 	Threads.main()->previousScore = VALUE_INFINITE;
@@ -2376,9 +2358,6 @@ void MainThread::think()
 	// 合法手がないならここで投了
 	// ---------------------
 
-	// root nodeにおける自分の手番
-	auto us = rootPos.side_to_move();
-
 	// lazy SMPではcompletedDepthを最後に比較するのでこれをゼロ初期化しておかないと
 	// 探索しないときにThreads.main()の指し手が選ばれない。
 	for (Thread* th : Threads)
@@ -2540,6 +2519,9 @@ void MainThread::think()
 	// ---------------------
 
 	{
+		// root nodeにおける自分の手番
+		auto us = rootPos.side_to_move();
+
 		StateInfo si;
 		auto& pos = rootPos;
 
@@ -2583,10 +2565,6 @@ void MainThread::think()
 	// 反復深化の終了。
 ID_END:;
 
-	// nodes as time(時間としてnodesを用いるモード)のときは、利用可能なノード数から探索したノード数を引き算する。
-	if (Limits.npmsec)
-		Time.availableNodes = std::max(Time.availableNodes + Limits.inc[us] - Threads.nodes_searched() , (s64)0);
-
 	// 最大depth深さに到達したときに、ここまで実行が到達するが、
 	// まだSignals.stopが生じていない。しかし、ponder中や、go infiniteによる探索の場合、
 	// USI(UCI)プロトコルでは、"stop"や"ponderhit"コマンドをGUIから送られてくるまで
@@ -2595,10 +2573,10 @@ ID_END:;
 	if (!Signals.stop && (Limits.ponder || Limits.infinite))
 	{
 		// "stop"が送られてきたらSignals.stop == trueになる。
-		// "ponderhit"が送られてきたらLimits.ponder == 0になるので、それを待つ。(stopOnPonderhitは用いない)
+		// "ponderhit"が送られてきたらLimits.ponder == 0になるのでそれを待つ。
 		// "go infinite"に対してはstopが送られてくるまで待つ。
 		while (!Signals.stop && (Limits.ponder || Limits.infinite))
-			sleep(1);
+			sleep(10);
 	}
 
 	Signals.stop = true;
@@ -2614,9 +2592,7 @@ ID_END:;
 	Thread* bestThread = this;
 
 	// 並列して探索させていたスレッドのうち、ベストのスレッドの結果を選出する。
-	if (Options["MultiPV"] == 1
-		&& !Limits.depth
-		&& rootMoves[0].pv[0] != MOVE_NONE)
+	if (Options["MultiPV"] == 1)
 	{
 		// 深くまで探索できていて、かつそっちの評価値のほうが優れているならそのスレッドの指し手を採用する
 		// 単にcompleteDepthが深いほうのスレッドを採用しても良さそうだが、スコアが良いほうの探索深さのほうが
@@ -2625,15 +2601,15 @@ ID_END:;
 			if (th->completedDepth > bestThread->completedDepth
 				&& th->rootMoves[0].score > bestThread->rootMoves[0].score)
 				bestThread = th;
+
+		// 次回の探索のときに何らか使えるのでベストな指し手の評価値を保存しておく。
+		previousScore = bestThread->rootMoves[0].score;
+
+		// ベストな指し手として返すスレッドがmain threadではないのなら、その読み筋は出力していなかったはずなので
+		// ここで読み筋を出力しておく。
+		if (bestThread != this && !Limits.silent)
+			sync_cout << USI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 	}
-
-	// 次回の探索のときに何らか使えるのでベストな指し手の評価値を保存しておく。
-	previousScore = bestThread->rootMoves[0].score;
-
-	// ベストな指し手として返すスレッドがmain threadではないのなら、その読み筋は出力していなかったはずなので
-	// ここで読み筋を出力しておく。
-	if (bestThread != this && !Limits.silent)
-		sync_cout << USI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 
 	// ---------------------
 	// 指し手をGUIに返す
