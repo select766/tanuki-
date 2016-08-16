@@ -10,11 +10,9 @@ import shutil
 import subprocess
 import sys
 
-YANEURAOU_GENERATE_KIFU_EXE = 'YaneuraOu.2016-08-05.generate_kifu.exe'
-YANEURAOU_LEARN_EXE = 'YaneuraOu.2016-08-05.learn.exe'
 AVERAGED_EVAL_FOLDER_NAME = '999999999'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
-go rtime 100
+go byoyomi 1000
 setoption name Threads value 1
 setoption name Hash value 256
 setoption name EvalDir value {0}
@@ -36,17 +34,18 @@ def AdoptSubfolder(subfolder):
   return num_positions % 1000000000 == 0 or num_positions % 10000 != 0
 
 
-def GenerateKifu(kifu_output_folder_path_base, eval_folder_path, generate_kifu_exe_file_path, num_threads):
+def GenerateKifu(eval_folder_path, kifu_output_folder_path_base, generate_kifu_exe_file_path, num_threads):
   print('-' * 80)
   print('GenerateKifu')
   kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
   input = '''usi
-setoption name KifuDir value {0}
-setoption name Threads value {1}
+setoption name EvalDir value {0}
+setoption name KifuDir value {1}
+setoption name Threads value {2}
 isready
 usinewgame
 generate_kifu
-'''.format(kifu_folder_path, num_threads).encode('utf-8')
+'''.format(eval_folder_path, kifu_folder_path, num_threads).encode('utf-8')
   print(input.decode('utf-8'))
   print(flush=True)
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
@@ -208,7 +207,7 @@ def main():
   previous_eval_folder_path = eval_folder_path
   while True:
     if not skip_kifu_generation:
-      kifu_folder_path = GenerateKifu(kifu_output_folder_path_base, eval_folder_path, generate_kifu_exe_file_path, num_threads)
+      kifu_folder_path = GenerateKifu(eval_folder_path, kifu_output_folder_path_base, generate_kifu_exe_file_path, num_threads)
       previous_eval_folder_path = eval_folder_path
     skip_kifu_generation = False
 
