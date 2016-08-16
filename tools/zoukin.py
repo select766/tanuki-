@@ -14,9 +14,9 @@ YANEURAOU_GENERATE_KIFU_EXE = 'YaneuraOu.2016-08-05.generate_kifu.exe'
 YANEURAOU_LEARN_EXE = 'YaneuraOu.2016-08-05.learn.exe'
 AVERAGED_EVAL_FOLDER_NAME = '999999999'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
-go rtime 100
+go byoyomi 1000
 setoption name Threads value 1
-setoption name Hash value 256
+setoption name Hash value 512
 setoption name EvalDir value {0}
 '''
 YANEURAOU_LOCAL_GAME_SERVER_EXE = 'YaneuraOu-local-game-server.exe'
@@ -41,12 +41,13 @@ def GenerateKifu(kifu_output_folder_path_base, eval_folder_path, generate_kifu_e
   print('GenerateKifu')
   kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
   input = '''usi
-setoption name KifuDir value {0}
-setoption name Threads value {1}
+setoption name EvalDir value {0}
+setoption name KifuDir value {1}
+setoption name Threads value {2}
 isready
 usinewgame
 generate_kifu
-'''.format(kifu_folder_path, num_threads).encode('utf-8')
+'''.format(eval_folder_path, kifu_folder_path, num_threads).encode('utf-8')
   print(input.decode('utf-8'))
   print(flush=True)
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
