@@ -79,11 +79,11 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 50'0000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 20'0000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
-  constexpr double kGradientNoiseEta = 0.01;
+  constexpr double kGradientNoiseEta = 5.0;
   constexpr double kGradientNoiseTau = 0.55;
 #endif
 
@@ -361,25 +361,6 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::vector<int64_t> write_eval_per_positions = {
       std::numeric_limits<int64_t>::max(),
-      20'0000LL,
-      40'0000LL,
-      60'0000LL,
-      80'0000LL,
-      100'0000LL,
-      200'0000LL,
-      400'0000LL,
-      600'0000LL,
-      800'0000LL,
-      1000'0000LL,
-      2000'0000LL,
-      4000'0000LL,
-      6000'0000LL,
-      8000'0000LL,
-      1'0000'0000LL,
-      2'0000'0000LL,
-      4'0000'0000LL,
-      6'0000'0000LL,
-      8'0000'0000LL,
       10'0000'0000LL,
       20'0000'0000LL,
       30'0000'0000LL,

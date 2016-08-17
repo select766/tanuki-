@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 
-AVERAGED_EVAL_FOLDER_NAME = '999999999'
+OUTPUT_EVAL_FOLDER_NAME = '2000000000'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
 setoption name Threads value 1
@@ -215,7 +215,7 @@ def main():
     SelfPlay(original_eval_folder_path, new_eval_folder_path_base, vs_original_result_file_path, local_game_server_exe_file_path, num_threads, num_games)
     SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path, local_game_server_exe_file_path, num_threads, num_games)
 
-    eval_folder_path = os.path.join(new_eval_folder_path_base, AVERAGED_EVAL_FOLDER_NAME)
+    eval_folder_path = os.path.join(new_eval_folder_path_base, OUTPUT_EVAL_FOLDER_NAME)
 
 
 if __name__ == '__main__':

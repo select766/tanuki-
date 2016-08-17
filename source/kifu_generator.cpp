@@ -23,8 +23,8 @@ namespace Learner
 
 namespace
 {
-  constexpr int kNumGames = 10'0000;
-  constexpr char* kOutputFileNameDate = "2016-07-16";
+  constexpr int kNumGames = 2000'0000;
+  constexpr char* kOutputFileNameDate = "2016-08-18";
   constexpr char* kBookFileName = "book.sfen";
   constexpr int kMinBookMove = 32;
   constexpr int kMaxBookMove = 32;
