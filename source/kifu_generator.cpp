@@ -143,7 +143,9 @@ void Learner::GenerateKifu()
       int num_book_move = num_book_move_distribution(mt19937_64);
       while (pos.game_ply() < num_book_move)
       {
-        is >> token;
+        if (!(is >> token)) {
+          break;
+        }
         if (token == "startpos" || token == "moves")
           continue;
 
