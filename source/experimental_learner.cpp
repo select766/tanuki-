@@ -377,7 +377,7 @@ void Learner::Learn(std::istringstream& iss) {
 
   // 評価関数テーブルから重みベクトルへ重みをコピーする
   // 並列化を効かせたいのでdimension_indexで回す
-#pragma omp parallel for
+#pragma omp parallel for schedule(guided)
   for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
     if (IsKppIndex(dimension_index)) {
       Square k;
@@ -461,7 +461,7 @@ void Learner::Learn(std::istringstream& iss) {
     {
       // ミニバッチ
       // num_records個の学習データの勾配の和を求めて重みを更新する
-#pragma omp for
+#pragma omp for schedule(guided)
       for (int record_index = 0; record_index < num_records; ++record_index) {
         int thread_index = omp_get_thread_num();
         Thread& thread = *Threads[thread_index];
@@ -565,7 +565,7 @@ void Learner::Learn(std::istringstream& iss) {
   std::fflush(stdout);
 
   // 平均化法をかけた後、評価関数テーブルに重みを書き出す
-#pragma omp parallel for
+#pragma omp parallel for schedule(guided)
   for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
     if (IsKppIndex(dimension_index)) {
       Square k;
@@ -674,7 +674,7 @@ void Learner::MeasureError() {
     }
 
     // ミニバッチ
-#pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy)
+#pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy) schedule(guided)
     for (int record_index = 0; record_index < num_records; ++record_index) {
       int thread_index = omp_get_thread_num();
       Thread& thread = *Threads[thread_index];
