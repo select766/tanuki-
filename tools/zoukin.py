@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 OUTPUT_EVAL_FOLDER_NAME = '2000000000'
+#OUTPUT_EVAL_FOLDER_NAME = '99999999999'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
 setoption name Threads value 1
@@ -74,34 +75,32 @@ learn output_folder_path_base {3}
 def SelfPlay(old_eval_folder_path, new_eval_folder_path_base, result_file_path, local_game_server_exe_file_path, num_threads, num_games):
   print('-' * 80)
   print('SelfPlay')
-  subfolders = GetSubfolders(new_eval_folder_path_base)
   with open(result_file_path, 'a') as output_file:
     csvwriter = csv.writer(output_file)
-    for subfolder in subfolders:
-      if not AdoptSubfolder(subfolder):
-        continue
-      print(subfolder)
+    subfolder = OUTPUT_EVAL_FOLDER_NAME
+    print(subfolder)
 
-      with open('engine-config1.txt', 'w') as engine_config1_file:
-        engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
-      with open('engine-config2.txt', 'w') as engine_config2_file:
-        engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(os.path.join(new_eval_folder_path_base, subfolder)))
-      input = '''setoption name Threads value {0}
+    with open('engine-config1.txt', 'w') as engine_config1_file:
+      engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
+    with open('engine-config2.txt', 'w') as engine_config2_file:
+      engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(os.path.join(new_eval_folder_path_base, subfolder)))
+    input = '''setoption name Threads value {0}
 go btime {1}
+quit
 '''.format(num_threads, int(num_games / num_threads)).encode('utf-8')
-      print(input.decode('utf-8'))
-      print(flush=True)
-      completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
-      stdout = completed_process.stdout.decode('utf-8')
-      print(stdout)
-      matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(stdout)
-      lose = float(matched.group(1))
-      draw = float(matched.group(2))
-      win = float(matched.group(3))
-      winning_percentage = 0.0
-      if lose + draw + win > 0.0:
-       winning_percentage = win / (lose + draw + win)
-      csvwriter.writerow([new_eval_folder_path_base, subfolder, winning_percentage])
+    print(input.decode('utf-8'))
+    print(flush=True)
+    completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+    stdout = completed_process.stdout.decode('utf-8')
+    print(stdout)
+    matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(stdout)
+    lose = float(matched.group(1))
+    draw = float(matched.group(2))
+    win = float(matched.group(3))
+    winning_percentage = 0.0
+    if lose + draw + win > 0.0:
+      winning_percentage = win / (lose + draw + win)
+    csvwriter.writerow([new_eval_folder_path_base, subfolder, winning_percentage])
 
 
 def main():
