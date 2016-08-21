@@ -107,6 +107,23 @@ namespace Eval
 	}
 
 
+	s32 calc_check_sum()
+	{
+		s32 sum = 0;
+		
+		auto add_sum = [&](s32*ptr , size_t t)
+		{
+			for (size_t i = 0; i < t; ++i)
+				sum += ptr[i];
+		};
+		
+		add_sum(reinterpret_cast<s32*>(kk) , sizeof(kk ) / sizeof(s32));
+		add_sum(reinterpret_cast<s32*>(kkp), sizeof(kkp) / sizeof(s32));
+		add_sum(reinterpret_cast<s32*>(kpp), sizeof(kpp) / sizeof(s32));
+
+		return sum;
+	}
+
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
 	// 評価関数の共有を行うための大掛かりな仕組み
@@ -131,9 +148,9 @@ namespace Eval
 		}
 
 		// エンジンのバージョンによって評価関数は一意に定まるものとする。
+		// Numaで確保する名前を変更しておく。
 
-
-		auto dir_name = (string)Options["EvalDir"];
+		auto dir_name = (string)Options["EvalDir"] + "Numa" + (string)Options["EngineNuma"];
 		// Mutex名にbackslashは使えないらしいので、escapeする。念のため'/'もescapeする。
 		replace(dir_name.begin(), dir_name.end(), '\\', '_');
 		replace(dir_name.begin(), dir_name.end(), '/', '_');
@@ -174,7 +191,8 @@ namespace Eval
 				// このタイミングで評価関数バイナリを読み込む
 				load_eval_impl();
 
-				sync_cout << "info string created shared eval memory." << sync_endl;
+				auto check_sum = calc_check_sum();
+				sync_cout << "info string created shared eval memory. Display : check_sum = " << std::hex << check_sum << std::dec << sync_endl;
 
 			} else {
 
