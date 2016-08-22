@@ -275,6 +275,12 @@ namespace USI
     o["EvalShare"] << Option(true);
 #endif
 
+#if defined(LOCAL_GAME_SERVER) || (defined(USE_SHARED_MEMORY_IN_EVAL) && defined(EVAL_KPPT) && defined(_MSC_VER))
+	// 子プロセスでEngineを実行するプロセッサグループ(Numa node)
+	// -1なら、指定なし。
+	o["EngineNuma"] << Option(-1, 0, 99999);
+#endif
+
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
   }
@@ -334,35 +340,51 @@ namespace USI
 // USI関係のコマンド処理
 // --------------------
 
+s32 eval_sum;
+
 // is_ready_cmd()を外部から呼び出せるようにしておく。(benchコマンドなどから呼び出したいため)
 void is_ready()
 {
-  static bool first = true;
+	static bool first = true;
 
-  // 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
-  // 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
-  if (first)
-  {
-    // 評価関数の読み込み
-    Eval::load_eval();
+	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
+	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
+	if (first)
+	{
+		// 評価関数の読み込み
+		Eval::load_eval();
+		eval_sum = Eval::calc_check_sum();
 
-    first = false;
-  }
+		first = false;
 
-  Search::clear();
+	} else {
+
+		if (eval_sum != Eval::calc_check_sum())
+			sync_cout << "Error! : evaluate memory is corrupted" << sync_endl;
+
+	}
+
+	Search::clear();
+
+	Time.availableNodes = 0;
 }
 
 // isreadyコマンド処理部
 void is_ready_cmd(Position& pos)
 {
-  is_ready();
+	// 対局ごとに"isready","usinewgame"の両方が来るはずだが、
+	// "isready"は起動後に1度だけしか来ないGUI実装がありうるかも知れない。
+	// 将棋では、"isready"が毎回来るようなので、"usinewgame"のほうは無視して、
+	// "isready"に応じて評価関数、定跡、探索部を初期化する。
 
-  // Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
-  // evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
-  pos.set(SFEN_HIRATE);
+	is_ready();
 
-  ponder_mode = false;
-  sync_cout << "readyok" << sync_endl;
+	// Positionコマンドが送られてくるまで評価値の全計算をしていないの気持ち悪いのでisreadyコマンドに対して
+	// evalの値を返せるようにこのタイミングで平手局面で初期化してしまう。
+	pos.set(SFEN_HIRATE);
+
+	ponder_mode = false;
+	sync_cout << "readyok" << sync_endl;
 }
 
 // "position"コマンド処理部
@@ -424,7 +446,7 @@ void setoption_cmd(istringstream& is)
     // USI_HashとUSI_Ponderは無視してやる。
     if (name != "USI_Hash" && name != "USI_Ponder")
       // この名前のoptionは存在しなかった
-      sync_cout << "No such option: " << name << sync_endl;
+      sync_cout << "Error! : No such option: " << name << sync_endl;
   }
 }
 

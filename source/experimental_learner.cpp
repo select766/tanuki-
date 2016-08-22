@@ -60,11 +60,8 @@ namespace
 
     void AddGradient(double gradient);
     template<typename T>
-    void UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
-#ifdef GRADIENT_NOISE
-        double gradient_noise,
-#endif
-        T& eval_weight);
+    void UpdateWeight(
+        double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight);
     template<typename T>
     void Finalize(int num_mini_batches, T& eval_weight);
   };
@@ -79,13 +76,14 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 50'0000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 20'0000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
-  constexpr double kGradientNoiseEta = 0.01;
+  constexpr double kGradientNoiseEta = 5.0;
   constexpr double kGradientNoiseTau = 0.55;
 #endif
+  constexpr char* kKifuDate = "2016-08-18";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -166,11 +164,7 @@ namespace
   }
 
   template<typename T>
-  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
-#ifdef GRADIENT_NOISE
-      double gradient_noise,
-#endif
-      T& eval_weight) {
+  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
     // Adam
     m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient;
     v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient * sum_gradient;
@@ -179,10 +173,6 @@ namespace
     WeightType vv = v / (1.0 - adam_beta2_t);
     WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
     w -= delta;
-
-#ifdef GRADIENT_NOISE
-    w += gradient_noise;
-#endif
 
     // 平均化確率的勾配降下法
     sum_w += w;
@@ -349,7 +339,8 @@ void Learner::Learn(std::istringstream& iss) {
 
     Eval::eval_learn_init();
 
-  omp_set_num_threads((int)Options["Threads"]);
+  int num_threads = (int)Options["Threads"];
+  omp_set_num_threads(num_threads);
 
   std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
   std::string token;
@@ -361,25 +352,6 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::vector<int64_t> write_eval_per_positions = {
       std::numeric_limits<int64_t>::max(),
-      20'0000LL,
-      40'0000LL,
-      60'0000LL,
-      80'0000LL,
-      100'0000LL,
-      200'0000LL,
-      400'0000LL,
-      600'0000LL,
-      800'0000LL,
-      1000'0000LL,
-      2000'0000LL,
-      4000'0000LL,
-      6000'0000LL,
-      8000'0000LL,
-      1'0000'0000LL,
-      2'0000'0000LL,
-      4'0000'0000LL,
-      6'0000'0000LL,
-      8'0000'0000LL,
       10'0000'0000LL,
       20'0000'0000LL,
       30'0000'0000LL,
@@ -396,7 +368,12 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+  std::vector<std::shared_ptr<Learner::KifuReader> > kifu_readers;
+  while (kifu_readers.size() < num_threads) {
+    auto kifu_reader = std::make_shared<Learner::KifuReader>(
+      GenerateKifuFilePath(kifu_readers.size()), true);
+    kifu_readers.push_back(kifu_reader);
+  }
 
   Eval::load_eval();
 
@@ -407,7 +384,7 @@ void Learner::Learn(std::istringstream& iss) {
 
   // 評価関数テーブルから重みベクトルへ重みをコピーする
   // 並列化を効かせたいのでdimension_indexで回す
-#pragma omp parallel for
+#pragma omp parallel for schedule(guided)
   for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
     if (IsKppIndex(dimension_index)) {
       Square k;
@@ -449,9 +426,6 @@ void Learner::Learn(std::istringstream& iss) {
   limits.silent = true;
   Search::Limits = limits;
 
-  // 作成・破棄のコストが高いためループの外に宣言する
-  std::vector<Record> records;
-
   // 全学習データに対してループを回す
   auto start = std::chrono::system_clock::now();
   int num_mini_batches = 0;
@@ -482,24 +456,28 @@ void Learner::Learn(std::istringstream& iss) {
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
-    if (!kifu_reader->Read(num_records, records)) {
-      break;
-    }
     ++num_mini_batches;
 
 #pragma omp parallel
     {
+      int thread_index = omp_get_thread_num();
+      KifuReader& kifu_reader = *kifu_readers[thread_index];
+
       // ミニバッチ
       // num_records個の学習データの勾配の和を求めて重みを更新する
-#pragma omp for
+#pragma omp for schedule(guided)
       for (int record_index = 0; record_index < num_records; ++record_index) {
         int thread_index = omp_get_thread_num();
         Thread& thread = *Threads[thread_index];
         Position& pos = thread.rootPos;
         pos.set_this_thread(&thread);
 
-        pos.set(Position::sfen_unpack(records[record_index].packed));
-        Value record_value = static_cast<Value>(records[record_index].value);
+        Record record;
+        bool succeeded = kifu_reader.Read(record);
+        ASSERT_LV3(succeeded);
+
+        pos.set(Position::sfen_unpack(record.packed));
+        Value record_value = static_cast<Value>(record.value);
 
         Value value;
         Color rootColor;
@@ -535,11 +513,11 @@ void Learner::Learn(std::istringstream& iss) {
                 }
 
                 auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
-                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-                    normal_distribution(mt19937_64),
+                weight.AddGradient(normal_distribution(mt19937_64));
 #endif
-                    Eval::kpp[k][p0][p1][weight_kind]);
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+                  Eval::kpp[k][p0][p1][weight_kind]);
                 Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
 
             }
@@ -550,10 +528,10 @@ void Learner::Learn(std::istringstream& iss) {
                 WeightKind weight_kind;
                 RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
                 auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
-                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-                    normal_distribution(mt19937_64),
+                weight.AddGradient(normal_distribution(mt19937_64));
 #endif
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
                   Eval::kkp[k0][k1][p][weight_kind]);
 
             }
@@ -563,11 +541,11 @@ void Learner::Learn(std::istringstream& iss) {
                 WeightKind weight_kind;
                 RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
                 auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
-                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
 #ifdef GRADIENT_NOISE
-                    normal_distribution(mt19937_64),
+                weight.AddGradient(normal_distribution(mt19937_64));
 #endif
-                    Eval::kk[k0][k1][weight_kind]);
+                weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+                  Eval::kk[k0][k1][weight_kind]);
 
         }
         else {
@@ -595,7 +573,7 @@ void Learner::Learn(std::istringstream& iss) {
   std::fflush(stdout);
 
   // 平均化法をかけた後、評価関数テーブルに重みを書き出す
-#pragma omp parallel for
+#pragma omp parallel for schedule(guided)
   for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
     if (IsKppIndex(dimension_index)) {
       Square k;
@@ -646,7 +624,8 @@ void Learner::MeasureError() {
 
   Eval::eval_learn_init();
 
-  omp_set_num_threads((int)Options["Threads"]);
+  int num_threads = (int)Options["Threads"];
+  omp_set_num_threads(num_threads);
 
   ASSERT_LV3(
     KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
@@ -656,7 +635,12 @@ void Learner::MeasureError() {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
+  std::vector<std::shared_ptr<Learner::KifuReader> > kifu_readers;
+  while (kifu_readers.size() < num_threads) {
+    auto kifu_reader = std::make_shared<Learner::KifuReader>(
+      GenerateKifuFilePath(kifu_readers.size()), true);
+    kifu_readers.push_back(kifu_reader);
+  }
 
   Eval::load_eval();
 
@@ -699,36 +683,41 @@ void Learner::MeasureError() {
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
-    if (!kifu_reader->Read(num_records, records)) {
-      break;
-    }
 
     // ミニバッチ
-#pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy)
-    for (int record_index = 0; record_index < num_records; ++record_index) {
-      int thread_index = omp_get_thread_num();
-      Thread& thread = *Threads[thread_index];
-      Position& pos = thread.rootPos;
-      pos.set_this_thread(&thread);
+#pragma omp parallel
+    {
+      int thread_index = omp_get_num_threads();
+      KifuReader& kifu_reader = *kifu_readers[thread_index];
+#pragma omp for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy) schedule(guided)
+      for (int record_index = 0; record_index < num_records; ++record_index) {
+        int thread_index = omp_get_thread_num();
+        Thread& thread = *Threads[thread_index];
+        Position& pos = thread.rootPos;
+        pos.set_this_thread(&thread);
 
-      pos.set(Position::sfen_unpack(records[record_index].packed));
-      Value record_value = static_cast<Value>(records[record_index].value);
+        Record record;
+        bool succeeded = kifu_reader.Read(record);
+        ASSERT_LV3(succeeded);
+        pos.set(Position::sfen_unpack(record.packed));
+        Value record_value = static_cast<Value>(record.value);
 
-      Value value;
-      Color rootColor;
-      pos.set_this_thread(&thread);
-      if (!search_shallowly(pos, value, rootColor)) {
-        continue;
+        Value value;
+        Color rootColor;
+        pos.set_this_thread(&thread);
+        if (!search_shallowly(pos, value, rootColor)) {
+          continue;
+        }
+
+        double diff_value = record_value - value;
+        sum_squared_error_of_value += diff_value * diff_value;
+        double p = winning_percentage(record_value);
+        double q = winning_percentage(value);
+        double diff_winning_percentage = p - q;
+        sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
+        sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+        sum_norm += abs(value);
       }
-
-      double diff_value = record_value - value;
-      sum_squared_error_of_value += diff_value * diff_value;
-      double p = winning_percentage(record_value);
-      double q = winning_percentage(value);
-      double diff_winning_percentage = p - q;
-      sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
-      sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
-      sum_norm += abs(value);
     }
 
     num_processed_positions += num_records;
@@ -752,7 +741,7 @@ void Learner::BenchmarkKifuReader() {
 
   sync_cout << "Initializing kifu reader..." << sync_endl;
   std::unique_ptr<Learner::KifuReader> kifu_reader =
-    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+    std::make_unique<Learner::KifuReader>(GenerateKifuFilePath(0), true);
 
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
@@ -780,17 +769,21 @@ void Learner::BenchmarkKifuReader() {
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
     }
 
-    int num_records = static_cast<int>(std::min(
-      kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
-    if (!kifu_reader->Read(num_records, records)) {
-      break;
-    }
-
-    num_processed_positions += num_records;
+    Record record;
+    kifu_reader->Read(record);
+    ++num_processed_positions;
   }
 
   auto elapsed = std::chrono::system_clock::now() - start;
   double elapsed_sec = static_cast<double>(
     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
   sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
+}
+
+std::string Learner::GenerateKifuFilePath(int thread_index) {
+  char file_path[1024];
+  std::string kifu_directory = (std::string)Options["KifuDir"];
+  std::sprintf(file_path, "%s/kifu.%s.%d.%d.%03d.bin", kifu_directory.c_str(),
+    kKifuDate, kSearchDepth, kNumGamesToGenerateKifu, thread_index);
+  return file_path;
 }
