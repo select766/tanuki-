@@ -476,7 +476,7 @@ void Learner::Learn(std::istringstream& iss) {
         bool succeeded = kifu_reader.Read(record);
         ASSERT_LV3(succeeded);
 
-        pos.set(Position::sfen_unpack(record.packed));
+        pos.set_from_packed_sfen(record.packed);
         Value record_value = static_cast<Value>(record.value);
 
         Value value;
@@ -699,7 +699,7 @@ void Learner::MeasureError() {
         Record record;
         bool succeeded = kifu_reader.Read(record);
         ASSERT_LV3(succeeded);
-        pos.set(Position::sfen_unpack(record.packed));
+        pos.set_from_packed_sfen(record.packed);
         Value record_value = static_cast<Value>(record.value);
 
         Value value;
