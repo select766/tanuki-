@@ -15,8 +15,10 @@ OUTPUT_EVAL_FOLDER_NAME = '2000000000'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
 setoption name Threads value 1
-setoption name Hash value 256
+setoption name Hash value 128
 setoption name EvalDir value {0}
+setoption name NetworkDelay value 0
+setoption name NetworkDelay2 value 0
 '''
 YANEURAOU_LOCAL_GAME_SERVER_EXE = 'YaneuraOu-local-game-server.exe'
 
@@ -90,7 +92,7 @@ quit
 '''.format(num_threads, num_games).encode('utf-8')
     print(input.decode('utf-8'))
     print(flush=True)
-    completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)
+    completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
     stdout = completed_process.stdout.decode('utf-8')
     print(stdout)
     matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(stdout)
