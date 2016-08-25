@@ -352,6 +352,23 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::vector<int64_t> write_eval_per_positions = {
       std::numeric_limits<int64_t>::max(),
+
+	  10'0000LL,
+	  20'0000LL,
+	  50'0000LL,
+
+	  100'0000LL,
+	  200'0000LL,
+	  500'0000LL,
+
+	  1000'0000LL,
+	  2000'0000LL,
+	  5000'0000LL,
+
+	  1'0000'0000LL,
+	  2'0000'0000LL,
+	  5'0000'0000LL,
+
       10'0000'0000LL,
       20'0000'0000LL,
       30'0000'0000LL,
@@ -467,7 +484,6 @@ void Learner::Learn(std::istringstream& iss) {
       // num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(guided)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        int thread_index = omp_get_thread_num();
         Thread& thread = *Threads[thread_index];
         Position& pos = thread.rootPos;
         pos.set_this_thread(&thread);
@@ -687,11 +703,10 @@ void Learner::MeasureError() {
     // ミニバッチ
 #pragma omp parallel
     {
-      int thread_index = omp_get_num_threads();
+      int thread_index = omp_get_thread_num();
       KifuReader& kifu_reader = *kifu_readers[thread_index];
 #pragma omp for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy) schedule(guided)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        int thread_index = omp_get_thread_num();
         Thread& thread = *Threads[thread_index];
         Position& pos = thread.rootPos;
         pos.set_this_thread(&thread);
