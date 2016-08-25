@@ -23,9 +23,12 @@ namespace Learner
 
 namespace
 {
+  constexpr int kNumGames = 2000'0000;
+  constexpr char* kOutputFileNameDate = "2016-08-18";
   constexpr char* kBookFileName = "book.sfen";
   constexpr int kMinBookMove = 0;
   constexpr int kMaxBookMove = 32;
+  constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
@@ -97,20 +100,22 @@ void Learner::GenerateKifu()
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
-    std::string output_file_path = GenerateKifuFilePath(thread_index);
+    char output_file_path[1024];
+    std::sprintf(output_file_path, "%s/kifu.%s.%d.%d.%03d.bin", kifu_directory.c_str(),
+      kOutputFileNameDate, kSearchDepth, kNumGames, thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
 
 #pragma omp for schedule(guided)
-    for (int game_index = 0; game_index < kNumGamesToGenerateKifu; ++game_index) {
+    for (int game_index = 0; game_index < kNumGames; ++game_index) {
       int current_game_index = global_game_index++;
       if (current_game_index && current_game_index % 1000 == 0) {
         auto current = std::chrono::system_clock::now();
         auto elapsed = current - start;
         double elapsed_sec =
           static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (kNumGamesToGenerateKifu - current_game_index));
+        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (kNumGames - current_game_index));
         int h = remaining_sec / 3600;
         int m = remaining_sec / 60 % 60;
         int s = remaining_sec % 60;
@@ -121,7 +126,7 @@ void Learner::GenerateKifu()
         time(&current_time);
         local_time = localtime(&current_time);
         std::printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-          current_game_index, kNumGamesToGenerateKifu,
+          current_game_index, kNumGames,
           local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
           local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
         std::fflush(stdout);
