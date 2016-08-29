@@ -12,7 +12,7 @@
 #include "thread.h"
 
 // Gradient Noise
-#define GRADIENT_NOISE
+//#define GRADIENT_NOISE
 
 namespace Learner
 {
@@ -76,11 +76,11 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 20'0000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 50'0000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
-  constexpr double kGradientNoiseEta = 5.0;
+  constexpr double kGradientNoiseEta = 0.0;
   constexpr double kGradientNoiseTau = 0.55;
 #endif
 
