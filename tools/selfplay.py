@@ -81,7 +81,7 @@ def CalculateWinningPercentage(learner_output_folder_path):
 def CalculateMeanSquaredError(learner_output_folder_path, learner_exe_file_path):
   subfolders = GetSubfolders(learner_output_folder_path)
   output_cvs_file_path = os.path.join(learner_output_folder_path, 'mean_squared_error.' + GetDateTimeString() + '.csv')
-  with open(output_cvs_file_path, 'wb') as output_file:
+  with open(output_cvs_file_path, 'w') as output_file:
     csvwriter = csv.writer(output_file)
     csvwriter.writerow(['subfolder', 'rmse_value', 'rmse_winning_percentage', 'mean_cross_entropy', 'norm'])
     for subfolder in subfolders:
