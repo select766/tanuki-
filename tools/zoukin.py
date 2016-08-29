@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 
-OUTPUT_EVAL_FOLDER_NAME = '2000000000'
+OUTPUT_EVAL_FOLDER_NAME = '5000000000'
 #OUTPUT_EVAL_FOLDER_NAME = '99999999999'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
@@ -236,6 +236,7 @@ def main():
     SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path, local_game_server_exe_file_path, num_threads, num_games)
 
     eval_folder_path = os.path.join(new_eval_folder_path_base, OUTPUT_EVAL_FOLDER_NAME)
+    #break
 
 
 if __name__ == '__main__':
