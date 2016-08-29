@@ -15,7 +15,8 @@ OUTPUT_EVAL_FOLDER_NAME = '5000000000'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
 setoption name Threads value 1
-setoption name Hash value 128
+setoption name Hash value 256
+>>>>>>> 46afdf59cd78304873cf7e7304565f718f0e7484
 setoption name EvalDir value {0}
 setoption name NetworkDelay value 0
 setoption name NetworkDelay2 value 0
