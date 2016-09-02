@@ -14,6 +14,9 @@
 // Gradient Noise
 //#define GRADIENT_NOISE
 
+// 平均化確率的勾配降下法
+//#define AVERAGING
+
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -55,8 +58,10 @@ namespace
     // Adam用変数
     WeightType m;
     WeightType v;
+#ifdef AVERAGING
     // 平均化確率的勾配降下法用変数
     WeightType sum_w;
+#endif
 
     void AddGradient(double gradient);
     template<typename T>
@@ -173,8 +178,10 @@ namespace
     WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
     w -= delta;
 
+#ifdef AVERAGING
     // 平均化確率的勾配降下法
     sum_w += w;
+#endif
 
     // 重みテーブルに書き戻す
     eval_weight = static_cast<T>(std::round(w));
@@ -185,8 +192,11 @@ namespace
   template<typename T>
   void Weight::Finalize(int num_mini_batches, T& eval_weight)
   {
+#ifdef AVERAGING
     int64_t value = static_cast<int64_t>(std::round(sum_w / num_mini_batches));
-    //int64_t value = static_cast<int64_t>(std::round(w));
+#else
+    int64_t value = static_cast<int64_t>(std::round(w));
+#endif
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
     eval_weight = static_cast<T>(value);
