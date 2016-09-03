@@ -800,7 +800,7 @@ inline Value draw_value(RepetitionState rs, Color c) { ASSERT_LV3(is_ok(rs)); re
 namespace Eval
 {
 #ifndef EVAL_KPPT_FAST
-  enum BonaPiece: int16_t;
+  enum BonaPiece: int32_t;
 #else
   enum BonaPiece: int32_t;
 #endif
