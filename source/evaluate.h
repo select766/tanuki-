@@ -130,7 +130,7 @@ namespace Eval {
   // BonanzaのようにKPPを求めるときに、39の地点の歩のように、
   // 升×駒種に対して一意な番号が必要となる。これをBonaPiece型と呼ぶことにする。
 #ifndef EVAL_KPPT_FAST
-  enum BonaPiece: int16_t
+  enum BonaPiece: int32_t
 #else
   // KPPT_FASTでは、高速化のためにVPGATHERDDを用いる関係で4バイトのほうが好都合。
   enum BonaPiece : int32_t
@@ -293,8 +293,8 @@ namespace Eval {
     }
 
     // 駒リスト。駒番号(PieceNo)いくつの駒がどこにあるのか(BonaPiece)を示す。FV38などで用いる。
-    BonaPiece pieceListFb[PIECE_NO_NB];
-    BonaPiece pieceListFw[PIECE_NO_NB];
+    alignas(32) BonaPiece pieceListFb[PIECE_NO_NB];
+    alignas(32) BonaPiece pieceListFw[PIECE_NO_NB];
 
     // あるBonaPieceに対して、その駒番号(PieceNo)を保持している配列
     PieceNo piece_no_list[fe_end2];
