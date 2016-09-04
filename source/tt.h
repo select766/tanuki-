@@ -183,8 +183,17 @@ inline Value value_to_tt(Value v, int ply) {
 
   ASSERT_LV3(-VALUE_INFINITE < v && v < VALUE_INFINITE);
 
-  return  v >= VALUE_MATE_IN_MAX_PLY ? v + ply
-    : v <= VALUE_MATED_IN_MAX_PLY ? v - ply : v;
+  if (v >= VALUE_MATE_IN_MAX_PLY) {
+    // 詰みに係る局面で置換表にVALUE_INFINITE以上の値が書き込まれる場合があるバグに対するハック
+    // TODO(nodchip): やねさんが修正してくださるのを待つ
+    return std::min(VALUE_MATE, v + ply);
+  }
+  else if (v <= VALUE_MATED_IN_MAX_PLY) {
+    return std::max(-VALUE_MATE, v - ply);
+  }
+  else {
+    return v;
+  }
 }
 
 // value_to_tt()の逆関数
