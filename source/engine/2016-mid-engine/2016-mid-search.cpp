@@ -413,13 +413,13 @@ namespace YaneuraOu2016Mid
 		  // ペナルティを与える。
 
 		  if ((ss - 2)->counterMoves)
-			  (ss - 2)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + ONE_PLY) / ONE_PLY - 1);
+			  (ss - 2)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
 
 		  if ((ss - 3)->counterMoves)
-			  (ss - 3)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + ONE_PLY) / ONE_PLY - 1);
+			  (ss - 3)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
 
 		  if ((ss - 5)->counterMoves)
-			  (ss - 5)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + ONE_PLY) / ONE_PLY - 1);
+			  (ss - 5)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
 	  }
   }
 
@@ -567,9 +567,6 @@ namespace YaneuraOu2016Mid
     // -----------------------
     //     eval呼び出し
     // -----------------------
-
-    // 1手詰めで必要なのでこのタイミングで更新しておく。
-    pos.check_info_update();
 
     if (InCheck)
     {
@@ -987,7 +984,10 @@ namespace YaneuraOu2016Mid
 
 	  // このnodeで探索から除外する指し手。ss->excludedMoveのコピー。
 	  Move excludedMove = ss->excludedMove;
-	  auto posKey = excludedMove ? pos.state()->exclusion_key() : pos.state()->key();
+	  // 除外した指し手をxorしてそのままhash keyに使う。
+	  // 除外した指し手がないときは、0だから、xorしても0。
+	  // ただし、hash keyのbit0は手番を入れることになっているのでここは0にしておく。
+	  auto posKey = pos.key() ^ Key(excludedMove << 1);
 
 	  bool ttHit;    // 置換表がhitしたか
 
@@ -1061,9 +1061,6 @@ namespace YaneuraOu2016Mid
 
 	  Move bestMove = MOVE_NONE;
 	  const bool InCheck = pos.checkers();
-
-	  // mate1ply()で必要なのでこのタイミングで更新しておく。
-	  pos.check_info_update();
 
 #ifdef USE_MATE_1PLY_IN_SEARCH
 
@@ -2679,8 +2676,6 @@ namespace Learner
 	// Learner::search(),Learner::qsearch()から呼び出される。
 	void init_for_search(Position pos)
 	{
-		pos.check_info_update();
-
 		// 探索深さ無限
 		auto& limits = Search::Limits;
 		limits.infinite = true;

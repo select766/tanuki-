@@ -150,7 +150,6 @@ void Learner::GenerateKifu()
           continue;
 
         Move m = move_from_usi(pos, token);
-        pos.check_info_update();
         if (!is_ok(m) || !pos.legal(m))
         {
           //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;

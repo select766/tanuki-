@@ -163,6 +163,12 @@
     <ClInclude Include="learn\learn.h">
       <Filter>リソース ファイル\learn</Filter>
     </ClInclude>
+    <ClInclude Include="engine\2016-late-engine\2016-late-param.h">
+      <Filter>リソース ファイル\engine\2016-late-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\move_picker_2016Q3.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -296,6 +302,9 @@
     </ClCompile>
     <ClCompile Include="learn\evaluate_kppt_learn.cpp">
       <Filter>リソース ファイル\learn</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\move_picker_2016Q3.cpp">
+      <Filter>リソース ファイル\extra</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

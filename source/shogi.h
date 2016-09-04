@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "3.57"
+#define ENGINE_VERSION "3.65"
 
 // --------------------
 // コンパイル時の設定
@@ -31,8 +31,8 @@
 //#define YANEURAOU_MINI_ENGINE            // やねうら王mini        (完成2016/02/29)
 //#define YANEURAOU_CLASSIC_ENGINE         // やねうら王classic     (完成2016/04/03)
 //#define YANEURAOU_CLASSIC_TCE_ENGINE     // やねうら王classic tce (完成2016/04/15)
-#define YANEURAOU_2016_MID_ENGINE        // やねうら王2016(MID)   (完成2016/06/28)
-//#define YANEURAOU_2016_LATE_ENGINE       // やねうら王2016(LATE)  (開発中)
+//#define YANEURAOU_2016_MID_ENGINE        // やねうら王2016(MID)   (完成2016/08/18)
+#define YANEURAOU_2016_LATE_ENGINE       // やねうら王2016(LATE)  (開発中)
 //#define RANDOM_PLAYER_ENGINE             // ランダムプレイヤー
 //#define MATE_ENGINE                      // 詰め将棋solverとしてリリースする場合。(開発中)
 //#define HELP_MATE_ENGINE                 // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
@@ -305,13 +305,13 @@ namespace Effect8
 }
 
 // 与えられた3升が縦横斜めの1直線上にあるか。駒を移動させたときに開き王手になるかどうかを判定するのに使う。
-// 例) 王がsq1, pinされている駒がsq2にあるときに、pinされている駒をsq3に移動させたときにis_aligned(sq1,sq2,sq3)であれば、
+// 例) 王がsq1, pinされている駒がsq2にあるときに、pinされている駒をsq3に移動させたときにaligned(sq1,sq2,sq3)であれば、
 //  pinされている方向に沿った移動なので開き王手にはならないと判定できる。
-// ただし玉はsq1として、sq2,sq3は同じ側にいるものとする。(玉を挟んでの一直線は一直線とはみなさない)
-inline bool is_aligned(Square sq1 /* is ksq */, Square sq2, Square sq3)
+// ただし玉はsq3として、sq1,sq2は同じ側にいるものとする。(玉を挟んでの一直線は一直線とはみなさない)
+inline bool aligned(Square sq1, Square sq2, Square sq3/* is ksq */)
 {
-  auto d1 = Effect8::directions_of(sq1, sq2);
-  return d1 ? d1 == Effect8::directions_of(sq1, sq3) : false;
+  auto d1 = Effect8::directions_of(sq1, sq3);
+  return d1 ? d1 == Effect8::directions_of(sq2, sq3) : false;
 }
 
 // --------------------
@@ -324,29 +324,34 @@ const int MAX_PLY = MAX_PLY_NUM;
 // 探索深さを表現するためのenum
 enum Depth : int32_t
 {
-  // 探索深さ0
-  DEPTH_ZERO = 0,
-
-  // Depthは1手をONE_PLY倍にスケーリングする。
+	// Depthは1手をONE_PLY倍にスケーリングする。
 #ifdef ONE_PLY_EQ_1
-  ONE_PLY = 1 ,
+	ONE_PLY = 1,
 #else
-  ONE_PLY = 2 ,
+	ONE_PLY = 2,
 #endif
+	
+	// 探索深さ0
+  DEPTH_ZERO = 0 * ONE_PLY,
 
   // 最大深さ
   DEPTH_MAX = MAX_PLY*(int)ONE_PLY ,
 
   // 静止探索で王手がかかっているときにこれより少ない残り探索深さでの探索した結果が置換表にあってもそれは信用しない
   DEPTH_QS_CHECKS = 0*(int)ONE_PLY,
+
   // 静止探索で王手がかかっていないとき。
   DEPTH_QS_NO_CHECKS = -1*(int)ONE_PLY,
+
   // 静止探索でこれより深い(残り探索深さが少ない)ところではRECAPTURESしか生成しない。
   DEPTH_QS_RECAPTURES = -5*(int)ONE_PLY,
 
   // DEPTH_NONEは探索せずに値を求めたという意味に使う。
   DEPTH_NONE = -6 * (int)ONE_PLY
 };
+
+// ONE_PLYは2のべき乗でないといけない。
+static_assert(!(ONE_PLY & (ONE_PLY - 1)), "ONE_PLY is not a power of 2");
 
 // --------------------
 //     評価値の性質
@@ -859,7 +864,7 @@ namespace USI {
     }
 
     // string型への暗黙の変換子
-    operator std::string() const { ASSERT_LV1(type == "string" || type == "combo");  return currentValue; }
+    operator std::string() const { ASSERT_LV1(type == "string" || type == "combo" || type == "spin");  return currentValue; }
 
   private:
     friend std::ostream& operator<<(std::ostream& os, const OptionsMap& om);

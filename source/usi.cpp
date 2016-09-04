@@ -172,7 +172,6 @@ namespace USI
         int ply = 0;
         while (ply < MAX_PLY && moves[ply] != MOVE_NONE)
         {
-          pos_->check_info_update();
           pos_->do_move(moves[ply], si[ply]);
           ss << " " << moves[ply];
           bool found;
@@ -846,8 +845,6 @@ Move move_from_usi(const Position& pos, const std::string& str)
   // 上位bitに駒種を入れておかないとpseudo_legal()で引っかかる。
   move = pos.move16_to_move(move);
 
-  // pseudo_legal(),legal()チェックのためにはCheckInfoのupdateが必要。
-  const_cast<Position*>(&pos)->check_info_update();
   if (pos.pseudo_legal(move) && pos.legal(move))
     return move;
 

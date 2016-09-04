@@ -160,7 +160,7 @@
 // 置換表のprobeに必ず失敗する設定
 // 自己生成棋譜からの学習でqsearch()のPVが欲しいときに
 // 置換表にhitして枝刈りされたときにPVが得られないの悔しいので
- //#define USE_FALSE_PROBE_IN_TT
+ #define USE_FALSE_PROBE_IN_TT
 
 // 評価関数パラメーターを共有メモリを用いて他プロセスのものと共有する。
 // 少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
@@ -259,18 +259,25 @@
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Late"
-//#define ASSERT_LV 3
-#define ENABLE_TEST_CMD
-#define EVAL_KPPT_FAST
-#define USE_EVAL_HASH
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
 #define USE_SIMPLE_SEE
-#define USE_MOVE_PICKER_2016Q2
-#define LONG_EFFECT_LIBRARY
+#define USE_MOVE_PICKER_2016Q3
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
+// デバッグ絡み
+#define ASSERT_LV 3
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+#define USE_SFEN_PACKER
+#define EVAL_LEARN
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+//#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 
@@ -582,6 +589,8 @@ inline int MKDIR(std::string dir_name)
 #define EVAL_TYPE_NAME "KPP"
 #elif defined(EVAL_PPE)
 #define EVAL_TYPE_NAME "PPE"
+#elif defined(EVAL_KPPT)
+#define EVAL_TYPE_NAME "KPPT"
 #else
 #define EVAL_TYPE_NAME ""
 #endif
