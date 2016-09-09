@@ -81,7 +81,7 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 50'0000'0000LL;
+  constexpr int64_t kMaxPositionsForLearning = 20'0000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
@@ -501,10 +501,57 @@ void Learner::Learn(std::istringstream& iss) {
         Value value;
         Color rootColor;
         pos.set_this_thread(&thread);
-        if (!search_shallowly(pos, value, rootColor)) {
-          continue;
-        }
-      }
+		if (!search_shallowly(pos, value, rootColor)) {
+			continue;
+		}
+
+		WeightType delta = CalculateGradient(record_value, value);
+		// 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+		WeightType delta_color = (rootColor == BLACK ? delta : -delta);
+		// 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+		WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
+
+		// 値を更新する
+		Square sq_bk = pos.king_square(BLACK);
+		Square sq_wk = pos.king_square(WHITE);
+		const auto& list0 = pos.eval_list()->piece_list_fb();
+		const auto& list1 = pos.eval_list()->piece_list_fw();
+
+		// 勾配の値を加算する
+
+		// KK
+		weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+		weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+
+		for (int i = 0; i < PIECE_NO_KING; ++i) {
+			Eval::BonaPiece k0 = list0[i];
+			Eval::BonaPiece k1 = list1[i];
+			for (int j = 0; j < i; ++j) {
+				Eval::BonaPiece l0 = list0[j];
+				Eval::BonaPiece l1 = list1[j];
+
+				// 常にp0 < p1となるようにアクセスする
+
+				// KPP
+				Eval::BonaPiece p0b = std::min(k0, l0);
+				Eval::BonaPiece p1b = std::max(k0, l0);
+				weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+				weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+
+				// KPP
+				Eval::BonaPiece p0w = std::min(k1, l1);
+				Eval::BonaPiece p1w = std::max(k1, l1);
+				weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
+				weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+			}
+
+			// KKP
+			weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+			weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+		}
+
+		// 局面は元に戻さなくても問題ない
+	  }
 
       // 重みを更新する
       double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
