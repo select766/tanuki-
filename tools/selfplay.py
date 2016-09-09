@@ -46,7 +46,7 @@ def AdoptSubfolder(subfolder):
 def CalculateWinningPercentage(learner_output_folder_path):
   subfolders = GetSubfolders(learner_output_folder_path)
   output_cvs_file_path = os.path.join(learner_output_folder_path, 'winning_percentage.' + GetDateTimeString() + '.csv')
-  with open(output_cvs_file_path, 'wb') as output_file:
+  with open(output_cvs_file_path, 'w', newline='') as output_file:
     csvwriter = csv.writer(output_file)
     for subfolder in subfolders:
       if not AdoptSubfolder(subfolder):
@@ -64,7 +64,7 @@ def CalculateWinningPercentage(learner_output_folder_path):
       output = None
       try:
         with open(LOCAL_GAME_SERVER_TXT_FILE_NAME, 'r') as file:
-          output = subprocess.check_output(popenargs, stdin=file)
+          output = subprocess.check_output(popenargs, stdin=file).decode('utf-8')
       except subprocess.CalledProcessError:
         pass
       print(output)
@@ -81,7 +81,7 @@ def CalculateWinningPercentage(learner_output_folder_path):
 def CalculateMeanSquaredError(learner_output_folder_path, learner_exe_file_path):
   subfolders = GetSubfolders(learner_output_folder_path)
   output_cvs_file_path = os.path.join(learner_output_folder_path, 'mean_squared_error.' + GetDateTimeString() + '.csv')
-  with open(output_cvs_file_path, 'w') as output_file:
+  with open(output_cvs_file_path, 'w', newline='') as output_file:
     csvwriter = csv.writer(output_file)
     csvwriter.writerow(['subfolder', 'rmse_value', 'rmse_winning_percentage', 'mean_cross_entropy', 'norm'])
     for subfolder in subfolders:
@@ -95,7 +95,7 @@ def CalculateMeanSquaredError(learner_output_folder_path, learner_exe_file_path)
       output = None
       try:
         with open(ERROR_MEASUREMENT_TXT_FILE_NAME, 'r') as file:
-          output = subprocess.check_output(popenargs, stdin=file)
+          output = subprocess.check_output(popenargs, stdin=file).decode('utf-8')
       except subprocess.CalledProcessError:
         pass
       print(output)
