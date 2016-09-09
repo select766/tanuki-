@@ -23,10 +23,10 @@ namespace Learner
 
 namespace
 {
-  constexpr int kNumGames = 5000'0000;
-  constexpr char* kOutputFileNameDate = "2016-08-30";
+  constexpr int kNumGames = 2000'0000;
+  constexpr char* kOutputFileNameDate = "2016-09-07";
   constexpr char* kBookFileName = "book.sfen";
-  constexpr int kMinBookMove = 32;
+  constexpr int kMinBookMove = 16;
   constexpr int kMaxBookMove = 32;
   constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
@@ -34,8 +34,6 @@ namespace
   constexpr int kMaxTrialsToSelectSquares = 100;
 
   std::vector<std::string> book;
-  std::random_device random_device;
-  std::mt19937_64 mt19937_64(random_device());
   std::uniform_int_distribution<> swap_distribution(0, 9);
   std::uniform_int_distribution<> num_book_move_distribution(kMinBookMove, kMaxBookMove);
 
@@ -106,6 +104,8 @@ void Learner::GenerateKifu()
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
+	std::random_device random_device;
+	std::mt19937_64 mt19937_64(random_device());
 
 #pragma omp for schedule(guided)
     for (int game_index = 0; game_index < kNumGames; ++game_index) {
