@@ -12,7 +12,7 @@
 #include "thread.h"
 
 // Gradient Noise
-//#define GRADIENT_NOISE
+#define GRADIENT_NOISE
 
 // 平均化確率的勾配降下法
 //#define AVERAGING
@@ -85,7 +85,7 @@ namespace
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
-  constexpr double kGradientNoiseEta = 0.0;
+  constexpr double kGradientNoiseEta = 5.0;
   constexpr double kGradientNoiseTau = 0.55;
 #endif
 
