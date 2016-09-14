@@ -379,19 +379,19 @@ namespace Eval
 #endif
 
 			// 重みのコピー
-			for (auto k1 : SQ)
-				for (auto k2 : SQ)
-					kk_w[k1][k2].w = { LearnFloatType(kk[k1][k2][0]) , LearnFloatType(kk[k1][k2][1]) };
+			//for (auto k1 : SQ)
+			//	for (auto k2 : SQ)
+			//		kk_w[k1][k2].w = { LearnFloatType(kk[k1][k2][0]) , LearnFloatType(kk[k1][k2][1]) };
 
-			for (auto k : SQ)
-				for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
-					for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
-						kpp_w[k][p1][p2].w = { LearnFloatType(kpp[k][p1][p2][0]) , LearnFloatType(kpp[k][p1][p2][1]) };
+			//for (auto k : SQ)
+			//	for (auto p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+			//		for (auto p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+			//			kpp_w[k][p1][p2].w = { LearnFloatType(kpp[k][p1][p2][0]) , LearnFloatType(kpp[k][p1][p2][1]) };
 
-			for (auto k1 : SQ)
-				for (auto k2 : SQ)
-					for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
-						kkp_w[k1][k2][p].w = { LearnFloatType(kkp[k1][k2][p][0]) , LearnFloatType(kkp[k1][k2][p][1]) };
+			//for (auto k1 : SQ)
+			//	for (auto k2 : SQ)
+			//		for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+			//			kkp_w[k1][k2][p].w = { LearnFloatType(kkp[k1][k2][p][0]) , LearnFloatType(kkp[k1][k2][p][1]) };
 
 		}
 	}

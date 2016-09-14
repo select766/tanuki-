@@ -110,7 +110,7 @@ void Learner::GenerateKifu()
 #pragma omp for schedule(guided)
     for (int game_index = 0; game_index < kNumGames; ++game_index) {
       int current_game_index = global_game_index++;
-      if (current_game_index && current_game_index % 1000 == 0) {
+      if (current_game_index && current_game_index % 10000 == 0) {
         auto current = std::chrono::system_clock::now();
         auto elapsed = current - start;
         double elapsed_sec =

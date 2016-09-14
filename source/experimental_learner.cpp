@@ -456,7 +456,7 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
     // Žc‚èŽžŠÔ•\Ž¦
-    if (num_processed_positions) {
+    if (num_processed_positions && num_processed_positions % (kMiniBatchSize * 10) == 0) {
       auto current = std::chrono::system_clock::now();
       auto elapsed = current - start;
       double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
