@@ -10,13 +10,12 @@ import shutil
 import subprocess
 import sys
 
-OUTPUT_EVAL_FOLDER_NAME = '5000000000'
+OUTPUT_EVAL_FOLDER_NAME = '2000000000'
 #OUTPUT_EVAL_FOLDER_NAME = '99999999999'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-mid.exe
 go byoyomi 1000
 setoption name Threads value 1
 setoption name Hash value 256
->>>>>>> 46afdf59cd78304873cf7e7304565f718f0e7484
 setoption name EvalDir value {0}
 setoption name NetworkDelay value 0
 setoption name NetworkDelay2 value 0
@@ -46,6 +45,7 @@ def GenerateKifu(eval_folder_path, kifu_output_folder_path_base, generate_kifu_e
 setoption name EvalDir value {0}
 setoption name KifuDir value {1}
 setoption name Threads value {2}
+setoption name Hash value 32768
 isready
 usinewgame
 generate_kifu

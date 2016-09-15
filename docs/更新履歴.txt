@@ -2,6 +2,81 @@
 やねうら王 更新履歴
 
 
+■　2016/09/03 V3.65
+
+・nanoがビルド通らなかったの修正。
+・LONG_EFFECTありのmated1plyがコンパイル通らなかったの修正。
+・Position::key()追加。
+・learn.hにLEARN_GENSFEN追加。
+・Key exclusion_key()　→　削除
+・futilityでpos.see_sign()を使っていたところ、see()に変更。
+・PARAM_REDUCTION_BY_HISTORY = 10000に戻す。
+・g++用のmakefileでLATE_ENGINEがコンパイル出来なかったの修正。
+
+
+■　2016/09/02 V3.64
+
+・update_stats()整理。
+・反駁ペナルティ等の変更。
+・ONE_PLYを2,4,8,...できちんと動作するように変更。
+・history pruningのときにkillerの判定しないように変更。
+・CheckInfo、StateInfoに隠匿。CheckInfoUpdate削除、CheckInfoUpdate()関係すべて削除。
+・Position::check_blocker()削除。
+・Position::silder_blockers()追加。
+・is_aligned()廃止。aligned()追加。aligned()の引数の並び順をStockfishに合せる。
+・Position::check_info_update()を呼び出さなくて良くなった。
+・Optionクラス、spin型でもto_string()が呼び出せるように変更。
+・testコマンドの最初でis_ready()を呼び出すように修正。
+・set_check_info()、null_move()のとき処理を分離した。
+
+
+■　2016/08/31 V3.63
+
+・学習のときのmini-batchサイズをlearnコマンドのときに指定できるように。
+・学習時の評価関数ファイルの保存を8000万局面ごとに変更。
+
+
+■　2016/08/30 V3.62
+
+・pythonスクリプトに、自己対局のときに評価値つきの棋譜を残す機能追加。
+・教師局面生成時に千日手局面に突入したらその対局を終了するように変更。
+
+
+■　2016/08/26 V3.61
+
+・目的関数=勝率の関数のときにも、YANE_SGD_UPDATEの更新式を用意。
+・SGDのeta2、constにしてて、global変数参照してた…。0になってたのか…。
+
+
+■　2016/08/22 V3.60
+
+・YANE_SGD_UPDATE追加。
+・2016Lateをmakebookコマンドに対応。
+・test exambookコマンド追加。
+・KPPTのときに評価関数名が、usiの応答に対して出力されていなかったのを修正。
+・learnコマンドでrmseの計算にsfen_unpack()を使っていたところをset_from_packed_sfen()に変更。
+・自己対戦フレームワーク、readyokに対して初回のみ1秒のwaitを追加。
+
+
+■　2016/08/20 V3.59
+
+・自己対戦フレームワークに、time outの処理追加した。
+・search()のmate1判定、depth == ONE_PLYでもやるように変更。
+・IID単純化。
+・captureでのLMR追加。
+・2016Late engineをgensfenコマンドに対応。
+
+
+■　2016/08/19 V3.58
+
+・2016Late engine書きかけ。
+・move_picker2016Q3追加。
+・Search::search_endの説明が間違ってる気がする。消す。
+・move_picker、capturesで歩の成り、考慮しない。
+・move_picker、BadCaptureの順序変更。
+・evaluateのときのTempo使わないように変更。
+
+
 ■　2016/08/18 V3.57
 
 ・SSEなしのときにBitboardの>>=演算子の実装が間違っていたの修正。(ai5さん、thanks！)

@@ -25,6 +25,13 @@
 // ※　色々実験中なので使わないように。
 
 //#define LEARN_YANEURAOU_2016_LATE
+//#define EVAL_SAVE_ONLY_ONCE
+
+
+// 教師局面生成時の設定
+
+// 教師局面生成時に千日手・優等・劣等局面の判定をなくすなら、LEARN_GENSFENをdefineすること。
+//#define LEARN_GENSFEN
 
 
 // ----------------------
@@ -40,19 +47,25 @@
 //#define USE_SGD_UPDATE
 
 
-// 2) AdaGradによるupdate
+// 2) YANE_SGDによるupdate
+//  これはSGDを改良したもの。
+
+//#define USE_YANE_SGD_UPDATE
+
+
+// 3) AdaGradによるupdate
 //  これは普通のAdaGrad
 
 //#define USE_ADA_GRAD_UPDATE
 
 
-// 3) YaneGradによるupdate
+// 4) YaneGradによるupdate
 //  これはAdaGradを改良したもの。
 
 //#define USE_YANE_GRAD_UPDATE
 
 
-// 4) Adamによるupdate
+// 5) Adamによるupdate
 //  これは普通のAdam 評価関数ファイルの16倍ぐらいWeight用のメモリが必要。
 
 //#define USE_ADAM_UPDATE
@@ -123,7 +136,7 @@
 //        置換表
 // ----------------------
 
-// 置換表を用いない。(やねうら王Mid2016のみ対応)
+// 置換表を用いない。(やねうら王Mid2016/Late2016のみ対応)
 // これをオンにすると通常対局時にも置換表を参照しなくなってしまうので棋譜からの学習を行う実行ファイルでのみオンにする。
 // 棋譜からの学習時にはオンにしたほうがよさげ。
 // 理由) 置換表にhitするとPV learが評価値の局面ではなくなってしまう。
@@ -142,6 +155,8 @@
 // 現状、10億局面ずつ。
 #define EVAL_FILE_NAME_CHANGE_INTERVAL (u64)1000000000
 
+// evalファイルの保存は1度のみにする。
+//#define EVAL_SAVE_ONLY_ONCE
 
 // ----------------------
 // 学習に関するデバッグ設定
@@ -210,12 +225,13 @@ typedef float LearnFloatType;
 
 #ifdef LEARN_YANEURAOU_2016_LATE
 #define USE_SGD_UPDATE
+//#define USE_YANE_SGD_UPDATE
 //#define USE_YANE_GRAD_UPDATE
 //#define USE_ADAM_UPDATE
 #undef LEARN_MINI_BATCH_SIZE
 #define LEARN_MINI_BATCH_SIZE (1000 * 1000 * 1)
-#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
-//#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
 #define USE_QSEARCH_FOR_SHALLOW_VALUE
 #define DISABLE_TT_PROBE
 #undef EVAL_FILE_NAME_CHANGE_INTERVAL
@@ -229,6 +245,8 @@ typedef float LearnFloatType;
 // 更新式に応じた文字列。(デバッグ用に出力する。)
 #if defined(USE_SGD_UPDATE)
 #define LEARN_UPDATE "SGD"
+#elif defined(USE_YANE_SGD_UPDATE)
+#define LEARN_UPDATE "YaneSGD"
 #elif defined(USE_ADA_GRAD_UPDATE)
 #define LEARN_UPDATE "AdaGrad"
 #elif defined(USE_YANE_GRAD_UPDATE)

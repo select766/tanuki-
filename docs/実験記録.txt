@@ -10,8 +10,2267 @@
 
 
 ToDo: 
+・探索パラメーターの改良(2016/09/05～2016/09/10)
+・技巧のソースコード調べる(2016/09/05～2016/09/10)
+・mate3()書く。(2016/09/05～2016/09/10)
+・評価関数に特徴追加(2016/09/10～2016/09/15)
+・持ち時間制御の改良。(2016/09/10～2016/09/15)
+・新やねうら王大定跡の生成(2016/09/20～2016/09/25)
+・Stockfishにキャッチアップ(2016/09/25)
+・Stockfishのpull req.にキャッチアップ(2016/10/01)
+・最終ランニング(2016/10/01～2016/10/06)
+
+
+・評価値のmin,max,分散を計算して表示したほうがいいな。
+　出現回数の平均等も。
+
+
+■　2016/09/04
+
+・2016Late、g++でコンパイルが通るようにした。
+	benchコマンドはg++のほうが3%ぐらい速いようだ。
+
+・
+#77
+	182_20160829_62_50Gから50億局面生成。前回の182_20160901_74_40Gから追加学習。50億×2周。
+		YaneuraOuV365learn150win.exe
+
+#78
+		η = 150が大きすぎる可能性…。
+		η = 32ぐらいでどうなのか。
+		YaneuraOuV365learn32win.exe
+
+
+■　2016/09/03
+
+
+・手番評価が合っているのかという問題が..
+・手番だけ1/4にするの本当にいいのかどうか…。
+
+	rmse = 0.0810652 , mean_error = 988.444
+	rmse = 0.0807737 , mean_error = 988.438
+
+	これだけにしてみる。
+		kk_w[sq_bk][sq_wk].add_grad( 0 , g );
+
+		rmse = 0.0812481 , mean_error = 985.498
+		rmse = 0.0812475 , mean_error = 985.497
+		rmse = 0.0812469 , mean_error = 985.497
+	符号は合ってるけど動きが小さすぎ。
+	eta2使うのやめたほうがいいかも。
+	eta2→etaに変更。
+
+		rmse = 0.0812471 , mean_error = 985.497
+		rmse = 0.0812467 , mean_error = 985.497
+		rmse = 0.0812457 , mean_error = 985.497
+		rmse = 0.0812451 , mean_error = 985.498
+
+	((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(0 ,  +g );
+
+		rmse = 0.0809696 , mean_error = 988.293
+		rmse = 0.0805326 , mean_error = 988.611
+		rmse = 0.0802162 , mean_error = 988.687
+
+	((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(0 ,  -g );
+		rmse = 0.0825053 , mean_error = 990.759
+		rmse = 0.0839705 , mean_error = 994.512
+		rmse = 0.0860035 , mean_error = 999.369
+
+	→　符号はさすがに間違ってなかった…が…。
+
+
+
+・V3.64aで弱くなった原因調べる。
+	→　cm_stats_update()呼び出してなかったのとかが関係しているのかも。
+	V3.64cでV3.62より強くなっているならそれでいいや。
+	パラメーターに関してはこのあと調整するしな…。
+
+・
+	engine1 = YaneuraOuV362.exe , eval = Apery20160824
+	engine2 = YaneuraOuV364c.exe , eval = Apery20160824
+	T1,r300,2466 - 70 - 2734(47.42% R-17.92)
+
+・学習、教師局面が足りてない可能性はあるわな…。うーむ..。
+	depth3で30億さらに生成して、50億で学習回してみるか？
+
+	engine1 = YaneuraOuV362.exe , eval = 182_20160901_74_40G
+	engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+	T1,b5000,1474 - 123 - 1543(48.86% R-7.95)
+
+・その前にAperyWCSC26からの学習、一応再度テストしておくか。
+	AperyWCSC26からdepth3で生成。5億局面。20160903d3_ap.bin
+
+	#76
+		// 5億局面×1周
+		engine1 = YaneuraOuV362.exe , eval = 182_20160903_76_05G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160505
+		T1,b3000,1534 - 77 - 1389(52.48% R17.25)
+
+		// 5億局面×3周
+		engine1 = YaneuraOuV362.exe , eval = 182_20160903_76_15G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160505
+		T1,b3000,1231 - 63 - 1006(55.03% R35.06)
+
+	5億×1周では全然収束してないな…。mini-batchのサイズ大きすぎる可能性はなくはない。
+	ともかく強くなっていることはわかった。
+
+
+■　2016/09/02
+
+・探索部改良
+	V3.64a
+		Refutation penalty on captures	
+		https://github.com/official-stockfish/Stockfish/commit/0b4f6e562b76a7a7fb581ad117927748371fe790
+
+		Reformat stats update
+		https://github.com/official-stockfish/Stockfish/commit/3e739f883fb766f965ed434507c9c8fbcf18a855
+
+		Simplify stats update
+		https://github.com/official-stockfish/Stockfish/commit/9bd856e28ec93a16a5db78b24f9579c607541def
+		
+		engine1 = YaneuraOuV362.exe , eval = Apery20160824
+		engine2 = YaneuraOuV364a.exe , eval = Apery20160824
+		T1,r300,4727 - 162 - 5111(48.05% R-13.57)
+		T1,b3000,1524 - 96 - 1380(52.48% R17.24)
+
+		engine1 = YaneuraOuV364a.exe , eval = Apery20160824
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,1366 - 94 - 1540(47.01% R-20.83)
+
+		// やばい。長い時間で弱くなっている。原因調べる(´ω｀)
+		
+	V3.64b
+		Make engine ONE_PLY value independent
+		https://github.com/official-stockfish/Stockfish/commit/4c5cbb1b14b283679e3e0096b7973c97b75088f3
+
+		Silence some warnings with MSVC 2013
+		https://github.com/official-stockfish/Stockfish/commit/0b944c718631cdbdd8fae46eaf96a099f48ad5a4
+
+		Optimize order of a few conditions in search
+		https://github.com/official-stockfish/Stockfish/commit/5cffc032da8402df79cf6cba4238b83ff5d29f7e
+
+		Remove condition on killers in history pruning
+		https://github.com/official-stockfish/Stockfish/commit/2731bbaf6b4bed23abaae8de5c1fa9f373e30e57
+
+		engine1 = YaneuraOuV364a.exe , eval = Apery20160824
+		engine2 = YaneuraOuV364b.exe , eval = Apery20160824
+		T1,r300,4898 - 200 - 4902(49.98% R-0.14)
+		// この改造では何も壊していない。
+
+	V3.64c
+		Tweak probcut threshold
+		https://github.com/official-stockfish/Stockfish/commit/6aa9308f08bc76b0e3615dde65de7782a6761fa3
+
+		// これはいい改造の予感。
+
+		Move CheckInfo under StateInfo
+		https://github.com/official-stockfish/Stockfish/commit/805afcbf3d5db39c85b759232cfb99ab0a250311
+		→　いまごろになってやっとCheckInfoをStateInfoに隠匿するのか。遅すぎ。
+		→　これ大改造になるな…。
+
+		Retire CheckInfo
+		https://github.com/official-stockfish/Stockfish/commit/1ee2838214fcbadc352fb17c8c6fa1142ae5dcb0
+
+
+		// これもはや、不要なのか…。うーむ..
+		enum CheckInfoUpdate
+		{
+		  CHECK_INFO_UPDATE_NONE,           // 何もupdateされていない状態
+		  CHECK_INFO_UPDATE_ALL,            // 以下の2つともupdate
+		  CHECK_INFO_UPDATE_PINNED,         // pinnedの情報だけupdate
+		  CHECK_INFO_UPDATE_WITHOUT_PINNED, // pinned以外の情報だけupdate
+		};
+		→　大改造の予感。
+
+	  // 自分側(手番側)の(敵駒によって)pinされている駒
+	  Bitboard pinned;
+		→　blockersForKing
+
+	  // 自駒の駒種Xによって敵玉が王手となる升のbitboard
+	  Bitboard checkSq[PIECE_WHITE];
+		→　checkSquares
+
+	→　大改造になった。
+	→　legal_drop()が少し簡単化できた。
+
+	// 与えられた3升が縦横斜めの1直線上にあるか。駒を移動させたときに開き王手になるかどうかを判定するのに使う。
+	// 例) 王がsq1, pinされている駒がsq2にあるときに、pinされている駒をsq3に移動させたときにaligned(sq1,sq2,sq3)であれば、
+	//  pinされている方向に沿った移動なので開き王手にはならないと判定できる。
+	// ただし玉はsq3として、sq1,sq2は同じ側にいるものとする。(玉を挟んでの一直線は一直線とはみなさない)
+	inline bool aligned(Square sq1, Square sq2, Square sq3/* is ksq */)
+	{
+		auto d1 = Effect8::directions_of(sq1, sq2);
+		return d1 ? d1 == Effect8::directions_of(sq1, sq3) : false;
+	}
+	→　これ2回テーブルを引くので言うほど速くない気がしてきた。まあいいか…。
+
+	・これ、元のコードがバグっている可能性が微レ存。
+				case DIRECT_U: case DIRECT_D:
+					st->checkersBB |= rookEffectFile(from, pieces()) & pieces(Us); break;
+
+
+				 香
+				^玉
+
+				 
+				 角
+				 香
+
+		こういうときに誤って上の香を足してないか？
+		ああ、fromだからいいのか..そうか。
+
+		→　random playerでのテストは通ったが、benchが通らない。
+		→　do_null_move()でset_check_info()が要るのか…。うーむ..
+		→　bench通った。最適化はあとで考えようか…。
+
+		===========================
+		Total time (ms) : 81136
+		Nodes searched  : 48509614
+		Nodes/second    : 597880
+
+		→　set_check_info()、null_move()のとき処理を分離した。ベンチ通った。
+
+		===========================
+		Total time (ms) : 75429
+		Nodes searched  : 48509614
+		Nodes/second    : 643116
+
+		テスト関連のコード。
+			if (st->checkersBB != attackers_to(Us, king_square(~Us)))
+			{
+				cout << *this << st->checkersBB << attackers_to(Us, king_square(~Us)) << m << endl << prevSt->blockersForKing[~Us];
+
+				Bitboard pinned = prevSt->blockersForKing[~Us] & from;
+				if (discovered(from, to, ksq, pinned))
+				{
+					cout << "DISCOVERED";
+				} else {
+					cout << prevSt->checkSquares[type_of(moved_after_pc)];
+					cout << (prevSt->checkSquares[type_of(moved_after_pc)] & to);
+					cout << st->checkersBB;
+					st->checkersBB = prevSt->checkSquares[type_of(moved_after_pc)] & to;
+					cout << st->checkersBB;
+				}
+				cout <<  pinned 
+					<<
+					(pinned & from)               // 2)
+					<< !aligned(from, to, ksq); // 3)
+				cout << pinned
+					<<
+					(pinned & from)               // 2)
+					<< !aligned(from, to, ksq); // 3)
+
+			}
+
+		engine1 = YaneuraOuV364b.exe , eval = Apery20160824
+		engine2 = YaneuraOuV364c.exe , eval = Apery20160824
+		T1,b3000,1407 - 97 - 1496(48.47% R-10.65)
+
+		→　これは強くなっているようだが？
+
+	V3.64d forked from V3.64c
+
+					Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(to_sq(move))];
+		-		//	+ (is_promote(move) ? (Value)ProDiffPieceValue[pos.piece_on(move_from(move))] : VALUE_ZERO);
+
+		これないほうが良いのでは..
+
+			engine1 = YaneuraOuV364c.exe , eval = Apery20160824
+			engine2 = YaneuraOuV364d.exe , eval = Apery20160824
+			T1,b1000,4947 - 256 - 4797(50.77% R5.35)
+			T1,b3000,2416 - 183 - 2401(50.16% R1.08)
+
+		→　そうでもなかった…。
+
+
+	V3.64e forked from V3.64d
+			以下のところ、see()に変更してみる。
+				// ToDo: pos.see(move) <= VALUE_ZEROのほうが良い可能性。
+				if (futilityBase <= alpha && pos.see_sign(move) <= VALUE_ZERO)
+				{
+					bestValue = std::max(bestValue, futilityBase);
+					continue;
+				}
+
+		engine1 = YaneuraOuV364d.exe , eval = Apery20160824
+		engine2 = YaneuraOuV364e.exe , eval = Apery20160824
+		T1,b1000,4941 - 284 - 4775(50.85% R5.94)
+		→　弱くなった？
+
+		engine1 = YaneuraOuV364d.exe , eval = Apery20160824
+		engine2 = YaneuraOuV364e.exe , eval = Apery20160824
+		T1,b3000,1422 - 121 - 1457(49.39% R-4.22)
+		T1,b3000,2404 - 212 - 2384(50.21% R1.45)
+			3826-333-3841
+
+	V3.64f forked form V3.64c
+
+		// 除外した指し手をxorしてそのままhash keyに使う。
+		// 除外した指し手がないときは、0だから、xorしても0。
+		// ただし、hash keyのbit0は手番を入れることになっているのでここはクリアしておく。
+		auto posKey = pos.key() ^ Key(excludedMove << 1);
+
+		こうしたほうがいいな。
+
+		tte->eval()要らんのちゃう？
+		→　うーん。難しい。
+
+	V3.64g forked form V3.64f
+
+		PARAM_REDUCTION_BY_HISTORYを8000→10000に戻してテスト
+
+			engine1 = YaneuraOuV362.exe , eval = Apery20160824
+			engine2 = YaneuraOuV364g.exe , eval = Apery20160824
+			T1,b3000,1408 - 92 - 1500(48.42% R-11.0)
+
+		やはり、このへんが肝のようだが…。
+
+
+
+
+■　2016/09/01
+
+・学習のイテレーションを安定して回せる状態にする(～2016/09/03)
+
+・
+	#62(182_20160829_62_50G)からdepth3で10,20億局面を生成。182_20160829_62_50Gから追加学習。
+	EVAL_LIMIT = VALUE_INFINITE
+	目的関数 = LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+	//	Weight::eta = 100.0f * (float)pow(0.999f, epoch);
+
+	#69..10億局面 minibatch = 100万局面
+	#70..10億局面 minibatch = 500万局面
+	#71..10億局面 minibatch = 200万局面
+	#72..20億局面 minibatch = 100万局面
+	#73..20億局面 minibatch = 100万局面 , ηの減衰なし。η=100
+		YaneuraOuV363learn_win.exe
+		//	Weight::eta = 100.0f;
+
+	#74..20億局面 minibatch = 100万局面 , ηの減衰なし。η=150
+		YaneuraOuV363learn150win.exe
+		//  Weight::eta = 150.0f;
+
+	#75..10億局面 minibatch = 100万局面 ただし、depth6で生成した教師局面10億局面
+		学習方法は、#74と同じ。
+	
+
+	実験結果)
+	#69
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		T1,r300,4888 - 156 - 4956(49.65% R-2.4)
+		T1,b3000,1470 - 100 - 1430(50.69% R4.79)
+		// 元のバージョンより弱い可能性が。よくわからない。
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_10G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		T1,b3000,1434 - 102 - 1464(49.48% R-3.6)
+
+		// 10Gではまだ収束していない可能性がある。
+		// rmse自体はまだ下がり続けている。
+		// きちんと棋力が伸びなくなる限界まで回さないと雑巾が絞りにくいのでは。
+		// →　η、減衰しないほうと比較実験などをする。
+
+		#69のrmse推移
+		rmse = 0.070048 , mean_error = 985.541  //  0億
+		rmse = 0.0691731 , mean_error = 988.378 // 10億
+		rmse = 0.0689261 , mean_error = 989.072 // 20億
+
+		#73のrmse推移
+		rmse = 0.0701574 , mean_error = 984.905 //  0億
+		rmse = 0.0689784 , mean_error = 989.425 // 10億
+		rmse = 0.0686712 , mean_error = 990.957 // 20億
+		rmse = 0.0678776 , mean_error = 991.066 // 30億
+
+		// →　#73の10億時点で#69の20億ぐらいの感じか。
+
+
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,1431 - 37 - 1532(48.3% R-11.85)
+
+	#70
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_70_20G
+		T1,r300,4912 - 151 - 4937(49.87% R-0.88)
+		T1,b3000,1480 - 95 - 1425(50.95% R6.58) // 収束していない。前バージョンより少し弱い。
+
+		// 10Gと20Gとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_70_10G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_70_20G
+		T1,b3000,1416 - 111 - 1473(49.01% R-6.86)
+
+	#71
+		// Aperyと
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_71_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,r300,5082 - 79 - 4839(51.22% R8.51)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_71_20G
+		T1,b3000,1544 - 110 - 1346(53.43% R23.84) // 収束してない。前バージョンよりR23も弱い
+
+	#72
+		// #69と#72との比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_72_20G
+		T1,r300,4921 - 147 - 4932(49.94% R-0.39)
+		T1,b3000,1447 - 93 - 1460(49.78% R-1.55)
+
+		// →　教師、10億局面と20億局面とで差がほぼ無いかも…。
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_72_40G
+		T1,r300,5024 - 135 - 4841(50.93% R6.45)
+		T1,b3000,1472 - 112 - 1416(50.97% R6.74)
+
+		// →　むしろ弱くなってるような…？		
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_72_40G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,1407 - 33 - 1560(47.42% R-17.93)
+
+		// →　弱くなってるような？
+
+	#73
+
+		// #69,#73の比較
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_73_20G
+		T1,r300,4909 - 153 - 4938(49.85% R-1.02)
+		T1,b3000,1432 - 102 - 1466(49.41% R-4.08)
+		T1,b3000,1419 - 95 - 1486(48.85% R-8.01)
+
+		// η、減衰しないほうがよさげ。
+
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_73_50G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,2391 - 68 - 2541(48.48% R-10.57)
+
+	#74
+
+		// #69と#74との比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_74_20G
+		T1,r300,4872 - 141 - 4987(49.42% R-4.05)
+		T1,b3000,1437 - 99 - 1464(49.53% R-3.23)
+
+		// #73と#74との比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_73_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_74_20G
+		T1,b3000,1972 - 118 - 1930(50.54% R3.74)
+		// →　大差なし？
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_73_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_74_40G
+		T1,b3000,2256 - 153 - 2311(49.4% R-4.18)
+		// #74のほうが優れていると言えそう。
+
+		// 20Gと40Gとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_74_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_74_40G
+		T1,b3000,2386 - 173 - 2441(49.43% R-3.96)
+
+		// #74ですら20Gでは収束していないっぽい。
+		// 40G回さないと駄目か…。
+
+	#75
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_69_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_75_10G
+		T1,b3000,1587 - 97 - 1506(51.31% R9.1)
+		// → 収束が十分でなさげ。弱い。
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_75_20G
+		T1,b3000,772 - 51 - 727(51.5% R10.43)
+		T1,b3000,2447 - 156 - 2397(50.52% R3.59)
+		// → 20G時点でも元の評価関数より強くなっているかも謎。
+
+		// #74との比較
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_74_40G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160901_75_30G
+		T1,r300,4935 - 135 - 4930(50.03% R0.18)
+		T1,b3000,2426 - 162 - 2392(50.35% R2.45)
+		→　depth3の教師と変わらないなら、depth6意味ないことになるが…。
+		
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_75_10G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,1862 - 64 - 1994(48.29% R-11.9)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_75_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,r300,4826 - 79 - 4495(51.78% R12.34)
+		T1,b3000,466 - 6 - 508(47.84% R-14.99) // 対局数少なめ
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160901_75_30G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,r300,5100 - 83 - 4817(51.43% R9.92)
+		T1,b3000,2393 - 81 - 2526(48.65% R-9.4)
+
+	・mini batchサイズの変更は明らかに弱い。収束が十分でないのだろう。
+		十分に時間をかけた場合、どちらが良いかはよくわからない。
+		#71のほうがmini batchサイズが小さいのに、#70のほうが勝率が良さそうであるが、
+		単に値が動いていないから前のバージョンからあまり弱くなっていないだけかも。
+
+	・depth6で教師局面を生成したほう、収束が遅いように思う。
+		教師が元のものからかけ離れているからか？
+		depth3と大差ないならdepth3で回したほうが良いのではないか？
+
+
+■　2016/08/31
+
+
+・mini-batchサイズの違いによる学習の差を計測してみる実験。
+	100万と500万とで比較。
+
+・10億をflowで生成するJenkinsのJob書いた。
+
+		// build number
+		def bn = build.getEnvironment(listener).get('BUILD_NUMBER')  
+
+		// parallel number
+		def pn = params["PARA_NUM"].toInteger()
+
+		def builds = []
+		for(int i=0;i<pn;++i)
+		{
+		  // ここでjにコピーして、これをclosureに束縛させる。
+		  int j=i
+		  builds.add( { -> build("yanejob/教師局面ファイル生成flow",SFEN_FILENAME:"ALN_"+bn+"_" + j.toString() +".bin",
+								 DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : "32001") })
+		}
+		parallel(builds)  
+
+・depth3で生成するの、イテレーションが早くまわるように見えて、その後の強くなったかどうかの検証で
+　こんなに時間かかると何やってるかわからんな…。
+
+
+■　2016/08/30
+
+・pythonスクリプトに、自己対局のときに評価値つきの棋譜を残す機能追加。
+	→　さらに評価値も出力させるように変更。
+
+
+■　2016/08/29
+
+・
+	教師a)
+	182_20160828_56_10G(182_20160824よりわずかに強い？)でdepth3で10億局面生成。
+	→　194.bin 195.bin 196.bin 197.bin
+
+	教師b)
+	Apery20160824からdepth3で10億局面生成
+	→　198.bin 199.bin 200.bin 201.bin
+
+	千日手、優等・劣等局面の判定なしで教師局面を生成。
+
+	学習局面数
+	10G..10億局面×1周
+	20G..10億局面×2周
+	30G..10億局面×3周
+
+	EVAL_LIMIT = VALUE_INFINITE
+	目的関数 = LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+	
+	#62
+		182_20160828_56_10Gから追加学習。教師a)
+		YaneuraOuV361learn999win.exe
+
+	#63 比較実験
+		Apery20160824から追加学習。教師b)
+		YaneuraOuV361learn999win.exe
+
+	#64
+		182_20160828_56_10Gから追加学習。教師b)
+		YaneuraOuV361learn999win.exe
+
+	#65 比較実験
+		Apery20160824から追加学習。教師b)
+		YaneuraOuV361learn999win.exe
+
+	#66 比較実験
+		#63で10億×5周させたものから追加学習。教師b)
+		YaneuraOuV361learn999win.exe
+
+	戦績)
+	#62
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_10G
+		play_time = r300 ,  T1,r300,4834 - 136 - 5030(49.01% R-6.9)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_20G
+		play_time = r300 ,  T1,r300,4892 - 132 - 4976(49.57% R-2.96)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_30G
+		play_time = r300 ,  T1,r300,4878 - 136 - 4986(49.45% R-3.8)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_40G
+		play_time = r300 ,  T1,r300,4897 - 138 - 4965(49.66% R-2.4)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		play_time = r300 ,  T1,r300,4842 - 128 - 5030(49.05% R-6.62)
+
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_40G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = r300 ,  T1,r300,5200 - 96 - 4704(52.5% R17.41)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_40G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = b1000 ,  T1,b1000,2445 - 63 - 2492(49.52% R-3.31)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		r300 ,  T1,r300,5154 - 82 - 4764(51.97% R13.67)
+		b1000 ,  T1,b1000,2446 - 62 - 2492(49.53% R-3.24)
+		T1,b3000,1426 - 54 - 1520(48.4% R-11.09)
+		→ 長い持ち時間で勝敗が逆転しているが、前バージョンよりはAperyに対する勝率が上がっていると言えそう。
+
+		// #56と62との比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160828_56_10G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_10G
+		T1,b1000,2400 - 113 - 2487(49.11% R-6.19)
+
+	#63
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_63_10G
+		play_time = r300 ,  T1,r300,4541 - 105 - 5354(45.89% R-28.61)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_63_20G
+		play_time = r300 ,  T1,r300,4641 - 96 - 5263(46.86% R-21.85)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_63_30G
+		play_time = r300 ,  T1,r300,4526 - 94 - 5380(45.69% R-30.03)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_63_40G
+		play_time = r300 ,  T1,r300,4651 - 93 - 5256(46.95% R-21.24)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_63_50G
+		play_time = r300 ,  T1,r300,4690 - 83 - 5227(47.29% R-18.83)
+
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_63_10G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = r300 ,  T1,r300,5529 - 123 - 4348(55.98% R41.74)
+		play_time = b1000 ,  T1,b1000,2645 - 97 - 2258(53.95% R27.48)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_63_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = b1000 ,  T1,b1000,2665 - 94 - 2241(54.32% R30.1)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_63_40G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = b1000 ,  T1,b1000,2692 - 66 - 2242(54.56% R31.78)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_63_50G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		play_time = r300 ,  T1,r300,5468 - 111 - 4421(55.29% R36.92)
+		play_time = b1000 ,  T1,b1000,2678 - 91 - 2231(54.55% R31.72)
+		play_time = b5000 ,  T1,b5000,998 - 49 - 953(51.15% R8.02)
+		play_time = b10000 ,  T1,b10000,983 - 69 - 948(50.91% R6.3)
+		→　長い持ち時間だと差が縮まる傾向にある。
+
+	#64
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_64_10G
+		T1,r300,4845 - 153 - 5002(49.2% R-5.54)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_64_20G
+		T1,r300,4873 - 125 - 5002(49.35% R-4.54)
+
+		// Aperyとの比較
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_64_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b3000,1409 - 70 - 1521(48.09% R-13.29)
+		T1,b5000,968 - 32 - 1000(49.19% R-5.65)
+
+
+	#65
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_65_10G
+		T1,r300,4493 - 95 - 5412(45.36% R-32.33)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_65_20G
+		T1,r300,4568 - 129 - 5303(46.28% R-25.92)
+
+		// Aperyとの比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_65_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b5000,998 - 62 - 940(51.5% R10.4)
+
+	#66
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_66_10G
+		T1,r300,4538 - 104 - 5358(45.86% R-28.86)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160824
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_66_20G
+		T1,r300,4554 - 101 - 5345(46.0% R-27.82)
+
+	#62と#64、#64と#65、#65と#66の比較
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_64_10G
+		T1,b3000,1091 - 84 - 1215(47.31% R-18.7)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_64_10G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_65_10G
+		T1,r300,4506 - 89 - 5405(45.46% R-31.6)
+		T1,b1000,2229 - 78 - 2693(45.29% R-32.85)
+		T1,b5000,663 - 28 - 859(43.56% R-44.99)
+
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_65_20G
+		engine2 = YaneuraOuV362.exe , eval = 182_20160829_66_20G
+		T1,b1000,2441 - 119 - 2440(50.01% R0.07)
+
+		// Aperyとの比較
+				
+		engine1 = YaneuraOuV362.exe , eval = 182_20160829_66_20G
+		engine2 = YaneuraOuV362.exe , eval = Apery20160824
+		T1,b5000,1031 - 47 - 922(52.79% R19.41)
+
+	182_20160828_56_10Gの強さを示す予備データ) 
+		長い持ち時間ではApery20160824より-R10程度弱いようだ。(短い時間では勝っていたのに…。)
+
+		engine1 = YaneuraOuV360.exe , eval = 182_20160824
+		engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+		play_time = b1000 ,  T1,b1000,2450 - 105 - 2445(50.05% R0.35)
+
+		engine1 = YaneuraOuV360.exe , eval = 182_20160824
+		engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+		play_time = b3000 ,  T1,b3000,949 - 65 - 986(49.04% R-6.64)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160824
+		engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+		play_time = b1000 ,  T1,b1000,2516 - 81 - 2403(51.15% R7.98)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160824
+		engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+		play_time = b3000 ,  T1,b3000,1510 - 46 - 1444(51.12% R7.76)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160824
+		engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+		T1,b6000,747 - 32 - 701(51.59% R11.04)
+
+	結論)
+		・0.3秒対局において、#63は元の評価関数から強くなった(Apery20160824に+R40であることからも明らか)。
+		・0.3秒対局においても、#62は元の評価関数からほとんど強くならない。(雑巾絞れない現象)
+		・Aperyの評価関数は終盤の特徴因子に適切な点数がついていなくて、そこに適切な点数がついたがために
+		若干強くなったのだと考えられる。
+		・この手法、10億局面学習した時点で棋力的にはおおよそ収束していると見てよさそう。
+		・短い持ち時間の棋譜を確認したが、すぐに終盤に突入するので終盤の特徴に加点されていると
+		勝率が上がるのも無理はなさげ。(長い持ち時間ではこのような加点はむしろマイナスになることが多い)
+		・Apery20160824からdepth3で生成した教師から学習させたのに、#64は元の教師より-R30ぐらい弱い。
+		　元が弱いからだが、異なる評価関数からではあまりうまく学習できていない印象。
+		・#65は、Aperyより弱い評価関数でdepth3で生成した教師から学習したのに、元の評価関数より強くなっている。
+		　終盤の特徴が何らか強化されたからだろうか？
+		
+		検証) depth3の教師から雑巾が絞れているか？
+			#56と#62との比較から、元の評価関数より強いので絞れていると言えそう。
+			(終盤が強化されただけかも知れない)
+			depth3で教師生成→学習を繰り返してみるのはアリかも知れない。
+			
+		検証) 異なる評価関数であっても、強いほうの教師から学習させたほうが良いか？
+			#62→#64で少し強くなっているようではある。
+			教師を超える強さにはなっていないことから、異なる評価関数の教師による学習は
+			あまりよろしくないのではないかと思う。
+		
+			Aperyの評価関数に対して別の評価関数を教師にして学習させた#63は元のAperyの評価関数より
+		　強くなっているように見えたが、その後、Aperyを教師にして学習させた#63→#66は、結局は#65と
+		　同じ強さであったことから、#63は終盤が強化されていただけの可能性がある。
+
+		・教師を生成した評価関数が違うとよろしくないというのは真実っぽい。
+			目的関数が交差エントロピーでやるとまた違うのかも知れないが…。
+
+
+
+・Apery20160824からdepth3で10億局面生成。
+
+
+・depth3 , EVAL_LIMIT=VALUE_INFINITEである場合、1億局面の生成に1:40:00
+
+
+・教師局面生成時に千日手局面に突入したらその対局を終了するように変更。
+
+#if 1
+		// 何らかの千日手局面に突入したので局面生成を終了する。
+		auto draw_type = pos.is_repetition();
+		if (draw_type != REPETITION_NONE)
+			break;
+#endif
+
+
+・思ったほど戦績よくないな…。ともかく、これでdepth3で作った教師で学習回す。
+
+
+
+■　2016/08/28
+
+・eta2修正後。
+
+	#49 ... YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 32.0f * (float)pow(0.998f, epoch);
+		// YaneuraOuV361learn998.exe
+		// EVAL_LIMIT = 20000(11億局面) + 2000(8億局面)
+
+	#50 ... YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 100.0f * (float)pow(0.997f, epoch);
+		// YaneuraOuV361learn997.exe
+		// EVAL_LIMIT = 20000(11億局面) + 2000(8億局面)
+
+	#51 ... #50と同じだが、EVAL_LIMTE = 20000のみ9億局面
+		// YaneuraOuV361learn997.exe
+
+	#52 ... #49と同じだが、EVAL_LIMIT =  20000(2億局面) + 2000(8億局面)
+		// YaneuraOuV361learn998.exe
+
+	#56 ... #51と同じだがLOSS_FUNCTION_IS_WINNING_PERCENTAGE
+	#57 ... %52と同じだがLOSS_FUNCTION_IS_WINNING_PERCENTAGE
+		//	Weight::eta = 100.0f * (float)pow(0.999f, epoch);
+		//	YaneuraOuV360learn999win.exe
+
+	※　07G = 0.7Gの意味
+	07G ...  7億局面
+	10G ... 10億局面
+	20G ... 20億局面
+	30G ... 30億局面
+	…
+
+	engine1 = YaneuraOuV360.exe , eval = 182_20160824
+
+	# 49
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_49_07G
+	play_time = r300 ,  T1,r300,4899 - 148 - 4953(49.73% R-1.9) //　η低めで前のが平均化された影響？
+	play_time = b1000 ,  T1,b1000,1480 - 73 - 1447(50.56% R3.92)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_49_13G
+	play_time = r300 ,  T1,r300,4997 - 133 - 4870(50.64% R4.47)
+	play_time = b1000 ,  T1,b1000,1495 - 46 - 1459(50.61% R4.23)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_49_30G
+	play_time = r300 ,  T1,r300,5000 - 143 - 4857(50.73% R5.04)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_49_40G
+	play_time = r300 ,  T1,r300,5017 - 138 - 4845(50.87% R6.06)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_50G
+	play_time = r300 ,  T1,r300,4991 - 118 - 4891(50.51% R3.52)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_49_60G
+	play_time = r300 ,  T1,r300,5008 - 147 - 4845(50.83% R5.75)
+
+
+	# 50
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_50_07G
+	play_time = r300 ,  T1,r300,5075 - 147 - 4778(51.51% R10.48)
+	play_time = b1000 ,  T1,b1000,1530 - 50 - 1420(51.86% R12.96)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_50_13G
+	play_time = r300 ,  T1,r300,4984 - 131 - 4885(50.5% R3.49)
+	play_time = b1000 ,  T1,b1000,1548 - 50 - 1402(52.47% R17.21)
+	
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_50_30G
+	play_time = r300 ,  T1,r300,5122 - 123 - 4755(51.86% R12.92)
+
+
+	#51
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_10G
+	play_time = r300 ,  T1,r300,5041 - 124 - 4835(51.04% R7.25)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_20G
+	play_time = r300 ,  T1,r300,4985 - 131 - 4884(50.51% R3.56)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_30G
+	play_time = r300 ,  T1,r300,5061 - 123 - 4816(51.24% R8.62)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_40G
+	play_time = r300 ,  T1,r300,5090 - 134 - 4776(51.59% R11.06)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_51_50G
+	play_time = r300 ,  T1,r300,4991 - 118 - 4891(50.51% R3.52)
+
+	#52
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_52_10G
+	play_time = r300 ,  T1,r300,5154 - 126 - 4720(52.2% R15.28)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_52_20G
+	play_time = r300 ,  T1,r300,5164 - 141 - 4695(52.38% R16.54)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_52_30G
+	play_time = r300 ,  T1,r300,5134 - 123 - 4743(51.98% R13.76)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_52_40G
+	play_time = r300 ,  T1,r300,5224 - 123 - 4653(52.89% R20.11)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_52_50G
+	play_time = r300 ,  T1,r300,5039 - 143 - 4818(51.12% R7.79)
+
+
+	// 目的関数 = 勝率の関数
+	#56
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_10G
+	play_time = r300 ,  T1,r300,4831 - 143 - 5026(49.01% R-6.87)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_20G
+	play_time = r300 ,  T1,r300,4876 - 159 - 4965(49.55% R-3.14)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_30G
+	play_time = r300 ,  T1,r300,4993 - 146 - 4861(50.67% R4.65)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_40G
+	play_time = r300 ,  T1,r300,4917 - 154 - 4929(49.94% R-0.42)
+	
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_56_50G
+	play_time = r300 ,  T1,r300,4969 - 139 - 4892(50.39% R2.71)
+
+	
+	#57
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_10G
+	play_time = r300 ,  T1,r300,4953 - 153 - 4894(50.3% R2.08)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_20G
+	play_time = r300 ,  T1,r300,5056 - 140 - 4804(51.28% R8.88)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_30G
+	play_time = r300 ,  T1,r300,5037 - 142 - 4821(51.1% R7.61)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_40G
+	play_time = r300 ,  T1,r300,5088 - 157 - 4755(51.69% R11.76)
+
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_50G
+	play_time = r300 ,  T1,r300,5075 - 141 - 4784(51.48% R10.26)
+
+
+	#56と#57の比較
+	engine1 = YaneuraOuV360.exe , eval = 182_20160828_56_30G
+	engine2 = YaneuraOuV360.exe , eval = 182_20160828_57_30G
+	play_time = r300 ,  T1,r300,5028 - 152 - 4820(51.06% R7.34)
+
+
+	・#49と#50、#51と#52の結果、また、#56と#57の結果から、EVAL_LIMITは2000より20000が良いと結論できる。
+	・#56がベストであったことから、勝率の関数のほうが交差エントロピーよりよい目的関数であると言える。
+	
+
+・
+	Weight::eta = 3.2f;
+	→　YaneuraOuV360learnSGD.exe
+
+	これで19億局面から学習させてみる。
+	19億×3周とかで。12時間。
+	19億×5周で20時間。
+
+
+	Weight::eta = 100.0f;
+	→　YaneuraOuV360learnSGD100.exe
+
+
+	よく考えたら、η=300.0fで、EVAL_LIMIT=20000だと、
+	自分が0と評価している局面が+10000だったりすると、
+	差が10000ぐらいあって、一度しか出現しない特徴因子だと
+	そのときに10000×300.0fとかされて、明らかにオーバーフローするような気が…。
+	s32で受けて制限かけてるから大丈夫なのか？うーん..
+	∇ ≫ 100とかに対して制限かけたほうがいいかもな…。
+
+	+	// あまりきつい勾配を持っているとめったに出現しない特徴因子がおかしくなるので制約を課す
+	+	delta_grad = max(delta_grad, -100.0);
+	+	delta_grad = min(delta_grad,  100.0);
+
+	+	g = { eta * g[0] / count, eta2 * g[1] / count };
+
+		// あまり大きいと発散しかねないので移動量に制約を課す。
+	+	SET_A_LIMIT_TO(g, -64.0f, 64.0f);
+
+	・バグ発見！
+		eta2、constにしてて、global変数参照してた…。0になってたのか…。そうか…。
+
+	もう一度、SGDで以下の条件で実験。
+
+		// 1億で0.8倍、10億で0.13倍。
+		Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+
+
+■　2016/08/27
+
+・hyperopt入れる
+	//	pipがないならget-pip.pyをdownloadしてから
+	> c:/python27/python.exe get-pip.py
+
+	//	pipのupgrade
+	> c:/python27/python.exe -m pip install -U pip
+
+	//  pipを用いたhyperoptのインストール
+	> c:/python27/Scripts/pip install hyperopt
+	> c:/python27/Scripts/pip install numpy
+	> c:/python27/Scripts/pip install pymongo
+	> c:/python27/Scripts/pip install networkx
+	> c:/python27/Scripts/pip install scipy
+
+	scipyでインストールうまくいかない
+
+	http://www.lfd.uci.edu/~gohlke/pythonlibs/
+		scipy-0.18.0-cp27-cp27m-win_amd64.whl
+		numpy-1.11.1+mkl-cp27-cp27m-win_amd64.whl
+	を落としてきて
+
+	> c:/python27/Scripts/pip install scipy-0.18.0-cp27-cp27m-win_amd64.whl
+	> c:/python27/Scripts/pip install numpy-1.11.1+mkl-cp27-cp27m-win_amd64.whl
+
+	MKLがIntelのMath Kernel Libraryらしい。
+
+
+	hyperopt、そこそこ優秀なような気がしてきた。
+
+		#coding:utf-8
+
+		from hyperopt import fmin, tpe, hp, rand
+		import random
+
+		count = 0
+
+		def function(args):
+			a,b,c,d = args
+		#	print ("x={0},y={1},z={2},a={3},b={4},c={5},d={6}".format(x,y,z,a,b,c,d))
+
+			global count
+			count += 1
+			if (count % 100)==0:
+				print count
+
+			r = random.randint(0,100)
+			return \
+				abs(a-30)*1 + abs(b-40)*1 + abs(c-50)*1 + abs(d-60)*1+ r
+
+		space = [
+				  hp.quniform('a', 0, 100 , 1)
+				, hp.quniform('b', 0, 100 , 1)
+				, hp.quniform('c', 0, 100 , 1)
+				, hp.quniform('d', 0, 100 , 1)
+				]
+
+		best = fmin(function,space,algo=tpe.suggest,max_evals=500)
+		print "best = " , best
+
+・EVAL_LIMIT = 2000にして7億局面生成
+
+	L1正則化と勾配の出てない特徴をupdateしないように変更。
+
+		#if defined(USE_YANE_SGD_UPDATE)
+					// 出現頻度が低い特徴は勾配がでたらめである可能性があるのでこれでupdateするのはやめる。
+					if (count < 15000)
+					{
+						count = 0;
+						goto FINISH;
+					}
+		#endif
+
+		#if defined(USE_YANE_SGD_UPDATE)
+					// ゼロ方向に少し引っ張る(L1正則化的な何か)
+					w[0] -= (w[0]>0 ? 1 : -1)*0.1;
+					w[1] -= (w[1]>0 ? 1 : -1)*0.1;
+		#endif
+
+		YaneuraOuV360learn998L1.exe
+		→　発散した。
+
+
+		// 0方向に引張るのを真っ先にするべきか？
+		#if defined(USE_YANE_SGD_UPDATE)
+					// ゼロ方向に少し引っ張る(L1正則化的な何か)
+					w[0] -= (w[0]>0 ? 1 : -1)*0.1;
+					w[1] -= (w[1]>0 ? 1 : -1)*0.1;
+		#endif
+			if (g[0] == 0 && g[1] == 0)
+				return false;
+			→　これでも発散するわ。
+
+#if defined(USE_YANE_SGD_UPDATE)
+			// ゼロ方向に少し引っ張る(L1正則化的な何か)
+			w[0] -= (w[0]>0 ? 1 : -1)*0.01f;
+			w[1] -= (w[1]>0 ? 1 : -1)*0.01f;
+
+			// 出現頻度が低い特徴は勾配がでたらめである可能性があるのでこれでupdateするのはやめる。
+			if (count < 15000)
+			{
+				count = 0;
+				goto FINISH;
+			}
+#endif
+		→　これでも発散ぎみ
+
+#if defined(USE_YANE_SGD_UPDATE)
+			// ゼロ方向に少し引っ張る(L1正則化的な何か)
+			//w[0] -= (w[0]>0 ? 1 : -1)*0.01f;
+			//w[1] -= (w[1]>0 ? 1 : -1)*0.01f;
+
+			// 出現頻度が低い特徴は勾配がでたらめである可能性があるのでこれでupdateするのはやめる。
+			if (count < 5000)
+			{
+				count = 0;
+				goto FINISH;
+			}
+#endif
+		こう変える。
+
+		YaneuraOuV360learn998L1V3.exe
+		・9億×2周 #43
+		rmse = 0.0936463 , mean_error = 206.853
+		rmse = 0.0925597 , mean_error = 203.518
+
+			engine1 = YaneuraOuV360.exe , eval = 182_20160824
+			engine2 = YaneuraOuV360.exe , eval = 182_20160827_43
+			play_time = r300 ,  T1,r300,4991 - 139 - 4870(50.61% R4.26)
+			play_time = b1000 ,  T1,b1000,1531 - 68 - 1401(52.22% R15.41)
+
+
+		#define RESET_TO_ZERO_VECTOR
+		有効に。
+
+		>	Weight::eta = 300.0f * (float)pow(0.997f, epoch);
+		YaneuraOuV360learn997L1V3ZERO.exe
+
+		・9億×2周 #45
+		rmse = 0.191646 , mean_error = 449.053
+		rmse = 0.14841 , mean_error = 336.394
+		あまり下がってないな…。
+
+
+
+・EVAL_LIMIT = 2000にして7億局面生成
+
+	教師生成1億局面(40HT) 2:28:00
+
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 32.0f * (float)pow(0.999f, epoch);
+		YaneuraOuV360learn.exe
+
+	・7億×1周 #39
+		rmse = 0.0935364 , mean_error = 206.479
+		rmse = 0.0919638 , mean_error = 202.336
+		play_time = r300 ,  T1,r300,5087 - 156 - 4757(51.68% R11.65)
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+		YaneuraOuV360learn998.exe
+
+	・7億×1周 #37
+		rmse = 0.0934595 , mean_error = 206.156
+		rmse = 0.090139 , mean_error = 198.62
+		play_time = r300 ,  T1,r300,5233 - 127 - 4640(53.0% R20.89)
+		play_time = b1000 ,  T1,b1000,1586 - 67 - 1347(54.07% R28.37)
+
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 300.0f * (float)pow(0.997f, epoch);
+		YaneuraOuV360learn997.exe
+
+	・7億×1周 #36
+		rmse = 0.0932377 , mean_error = 205.695
+		→　速攻発散した。
+
+	] YANE_SGD_UPDATE、目的関数 : 勝率 , Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+
+		YaneuraOuV360learn998win.exe
+
+	・7億×1周 #38
+		rmse = 0.0936112 , mean_error = 206.773
+		rmse = 0.0916344 , mean_error = 201.542
+		play_time = r300 ,  T1,r300,5094 - 148 - 4758(51.71% R11.85)
+		play_time = b1000 ,  T1,b1000,1472 - 65 - 1463(50.15% R1.07)
+
+		//
+		engine1 = YaneuraOuV360.exe , eval = 182_20160827_37
+		engine2 = YaneuraOuV360.exe , eval = Apery20160824
+		play_time = r300 ,  T1,r300,4899 - 86 - 5015(49.41% R-4.07)
+
+
+■　2016/08/26
+
+
+・182_20160824からdepth6で生成した棋譜に対して
+	182_20160824 (Apery20160824より+R10程度)
+	からの追加学習。
+
+	rmse,mean_errorの表記は開始時と終了時。
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 32.0f * (float)pow(0.999f, epoch);
+
+	・3億×5周  #22
+		rmse = 0.0868215 , mean_error = 350.269
+		rmse = 0.0856406 , mean_error = 347.075
+		play_time = r300 ,  T1,r300,4891 - 147 - 4962(49.64% R-2.5)
+
+	・3億×10周 #23
+		rmse = 0.0868182 , mean_error = 350.228
+		rmse = 0.0851735 , mean_error = 345.941
+		play_time = r300 ,  T1,r300,4976 - 117 - 4907(50.35% R2.43)
+
+	・6億×2周  #24
+		rmse = 0.0868157 , mean_error = 350.247
+		rmse = 0.0858546 , mean_error = 347.404
+		play_time = r300 ,  T1,r300,4974 - 155 - 4871(50.52% R3.64)
+
+	・6億×5周  #25
+		rmse = 0.0868167 , mean_error = 350.22
+		rmse = 0.0855211 , mean_error = 346.433
+		play_time = r300 ,  T1,r300,4991 - 155 - 4854(50.7% R4.84)
+
+	・9億×2周  #26
+		rmse = 0.086842 , mean_error = 350.231
+		rmse = 0.085832 , mean_error = 347.25
+		play_time = r300 ,  T1,r300,4956 - 156 - 4888(50.35% R2.4)
+
+	・9億×3周  #27
+		rmse = 0.0868449 , mean_error = 350.251
+		rmse = 0.0858532 , mean_error = 347.141
+		play_time = r300 ,  T1,r300,4911 - 146 - 4943(49.84% R-1.13)
+
+		// 22と27との比較
+		engine1 = YaneuraOuV360.exe , eval = 182_20160826_22
+		engine2 = YaneuraOuV360.exe , eval = 182_20160826_27
+		play_time = r300 ,  T1,r300,4996 - 161 - 4843(50.78% R5.4)
+
+		// 27と31との比較
+		engine1 = YaneuraOuV360.exe , eval = 182_20160826_27
+		engine2 = YaneuraOuV360.exe , eval = 182_20160826_31
+		play_time = b1000 ,  T1,b1000,2488 - 125 - 2387(51.04% R7.2)
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+
+		// 1億で0.8倍、10億で0.13倍。
+
+		YaneuraOuV360learn998.exe
+
+	・3億×2周  #28  182_20160826_28
+		rmse = 0.0868901 , mean_error = 350.49
+		rmse = 0.0834686 , mean_error = 340.779
+		play_time = r300 ,  T1,r300,5067 - 134 - 4799(51.36% R9.44)
+
+	・3億×3周  #29  182_20160826_29
+		rmse = 0.0866145 , mean_error = 349.971
+		rmse = 0.0827457 , mean_error = 338.772
+		play_time = r300 ,  T1,r300,5073 - 149 - 4778(51.5% R10.41)
+
+	・6億×2周  #30
+		rmse = 0.0868749 , mean_error = 350.514
+		rmse = 0.0850343 , mean_error = 342.688
+		play_time = r300 ,  T1,r300,5072 - 152 - 4776(51.5% R10.45)
+
+	・9億×2周  #31
+		rmse = 0.0871074 , mean_error = 351.39
+		rmse = 0.0844194 , mean_error = 341.205
+		play_time = r300 ,  T1,r300,5008 - 156 - 4836(50.87% R6.07)
+		play_time = b1000 ,  T1,b1000,2551 - 110 - 2339(52.17% R15.07)
+
+	もやってみる。
+
+	] YANE_SGD_UPDATE、交差エントロピー , Weight::eta = 300.0f * (float)pow(0.997f, epoch);
+
+		// 1億で0.74倍、10億で0.05倍。
+		YaneuraOuV360learn997.exe
+
+	・3億×2周  #34
+		rmse = 0.0870329 , mean_error = 351.028
+		rmse = 0.0835192 , mean_error = 338.577
+		play_time = r300 ,  T1,r300,5116 - 133 - 4751(51.85% R12.86)
+
+	・9億
+
+		rmse = 0.0864173 , mean_error = 349.797
+
+	  10億時点  #35 , 182_20160826_35_1G
+		rmse = 0.0830257 , mean_error = 335.504
+		play_time = r300 ,  T1,r300,5116 - 129 - 4755(51.83% R12.71)
+
+	  20億時点  #35 , 182_20160826_35_2G
+		rmse = 0.0830441 , mean_error = 335.392
+		play_time = r300 ,  T1,r300,5120 - 129 - 4751(51.87% R12.99)
+
+	  30億時点  #35
+		rmse = 0.0830468 , mean_error = 335.376
+
+	  40億時点  #35
+		rmse = 0.0830471 , mean_error = 335.372
+
+	  45億時点  #35  , 182_20160826_35_5G
+		rmse = 0.0830469 , mean_error = 335.372
+		play_time = r300 ,  T1,r300,4965 - 154 - 4881(50.43% R2.96)
+		T1,b1000,2206 - 81 - 2073(51.55% R10.8)
+
+
+		engine1 = YaneuraOuV360.exe , eval = 182_20160826_27
+		engine2 = YaneuraOuV360.exe , eval = 182_20160826_35_1G
+		play_time = r300 ,  T1,r300,5034 - 132 - 4834(51.01% R7.04)
+
+		engine1 = YaneuraOuV360.exe , eval = 182_20160826_35_1G
+		engine2 = YaneuraOuV360.exe , eval = 182_20160826_35_2G
+		play_time = r300 ,  T1,r300,4915 - 152 - 4933(49.91% R-0.64)
+
+
+	交差エントロピーがいけない気もする..。
+
+	] YANE_SGD_UPDATE、目的関数 : 勝率 , Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+
+		YaneuraOuV360learn998win.exe
+
+	・6億×2周  #32
+		rmse = 0.086859 , mean_error = 350.391
+		rmse = 0.0854933 , mean_error = 349.878
+		play_time = r300 ,  T1,r300,4962 - 135 - 4903(50.3% R2.08)
+
+	・9億×3周  #33
+		rmse = 0.0868654 , mean_error = 350.474
+		rmse = 0.0857386 , mean_error = 350.528
+		play_time = r300 ,  T1,r300,5031 - 144 - 4825(51.05% R7.26)
+
+
+
+■　2016/08/25
+
+
+  depth6 1億局面生成 6:00:00×8並列
+  8億×4周=32局面からの学習 6:00:00
+  --------------------------------
+  合計)  12:00:00
+
+  明日、起きてから異なる条件で学習させて比較しよう…。
+
+
+・自己対局の定跡差し替え
+	records2016_10818.sfen
+
+	engine1 = YaneuraOuV360.exe , eval = 182_20160824
+	engine2 = YaneuraOuV360.exe , eval = Apery20160824
+	play_time = r300 ,  T1,r300,517 - 12 - 471(52.33% R16.19)
+
+
+・Apery新。
+
+	engine1 = YaneuraOuV360.exe , eval = 182_20160824
+	engine2 = YaneuraOuV360.exe , eval = Apery20160824
+	play_time = r300 ,  T1,r300,5078 - 91 - 4831(51.25% R8.66)
+
+	engine1 = YaneuraOuV360.exe , eval = Apery20160821
+	engine2 = YaneuraOuV360.exe , eval = Apery20160824
+	play_time = r300 ,  T1,r300,4908 - 123 - 4969(49.69% R-2.15)
+
+	engine1 = YaneuraOuV360.exe , eval = 182_20160824
+	engine2 = YaneuraOuV360.exe , eval = Apery20160824
+	play_time = b1000 ,  T1,b1000,2513 - 59 - 2428(50.86% R5.98)
+
+
+
+・jenkinsのworkflowを理解する。
+	depth3 , 10億局面の生成 = 14.5時間(40HT)
+					+ ファイルコピー(15分ほど)
+	10億×3周               =  6  時間
+
+	1iteration = 21時間程度
+
+	10億局面の生成自体は、4並列なら3.625時間で済むので
+	10時間ぐらいで1iterationが回せるようになる。
+	(あまり速くなってないか？)
+
+	10億×3周がもったいないのか？
+	SGDの学習率調整して、2周ぐらいで済むようにするべきか？
+	うーん。よくわからん…。
+
+	てかdepth6でも1日2周ぐらい回るのでは…。
+	よくわからんので10億×2周に設定して1日回しておく。
+
+	8時間ぐらいで1 iteration回るから、明日には
+	これで強くなるのかどうかがわかる。
+	→　強くならんかった…。
+
+	2周が足りないのか何なのか…。
+
+		engine1 = YaneuraOuV360.exe , eval = 183_LOOP_20160825a
+		engine2 = YaneuraOuV360.exe , eval = Apery20160824
+		play_time = r300 ,  T1,r300,5081 - 94 - 4825(51.29% R8.98)
+
+		engine1 = YaneuraOuV360.exe , eval = 183_LOOP_20160825a
+		engine2 = YaneuraOuV360.exe , eval = 183_LOOP
+		play_time = r300 ,  T1,r300,4924 - 148 - 4928(49.98% R-0.14)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160824
+		engine2 = YaneuraOuV360.exe , eval = 183_LOOP_20160825b
+		play_time = r300 ,  T1,r300,4986 - 99 - 4915(50.36% R2.49)
+
+		engine1 = YaneuraOuV360.exe , eval = 182_20160824
+		engine2 = YaneuraOuV360.exe , eval = 183_LOOP_20160825b
+		play_time = r300 ,  T1,r300,5134 - 141 - 4725(52.07% R14.42)
+
+
+
+・Jenkinsのgroovyで並列ビルドできた。
+
+	while(true)
+	{
+	  // build number
+	  def bn = build.getEnvironment(listener).get('BUILD_NUMBER')  
+  
+	  // parallel number
+	  def pn = 8
+
+	  parallel(
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_0", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_1", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_2", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_3", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_4", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_5", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_6", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+		{ build("yanejob/教師局面ファイル生成flow", SFEN_FILENAME:"ALN_"+bn+"_7", DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : 20000) },
+	  )
+
+	  def files = ""
+	  for(int i=0;i<pn;++i)
+  		files += "ALN_" + bn + "_" + i.toString() + ".bin "
+  
+	  build("yanejob/教師局面からの学習flow", KIF_FILES: files , LEARN_LOOP_MAX : params["LEARN_LOOP_MAX"] , EVAL_DIR : params["EVAL_DIR"] )
+	}
+
+	↓書き換え
+
+		  def tasks = [:]
+		  for(int i=0;i<pn;++i)
+		  {
+			def task_tag = "task-aln-"+i.toString()
+			// def task_args = [SFEN_FILENAME:"ALN_"+bn+ "_" +i.toString(),DEPTH:params["DEPTH"],LOOP_MAX:params["SFEN_LOOP"],EVAL_DIR:params["EVAL_DIR"],EVAL_LIMIT:"20000"]
+
+			def task_args = [new StringParameterValue("SFEN_FILENAME","ALN_"+bn+ "_" +i.toString()),
+						new StringParameterValue("DEPTH", params["DEPTH"]),
+						new StringParameterValue("LOOP_MAX",params["SFEN_LOOP"]),
+						new StringParameterValue("EVAL_DIR",params["EVAL_DIR"]),
+						new StringParameterValue("EVAL_LIMIT", "20000")]
+        
+			tasks[task_tag] = { task_tag : {  build job : "yanejob/教師局面ファイル生成flow", parameters : task_args }}
+		  }
+		  parallel tasks
+
+		古いサンプルはこれで動くのになぁ…仕様変わったのか…。
+
+		// こうか？
+
+
+		while(true)
+		{
+		  // build number
+		  def bn = build.getEnvironment(listener).get('BUILD_NUMBER')  
+  
+		  // parallel number
+		  def pn = params["PARA_NUM"].toInteger()
+
+		  def builds = []
+		  for(int i=0;i<pn;++i)
+		  {
+			// ここでjにコピーして、これをclosureに束縛させる。
+			int j=i
+			builds.add( { -> build("yanejob/教師局面ファイル生成flow",SFEN_FILENAME:"ALN_"+bn+"_" + j.toString() +".bin",
+								DEPTH: params["DEPTH"], LOOP_MAX: params["SFEN_LOOP"] , EVAL_DIR : params["EVAL_DIR"] , EVAL_LIMIT : "20000") })
+		  }
+		  parallel(builds)  
+    
+		  def files = ""
+		  for(int i=0;i<pn;++i)
+  			files += "ALN_" + bn + "_" + i.toString() + ".bin "
+    
+		  build("yanejob/教師局面からの学習flow", KIF_FILES: files , LEARN_LOOP_MAX : params["LEARN_LOOP_MAX"] , EVAL_DIR : params["EVAL_DIR"] )
+		}
+
+
+
+
+■　2016/08/24
+
+・無限学習
+
+	engine1 = YaneuraOuV360.exe , eval = 180_20160824 // depth3 , 3億のイテレーション*6
+	engine2 = YaneuraOuV360.exe , eval = 182_20160824 // depth3 , 10億のイテレーション*1
+	T1,r300,749 - 14 - 897(45.5% R-31.32)
+
+	engine1 = YaneuraOuV360.exe , eval = 180_20160824 // depth3 , 3億のイテレーション*6
+	engine2 = YaneuraOuV360.exe , eval = 181_20160824 // depth6 , 3億のイテレーション*1
+	T1,r300,719 - 23 - 938(43.39% R-46.19)
+
+	engine1 = YaneuraOuV360.exe , eval = 181_20160824
+	engine2 = YaneuraOuV360.exe , eval = 182_20160824
+	play_time = r300 ,  T1,r300,4827 - 116 - 5057(48.84% R-8.09)
+
+	engine1 = YaneuraOuV360.exe , eval = 181_20160824
+	engine2 = YaneuraOuV360.exe , eval = Apery20160821
+	play_time = r300 ,  T1,r300,5066 - 80 - 4854(51.07% R7.43)
+
+	engine1 = YaneuraOuV360.exe , eval = 182_20160824
+	engine2 = YaneuraOuV360.exe , eval = Apery20160821
+	play_time = r300 ,  T1,r300,5102 - 76 - 4822(51.41% R9.81)
+
+	engine1 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+	engine2 = YaneuraOuV360.exe , eval = 182_20160824
+	play_time = r300 ,  T1,r300,4877 - 140 - 4983(49.46% R-3.74)
+
+	engine1 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+	engine2 = YaneuraOuV360.exe , eval = 181_20160824
+	play_time = r300 ,  T1,r300,4913 - 123 - 4964(49.74% R-1.79)
+
+	engine1 = YaneuraOuV360.exe , eval = Apery20160821
+	engine2 = YaneuraOuV360.exe , eval = 182_20160824
+	play_time = b1000 ,  T1,b1000,1480 - 17 - 1503(49.61% R-2.68)
+
+	3億局面はいずれにせよ、よくないということがわかった。
+	もう1イテレーション回して結果を観測する。
+
+・ppt実験
+
+	engine1 = YaneuraOuV360.exe , eval = Apery20160821
+	engine2 = YaneuraOuV360_ppt2.exe , eval = Apery20160821
+	play_time = r300 ,  T1,r300,4870 - 111 - 5019(49.25% R-5.24)
+
+	うーむ。わからん…。
+	
+	値をダンプしてみたところ、手番があるときの手駒の価値を補整するような値に
+	なってる気がする。
+
+	これ自体は、駒割り自体に手番の価値があるべきような気はする。
+	しかし2枚目の歩、3枚目の歩…などのように手駒の価値が変動するので難しい。
+	いずれにせよ、意味があるということのようだ。
+
+	というか、PPHは本当に駄目なアイデアなのだろうか…。
+	KPHTとか。
+	KPP + KPHT駄目なんかな…。
+
+	PPP + PPTとどっちがいいかだな…。
+	PPPで7.812GB必要。
+	2バイト + 勾配の計算用のfloat(4) + カウント用変数(4) = 10
+	つまり、7.812GBの5倍がSGDのために必要だな。さすがに足りないのか。
+	3角配列使って1/4にはなるのか。うーん..メモリ的には足りるのか。
+	強くなるかどうかは不明だが…。
+	さすがに重いような気がしてきた。1枚駒captureするとき、
+	39*38回×4の計算が必要なのか…。そうか…。captureがなくてもこの半分か。
+	
+	早く決断せねば…。
+
+・自己対戦フレームワーク、エンジン起動後、10秒ぐらい待ったほうが良いのでは。
+	→　以下のように修正した
+
+	# 初回のreadyokに対するwait
+	initial_waits = [True]*threads*2
+
+				if ("readyok" in line) and (states[i] == "wait_for_readyok"):
+
+					# 初回のみこの応答に対して1秒待つことにより、
+					# プロセスの初期化タイミングが重複しないようにする。
+					if initial_waits[i]:
+						initial_waits[i] = False
+						time.sleep(1)
+
+
+
+■　2016/08/23
+
+・手駒に対する手番って関係ないのでは？
+
+		YaneuraOuV360no_ht.exe
+#if 1
+			// KPPTの手駒は手番必要ないのではないかを検証するためのコード
+			for (BonaPiece p1 = BONA_PIECE_ZERO; p1 < fe_hand_end; ++p1)
+				for (BonaPiece p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+				{
+					for (auto sq : SQ)
+					{
+						kpp[sq][p1][p2][1] = 0;
+						kpp[sq][p2][p1][1] = 0;
+					}
+				}
+#endif
+		T1,r300,340 - 15 - 825(29.18% R-153.99)
+		あれ？弱すぎない？
+		そうでもないか。
+
+		これ置換表共有してて、共有メモリ壊したりしてないか？
+		うむむ..??
+
+		学習のときには置換表共有してないから大丈夫か…。
+		棋譜生成のときは？
+
+		evalshareしてると危ないな…。うーむ..そんな可能性があるのか…。
+		実験用はversionナンバー変更しないといかんな…。
+
+		もっかい360_pptの実験。
+		→　この実験結果は正しいようだ。なんなんこれ…。
+	
+
+・自動無限学習
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0081G_V6
+		play_time = r300 ,  T1,r300,4899 - 78 - 5023(49.38% R-4.34)
+		play_time = b1000 ,  T1,b1000,1458 - 34 - 1508(49.16% R-5.86)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		engine2 = YaneuraOuV360.exe , eval = 179_0081G_V6
+		play_time = r300 ,  T1,r300,5046 - 131 - 4823(51.13% R7.85)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0082G_V6
+		play_time = r300 ,  T1,r300,2485 - 41 - 2474(50.11% R0.77)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		engine2 = YaneuraOuV360.exe , eval = 179_0082G_V6
+		T1,r300,2721 - 59 - 2410(53.03% R21.08)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0082G_V6
+		T1,b1000,1709 - 29 - 1682(50.4% R2.77)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0082G_V6
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		T1,b1000,1719 - 74 - 1967(46.64% R-23.41)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0090G_V6_180
+		play_time = r300 ,  T1,r300,5139 - 84 - 4777(51.83% R12.69)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0090G_V6_180
+		play_time = b1000 ,  T1,b1000,2708 - 64 - 2228(54.86% R33.89)
+
+
+		depth3、3億局面は甘すぎであったか…。
+
 
 ・魔女と持ち時間制で比較。
+	t300000 だと魔女がタイムオーバー
+	t600000 だとpythonスクリプトのtime outに引っかかる。
+	スクリプト修正するか…。
+
+	-			and time.time() - go_times[i] >= 60:
+	+			and time.time() - go_times[i] >= (300 if "t" in opt2 else 60):
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160821
+		T1,t900000,196 - 5 - 39(83.4% R280.48)
+
+	それを除いても、魔女勝たないな。魔女側、持ち時間制御がApery由来だからか…。
+	inc time設定で回すか…。もういいか..
+
+		t900000 i10000
+	これで回しておく。これで駄目ならもう知らん。
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160821
+		play_time = t900000/i10000 ,  T1,t900000/i10000,474 - 70 - 456(50.97% R6.73)
+
+	互角以上なので持ち時間制御においてもやねうら王のほうが優れている。
+
+
+・無限自動学習
+
+  depth3 3億局面生成 3:15:00
+  3億×5周=15局面からの学習 2:50:00
+  --------------------------------
+  合計)  6:00:00
+
+  →　棋譜生成、workflowにして3～4並列化すれば4時間ぐらいで1回回るのだが…。
+	あとで考えよう。jenkinsのworkflow、こなれてなくて、難しそう…。
+
+
+・2倍の思考時間テスト
+			option.append("go btime REST_TIME wtime REST_TIME byoyomi " + str(byoyomi * (i+1)))
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = Apery20160821
+		play_time = b1000 ,  t1,b1000,216 - 16 - 768(21.95% R-220.36)
+
+	R200ぐらい差があるんだな。凄い。
+	
+	KPPTに2割ぐらい使ってるから、20%改善するとnpsは1.25倍。
+
+	2倍でR210だとすると..
+	1.25倍でlog(1.25,2)*210 = R67.6up
+
+	KKPTとKPPTとの差はR100程度として、PPTにするとR30ぐらい改善するかも知れないから
+	R70ぐらいの差。
+
+	ほぼ同じなのか…。なんだこれ。ほぼ同じならなおすほどのこともないのか…。
+	しかしPPTでR50ぐらい上がると逆転するのだが…。そんなに上がらないか..うーん..
+
+	KPPTのうちの、PPTだけにするために
+		PPT = ΣKKPT/n
+	みたいに平均化したもので勝率どれくらいになるのか見るといいか。
+
+		// KPPTをPPTで代替えできないかを検証するためのコード
+		// KPPTの値を平均化してPPTとして代入する。
+
+		for (BonaPiece p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+			for (BonaPiece p2 = BONA_PIECE_ZERO; p2 < fe_end; ++p2)
+			{
+				int sum = 0;
+				for (auto sq : SQ)
+					sum += kpp[sq][p1][p2][1];
+
+				int z = sum / SQ_NB;
+
+				for (auto sq : SQ)
+					kpp[sq][p1][p2][1] = z;
+			}
+
+		→	YaneuraOuV360_ppt.exe
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360_ppt.exe , eval = Apery20160821
+		play_time = r300 ,  t1,r300,4836 - 142 - 5022(49.06% R-6.56)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360_ppt.exe , eval = Apery20160821
+		play_time = b1000 ,  t1,b1000,1480 - 53 - 1467(50.22% R1.53)
+
+		やはりそうか！KPPTみたいなものは意味のない概念だったんだ。
+		当たりかどうかはPPTを見れば十分なわけで…。
+		いやはや…。
+
+		ということは、R50ぐらい上がるのか…。これは儲け儲け。
+		evaluate_kppt_prime.h/cpp追加するか…。
+		これは凄い発見かも知れん。
+
+
+・自己対戦から糞定跡を取り除く。
+
+	コマンド追加。
+	> makebook from_sfen_to_sfen book_in.sfen book_out.sfen eval -100 100 moves 24 depth 18
+
+	定跡ファイルの精査用。(自己対戦時の精度を上げるためのもの)
+
+	sfenファイルbook_in.sfenを読み込み、
+	depth18で24手目の局面を探索して、評価値が[-100,100]に収まっていなければ除外。
+	最終的に残ったものをbook_out.sfenとして書き出す。
+
+	→　良くない気がしてきた。やねうら大定跡から持ってきたほうが簡単なような…。
+		最初がsfenになるの気持ち悪いのか？
+		うーん、難しいなぁ…。
+		やねうら大定跡と比較して局面出力すればいいのかも？
+		test exambookコマンド追加しておく。
+
+	→　できた。
+		records2016_10000.sfen
+		評価値 [-100,100]
+		moves = 24
+		records = 11207
+
+	これに伴い、pythonのスクリプト変更。
+	ランダムに読むのではなく11207までは1周回す。
+	→　差し替えた。
+
+・自己対戦の結果表示、Stockfishに倣ったほうがいいかも知れん。
+	https://github.com/glinscott/fishtest/wiki/Creating-my-first-test
+	STC = Short time control (10+0.1)
+	LTC = Long time control (60+0.6)
+	SPRT(x,y) = SPRT test with elo0 = x and elo1 = y
+	http://chess-sprt-calc.azurewebsites.net/
+
+	→　倣うほどのものでもなさげなのでまあいいや。
+
+・無限自動学習スクリプト(新)
+	:loop
+	start /NODE %EXECUTOR_NUMBER% /B /WAIT /D %YANEHOME% %YANEHOME%\exe\YaneuraOuV360.exe evaldir eval/%EVAL_DIR% , threads %HT_CORES% , hash 4096 , gensfen depth %DEPTH% loop %GEN_LOOP_MAX% eval_limit %EVAL_LIMIT% file %WORKSPACE%\AL%BUILD_NUMBER%.bin , quit
+	start /NODE %EXECUTOR_NUMBER% /B /WAIT move %WORKSPACE%\AL%BUILD_NUMBER%.bin %YANEHOME%\gen_sfen\
+	start /NODE %EXECUTOR_NUMBER% /B /WAIT /D %YANEHOME% %YANEHOME%\exe\YaneuraOuV360learn_once30.exe evaldir eval/%EVAL_DIR% , evalsavedir %YANEHOME%\eval/%EVAL_DIR% , threads %HT_CORES% , hash 4096 , evalshare false , learn loop %LEARN_LOOP_MAX% dir %YANEHOME%\gen_sfen AL%BUILD_NUMBER%.bin , quit
+	goto loop
+
+	numa指定してmoveしてるのに、もう片方のnumaがCPU資源もらえてない。なにこれ..
+	DMA転送に起因する何かか？
+
+
+■　2016/08/22
+
+
+・KKPTの実験
+	YaneuraOuV360kkpt
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360kkpt.exe , eval = Apery20160821
+		t1,r300,644 - 16 - 380(62.89% R91.64)
+		t1,b1000,221 - 4 - 125(63.87% R98.99)
+		R100ぐらいの負けか。学習しなおしてみるか。
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160505
+		engine2 = YaneuraOuV360kkpt.exe , eval = Apery20160821
+		play_time = b1000 ,  t1,b1000,1240 - 27 - 1733(41.71% R-58.15)
+
+		それでもApery20160505よりはR60近く強いのか。
+
+
+	YaneuraOuV360learn_once30kkpt
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30KKPT
+		t1,r300,4577 - 80 - 3133(59.36% R65.85)
+		t1,b1000,1555 - 27 - 968(61.63% R82.34)
+
+		これだけ差があるとKKPTにするとR30ぐらい損する気が。
+		ついでに1秒-2秒,5-10秒のr差、求めておいたほうがいいかも。
+
+
+		engine1 = YaneuraOuV360kkpt.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30KKPT
+		play_time = r300 ,  t1,r300,4938 - 86 - 4976(49.81% R-1.33)
+
+		engine1 = YaneuraOuV360kkpt.exe , eval = 179_0080G_V5_E3
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30KKPT
+		t1,r300,1680 - 43 - 1657(50.34% R2.39)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		t1,b1000,616 - 14 - 660(48.28% R-11.99)
+
+		KKPT用に学習しなおしても元のからKPPT=0にしたものと強さがほぼ変わらん。
+
+
+・SGDのη、低すぎるような気が。
+
+		// epoch == 100(1億局面)で0.9倍。10億で0.3倍みたいな。
+		Weight::eta = 3.2f;
+		↓
+		Weight::eta = 10.0f * pow(0.999,epoch);
+
+		// ↑比較↓
+
+		YaneuraOuV360learn_once30
+		Weight::eta = 30.0f * pow(0.999,epoch);
+
+		mean error上がってって話にならん。
+		rmseは下がってるんだけどな…。うーん。
+
+		Weight::eta = 3.2f * pow(0.999,epoch);
+		Weight::eta = 30.0f * pow(0.999,epoch);
+		// この２つで学習回して、結果を比較するのがいいな。
+
+	YaneuraOuV360learn_once3 
+		rmse = 0.0911691 , mean_error = 345.41 
+		rmse = 0.0902648 , mean_error = 345.825 // 12億局面 = 179_0080G_V5_E3
+	YaneuraOuV360learn_once30
+		rmse = 0.0880975 , mean_error = 347.994 // 12億局面 = 179_0080G_V5_E30
+	YaneuraOuV360learn_once30kkpt
+		rmse = 0.0976883 , mean_error = 357.362
+		rmse = 0.094295 , mean_error = 362.943  // 12億局面 = 179_0080G_V5_E30KKPT
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E3
+		play_time = r300 ,  t1,r300,4900 - 103 - 4997(49.51% R-3.41)
+		play_time = b1000 ,  t1,b1000,1513 - 45 - 1442(51.2% R8.35)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160821
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		play_time = r300 ,  t1,r300,4846 - 110 - 5044(49.0% R-6.96)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0080G_V5_E3
+		engine2 = YaneuraOuV360.exe , eval = 179_0080G_V5_E30
+		t1,b1000,1436 - 55 - 1469(49.43% R-3.95)
+
+	→　E30のほうが強いっぽい。E20のほうがrmseの下がりが大きいので、こちらが強いというのは妥当性がある。
+		YANE_SGD_UPDATEではeta = 32.0fをデフォルトに変更する。
+			Weight::eta = 32.0f * (float)pow(0.999f, epoch);
+		mini-batch sizeもっと小さくしたいのだが、update()を並列化していないので難しいな…。うーん。
+
+
+・3時間で棋譜生成、3時間学習にするには…。3時間だとdepth 3でも3億局面しか…。
+	3億局面、そこまで少なくない気もするけども..。
+	学習は100億=24時間ぐらい。
+	3時間で3億局面×4周ぐらい回すと？
+
+		depth 3 , 1.5時間 1億
+		depth 4 , 2.5時間 1億
+		depth 5 , 
+		depth 6 , 4.3時間 1億
+		…
+
+	Jenkinsのワークフローで何とかしたほうがいいような…。
+
+・eval、上書きするモードが必要なような..
+	→　追加した。
+
+	engine1 = YaneuraOuV360.exe , eval = 179_0070G_V5
+	engine2 = YaneuraOuV360.exe , eval = Apery20160821
+	t1,r300,2335 - 48 - 2377(49.55% R-3.1)
+
+
+	engine1 = YaneuraOuV360.exe , eval = 179_0068G_V5
+	engine2 = YaneuraOuV360.exe , eval = 179_0070G_V5
+	t1,r300,3963 - 112 - 3955(50.05% R0.35)
+	t1,b1000,1079 - 41 - 1120(49.07% R-6.48)
+	検知できない差。
+
+
+・Apery新バイナリ
+	engine1 = YaneuraOuV360.exe , eval = Apery20160815
+	engine2 = YaneuraOuV360.exe , eval = Apery20160821
+	play_time = b1000 ,  t1,b1000,1459 - 65 - 1476(49.71% R-2.01)
+	play_time = r300 ,  t1,r300,4840 - 129 - 5031(49.03% R-6.72)
+
+
+■　2016/08/21
+
+・V3.60 = V3.59h
+
+		engine1 = gikou_win_20160606/gikou.exe , eval = dummy
+		engine2 = YaneuraOuV359h , eval = Apery20160815
+		t2 , b6000 , 373 - 7 - 500(42.73% R-50.9)
+
+		engine1 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160815
+		engine2 = YaneuraOuV359h , eval = Apery20160815
+		t4 , b6000 , 249 - 29 - 242(50.71% R4.95)
+
+		engine1 = gikou_win_20160606/gikou.exe , eval = dummy
+		engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160815
+		t2,b6000,150 - 9 - 161(48.23% R-12.29)
+
+		魔女は技巧に対してあまり勝率が良くない感。
+
+・depth8 ×1億局面から。
+	・開始時
+		rmse = 0.0889041 , mean_error = 443.663
+
+		3億局面経過
+		engine1 = YaneuraOuV360.exe , eval = 179_0060G_V4
+		engine2 = YaneuraOuV360.exe , eval = 179_0061G_V5
+		play_time = R200 ,  t1,R200,4954 - 167 - 4879(50.38% R2.65)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160815
+		engine2 = YaneuraOuV360.exe , eval = 179_0061G_V5
+		t1,R200,3697 - 75 - 3618(50.54% R3.75)
+
+		検知できるレベルの差を生まないということか。
+		ここなしか、Aperyには近づいているのか？
+		わからん。以前の評価関数でR200でやったデータがなかった(´ω｀)
+
+		50億局面
+		engine1 = YaneuraOuV360.exe , eval = 179_0060G_V4
+		engine2 = YaneuraOuV360.exe , eval = 179_0065G_V5
+		play_time = b1000 ,  t1,b1000,1466 - 68 - 1466(50.0% R-0.0)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0063G_V5
+		engine2 = YaneuraOuV360.exe , eval = 179_0065G_V5
+		play_time = r200 ,  t1,r200,5060 - 123 - 4817(51.23% R8.55)
+		play_time = b1000 ,  t1,b1000,995 - 42 - 963(50.82% R5.68)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160815
+		engine2 = YaneuraOuV360.exe , eval = 179_0065G_V5
+		play_time = r200 ,  t1,r200,4896 - 90 - 5014(49.4% R-4.14)
+		t1,r300,1258 - 19 - 1293(49.31% R-4.77)
+		play_time = b1000 ,  t1,b1000,1027 - 22 - 951(51.92% R13.36)
+		play_time = b5000 ,  t1,b5000,513 - 18 - 469(52.24% R15.58)
+
+		engine1 = YaneuraOuV360.exe , eval = 179_0060G_V4
+		engine2 = YaneuraOuV360.exe , eval = 179_0068G_V5
+		play_time = r300 ,  t1,r300,4885 - 135 - 4980(49.52% R-3.35)
+
+		engine1 = YaneuraOuV360.exe , eval = Apery20160815
+		engine2 = YaneuraOuV360.exe , eval = 179_0068G_V5
+		play_time = b5000 ,  t1,b5000,487 - 16 - 497(49.49% R-3.53)
+
+
+
+■　2016/08/20
+
+・やねうら王のエンジンオプションで1パラメーターだけ好きに変更できるようにするか？
+	いやー、、パラメーター名 + 値をいくらでも書けばいいのでは.
+		FUTILITY_MARGIN:50:RAZOR_MARGIN:70:...
+	みたいな？なんかダサい気もする。よくわからない。
+	せっかく自動調整出来るのにいまさら手動とか意味わからん…。
+	paramファイル、固定なのがよくない気がする。これフォルダ変えれるようにして別のところに配置するか。
+	そして、5秒1000局で回すか…。うーん…。それするなら並列化したい気もするんだよな…。
+	しんどいか…。逆に並列化しないなら、フォルダ位置変えられる必要ないのでは…。
+	結局、python側で調整すればいいのか…そうか…。
+	この実装、2,3時間かかりそうなのであとでやろう。
+	そして、いま調整しても、Stockfish側の進化で再調整が必要になる可能性が…。
+	コード書くだけ書いて、futility等、簡単なところの調整だけにするか。まずは。
+
+
+・自己対戦フレームワーク、time outの処理追加する。
+	→　追加した。
+
+・新自己対戦フレームワークを探索パラメーターの自動調整に対応させたほうがいいかも知れない…が、1手5秒とかだと
+	1パラメーター調整にどれだけかかることやら…。1手1秒だとまたおかしいことになりかねないし…。うーん。
+	あまりいまのパラメーターから動かすとStockfishの今後の枝刈りとの相性が悪くなる可能性もあるし…。困るなぁ…。
+
+	V3.59a
+		// 捕獲から逃れる指し手はreduction量を減らす。
+		これ有効にしてみよう。
+
+			engine1 = YaneuraOuV357e.exe , eval = Apery20160815
+			engine2 = YaneuraOuV359a.exe , eval = Apery20160815
+			play_time = b1000 ,  1446 - 51 - 1503(49.03% R-6.72)
+
+			engine1 = YaneuraOuV357e.exe , eval = Apery20160815
+			engine2 = YaneuraOuV359a.exe , eval = Apery20160815
+			play_time = b3000 ,  487 - 21 - 492(49.74% R-1.77)
+
+		よくわからんが入れたほうがいいっぽい…。そうなのか…。
+
+
+	V3.59b forked from 3.59a
+		静止探索の1手詰め、長い持ち時間でも入れたほうがいいのか？
+
+			engine1 = YaneuraOuV359a.exe , eval = Apery20160815
+			engine2 = YaneuraOuV359b.exe , eval = Apery20160815
+			play_time = b1000 ,  1631 - 55 - 1314(55.38% R37.54)
+
+			engine1 = YaneuraOuV359a.exe , eval = Apery20160815
+			engine2 = YaneuraOuV359b.exe , eval = Apery20160815
+			play_time = b6000 ,  538 - 23 - 439(55.07% R35.33)
+
+
+	V3.59c forked from V3.59a
+		通常探索の1手詰め、入れないと？
+
+		engine1 = YaneuraOuV359a.exe , eval = Apery20160815
+		engine2 = YaneuraOuV359c.exe , eval = Apery20160815
+		play_time = b1000 ,  1471 - 57 - 1472(49.98% R-0.12)
+
+		engine1 = YaneuraOuV359a.exe , eval = Apery20160815
+		engine2 = YaneuraOuV359c.exe , eval = Apery20160815
+		play_time = b3000 ,  522 - 30 - 448(53.81% R26.56)
+
+		入れたほうがよさ気ではある。
+		残り探索深さがある程度ないと詰みを見つけたときのリターンが少ない気はする。
+		PVかどうかとか、残りdepthに応じて変えたほうが良いのかも..
+
+
+	V3.59d forked from V3.59a
+		・捕獲から逃れる指し手、あり
+		・tempo、なしに
+		→　これで魔女と対局させておく。
+
+		以前のデータ。
+		// 4 threads
+		engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+		engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160815
+		342 - 47 - 311(52.37% R16.51)
+
+
+		// 4 threads
+		b1000 , 1127 - 79 - 1114(50.29% R2.02)
+
+		engine1 = YaneuraOuV359d , eval = Apery20160815
+		engine2 = gikou_win_20160606/gikou.exe , eval = Apery20160815
+		play_time = b3000 ,  494 - 4 - 502(49.6% R-2.79)
+
+		短い時間ではあまり勝ってない。
+
+		engine1 = YaneuraOuV359d , eval = Apery20160815
+		engine2 = gikou_win_20160606/gikou.exe , eval = Apery20160815
+		2 threads
+		b6000 , 359 - 5 - 256(58.37% R58.74)
+
+		技巧には相性いいみたい。
+
+		engine1 = YaneuraOuV359d , eval = Apery20160815
+		engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160815
+		b5000 , 220 - 28 - 202(52.13% R14.83)
+
+		魔女にはいまひとつ。
+
+	V3.59e forked from V3.59d
+		Use predicted depth for history pruning
+		https://github.com/official-stockfish/Stockfish/commit/7396c08b795191d954528d687e84d7ff6dbe7a3b
+
+		engine1 = YaneuraOuV359d , eval = Apery20160815
+		engine2 = YaneuraOuV359e , eval = Apery20160815
+		play_time = b1000 ,  1438 - 55 - 1507(48.83% R-8.14)
+
+
+	V3.59f forked from V3.59e
+		通常探索の1手詰め判定、変更したほうが良いのでは…。
+	-		if (!RootNode && !ttHit && depth > ONE_PLY && !InCheck)
+	+		if (!RootNode && !ttHit && !InCheck)
+
+		b1000,	632 - 22 - 626(50.24% R1.66)
+		b3000,  142 - 3 - 115(55.25% R36.64)
+		b5000,  228 - 17 - 225(50.33% R2.3)
+
+		engine1 = YaneuraOuV359e , eval = Apery20160815
+		engine2 = YaneuraOuV359f , eval = Apery20160815
+		play_time = b3000 ,  934 - 58 - 1008(48.09% R-13.25)
+
+		検知できる程度の差にならないな…。たぶんdepth > ONE_PLYの条件は外したほうがいいのだろうけど。外すか。
+
+	V3.59g forked from V3.59e
+
+		逆にdepth > 2*ONE_PLYぐらいのほうがいいかも。
+	-		if (!RootNode && !ttHit && depth > ONE_PLY && !InCheck)
+	+		if (!RootNode && !ttHit && depth > ONE_PLY*2 && !InCheck)
+	
+		engine1 = YaneuraOuV359e , eval = Apery20160815
+		engine2 = YaneuraOuV359g , eval = Apery20160815
+		play_time = r500 ,  1522 - 35 - 1443(51.33% R9.26)
+
+		engine1 = YaneuraOuV359e , eval = Apery20160815
+		engine2 = YaneuraOuV359g , eval = Apery20160815
+		play_time = b3000 ,  495 - 23 - 482(50.67% R4.62)
+
+		engine1 = YaneuraOuV359e , eval = Apery20160815
+		engine2 = YaneuraOuV359g , eval = Apery20160815
+		play_time = b6000 ,  485 - 37 - 478(50.36% R2.53)
+
+		よくなさげ。
+
+	V3.59h forked from V3.59f
+		Simplify IID
+		https://github.com/official-stockfish/Stockfish/commit/5596492f6ed72ebc52a4d0f65bed483568e48918
+
+		→　IIDは、置換表が逼迫しない限り関係ないのでこのまま受け入れておく。
+
+		Do LMR on captures
+		https://github.com/official-stockfish/Stockfish/commit/8493c8c6b8da07a454adcaa160af8e8aa3d6b525
+
+		engine1 = YaneuraOuV359f , eval = Apery20160815
+		engine2 = YaneuraOuV359h , eval = Apery20160815
+		play_time = r300 ,  2350 - 62 - 2588(47.59% R-16.76)
+
+		engine1 = YaneuraOuV359f , eval = Apery20160815
+		engine2 = YaneuraOuV359h , eval = Apery20160815
+		play_time = b1000 ,  2435 - 102 - 2463(49.71% R-1.99)
+
+		engine1 = YaneuraOuV359f , eval = Apery20160815
+		engine2 = YaneuraOuV359h , eval = Apery20160815
+		play_time = b3000 ,  481 - 14 - 505(48.78% R-8.46)
+
+		計測できる差ではなさげだが、まあいいか。
+
+
+	V3.59i forked from V3.59h
+		captureOrPawnPromotion、単にcaptureOrPromotionにすると本当に駄目なのか？
+
+		-			bool captureOrPawnPromotion = pos.capture_or_pawn_promotion(move);
+		+			bool captureOrPawnPromotion = pos.capture_or_promotion(move);
+
+			play_time = r300 ,  2626 - 73 - 2301(53.3% R22.95)
+			play_time = b1000 , 1191 - 49 - 1010(54.11% R28.64)
+
+			→　駄目のようだ。
+
+	V3.59j forked from V3.59h
+
+		歩の成りを角、飛車の成りにまで拡大するとオーダリング性能は落ちるのだろうか？
+
+		-	bool captureOrPawnPromotion = pos.capture_or_pawn_promotion(move);
+		+	bool captureOrPawnPromotion = pos.capture_or_valuable_promotion(move);
+
+			play_time = r300 ,  2566 - 76 - 2358(52.11% R14.69)
+			play_time = b1000 , 311 - 9 - 280(52.62% R18.24)
+
+			→　駄目のようだ。
+
+	V3.59k forked from V3.59h
+
+		// captureのみに絞ったほうが良い可能性
+		-	bool captureOrPawnPromotion = pos.capture_or_pawn_promotion(move);
+		+	bool captureOrPawnPromotion = pos.capture(move);
+
+		play_time = r300 ,  2449 - 76 - 2475(49.74% R-1.83)
+		play_time = b1000 ,  2447 - 82 - 2471(49.76% R-1.7)
+		play_time = b3000 ,  989 - 44 - 967(50.56% R3.91)
+
+		// 成りがこんなに低いなら歩の捕獲をcaptureから除外しても良さそうなもんだけどな…。
+
+
+・局面、depth 8で1億作るのどれくらいかかるんだろうか…。
+	40HTで40万局面10分ぐらい？10*250=2500分でいけるのか。4並列で625分。ふーん…。
+	いま見た感じ、もうちょっと早く済みそう。360分ぐらいでいけそう。
+	
+	
+■　2016/08/19
+
+・Jenkinsの最後に終了したJobがどれだかわからない問題、
+　終了するときに空のファイルを共有フォルダに作るとかすべきか？そんな原始的な…。
+
+
+・探索部もう少し突っ込んで改良する。
+	作業、2016-late-searchのほうでやるか…。
+
+		V3.57
+		move_picker		
+		capturesで歩の成り、考慮しないほうが良い？
+				m.value =// (pawn_promo ? (Value)(Eval::ProDiffPieceValue[PAWN]) : VALUE_ZERO)
+			//      +
+
+			engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357.exe , eval = Apery20160815
+			play_time = r300 ,  4828 - 121 - 5051(48.87% R-7.84)
+			b1000 , 2989 - 134 - 3047(49.52% R-3.34)
+
+		V3.57a
+		evasionでLVAはやらないほうがよさげ？
+			m.value = (Value)Eval::CapturePieceValue[pos.piece_on(move_to(m))]
+			//	- Value(LVA(type_of(pos.moved_piece_before(m))))
+				+ HistoryStats::Max;
+			→　Stockfishでも似たことはやっているのでやったほうがよさげ。
+				Aperyと魔女が何故やってないのかは知らないが…。
+
+				engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+				engine2 = YaneuraOuV357a.exe , eval = Apery20160815
+				r300 , 2091 - 56 - 1633(56.15% R42.95)
+				b1000, 1414 - 45 - 1111(56.0% R41.89)
+
+			→　外すとめっさ弱くなる。マジっぽい。なんでなの？ここ以外に何かいじった？
+				ちょっと尋常じゃない。そんなに変わるほうがおかしいと思うのだが…。
+
+		V3.57b
+		BadCaptureの処遇は？
+			  QUIETS,                       // CAPTURES_PRO_PLUSで生成しなかった指し手を生成して、一つずつ返す。SEE値の悪い手は後回し。
+			  BAD_CAPTURES,                 // 捕獲する悪い指し手(SEE < 0 の指し手だが、将棋においてそこまで悪い手とは限らない)
+			こうすると？(V3.58の改造+この改造)
+
+			engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357b.exe , eval = Apery20160815
+			r300 ,  2585 - 62 - 2993(46.34% R-25.46)
+
+			engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357b.exe , eval = Apery20160815
+			b1000 , 1051 - 43 - 1256(45.56% R-30.95)
+
+			engine1 = YaneuraOuV357.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357b.exe , eval = Apery20160815
+			2759 - 66 - 3095(47.13% R-19.96)
+
+			engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+			engine2 = SM_V110/SILENT_MAJORITY_AVX2_x64.exe , eval = Apery20160815
+			b2000 , 226 - 15 - 199(53.18% R22.1)
+
+	この処理、やはり+1が正しい気がする。
+	-	  (ss - 2)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + ONE_PLY) / ONE_PLY - 1);
+	+	  (ss - 2)->counterMoves->update(prevPc, prevSq, -bonus - 2 * (depth + 1) / ONE_PLY - 1);
+
+	Searchの、movetimeとかponderとかの変数が一箇所に書いてあるの、行を分けないとIntelliSenseが機能しない。
+	なおしておく。
+
+	Search::search_endの説明が間違ってる気がする。消す。
+	  // この値がマイナスのときは、startTimeFromPonderhit - (search_end) >= now() になったら停止。
+
 
 ・気になるのであとで調べる。
 	https://twitter.com/merom686/status/765463718146641920
@@ -19,9 +2278,60 @@ ToDo:
 	https://twitter.com/merom686/status/765464617417977856
 	merom686 > 35000くらいの大きい数になるのは、ScoreMateInMaxPlyより少し小さい数をセンチポーン補正で1割くらい大きく表示してるから。
 
-・kppの手番→ppの手番で代替できるような気が…。
-・mate3()書く。
+	→　やねうら王の実装で正しい気がしてきた。
+	念のため、qsearchの以下のところをVALUE_INFINITEに書き換えて試してみる。
+			V3.57c
+				&&  futilityBase > -VALUE_KNOWN_WIN)
 
+			engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357c.exe , eval = Apery20160815
+			r300 , 4463 - 107 - 4480(49.9% R-0.66)
+
+			1万局で計測できるレベルの差を生まない。StockfishもVALUE_KNOWN_WINだし元のままでいいや。
+			こんなところいまさら書き換えると置換表のassertで引っかかりかねん。
+
+
+・自己対戦の結果を安定させるために、互角の局面集みたいなのを作ったほうが良いかも。
+　やねうら大定跡を用いるという手もあるか…。
+	　→　0.2秒以上なら問題なさそうなのでまあいいや。
+
+・同種のソフトと対局させても強くなっているとは言えないところがアレだな…。技巧とも対局させていくべきか…。
+
+	V3.57d forked from V3.57b
+		null_moveのあと、2 * Tempoで手番の価値を計算しているところ、evaluate()に変更して本当に弱くなるのか？
+		search()のほう変更して様子見。
+
+			engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357d.exe , eval = Apery20160815
+			play_time = r200 ,  1512 - 45 - 1443(51.17% R8.11)
+
+			engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357d.exe , eval = Apery20160815
+			play_time = b1000 ,  1464 - 53 - 1483(49.68% R-2.24)
+
+			b3000 , 935 - 63 - 972(49.03% R-6.74)
+
+			engine1 = YaneuraOuV357b.exe , eval = Apery20160815
+			engine2 = YaneuraOuV357d.exe , eval = Apery20160815
+			play_time = b5000 ,  468 - 32 - 500(48.35% R-11.49)
+
+			長い持ち時間ではそうでもなさげ？うむむ？
+
+	V3.57e forked from V3.57d
+			qsearch()のほうも同様にTempo消して、1秒、5秒で回しておく。
+
+			b1000 , 586 - 11 - 583(50.13% R0.89)
+
+
+・R300とr300との違い
+		engine1 = YaneuraOuV356a.exe , eval = 179_0054G_V4
+		engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+		play_time = R200 ,  4828 - 160 - 5012(49.07% R-6.5)
+		play_time = R300 ,  4864 - 159 - 4977(49.43% R-3.99)
+		play_time = r300 ,  4821 - 103 - 5076(48.71% R-8.95)
+		play_time = R500 ,  4849 - 187 - 4964(49.41% R-4.07)
+
+		あまり変わらないか…。そうか…。
 
 
 ■　2016/08/18
@@ -60,6 +2370,7 @@ ToDo:
 
 
 ・技巧、自己対戦フレームワークでうまく動くようになったので1,3,5秒でAperyのバイナリと対戦。
+	threads = 2
 
 		engine1 = YaneuraOuV356a.exe , eval = Apery20160815
 		engine2 = gikou_win_20160606/gikou.exe , eval = dummy
@@ -234,11 +2545,20 @@ ToDo:
 
 		ほぼ互角っぽい。まだサチっていないなら、もう60億ほど回したほうがいいな…。
 
+		engine1 = YaneuraOuV356a.exe , eval = 179_0054G_V4
+		engine2 = YaneuraOuV356a.exe , eval = haku20160729
+		play_time = b1000 ,  531 - 5 - 464(53.37% R23.43)
+
 		engine1 = YaneuraOuV356a.exe , eval = Apery20160815
 		engine2 = YaneuraOuV356a.exe , eval = 179_0047G_V4
 		play_time = b1000 ,  525 - 6 - 469(52.82% R19.59)
 
 		まだ最新版には負けているのか。
+
+		engine1 = YaneuraOuV356a.exe , eval = Apery20160505
+		engine2 = YaneuraOuV356a.exe , eval = 179_0047G_V4
+		play_time = b1000 ,  327 - 7 - 666(32.93% R-123.57)
+		play_time = b2000 ,  340 - 7 - 653(34.24% R-113.37)
 
 	179_0054G_V4
 		さらに30億×2
@@ -258,7 +2578,37 @@ ToDo:
 		さらに30億×2
 			rmse = 0.092966 , mean_error = 359.047
 
+				engine1 = YaneuraOuV356a.exe , eval = 179_0054G_V4
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = R100 ,  4953 - 126 - 4921(50.16% R1.13)
 
+				engine1 = YaneuraOuV356a.exe , eval = 179_0054G_V4
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = R200 ,  4828 - 160 - 5012(49.07% R-6.5)
+
+				engine1 = YaneuraOuV356a.exe , eval = 179_0054G_V4
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = b1000 ,  471 - 21 - 508(48.11% R-13.14)
+
+		R100だと差が見えないか。R100駄目だな…。R200以上だな。
+
+				engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = r100 ,  4610 - 74 - 5316(46.44% R-24.75)
+
+				engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = R100 ,  4713 - 81 - 5206(47.51% R-17.28)
+
+				engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = b1000 ,  506 - 10 - 484(51.11% R7.72)
+
+				engine1 = YaneuraOuV356a.exe , eval = Apery20160815
+				engine2 = YaneuraOuV356a.exe , eval = 179_0060G_V4
+				play_time = b3000 ,  518 - 11 - 471(52.38% R16.52)
+
+		まだAperyにこの評価関数は負けているのか。
 
 ・魔女と
 

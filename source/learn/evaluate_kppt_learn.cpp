@@ -5,7 +5,7 @@
 
 #include "../shogi.h"
 
-#if defined(EVAL_LEARN) && defined(YANEURAOU_2016_MID_ENGINE)
+#if defined(EVAL_LEARN)
 
 #include "learn.h"
 
@@ -20,7 +20,7 @@ using namespace std;
 namespace Eval
 {
 	// 絶対値を抑制するマクロ
-#define SET_A_LIMIT_TO(X,MIN,MAX)  \
+#define SET_A_LIMIT_TO(X,MIN,MAX)    \
 	X[0] = std::min(X[0],(MAX));     \
 	X[0] = std::max(X[0],(MIN));     \
 	X[1] = std::min(X[1],(MAX));     \
@@ -159,7 +159,7 @@ namespace Eval
 		FloatPair g;
 
 
-#if defined (USE_SGD_UPDATE)
+#if defined (USE_SGD_UPDATE) || defined (USE_YANE_SGD_UPDATE)
 		// SGDの更新式
 		//   w = w - ηg
 
@@ -239,13 +239,14 @@ namespace Eval
 #endif
 
 		// 手番用の学習率。これはηより小さめで良いはず。(小さめの値がつくべきところなので)
-		const LearnFloatType eta2 = LearnFloatType(eta / 4);
+		// これconstにするとetaに応じてeta2が変わらない。注意すること。
+		#define	eta2 (eta / 4)
 
 		void add_grad(LearnFloatType delta1, LearnFloatType delta2)
 		{
 			g[0] += delta1;
 			g[1] += delta2;
-#ifdef USE_SGD_UPDATE
+#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE)
 			count++;
 #endif
 		}
@@ -255,17 +256,53 @@ namespace Eval
 		// wをupdateしたならtrueを返す。
 		bool update(bool skip_update)
 		{
-#ifdef USE_SGD_UPDATE
+#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE)
+
 			if (g[0] == 0 && g[1] == 0)
 				return false;
 
 			// 勾配はこの特徴の出現したサンプル数で割ったもの。
 			if (count == 0)
 				goto FINISH;
-			g[0] /= count;
-			g[1] /= count;
+
+#if defined(USE_YANE_SGD_UPDATE)
+
+#if 0
+			// ゼロ方向に少し引っ張る(L1正則化的な何か)
+			w[0] -= (w[0]>0 ? 1 : -1)*0.01f;
+			w[1] -= (w[1]>0 ? 1 : -1)*0.01f;
+#endif
+
+#if 0
+			// 出現頻度が低い特徴は勾配がでたらめである可能性があるのでこれでupdateするのはやめる。
+			if (count < 5000)
+			{
+				count = 0;
+				goto FINISH;
+			}
+#endif
+		
+#endif
+
+			// 今回の更新量
+//			g = { eta * g[0] / count, eta2 * g[1] / count };
+
+			// → eta2では小さすぎのようだ。
+			g = { eta * g[0] / count, eta * g[1] / count };
+
+			// あまり大きいと発散しかねないので移動量に制約を課す。
+			SET_A_LIMIT_TO(g, -64.0f, 64.0f);
+
+			w = FloatPair{ w[0] - g[0] , w[1] -g[1] };
+
 			count = 0;
-			w = FloatPair{ w[0] - eta * g[0] , w[1] - eta2 * g[1] };
+
+//#if defined(USE_YANE_SGD_UPDATE)
+//			// ゼロ方向に少し引っ張る(L1正則化的な何か)
+//			w[0] -= (w[0]>0 ? 1 : -1)*0.1f;
+//			w[1] -= (w[1]>0 ? 1 : -1)*0.1f;
+//#endif
+
 #endif
 
 #ifdef USE_ADA_GRAD_UPDATE
@@ -330,11 +367,7 @@ namespace Eval
 	};
 
 
-#ifdef USE_SGD_UPDATE
-	LearnFloatType Weight::eta;
-#elif defined USE_ADA_GRAD_UPDATE
-	LearnFloatType Weight::eta;
-#elif defined USE_YANE_GRAD_UPDATE
+#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE) || defined(USE_ADA_GRAD_UPDATE) || defined(USE_YANE_GRAD_UPDATE)
 	LearnFloatType Weight::eta;
 #elif defined USE_ADAM_UPDATE
 	double Weight::bt;
@@ -399,6 +432,10 @@ namespace Eval
 	// 現在の局面で出現している特徴すべてに対して、勾配値を勾配配列に加算する。
 	void add_grad(Position& pos, Color rootColor, double delta_grad)
 	{
+		// あまりきつい勾配を持っているとめったに出現しない特徴因子がおかしくなるので制約を課す
+		delta_grad = max(delta_grad, -100.0);
+		delta_grad = min(delta_grad,  100.0);
+
 		// 勾配配列を確保するメモリがもったいないのでとりあえずfloatでいいや。
 
 		// 手番を考慮しない値
@@ -432,13 +469,23 @@ namespace Eval
 				l0 = list_fb[j];
 				l1 = list_fw[j];
 
+				// KPP
+
 				// kpp配列に関してはミラー(左右判定)とフリップ(180度回転)の次元下げを行う。
 
 				// kpp_w[sq_bk][k0][l0].add_grad(ValueKppFloat{ f ,  g });
 				// kpp_w[Inv(sq_wk)][k1][l1].add_grad(ValueKppFloat{ -f ,  g });
 
+#if 1
+				// KPPの手番ありのとき
 				((Weight*)kpp_w_)[get_kpp_index(sq_bk, k0, l0)].add_grad( f ,  g );
-				((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(-f ,  g );
+				((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad( -f ,  g );
+
+#else
+				// KPPの手番はなしのとき
+				((Weight*)kpp_w_)[get_kpp_index(sq_bk, k0, l0)].add_grad(f, 0);
+				((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(-f, 0);
+#endif
 
 #if 0
 				// ミラーもやめると…？
@@ -455,6 +502,8 @@ namespace Eval
 			// 右と左とでは居飛車、振り飛車的な戦型選択を暗に含むからミラーするのが良いとは限らない。
 			// 180度回転も先手後手とは非対称である可能性があるのでここのフリップも入れない。
 
+			// KKP
+
 			kkp_w[sq_bk][sq_wk][k0].add_grad( f , g );
 		}
 
@@ -467,7 +516,7 @@ namespace Eval
 		// 3回目まではwのupdateを保留する。
 		// ただし、SGDは履歴がないのでこれを行なう必要がない。
 		bool skip_update =
-#ifdef USE_SGD_UPDATE
+#if defined(USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE)
 			false;
 #else
 			epoch <= 3;
@@ -483,12 +532,44 @@ namespace Eval
 		//
 
 		// SGD
-#ifdef USE_SGD_UPDATE
+#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE)
 
 #if defined (LOSS_FUNCTION_IS_CROSS_ENTOROPY)
+
+#ifdef USE_SGD_UPDATE
 		Weight::eta = 3.2f;
+
+		//		Weight::eta = 100.0f;
+#endif
+
+#ifdef USE_YANE_SGD_UPDATE
+		//		Weight::eta = 100.0f;
+
+		// epoch == 100(1億局面)で0.9倍。10億で0.3倍みたいな。
+
+		// あとη、大きめに。
+//		Weight::eta = 32.0f * (float)pow(0.999f, epoch);
+
+		// 1億で0.8倍、10億で0.13倍。
+		Weight::eta = 100.0f * (float)pow(0.998f, epoch);
+
+		// 1億で0.74倍、10億で0.05倍。
+//		Weight::eta = 300.0f * (float)pow(0.997f, epoch);
+
+
+#endif
+
 #elif defined (LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
+
+#ifdef USE_SGD_UPDATE
+//		Weight::eta = 150.0f;
+
 		Weight::eta = 32.0f;
+#endif
+
+#ifdef USE_YANE_SGD_UPDATE
+		Weight::eta = 100.0f * (float)pow(0.999f, epoch);
+#endif
 #endif
 
 		// AdaGrad

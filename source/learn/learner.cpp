@@ -12,7 +12,7 @@
 // etc..
 
 
-#if defined(EVAL_LEARN) && defined(YANEURAOU_2016_MID_ENGINE)
+#if defined(EVAL_LEARN)
 
 #include "learn.h"
 
@@ -34,7 +34,7 @@ extern void is_ready();
 namespace Learner
 {
 
-// いまのところ、やねうら王2016Midしか、このスタブを持っていない。
+// いまのところ、やねうら王2016Mid/Lateしか、このスタブを持っていない。
 extern pair<Value, vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
 
 // packされたsfen
@@ -308,9 +308,6 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
     //    cout << endl;
     for (ply = 0; ply < MAX_PLY - 16; ++ply)
     {
-      // mate1ply()の呼び出しのために必要。
-      pos.check_info_update();
-
       if (pos.is_mated())
         break;
 
@@ -351,6 +348,13 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
 		// 評価値の絶対値がこの値以上の局面については
 		// その局面を学習に使うのはあまり意味がないのでこの試合を終了する。
 		if (abs(value1) >= eval_limit)
+			break;
+#endif
+
+#if 1
+		// 何らかの千日手局面に突入したので局面生成を終了する。
+		auto draw_type = pos.is_repetition();
+		if (draw_type != REPETITION_NONE)
 			break;
 #endif
 
@@ -451,7 +455,6 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
               ASSERT_LV3(false);
             }
             pos.do_move(m, state[ply2++]);
-            pos.check_info_update();
           }
           // leafに到達
           //      cout << pos;
@@ -775,9 +778,11 @@ struct SfenReader
 
 		for (auto& ps : sfen_for_mse)
 		{
-			auto sfen = pos.sfen_unpack(ps.data);
+//			auto sfen = pos.sfen_unpack(ps.data);
+//			pos.set(sfen);
 
-			pos.set(sfen);
+			pos.set_from_packed_sfen(ps.data);
+
 			auto th = Threads[thread_id];
 			pos.set_this_thread(th);
 
@@ -950,7 +955,7 @@ struct SfenReader
 	// total_readがこの値を超えたらupdate_weights()してmseの計算をする。
 	u64 next_update_weights;
 
-	int save_count;
+	u64 save_count;
 
 protected:
 
@@ -1033,18 +1038,14 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 3回目ぐらいまではg2のupdateにとどめて、wのupdateは保留する。
 			Eval::update_weights(mini_batch_size , ++epoch);
 
-			// 20回、update_weight()するごとに保存。
-			// 例えば、LEARN_MINI_BATCH_SIZEが1Mなら、1M×100 = 0.1G(1億)ごとに保存
+			// 8000万局面ごとに1回保存、ぐらいの感じで。
+
 			// ただし、update_weights(),calc_rmse()している間の時間経過は無視するものとする。
-			if (++sr.save_count >= 100)
+			if (++sr.save_count * mini_batch_size >= 80000000ULL)
 			{
 				sr.save_count = 0;
 
-				// 定期的に保存
-				// 10億局面ごとにフォルダを掘っていく。
-				// (あとでそれぞれの評価関数パラメーターにおいて勝率を比較したいため)
-				u64 change_name_size = (u64)EVAL_FILE_NAME_CHANGE_INTERVAL;
-				Eval::save_eval(std::to_string(sr.total_read / change_name_size));
+				save();
 			}
 
 			// rmseを計算する。1万局面のサンプルに対して行う。
@@ -1123,7 +1124,6 @@ void LearnerThink::thread_worker(size_t thread_id)
 				ASSERT_LV3(false);
 			}
 			pos.do_move(m, state[ply++]);
-			pos.check_info_update();
 		}
 
 		// leafに到達
@@ -1149,8 +1149,13 @@ void LearnerThink::save()
 	// 定期的に保存
 	// 10億局面ごとにファイル名の拡張子部分を"0","1","2",..のように変えていく。
 	// (あとでそれぞれの評価関数パラメーターにおいて勝率を比較したいため)
-	u64 change_name_size = u64(1000) * 1000 * 1000;
+#ifndef EVAL_SAVE_ONLY_ONCE
+	u64 change_name_size = (u64)EVAL_FILE_NAME_CHANGE_INTERVAL;
 	Eval::save_eval(std::to_string(sr.total_read / change_name_size));
+#else
+	// 1度だけの保存のときはサブフォルダを掘らない。
+	Eval::save_eval("");
+#endif
 }
 
 // 生成した棋譜からの学習
@@ -1195,6 +1200,11 @@ void learn(Position& pos, istringstream& is)
 		{
 			// 棋譜ファイル格納フォルダ
 			is >> dir;
+			continue;
+		} else if (option == "batchsize")
+		{
+			// ミニバッチのサイズ
+			is >> mini_batch_size;
 			continue;
 		}
 
