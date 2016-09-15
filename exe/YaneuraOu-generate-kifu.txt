@@ -1,5 +1,15 @@
-setoption name KifuDir value kifu_for_test
-setoption name Hash value 1024
-setoption name Threads value 48
+usi
+setoption name EvalDir value eval
+setoption name KifuDir value kifu\debug
+setoption name Threads value 12
+setoption name Hash value 8192
+setoption name GeneratorNumGames value 1000
+setoption name GeneratorMinSearchDepth value 3
+setoption name GeneratorMaxSearchDepth value 4
+setoption name GeneratorKifuTag value debug
+setoption name GeneratorStartposFileName value startpos.sfen
+setoption name GeneratorMinBookMove value 16
+setoption name GeneratorMaxBookMove value 32
+isready
+usinewgame
 generate_kifu
-quit

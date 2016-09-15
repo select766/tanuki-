@@ -23,29 +23,23 @@ namespace Learner
 
 namespace
 {
-  constexpr int kNumGames = 2000'0000;
-  constexpr char* kOutputFileNameDate = "2016-09-07";
-  constexpr char* kBookFileName = "book.sfen";
-  constexpr int kMinBookMove = 16;
-  constexpr int kMaxBookMove = 32;
-  constexpr Depth kSearchDepth = Depth(3);
   constexpr int kMaxGamePlay = 256;
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
 
   std::vector<std::string> book;
   std::uniform_int_distribution<> swap_distribution(0, 9);
-  std::uniform_int_distribution<> num_book_move_distribution(kMinBookMove, kMaxBookMove);
 
   bool ReadBook()
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
+      std::string book_file_name = Options[Learner::OPTION_GENERATOR_BOOK_FILE_NAME];
     std::ifstream fs_book;
-    fs_book.open(kBookFileName);
+    fs_book.open(book_file_name);
 
     if (!fs_book.is_open())
     {
-      sync_cout << "Error! : can't read " << kBookFileName << sync_endl;
+      sync_cout << "Error! : can't read " << book_file_name << sync_endl;
       return false;
     }
 
@@ -83,12 +77,20 @@ void Learner::GenerateKifu()
 
   Search::LimitsType limits;
   limits.max_game_ply = kMaxGamePlay;
-  limits.depth = kSearchDepth;
+  limits.depth = MAX_PLY;
   limits.silent = true;
   Search::Limits = limits;
 
   std::string kifu_directory = (std::string)Options["KifuDir"];
   _mkdir(kifu_directory.c_str());
+
+  int min_search_depth = Options[Learner::OPTION_GENERATOR_MIN_SEARCH_DEPTH];
+  int max_search_depth = Options[Learner::OPTION_GENERATOR_MAX_SEARCH_DEPTH];
+  std::uniform_int_distribution<> search_depth_distribution(min_search_depth, max_search_depth);
+  int min_book_move = Options[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE];
+  int max_book_move = Options[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE];
+  std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
+  int num_games = Options[Learner::OPTION_GENERATOR_NUM_GAMES];
 
   auto start = std::chrono::system_clock::now();
   ASSERT_LV3(book.size());
@@ -99,8 +101,9 @@ void Learner::GenerateKifu()
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
-    std::sprintf(output_file_path, "%s/kifu.%s.%d.%d.%03d.bin", kifu_directory.c_str(),
-      kOutputFileNameDate, kSearchDepth, kNumGames, thread_index);
+    std::string output_file_name_tag = Options[Learner::OPTION_GENERATOR_KIFU_TAG];
+    std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%d.%03d.bin", kifu_directory.c_str(),
+        output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_games, thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
@@ -108,14 +111,14 @@ void Learner::GenerateKifu()
 	std::mt19937_64 mt19937_64(random_device());
 
 #pragma omp for schedule(guided)
-    for (int game_index = 0; game_index < kNumGames; ++game_index) {
+    for (int game_index = 0; game_index < num_games; ++game_index) {
       int current_game_index = global_game_index++;
       if (current_game_index && current_game_index % 10000 == 0) {
         auto current = std::chrono::system_clock::now();
         auto elapsed = current - start;
         double elapsed_sec =
           static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (kNumGames - current_game_index));
+        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (num_games - current_game_index));
         int h = remaining_sec / 3600;
         int m = remaining_sec / 60 % 60;
         int s = remaining_sec % 60;
@@ -126,7 +129,7 @@ void Learner::GenerateKifu()
         time(&current_time);
         local_time = localtime(&current_time);
         std::printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-          current_game_index, kNumGames,
+          current_game_index, num_games,
           local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
           local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
         std::fflush(stdout);
@@ -272,7 +275,8 @@ void Learner::GenerateKifu()
         if (pos.is_mated()) {
           break;
         }
-        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, kSearchDepth);
+        int search_depth = search_depth_distribution(mt19937_64);
+        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         Value value = valueAndPv.first;

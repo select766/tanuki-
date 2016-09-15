@@ -81,7 +81,6 @@ namespace
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
-  constexpr int64_t kMaxPositionsForLearning = 20'0000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
 #ifdef GRADIENT_NOISE
@@ -454,13 +453,15 @@ void Learner::Learn(std::istringstream& iss) {
   int num_mini_batches = 0;
   double learning_rate = kInitialLearningRate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
-  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForLearning;) {
+  int64_t max_positions_for_learning;
+  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
     // Žc‚èŽžŠÔ•\Ž¦
     if (num_processed_positions && num_processed_positions % (kMiniBatchSize * 10) == 0) {
       auto current = std::chrono::system_clock::now();
       auto elapsed = current - start;
       double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForLearning - num_processed_positions));
+      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (max_positions_for_learning - num_processed_positions));
       int h = remaining_sec / 3600;
       int m = remaining_sec / 60 % 60;
       int s = remaining_sec % 60;
@@ -471,14 +472,14 @@ void Learner::Learn(std::istringstream& iss) {
       time(&current_time);
       local_time = localtime(&current_time);
       std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-        num_processed_positions, kMaxPositionsForLearning,
+        num_processed_positions, max_positions_for_learning,
         local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
         local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
       std::fflush(stdout);
     }
 
     int num_records = static_cast<int>(std::min(
-      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+        max_positions_for_learning - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
@@ -682,7 +683,9 @@ void Learner::Learn(std::istringstream& iss) {
     }
   }
 
+#ifdef AVERAGING
   save_eval(output_folder_path_base, 99999999999LL);
+#endif
 }
 
 void Learner::MeasureError() {
@@ -741,8 +744,10 @@ void Learner::MeasureError() {
       std::fflush(stdout);
     }
 
+    int64_t max_positions_for_learning;
+    std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
     int num_records = static_cast<int>(std::min(
-      kMaxPositionsForLearning - num_processed_positions, kMiniBatchSize));
+        max_positions_for_learning - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
