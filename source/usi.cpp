@@ -294,6 +294,13 @@ namespace USI
     o[Learner::OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
     o[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
     o[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
+    o[Learner::OPTION_LEARNING_RATE] << Option("0.5");
+    o[Learner::OPTION_CONVERTER_NUM_POSITIONS] << Option("10000000000");
+    o[Learner::OPTION_CONVERTER_RAW_KIFU_FILE_PATH_FORMAT] << Option("raw_kifu/raw_kifu.%02d.sfen");
+    o[Learner::OPTION_CONVERTER_MIN_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
+    o[Learner::OPTION_CONVERTER_MAX_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
+    o[Learner::OPTION_CONVERTER_KIFU_TAG] << Option("default_tag");
+
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 	}

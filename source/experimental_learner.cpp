@@ -66,7 +66,6 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kInitialLearningRate = 0.5;
   constexpr WeightType kLearningRateDecayRate = 1.0;
   constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
@@ -199,6 +198,7 @@ namespace
   }
 
   void save_eval(const std::string& output_folder_path_base, int64_t position_index) {
+    sync_cout << "Creating a folder: output_folder_path_base=" << output_folder_path_base << sync_endl;
     _mkdir(output_folder_path_base.c_str());
 
     char buffer[1024];
@@ -206,6 +206,7 @@ namespace
     std::printf("Writing eval files: %s\n", buffer);
     std::fflush(stdout);
     Options["EvalDir"] = buffer;
+    sync_cout << "Creating a folder: buffer=" << buffer << sync_endl;
     _mkdir(buffer);
     Eval::save_eval();
   }
@@ -420,7 +421,8 @@ void Learner::Learn(std::istringstream& iss) {
   // 全学習データに対してループを回す
   auto start = std::chrono::system_clock::now();
   int num_mini_batches = 0;
-  double learning_rate = kInitialLearningRate;
+  double learning_rate;
+  std::istringstream((std::string)Options[Learner::OPTION_LEARNING_RATE]) >> learning_rate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
