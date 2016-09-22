@@ -22,6 +22,7 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_LEARNING_RATE = "LearningRate";
   constexpr char* OPTION_CONVERTER_NUM_POSITIONS = "ConverterNumPositions";
   constexpr char* OPTION_CONVERTER_RAW_KIFU_FILE_PATH_FORMAT = "ConverterRawKifuFilePathFormat";
   constexpr char* OPTION_CONVERTER_MIN_SEARCH_DEPTH = "ConverterMinSearchDepth";
