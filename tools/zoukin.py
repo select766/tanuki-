@@ -37,10 +37,9 @@ def AdoptSubfolder(subfolder):
   return num_positions % 1000000000 == 0 or num_positions % 10000 != 0
 
 
-def GenerateKifu(eval_folder_path, kifu_output_folder_path_base, generate_kifu_exe_file_path, num_threads, num_games, kifu_tag):
+def GenerateKifu(eval_folder_path, kifu_folder_path, generate_kifu_exe_file_path, num_threads, num_games, kifu_tag):
   print('-' * 80)
   print('GenerateKifu')
-  kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
   input = '''usi
 setoption name EvalDir value {0}
 setoption name KifuDir value {1}
@@ -60,7 +59,6 @@ generate_kifu
   print(input.decode('utf-8'))
   print(flush=True)
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
-  return kifu_folder_path
 
 
 def Learn(eval_folder_path, kifu_folder_path, learner_output_folder_path_base, learner_exe_file_path, num_threads, num_positions):
@@ -188,6 +186,11 @@ def main():
     dest='skip_first_learn',
     help='Skip the first learn')
   parser.add_argument(
+    '--skip_first_self_play',
+    action='store_true',
+    dest='skip_first_self_play',
+    help='Skip the first self play')
+  parser.add_argument(
     '--original_eval_folder_path',
     action='store',
     dest='original_eval_folder_path',
@@ -274,6 +277,7 @@ def main():
   initial_new_eval_folder_path_base = args.initial_new_eval_folder_path_base
   skip_first_kifu_generation = args.skip_first_kifu_generation
   skip_first_learn = args.skip_first_learn
+  skip_first_self_play = args.skip_first_self_play
   original_eval_folder_path = args.original_eval_folder_path
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
@@ -294,9 +298,10 @@ def main():
   skip_learn = skip_first_learn
   while True:
     if not skip_kifu_generation:
-      kifu_folder_path = GenerateKifu(
-          eval_folder_path, kifu_output_folder_path_base, generate_kifu_exe_file_path,
-          num_threads_for_learning, num_games_for_generator_train, 'train')
+      kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
+      GenerateKifu(
+        eval_folder_path, kifu_folder_path, generate_kifu_exe_file_path,
+        num_threads_for_learning, num_games_for_generator_train, 'train')
       shutil.rmtree(KIFU_FOR_TEST_FOLDER_PATH, ignore_errors=True)
       previous_eval_folder_path = eval_folder_path
     skip_kifu_generation = False
@@ -309,10 +314,13 @@ def main():
           eval_folder_path, kifu_folder_path, learner_output_folder_path_base,
           learner_exe_file_path, num_threads_for_learning, num_positions_for_learning)
     skip_learn = False
-    SelfPlay(original_eval_folder_path, new_eval_folder_path_base, vs_original_result_file_path,
-             local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
-    SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path,
-             local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
+
+    if not skip_self_play:
+        SelfPlay(original_eval_folder_path, new_eval_folder_path_base, vs_original_result_file_path,
+                 local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
+        SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path,
+                 local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
+    skip_self_play = False
 
     shutil.rmtree(KIFU_FOR_TEST_FOLDER_PATH, ignore_errors=True)
     os.mkdir(KIFU_FOR_TEST_FOLDER_PATH)
