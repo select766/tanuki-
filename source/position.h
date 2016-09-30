@@ -62,8 +62,12 @@ struct StateInfo {
   // color = 手番側 なら pinされている駒(動かすと開き王手になる)
   // color = 相手側 なら 両王手の候補となる駒。
 
-  // 自分側(手番側)の(敵駒によって)pinされている駒
+  // 自玉に対して(敵駒によって)pinされている駒
   Bitboard blockersForKing[COLOR_NB];
+
+  // 自玉に対してpinしている(可能性のある)敵の大駒。
+  // 自玉に対して上下左右方向にある敵の飛車、斜め十字方向にある敵の角、玉の前方向にある敵の香、…
+  Bitboard pinnersForKing[COLOR_NB];
 
   // 自駒の駒種Xによって敵玉が王手となる升のbitboard
   Bitboard checkSquares[PIECE_WHITE];
@@ -89,7 +93,7 @@ struct StateInfo {
   // この局面で捕獲された駒
   // ※　次の局面にdo_move()で進むときにこの値が設定される
   // 先後の区別はなし。馬とか龍など成り駒である可能性はある。
-  Piece capturedType;
+  Piece capturedPiece;
 
   friend struct Position;
 
@@ -306,6 +310,7 @@ struct Position
 	// (occが指定されていなければ現在の盤面において。occが指定されていればそれをoccupied bitboardとして)
 	Bitboard attackers_to(Color c, Square sq) const { return attackers_to(c, sq, pieces()); }
 	Bitboard attackers_to(Color c, Square sq, const Bitboard& occ) const;
+	Bitboard attackers_to(Square sq, const Bitboard& occ) const;
 
 	// 打ち歩詰め判定に使う。王に打ち歩された歩の升をpawn_sqとして、c側(王側)のpawn_sqへ利いている駒を列挙する。香が利いていないことは自明。
 	Bitboard attackers_to_pawn(Color c, Square pawn_sq) const;
@@ -325,7 +330,9 @@ struct Position
 
 	// 升sに対して、c側の大駒に含まれる長い利きを持つ駒の利きを遮っている駒のBitboardを返す(先後の区別なし)
 	// ※　Stockfishでは、sildersを渡すようになっているが、大駒のcolorを渡す実装のほうが優れているので変更。
-	Bitboard slider_blockers(Color c, Square s) const;
+	// [Out] pinnersとは、pinされている駒が取り除かれたときに升sに利きが発生する大駒である。これは返し値。
+	// また、升sにある玉は~c側のKINGであるとする。
+	Bitboard slider_blockers(Color c, Square s, Bitboard& pinners) const;
 
 	// --- 局面を進める/戻す
 
@@ -352,7 +359,6 @@ struct Position
 	// --- legality(指し手の合法性)のチェック
 
 	// 生成した指し手(CAPTUREとかNON_CAPTUREとか)が、合法であるかどうかをテストする。
-	// 注意 : 事前にcheck_info_update()が呼び出されていること。
 	//
 	// 指し手生成で合法手であるか判定が漏れている項目についてチェックする。
 	// 王手のかかっている局面についてはEVASION(回避手)で指し手が生成されているはずなので
@@ -389,7 +395,6 @@ struct Position
 	// killerのような兄弟局面の指し手がこの局面において合法かどうかにも使う。
 	// ※　置換表の検査だが、pseudo_legal()で擬似合法手かどうかを判定したあとlegal()で自殺手でないことを
 	// 確認しなくてはならない。このためpseudo_legal()とlegal()とで重複する自殺手チェックはしていない。
-	// 注意 : 事前にcheck_info_update()が呼び出されていること。
 	bool pseudo_legal(const Move m) const { return pseudo_legal_s<true>(m); }
 
 	// All == false        : 歩や大駒の不成に対してはfalseを返すpseudo_legal()
@@ -410,7 +415,7 @@ struct Position
 	// --- StateInfo
 
 	// 現在の局面に対応するStateInfoを返す。
-	// たとえば、state()->capturedTypeであれば、前局面で捕獲された駒が格納されている。
+	// たとえば、state()->capturedPieceであれば、前局面で捕獲された駒が格納されている。
 	StateInfo* state() const { return st; }
 
 	// --- Evaluation
@@ -455,7 +460,6 @@ struct Position
 
 	// 指し手mで王手になるかを判定する。
 	// 指し手mはpseudo-legal(擬似合法)の指し手であるものとする。
-	// 事前にcheck_info_update()が呼び出されていること。
 	bool gives_check(Move m) const;
 
 	// 手番側の駒をfromからtoに移動させると素抜きに遭うのか？
@@ -472,21 +476,27 @@ struct Position
 	// 現局面で指し手がないかをテストする。指し手生成ルーチンを用いるので速くない。探索中には使わないこと。
 	bool is_mated() const;
 
-	// 直前の指し手によって捕獲した駒。
-	Piece captured_piece_type() const { return st->capturedType; }
+	// 直前の指し手によって捕獲した駒。先後の区別あり。
+	Piece captured_piece() const { return st->capturedPiece; }
 
 	// 捕獲する指し手か、成りの指し手であるかを返す。
 	bool capture_or_promotion(Move m) const { return (m & MOVE_PROMOTE) || capture(m); }
 
-	// 捕獲する指し手か、歩の成りの指し手であるかを返す。
-	bool capture_or_pawn_promotion(Move m) const
+	// 歩の成る指し手であるか？
+	bool pawn_promotion(Move m) const
 	{
 #ifdef KEEP_PIECE_IN_GENERATE_MOVES
 		// 移動させる駒が歩かどうかは、Moveの上位16bitを見れば良い
-		return (is_promote(m) && raw_type_of(moved_piece_after(m)) == PAWN) || capture(m);
+		return (is_promote(m) && raw_type_of(moved_piece_after(m)) == PAWN);
 #else
-		return (is_promote(m) && type_of(piece_on(move_from(m))) == PAWN) || capture(m);
+		return (is_promote(m) && type_of(piece_on(move_from(m))) == PAWN);
 #endif
+	}
+
+	// 捕獲する指し手か、歩の成りの指し手であるかを返す。
+	bool capture_or_pawn_promotion(Move m) const
+	{
+		return pawn_promotion(m) || capture(m);
 	}
 
 #if 1
@@ -513,13 +523,6 @@ struct Position
   // ただし1手詰めであれば確実に詰ませられるわけではなく、簡単に判定できそうな近接王手による
   // 1手詰めのみを判定する。(要するに判定に漏れがある。)
   // 
-  // 前提条件
-  // 1) LONG_EFFECT_LIBRARYを用いる場合、先行して、CheckInfo.pinnedを更新しておく必要がある。
-  // →　check_info_update_pinned()を利用するのが吉。
-  // 2) LONG_EFFECT_LIBRARYを用いない場合、CheckInfo.dcCandidatesを更新しておく必要がある。
-  // →　素直にcheck_info_update()を呼び出すのが吉。
-  // 
-
   // 返し値は、16bitのMove。このあとpseudo_legal()等を使いたいなら、
   // pos.move16_to_move()を使って32bitのMoveに変換すること。
 
@@ -527,6 +530,11 @@ struct Position
 
 	// ↑の先後別のバージョン。(内部的に用いる)
 	template <Color Us> Move mate1ply_impl() const;
+
+	// 利きのある場所への取れない近接王手からのply手詰め
+	// ply = 1,3,5,…,
+	Move weak_mate_n_ply(int ply) const;
+
 #endif
 
 	// 入玉時の宣言勝ち

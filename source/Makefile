@@ -46,7 +46,9 @@ SOURCES  = shogi.cpp                                                           \
 	extra/long_effect.cpp                                                      \
 	extra/mate1ply_with_effect.cpp                                             \
 	extra/mate1ply_without_effect.cpp                                          \
+	extra/mate_n_ply.cpp                                                       \
 	extra/move_picker_2016Q2.cpp                                               \
+	extra/move_picker_2016Q3.cpp                                               \
 	extra/test_cmd.cpp                                                         \
 	extra/timeman.cpp                                                          \
 	extra/see.cpp                                                              \

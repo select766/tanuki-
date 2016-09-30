@@ -27,16 +27,16 @@ namespace Zobrist {
 template <bool doNullMove>
 void Position::set_check_info(StateInfo* si) const {
 
-	//: si->blockersForKing[WHITE] = slider_blockers(pieces(BLACK), square<KING>(WHITE));
-	//: si->blockersForKing[BLACK] = slider_blockers(pieces(WHITE), square<KING>(BLACK));
+	//: si->blockersForKing[WHITE] = slider_blockers(pieces(BLACK), square<KING>(WHITE),si->pinnersForKing[WHITE]);
+	//: si->blockersForKing[BLACK] = slider_blockers(pieces(WHITE), square<KING>(BLACK),si->pinnersForKing[BLACK]);
 
 	// ↓Stockfishのこの部分の実装、将棋においては良くないので、以下のように変える。
 
 	if (!doNullMove)
 	{
 		// null moveのときは前の局面でこの情報は設定されているので更新する必要がない。
-		si->blockersForKing[WHITE] = slider_blockers(BLACK, square<KING>(WHITE));
-		si->blockersForKing[BLACK] = slider_blockers(WHITE, square<KING>(BLACK));
+		si->blockersForKing[WHITE] = slider_blockers(BLACK, square<KING>(WHITE), si->pinnersForKing[WHITE]);
+		si->blockersForKing[BLACK] = slider_blockers(WHITE, square<KING>(BLACK), si->pinnersForKing[BLACK]);
 	}
 
 	Square ksq = square<KING>(~sideToMove);
@@ -449,26 +449,39 @@ std::string Position::moves_from_start(bool is_pretty) const
 // 遮っている両方の手番を返す。ただし、２重に遮っている場合はそれらの駒は返さない。
 // もし、この関数のこの返す駒を取り除いた場合、升sに対してsliderによって利きがある状態になる。
 // 升sにある玉に対してこの関数を呼び出した場合、それはpinされている駒と両王手の候補となる駒である。
+// また、升sにある玉は~c側のKINGであるとする。
 
-Bitboard Position::slider_blockers(Color c, Square s) const {
+Bitboard Position::slider_blockers(Color c, Square s , Bitboard& pinners) const {
 
-	Bitboard b, pinners, result = ZERO_BB;
+	Bitboard result = ZERO_BB;
+
+	// pinnersは返し値。
+	pinners = ZERO_BB;
 
 	// cが与えられていないと香の利きの方向を確定させることが出来ない。
 	// ゆえに将棋では、この関数は手番を引数に取るべき。(チェスとはこの点において異なる。)
 
-	// pinnersとは、pinされている駒が取り除かれたときに升sに利きが発生する大駒である。
-	pinners = (pieces(c, ROOK) & rookStepEffect(s))
-			| (pieces(c, BISHOP) & bishopStepEffect(s))
-			// 香に関しては攻撃駒が先手なら、玉より下側をサーチして、そこにある先手の香を探す。
-			| (pieces(c, LANCE) & lanceStepEffect(~c, s));
+	// snipersとは、pinされている駒が取り除かれたときに升sに利きが発生する大駒である。
+	Bitboard snipers =
+		(pieces(c, ROOK) & rookStepEffect(s))
+		| (pieces(c, BISHOP) & bishopStepEffect(s))
+		// 香に関しては攻撃駒が先手なら、玉より下側をサーチして、そこにある先手の香を探す。
+		| (pieces(c, LANCE) & lanceStepEffect(~c, s));
 
-	while (pinners)
+	while (snipers)
 	{
-		b = between_bb(s, pinners.pop()) & pieces();
+		Square sniperSq = snipers.pop();
+		Bitboard b = between_bb(s, sniperSq) & pieces();
 
+		// snipperと玉との間にある駒が1個であるなら。
+		// (間にある駒が0個の場合、b == ZERO_BBとなり、何も変化しない。)
 		if (!more_than_one(b))
+		{
 			result |= b;
+			if (b & pieces(~c))
+				// sniperと玉に挟まれた駒が玉と同じ色の駒であるなら、pinnerに追加。
+				pinners |= sniperSq;
+		}
 	}
 	return result;
 }
@@ -490,6 +503,28 @@ Bitboard Position::attackers_to(Color c, Square sq, const Bitboard& occ) const
     | (rookEffect(sq, occ) & pieces(c, ROOK));
 //    | (kingEffect(sq) & pieces(c, HDK));
   // →　HDKは、銀と金のところに含めることによって、参照するテーブルを一個減らして高速化しようというAperyのアイデア。
+
+}
+
+// 
+Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const
+{
+	// sの地点に敵駒ptをおいて、その利きに自駒のptがあればsに利いているということだ。
+	return
+		  (pawnEffect(BLACK, sq) & pieces(WHITE, PAWN))
+		| (pawnEffect(WHITE, sq) & pieces(BLACK, PAWN))
+		| (lanceEffect(BLACK, sq, occ) & pieces(WHITE, LANCE))
+		| (lanceEffect(WHITE, sq, occ) & pieces(BLACK, LANCE))
+		| (knightEffect(BLACK, sq) & pieces(WHITE, KNIGHT))
+		| (knightEffect(WHITE, sq) & pieces(BLACK, KNIGHT))
+		| (silverEffect(BLACK, sq) & (pieces(WHITE, SILVER) | pieces(WHITE, HDK)))
+		| (silverEffect(WHITE, sq) & (pieces(BLACK, SILVER) | pieces(BLACK, HDK)))
+		| (goldEffect(BLACK, sq) & (pieces(WHITE, GOLD) | pieces(WHITE, HDK)))
+		| (goldEffect(WHITE, sq) & (pieces(BLACK, GOLD) | pieces(BLACK, HDK)))
+		| (bishopEffect(sq, occ) & (pieces(BLACK,BISHOP) | pieces(WHITE,BISHOP)))
+		| (rookEffect(sq, occ) & (pieces(BLACK,ROOK) | pieces(BLACK,ROOK)));
+	//    | (kingEffect(sq) & pieces(c, HDK));
+	// →　HDKは、銀と金のところに含めることによって、参照するテーブルを一個減らして高速化しようというAperyのアイデア。
 
 }
 
@@ -988,7 +1023,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 		}
 
 		// 駒打ちは捕獲した駒がない。
-		st->capturedType = NO_PIECE;
+		st->capturedPiece = NO_PIECE;
 
 		// Zobrist keyの更新
 		h -= Zobrist::hand[Us][pr];
@@ -1077,7 +1112,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 			h += Zobrist::hand[Us][pr];
 
 			// 捕獲した駒をStateInfoに保存しておく。(undo_moveのため)
-			st->capturedType = type_of(to_pc);
+			st->capturedPiece = to_pc;
 
 #ifndef EVAL_NO_USE
 			// 評価関数で使う駒割りの値も更新
@@ -1085,7 +1120,7 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 #endif
 
 		} else {
-			st->capturedType = NO_PIECE;
+			st->capturedPiece = NO_PIECE;
 
 #ifdef LONG_EFFECT_LIBRARY
 			// 移動先で駒を捕獲しないときの利きの更新
@@ -1244,15 +1279,15 @@ void Position::undo_move_impl(Move m)
 		// toの地点には捕獲された駒があるならその駒が盤面に戻り、手駒から減る。
 		// 駒打ちの場合は捕獲された駒があるということはありえない。
 		// (なので駒打ちの場合は、st->capturedTypeを設定していないから参照してはならない)
-		if (st->capturedType != NO_PIECE)
+		if (st->capturedPiece != NO_PIECE)
 		{
-			Piece to_pc = st->capturedType;
+			Piece to_pc = st->capturedPiece;
 
 			// 盤面のtoの地点に捕獲されていた駒を復元する
 			PieceNo piece_no2 = piece_no_of(Us, raw_type_of(to_pc)); // 捕っていた駒(手駒にある)のpiece_no
 			ASSERT_LV3(is_ok(piece_no2));
 
-			put_piece(to, make_piece(~Us, to_pc), piece_no2);
+			put_piece(to, to_pc , piece_no2);
 
 			// 手駒から減らす
 			sub_hand(hand[Us], raw_type_of(to_pc));
@@ -1262,7 +1297,7 @@ void Position::undo_move_impl(Move m)
 
 #ifdef LONG_EFFECT_LIBRARY
 			// 移動先で駒を捕獲するときの利きの更新
-			LongEffect::rewind_by_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc, make_piece(~Us, to_pc));
+			LongEffect::rewind_by_capturing_piece<Us>(*this, from, to, moved_pc, moved_after_pc, to_pc);
 #endif
 
 		} else {

@@ -256,6 +256,7 @@
     <ClCompile Include="extra\long_effect.cpp" />
     <ClCompile Include="extra\mate1ply_with_effect.cpp" />
     <ClCompile Include="extra\mate1ply_without_effect.cpp" />
+    <ClCompile Include="extra\mate_n_ply.cpp" />
     <ClCompile Include="extra\move_picker_2016Q2.cpp" />
     <ClCompile Include="extra\move_picker_2016Q3.cpp" />
     <ClCompile Include="extra\see.cpp" />
@@ -308,9 +309,10 @@
     <None Include="..\exe\YaneuraOu-nano-plus.exe" />
     <None Include="..\exe\YaneuraOu-nano.exe" />
     <None Include="..\README.md" />
+    <None Include="..\script\analyze_result_log.py" />
     <None Include="..\script\calc_rating.py" />
-    <None Include="..\script\engine_invoker.py" />
-    <None Include="..\script\engine_invoker2.py" />
+    <None Include="..\script\engine_invoker1.py" />
+    <None Include="..\script\engine_invoker4.py" />
     <None Include="Makefile" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

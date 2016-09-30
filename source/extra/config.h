@@ -113,12 +113,7 @@
 //#define USE_MATE_1PLY
 
 // Position::see()を用いるか。これはSEE(Static Exchange Evaluation : 静的取り合い評価)の値を返す関数。
-// これは比較的厳密な計算を行うSEE()で、この下にあるUSE_SIMPLE_SEEのほうが少し軽い。
-// というか、このsee()、少し計算バグっているのかも知れない。USE_SIMPLE_SEEのほうを使うこと推奨。
 // #define USE_SEE
-
-// Apery風の単純化されたSEE()を用いる場合
-// #define USE_SIMPLE_SEE
 
 // PV(読み筋)を表示するときに置換表の指し手をかき集めてきて表示するか。
 // 自前でPVを管理してRootMoves::pvを更新するなら、この機能を使う必要はない。
@@ -167,6 +162,8 @@
 // 評価関数をshared memoryを用いて他のプロセスと共有する機能。(対応しているのはいまのところKPPT評価関数のみ。かつWindows限定)
 // #define USE_SHARED_MEMORY_IN_EVAL
 
+// USIプロトコルでgameoverコマンドが送られてきたときに gameover_handler()を呼び出す。
+// #define USE_GAMEOVER_HANDLER
 
 // --------------------
 // release configurations
@@ -238,7 +235,7 @@
 #define ENGINE_NAME "YaneuraOu 2016 Mid"
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
-#define USE_SIMPLE_SEE
+#define USE_SEE
 #define USE_MOVE_PICKER_2016Q2
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
@@ -261,7 +258,7 @@
 #define ENGINE_NAME "YaneuraOu 2016 Late"
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
-#define USE_SIMPLE_SEE
+#define USE_SEE
 #define USE_MOVE_PICKER_2016Q3
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
@@ -270,6 +267,7 @@
 #define ONE_PLY_EQ_1
 // デバッグ絡み
 //#define ASSERT_LV 3
+//#define USE_DEBUG_ASSERT
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
 #define USE_SFEN_PACKER
@@ -278,6 +276,9 @@
 #define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
 #define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
 #endif
 
 
@@ -346,7 +347,6 @@
 #include <cstring>  // std::memcpy()
 #include <cmath>    // log(),std::round()
 #include <climits>  // INT_MAX
-#include <cstddef>  // offsetof
 #include <ctime>    // std::ctime()
 #include <random>   // random_device
 
@@ -393,7 +393,7 @@
 #ifndef USE_DEBUG_ASSERT
 #define ASSERT(X) { if (!(X)) *(int*)1 =0; }
 #else
-#define ASSERT(X) { if (!(X)) std::cout << "\nError : ASSERT(" << #X << ")\n"; }
+#define ASSERT(X) { if (!(X)) { std::cout << "\nError : ASSERT(" << #X << ")\n"; *(int*)1 =0;} }
 #endif
 
 // ASSERT LVに応じたassert

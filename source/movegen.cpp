@@ -62,7 +62,7 @@ using namespace std;
 // 成らない指し手生成を生成する
 #define MAKE_MOVE_TARGET(target_) { FOREACH_BB(target_,to,{                                      \
   mlist++->move = make_move(from,to) + OurPt(Us,Pt);                                             \
-});}                                                                                           
+});}                                                                                          
                                                                                                
 // 移動させる駒が不明な場合                                                                    
 #define MAKE_MOVE_TARGET_UNKNOWN(target_) { FOREACH_BB(target_,to,{                              \
@@ -119,7 +119,7 @@ template <Piece Pt, Color Us, bool All> struct make_move_target {
         to = from + (Us == BLACK ? SQ_U : SQ_D ); // to = target.pop(); より少し速い
         if (canPromote(Us, to))
         {
-          mlist++->move = make_move_promote(from, to) + OurPt(Us,Pt);
+          mlist++->move = make_move_promote(from, to) + OurProPt(Us,Pt);
           if (All && rank_of(to) != (Us == BLACK ? RANK_1 : RANK_9))
             mlist++->move = make_move(from, to) + OurPt(Us,Pt);
         } else
@@ -245,8 +245,8 @@ template <MOVE_GEN_TYPE GenType, Color Us, bool All> struct GeneratePieceMoves<G
     // 盤上の自駒の歩に対して
     auto pieces = pos.pieces(Us, PAWN);
 
-    // Apery型の縦型Bitboardにおいては歩の利きはbit shiftで済む。
-    auto target2 = (Us == BLACK ? (pieces >> 1) : (pieces << 1) ) & target;
+	// 歩の利き
+    auto target2 = (Us == BLACK ? shift<SQ_U>(pieces) : shift<SQ_D>(pieces) ) & target;
 
     // 先手に対する1段目(後手ならば9段目)を表す定数
     const Rank T_RANK1 = (Us == BLACK) ? RANK_1 : RANK_9;
@@ -829,7 +829,7 @@ ExtMove* generate_checks(const Position& pos, ExtMove* mlist)
   const Bitboard y = pos.discovered_check_candidates();
   const Bitboard target =
     (GenType == CHECKS || GenType == CHECKS_ALL) ? ~pos.pieces(Us) :                     // 自駒がない場所が移動対象升
-    (GenType == QUIET_CHECKS || GenType == QUIET_CHECKS_ALL) ? ~pos.pieces() :           // 捕獲の指し手を除外するため駒がない場所が移動対象升
+    (GenType == QUIET_CHECKS || GenType == QUIET_CHECKS_ALL) ? pos.empties() :           // 捕獲の指し手を除外するため駒がない場所が移動対象升
       ALL_BB; // Error!
 
   // yのみ。ただしxかつyである可能性もある。

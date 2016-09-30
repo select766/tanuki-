@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "3.65"
+#define ENGINE_VERSION "3.86"
 
 // --------------------
 // コンパイル時の設定
@@ -31,8 +31,8 @@
 //#define YANEURAOU_MINI_ENGINE            // やねうら王mini        (完成2016/02/29)
 //#define YANEURAOU_CLASSIC_ENGINE         // やねうら王classic     (完成2016/04/03)
 //#define YANEURAOU_CLASSIC_TCE_ENGINE     // やねうら王classic tce (完成2016/04/15)
-//#define YANEURAOU_2016_MID_ENGINE        // やねうら王2016(MID)   (完成2016/08/18)
-#define YANEURAOU_2016_LATE_ENGINE       // やねうら王2016(LATE)  (開発中)
+#define YANEURAOU_2016_MID_ENGINE        // やねうら王2016(MID)   (完成2016/08/18)
+//#define YANEURAOU_2016_LATE_ENGINE       // やねうら王2016(LATE)  (完成2016/10/07予定)
 //#define RANDOM_PLAYER_ENGINE             // ランダムプレイヤー
 //#define MATE_ENGINE                      // 詰め将棋solverとしてリリースする場合。(開発中)
 //#define HELP_MATE_ENGINE                 // 協力詰めsolverとしてリリースする場合。協力詰めの最長は49909手。「寿限無3」 cf. http://www.ne.jp/asahi/tetsu/toybox/kato/fbaka4.htm
@@ -153,7 +153,8 @@ enum Square : int32_t
   SQ_ZERO = 0, SQ_NB = 81,
   SQ_NB_PLUS1 = SQ_NB + 1, // 玉がいない場合、SQ_NBに移動したものとして扱うため、配列をSQ_NB+1で確保しないといけないときがあるのでこの定数を用いる。
 
-  // 方角に関する定数。StockfishだとN=北=盤面の下を意味するようだが…。
+  // 方角に関する定数。StockfishだとNORTH=北=盤面の下を意味するようだが、
+  // わかりにくいのでやねうら王ではストレートな命名に変更する。
   SQ_D  = +1, // 下(Down)
   SQ_R  = -9, // 右(Right)
   SQ_U  = -1, // 上(Up)
@@ -463,7 +464,7 @@ constexpr Piece type_of(Piece pc) { return (Piece)(pc & 15); }
 constexpr Piece raw_type_of(Piece pc) { return (Piece)(pc & 7); }
 
 // pcとして先手の駒を渡し、cが後手なら後手の駒を返す。cが先手なら先手の駒のまま。pcとしてNO_PIECEは渡してはならない。
-inline Piece make_piece(Color c, Piece pt) { ASSERT_LV3(color_of(pt) == BLACK && pt!=NO_PIECE);  return (Piece)(pt + (c << 4)); }
+inline Piece make_piece(Color c, Piece pt) { ASSERT_LV3(color_of(pt) == BLACK && pt!=NO_PIECE);  return (Piece)((c << 4) + pt); }
 
 // pcが遠方駒であるかを判定する。LANCE,BISHOP(5),ROOK(6),HORSE(13),DRAGON(14)
 inline bool has_long_effect(Piece pc) { return (type_of(pc) == LANCE) || (((pc+1) & 6)==6); }
@@ -713,8 +714,14 @@ enum MOVE_GEN_TYPE
   QUIET_CHECKS,          // 王手となる指し手(歩の不成などは含まない)で、CAPTURESの指し手は含まない指し手
   QUIET_CHECKS_ALL,      // 王手となる指し手(歩の不成なども含む)でCAPTURESの指し手は含まない指し手
 
+  // QUIET_CHECKS_PRO_MINUS,	  // 王手となる指し手(歩の不成などは含まない)で、CAPTURES_PRO_PLUSの指し手は含まない指し手
+  // QUIET_CHECKS_PRO_MINUS_ALL, // 王手となる指し手(歩の不成なども含む)で、CAPTURES_PRO_PLUSの指し手は含まない指し手
+  // →　これらは実装が難しいので、QUIET_CHECKSで生成してから、歩の成る指し手を除外したほうが良いと思う。
+
   RECAPTURES,            // 指定升への移動の指し手のみを生成する。(歩の不成などは含まない)
   RECAPTURES_ALL,        // 指定升への移動の指し手のみを生成する。(歩の不成なども含む)
+
+  QUIETS = NON_CAPTURES , // Stockfishとの互換性向上ためのalias
 };
 
 struct Position; // 前方宣言
@@ -730,33 +737,34 @@ template <MOVE_GEN_TYPE gen_type> ExtMove* generateMoves(const Position& pos, Ex
 // MoveGeneratorのwrapper。範囲forで回すときに便利。
 template<MOVE_GEN_TYPE GenType>
 struct MoveList {
-  // 局面をコンストラクタの引数に渡して使う。すると指し手が生成され、lastが初期化されるので、
-  // このclassのbegin(),end()が正常な値を返すようになる。
-  // CHECKS,CHECKS_NON_PRO_PLUSを生成するときは、事前にpos.check_info_update();でCheckInfoをupdateしておくこと。
-  explicit MoveList(const Position& pos) : last(generateMoves<GenType>(pos, mlist)){}
-    
-  // 内部的に持っている指し手生成バッファの先頭
-  const ExtMove* begin() const { return mlist; }
+	// 局面をコンストラクタの引数に渡して使う。すると指し手が生成され、lastが初期化されるので、
+	// このclassのbegin(),end()が正常な値を返すようになる。
+	// lastは内部のバッファを指しているので、このクラスのコピーは不可。
 
-  // 生成された指し手の末尾のひとつ先
-  const ExtMove* end() const { return last; }
+	explicit MoveList(const Position& pos) : last(generateMoves<GenType>(pos, mlist)) {}
 
-  // 生成された指し手のなかに引数で指定された指し手が含まれているかの判定。
-  // ASSERTなどで用いる。遅いので通常探索等では用いないこと。
-  bool contains(Move move) const {
-    for (const auto& m : *this) if (m == move) return true;
-    return false;
-  }
+	// 内部的に持っている指し手生成バッファの先頭
+	const ExtMove* begin() const { return mlist; }
 
-  // 生成された指し手の数
-  size_t size() const { return last - mlist; }
+	// 生成された指し手の末尾のひとつ先
+	const ExtMove* end() const { return last; }
 
-  // i番目の要素を返す
-  const ExtMove at(size_t i) const { ASSERT_LV3(0<=i && i<size()); return begin()[i]; }
+	// 生成された指し手のなかに引数で指定された指し手が含まれているかの判定。
+	// ASSERTなどで用いる。遅いので通常探索等では用いないこと。
+	bool contains(Move move) const {
+		for (const auto& m : *this) if (m == move) return true;
+		return false;
+	}
+
+	// 生成された指し手の数
+	size_t size() const { return last - mlist; }
+
+	// i番目の要素を返す
+	const ExtMove at(size_t i) const { ASSERT_LV3(0 <= i && i < size()); return begin()[i]; }
 
 private:
-  // 指し手生成バッファも自前で持っている。
-  ExtMove mlist[MAX_MOVES], *last;
+	// 指し手生成バッファも自前で持っている。
+	ExtMove mlist[MAX_MOVES], *last;
 };
 
 // --------------------

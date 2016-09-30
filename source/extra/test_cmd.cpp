@@ -90,7 +90,7 @@ struct PerftSolver {
     PerftSolverResult result = {};
     if (depth == 0) {
       result.nodes++;
-      if (pos.state()->capturedType != NO_PIECE) result.captures++;
+      if (pos.captured_piece() != NO_PIECE) result.captures++;
 #ifdef KEEP_LAST_MOVE
       if (is_promote(pos.state()->lastMove)) result.promotions++;
 #endif
@@ -890,7 +890,7 @@ void unit_test(Position& pos, istringstream& is)
 
   // -- 色んな関数
   {
-    cout << "> verious function ";
+    cout << "> various function ";
 
     // -- long effect
     bool success = true;
