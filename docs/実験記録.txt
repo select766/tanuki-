@@ -21,64 +21,7 @@ ToDo:
 ・最終ランニング(2016/10/01～2016/10/06)
 
 
-・評価値のmin,max,分散を計算して表示したほうがいいな。
-　出現回数の平均等も。
-
-
-■　2016/09/04
-
-・2016Late、g++でコンパイルが通るようにした。
-	benchコマンドはg++のほうが3%ぐらい速いようだ。
-
-・
-#77
-	182_20160829_62_50Gから50億局面生成。前回の182_20160901_74_40Gから追加学習。50億×2周。
-		YaneuraOuV365learn150win.exe
-
-#78
-		η = 150が大きすぎる可能性…。
-		η = 32ぐらいでどうなのか。
-		YaneuraOuV365learn32win.exe
-
-
 ■　2016/09/03
-
-
-・手番評価が合っているのかという問題が..
-・手番だけ1/4にするの本当にいいのかどうか…。
-
-	rmse = 0.0810652 , mean_error = 988.444
-	rmse = 0.0807737 , mean_error = 988.438
-
-	これだけにしてみる。
-		kk_w[sq_bk][sq_wk].add_grad( 0 , g );
-
-		rmse = 0.0812481 , mean_error = 985.498
-		rmse = 0.0812475 , mean_error = 985.497
-		rmse = 0.0812469 , mean_error = 985.497
-	符号は合ってるけど動きが小さすぎ。
-	eta2使うのやめたほうがいいかも。
-	eta2→etaに変更。
-
-		rmse = 0.0812471 , mean_error = 985.497
-		rmse = 0.0812467 , mean_error = 985.497
-		rmse = 0.0812457 , mean_error = 985.497
-		rmse = 0.0812451 , mean_error = 985.498
-
-	((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(0 ,  +g );
-
-		rmse = 0.0809696 , mean_error = 988.293
-		rmse = 0.0805326 , mean_error = 988.611
-		rmse = 0.0802162 , mean_error = 988.687
-
-	((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad(0 ,  -g );
-		rmse = 0.0825053 , mean_error = 990.759
-		rmse = 0.0839705 , mean_error = 994.512
-		rmse = 0.0860035 , mean_error = 999.369
-
-	→　符号はさすがに間違ってなかった…が…。
-
-
 
 ・V3.64aで弱くなった原因調べる。
 	→　cm_stats_update()呼び出してなかったのとかが関係しているのかも。
@@ -93,26 +36,9 @@ ToDo:
 ・学習、教師局面が足りてない可能性はあるわな…。うーむ..。
 	depth3で30億さらに生成して、50億で学習回してみるか？
 
-	engine1 = YaneuraOuV362.exe , eval = 182_20160901_74_40G
-	engine2 = YaneuraOuV362.exe , eval = 182_20160829_62_50G
-	T1,b5000,1474 - 123 - 1543(48.86% R-7.95)
-
 ・その前にAperyWCSC26からの学習、一応再度テストしておくか。
 	AperyWCSC26からdepth3で生成。5億局面。20160903d3_ap.bin
 
-	#76
-		// 5億局面×1周
-		engine1 = YaneuraOuV362.exe , eval = 182_20160903_76_05G
-		engine2 = YaneuraOuV362.exe , eval = Apery20160505
-		T1,b3000,1534 - 77 - 1389(52.48% R17.25)
-
-		// 5億局面×3周
-		engine1 = YaneuraOuV362.exe , eval = 182_20160903_76_15G
-		engine2 = YaneuraOuV362.exe , eval = Apery20160505
-		T1,b3000,1231 - 63 - 1006(55.03% R35.06)
-
-	5億×1周では全然収束してないな…。mini-batchのサイズ大きすぎる可能性はなくはない。
-	ともかく強くなっていることはわかった。
 
 
 ■　2016/09/02
@@ -262,26 +188,12 @@ ToDo:
 
 			}
 
-		engine1 = YaneuraOuV364b.exe , eval = Apery20160824
-		engine2 = YaneuraOuV364c.exe , eval = Apery20160824
-		T1,b3000,1407 - 97 - 1496(48.47% R-10.65)
-
-		→　これは強くなっているようだが？
-
 	V3.64d forked from V3.64c
 
 					Value futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(to_sq(move))];
 		-		//	+ (is_promote(move) ? (Value)ProDiffPieceValue[pos.piece_on(move_from(move))] : VALUE_ZERO);
 
 		これないほうが良いのでは..
-
-			engine1 = YaneuraOuV364c.exe , eval = Apery20160824
-			engine2 = YaneuraOuV364d.exe , eval = Apery20160824
-			T1,b1000,4947 - 256 - 4797(50.77% R5.35)
-			T1,b3000,2416 - 183 - 2401(50.16% R1.08)
-
-		→　そうでもなかった…。
-
 
 	V3.64e forked from V3.64d
 			以下のところ、see()に変更してみる。
@@ -291,17 +203,6 @@ ToDo:
 					bestValue = std::max(bestValue, futilityBase);
 					continue;
 				}
-
-		engine1 = YaneuraOuV364d.exe , eval = Apery20160824
-		engine2 = YaneuraOuV364e.exe , eval = Apery20160824
-		T1,b1000,4941 - 284 - 4775(50.85% R5.94)
-		→　弱くなった？
-
-		engine1 = YaneuraOuV364d.exe , eval = Apery20160824
-		engine2 = YaneuraOuV364e.exe , eval = Apery20160824
-		T1,b3000,1422 - 121 - 1457(49.39% R-4.22)
-		T1,b3000,2404 - 212 - 2384(50.21% R1.45)
-			3826-333-3841
 
 	V3.64f forked form V3.64c
 
@@ -318,14 +219,6 @@ ToDo:
 	V3.64g forked form V3.64f
 
 		PARAM_REDUCTION_BY_HISTORYを8000→10000に戻してテスト
-
-			engine1 = YaneuraOuV362.exe , eval = Apery20160824
-			engine2 = YaneuraOuV364g.exe , eval = Apery20160824
-			T1,b3000,1408 - 92 - 1500(48.42% R-11.0)
-
-		やはり、このへんが肝のようだが…。
-
-
 
 
 ■　2016/09/01

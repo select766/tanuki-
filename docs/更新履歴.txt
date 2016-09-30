@@ -9,9 +9,6 @@
 ・Position::key()追加。
 ・learn.hにLEARN_GENSFEN追加。
 ・Key exclusion_key()　→　削除
-・futilityでpos.see_sign()を使っていたところ、see()に変更。
-・PARAM_REDUCTION_BY_HISTORY = 10000に戻す。
-・g++用のmakefileでLATE_ENGINEがコンパイル出来なかったの修正。
 
 
 ■　2016/09/02 V3.64
