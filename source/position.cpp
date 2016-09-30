@@ -1346,55 +1346,55 @@ void Position::undo_null_move() {
 // 連続王手の千日手等で引き分けかどうかを返す(repPlyまで遡る)
 RepetitionState Position::is_repetition(const int repPly) const
 {
-	return REPETITION_NONE;
-	//// 4手かけないと千日手にはならないから、4手前から調べていく。
- // const int Start = 4;
- // int i = Start;
+	//return REPETITION_NONE;
+	// 4手かけないと千日手にはならないから、4手前から調べていく。
+  const int Start = 4;
+  int i = Start;
 
- // // 遡り可能な手数。
- // // 最大でもrepPly手までしか遡らないことにする。
- // const int e = min(repPly,st->pliesFromNull);
- // 
- // // pliesFromNullが未初期化になっていないかのチェックのためのassert
- // ASSERT_LV3(st->pliesFromNull >= 0);
+  // 遡り可能な手数。
+  // 最大でもrepPly手までしか遡らないことにする。
+  const int e = min(repPly,st->pliesFromNull);
+  
+  // pliesFromNullが未初期化になっていないかのチェックのためのassert
+  ASSERT_LV3(st->pliesFromNull >= 0);
 
- // if (i <= e)
- // {
- //   auto stp = st->previous->previous;
- //   auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
+  if (i <= e)
+  {
+    auto stp = st->previous->previous;
+    auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
 
- //   do {
- //     stp = stp->previous->previous;
+    do {
+      stp = stp->previous->previous;
 
- //     // 同じboard hash keyの局面であるか？
- //     if (stp->board_key() == key)
- //     {
- //       // 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
- //       if (stp->hand == st->hand)
- //       {
- //         // 自分が王手をしている連続王手の千日手なのか？
- //         if (i <= st->continuousCheck[sideToMove])
- //           return REPETITION_LOSE;
+      // 同じboard hash keyの局面であるか？
+      if (stp->board_key() == key)
+      {
+        // 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
+        if (stp->hand == st->hand)
+        {
+          // 自分が王手をしている連続王手の千日手なのか？
+          if (i <= st->continuousCheck[sideToMove])
+            return REPETITION_LOSE;
 
- //         // 相手が王手をしている連続王手の千日手なのか？
- //         if (i <= st->continuousCheck[~sideToMove])
- //           return REPETITION_WIN;
+          // 相手が王手をしている連続王手の千日手なのか？
+          if (i <= st->continuousCheck[~sideToMove])
+            return REPETITION_WIN;
 
- //         return REPETITION_DRAW;
- //       } else {
- //         // 優等局面か劣等局面であるか。(手番が相手番になっている場合はいま考えない)
- //         if (hand_is_equal_or_superior(st->hand, stp->hand))
- //           return REPETITION_SUPERIOR;
- //         if (hand_is_equal_or_superior(stp->hand, st->hand))
- //           return REPETITION_INFERIOR;
- //       }
- //     }
- //     i += 2;
- //   } while (i <= e);
- // }
+          return REPETITION_DRAW;
+        } else {
+          // 優等局面か劣等局面であるか。(手番が相手番になっている場合はいま考えない)
+          if (hand_is_equal_or_superior(st->hand, stp->hand))
+            return REPETITION_SUPERIOR;
+          if (hand_is_equal_or_superior(stp->hand, st->hand))
+            return REPETITION_INFERIOR;
+        }
+      }
+      i += 2;
+    } while (i <= e);
+  }
 
- // // 同じhash keyの局面が見つからなかったので…。
- // return REPETITION_NONE;
+  // 同じhash keyの局面が見つからなかったので…。
+  return REPETITION_NONE;
 }
 
 // ----------------------------------
