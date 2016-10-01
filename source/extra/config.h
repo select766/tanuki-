@@ -246,12 +246,12 @@
 //#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
-#define USE_SFEN_PACKER
-#define EVAL_LEARN
+//#define USE_SFEN_PACKER
+//#define EVAL_LEARN
 // 定跡生成絡み
-#define ENABLE_MAKEBOOK_CMD
+//#define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-#define USE_SHARED_MEMORY_IN_EVAL
+//#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
