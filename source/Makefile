@@ -11,9 +11,12 @@
 #YANEURAOU_EDITION = YANEURAOU_2016_MID_ENGINE_LEARN
 YANEURAOU_EDITION = YANEURAOU_2016_LATE_ENGINE
 
+KPP_PADDING0=0
+KPP_PADDING1=0
+
 COMPILER = g++
 #COMPILER = mpicxx
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64
+CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64 -DKPP_PADDING0=$(KPP_PADDING0) -DKPP_PADDING1=$(KPP_PADDING1)
 # ltoオプションを指定すると実行同時にSegmentation Faultで落ちるときがあるので、そのときは、コメントアウトしてください。
 # CFLAGS   += -flto
 CFLAGS   += -march=native
