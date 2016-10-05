@@ -85,7 +85,7 @@ struct Stats {
     //v = min((Value)+324, v);
 
     // ToDo : ↑と↓と、どちらが良いのか..
-    if (abs(int(v) >= 324))
+    if (abs(int(v)) >= 324)
       return ;
 
     table[to][pc] -= table[to][pc] * abs(int(v)) / (CM ? 936 : 324);
