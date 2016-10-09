@@ -1,8 +1,8 @@
 # About this project
 
-hakubishin (tanuki-sdt4 ver) is a shogi engine (AI player) based on YaneuraOu (https://github.com/yaneurao/YaneuraOu).　　The development concept is "easily and for fun!".
+hakubishin (tanuki-sdt4 ver) is a shogi engine (AI player) based on YaneuraOu.  The development concept is "easily and for fun!".
 
-†白美神†(tanuki-第4回電王トーナメントバージョン)はやねうら王(https://github.com/yaneurao/YaneuraOu)から派生したコンピューター将棋エンジンです。開発コンセプトは「楽に！楽しく！」です。
+†白美神†(tanuki-第4回電王トーナメントバージョン)はやねうら王から派生したコンピューター将棋エンジンです。開発コンセプトは「楽に！楽しく！」です。
 
 [やねうら王mini 公式サイト (解説記事、開発者向け情報等)](http://yaneuraou.yaneu.com/YaneuraOu_Mini/)
 
