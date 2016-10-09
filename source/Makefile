@@ -11,8 +11,8 @@
 #YANEURAOU_EDITION = YANEURAOU_2016_MID_ENGINE_LEARN
 YANEURAOU_EDITION = YANEURAOU_2016_LATE_ENGINE
 
-KPP_PADDING0=0
-KPP_PADDING1=0
+KPP_PADDING0=3
+KPP_PADDING1=1
 
 COMPILER = g++
 #COMPILER = mpicxx
@@ -26,10 +26,10 @@ INCLUDE  = #-I../include
 
 ifeq ($(OS),Windows_NT)
   LDFLAGS += -static
-  TARGET = YaneuraOu-by-gcc.exe
+  TARGET = tanuki-sdt4.exe
 else
   CFLAGS += -D_LINUX
-  TARGET = YaneuraOu-by-gcc
+  TARGET = tanuki-sdt4
 endif
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
