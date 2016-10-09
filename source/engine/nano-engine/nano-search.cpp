@@ -34,7 +34,15 @@ using namespace Eval;
 
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
-void USI::extra_option(USI::OptionsMap & o) {}
+void USI::extra_option(USI::OptionsMap & o)
+{
+  //
+  //   パラメーターの外部からの自動調整
+  //
+
+  o["Param1"] << Option(0, 0, 100000);
+  o["Param2"] << Option(0, 0, 100000);
+}
 
 namespace YaneuraOuNano
 {
@@ -145,7 +153,6 @@ namespace YaneuraOuNano
     }
 
     // 取り合いの指し手だけ生成する
-    pos.check_info_update();
     MovePicker mp(pos,move_to(pos.state()->lastMove));
     Move move;
 
@@ -225,7 +232,7 @@ namespace YaneuraOuNano
 
     // RootNodeであるなら、指し手は現在注目している1手だけであるから、それが置換表にあったものとして指し手を進める。
     Move ttMove = RootNode ? thisThread->rootMoves[thisThread->PVIdx].pv[0]
-      :  ttHit ? tte->move() : MOVE_NONE;
+                  :  ttHit ? pos.move16_to_move(tte->move()) : MOVE_NONE;
 
     // 置換表の値による枝刈り
     
@@ -248,7 +255,6 @@ namespace YaneuraOuNano
     // 1手ずつ指し手を試す
     // -----------------------
 
-    pos.check_info_update();
     MovePicker mp(pos,ttMove);
 
     Value value;
@@ -437,7 +443,7 @@ void MainThread::think() {
   // ---------------------
 
   {
-    auto it = book.find(rootPos.sfen());
+    auto it = book.find(rootPos);
     if (it != book.end()) {
       // 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
       const auto& move_list = it->second;

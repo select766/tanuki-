@@ -1,8 +1,9 @@
 ﻿#include "mate1ply.h"
 
 // 超高速1手詰め判定ライブラリ
+// 利きを用いる場合の実装
 
-#if defined(MATE_1PLY) && defined(LONG_EFFECT_LIBRARY)
+#if defined(USE_MATE_1PLY) && defined(LONG_EFFECT_LIBRARY)
 
 #include "../position.h"
 #include "long_effect.h"
@@ -144,13 +145,15 @@ Move Position::mate1ply_impl() const
   // 駒打ちで詰む条件を満たしていない。
   if (!hk) goto MOVE_MATE;
 
-  auto themKingWW = to_sqww(themKing);
+  {
+    auto themKingWW = to_sqww(themKing);
 
-  // 一番詰みそうな金から調べていく
-  CHECK_PIECE(GOLD);
-  CHECK_PIECE(SILVER);
-  CHECK_PIECE(ROOK) else CHECK_PIECE(LANCE); // 飛車打ちで詰まないときに香打ちで詰むことはないのでチェックを除外
-  CHECK_PIECE(BISHOP);
+    // 一番詰みそうな金から調べていく
+    CHECK_PIECE(GOLD);
+    CHECK_PIECE(SILVER);
+    CHECK_PIECE(ROOK) else CHECK_PIECE(LANCE); // 飛車打ちで詰まないときに香打ちで詰むことはないのでチェックを除外
+    CHECK_PIECE(BISHOP);
+  }
 
 MOVE_MATE:
 
@@ -158,8 +161,8 @@ MOVE_MATE:
   //     移動による詰み
   // -----------------------
 
-  auto& pinned = state()->checkInfo.pinned;
-
+  auto& pinned = pinned_pieces(sideToMove);
+  
   // 利きが2つ以上ある場所
   Directions a8_effect_us_gt1 = board_effect[Us].around8_greater_than_one(themKing); // 1)
 

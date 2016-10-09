@@ -18,7 +18,8 @@ struct TTEntry {
 #ifndef  NO_EVAL_IN_TT
   Value eval() const { return (Value)eval16; }
 #endif
-  Depth depth() const { return (Depth)((int)depth8 * ONE_PLY); }
+
+  Depth depth() const { return (Depth)(depth8 * int(ONE_PLY)); }
   Bound bound() const { return (Bound)(genBound8 & 0x3); }
 
   uint8_t generation() const { return genBound8 & 0xfc; }
@@ -36,6 +37,9 @@ struct TTEntry {
     uint8_t gen)
   {
     ASSERT_LV3((-VALUE_INFINITE < v && v < VALUE_INFINITE) || v == VALUE_NONE);
+
+	// ToDo: 探索部によってはVALUE_INFINITEを書き込みたいのかも知れない…。うーん。
+	//  ASSERT_LV3((-VALUE_INFINITE <= v && v <= VALUE_INFINITE) || v == VALUE_NONE);
 
     // このif式だが、
     // A = m!=MOVE_NONE
@@ -61,7 +65,7 @@ struct TTEntry {
     // 3. BOUND_EXACT(これはPVnodeで探索した結果で、とても価値のある情報なので無条件で書き込む)
     // 1. or 2. or 3.
     if ((k >> 48) != key16
-      || (d > depth() - 4 * ONE_PLY)
+      || (d / ONE_PLY > depth8 - 4)
     /*|| g != generation() // probe()において非0のkeyとマッチした場合、その瞬間に世代はrefreshされている。　*/
       || b == BOUND_EXACT
       )
@@ -113,6 +117,11 @@ struct TranspositionTable {
   // 見つかったならfound == trueにしてそのTT_ENTRY*を返す。
   // 見つからなかったらfound == falseで、このとき置換表に書き戻すときに使うと良いTT_ENTRY*を返す。
   TTEntry* probe(const Key key, bool& found) const;
+
+  // keyの下位bitをClusterのindexにしてその最初のTTEntry*を返す。
+  TTEntry* first_entry(const Key key) const {
+    return &table[(size_t)key & (clusterCount - 1)].entry[0];
+  }
 
   // 置換表のサイズを変更する。mbSize == 確保するメモリサイズ。MB単位。
   void resize(size_t mbSize);
@@ -177,8 +186,17 @@ inline Value value_to_tt(Value v, int ply) {
 
   ASSERT_LV3(-VALUE_INFINITE < v && v < VALUE_INFINITE);
 
-  return  v >= VALUE_MATE_IN_MAX_PLY ? v + ply
-    : v <= VALUE_MATED_IN_MAX_PLY ? v - ply : v;
+  if (v >= VALUE_MATE_IN_MAX_PLY) {
+    // 詰みに係る局面で置換表にVALUE_INFINITE以上の値が書き込まれる場合があるバグに対するハック
+    // TODO(nodchip): やねさんが修正してくださるのを待つ
+    return std::min(VALUE_MATE, v + ply);
+  }
+  else if (v <= VALUE_MATED_IN_MAX_PLY) {
+    return std::max(-VALUE_MATE, v - ply);
+  }
+  else {
+    return v;
+  }
 }
 
 // value_to_tt()の逆関数
@@ -186,8 +204,8 @@ inline Value value_to_tt(Value v, int ply) {
 inline Value value_from_tt(Value v, int ply) {
 
   return  v == VALUE_NONE ? VALUE_NONE
-    : v >= VALUE_MATE_IN_MAX_PLY ? v - ply
-    : v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
+		: v >= VALUE_MATE_IN_MAX_PLY ? v - ply
+		: v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
 }
 
 // PV lineをコピーする。
@@ -195,9 +213,9 @@ inline Value value_from_tt(Value v, int ply) {
 // 番兵として末尾はMOVE_NONEにすることになっている。
 inline void update_pv(Move* pv, Move move, Move* childPv) {
 
-  for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
-    *pv++ = *childPv++;
-  *pv = MOVE_NONE;
+	for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+		*pv++ = *childPv++;
+	*pv = MOVE_NONE;
 }
 
 extern TranspositionTable TT;

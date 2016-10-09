@@ -17,10 +17,10 @@ namespace Eval
 {
 
 // KKPファイル名
-#define KKP_BIN "eval\\kkp32ap.bin"
+#define KKP_BIN "/kkp32ap.bin"
 
 // KPPファイル名
-#define KPP_BIN "eval\\kpp16ap.bin"
+#define KPP_BIN "/kpp16ap.bin"
 
   typedef int16_t ValueKpp;
   typedef int32_t ValueKkp;
@@ -40,7 +40,7 @@ namespace Eval
     fstream fs;
     size_t size;
 
-    fs.open(KPP_BIN, ios::in | ios::binary);
+    fs.open((string)Options["EvalDir"] + KPP_BIN, ios::in | ios::binary);
     if (fs.fail())
       goto Error;
     size = SQ_NB_PLUS1 * (int)fe_end * (int)fe_end * (int)sizeof(ValueKpp);
@@ -49,7 +49,7 @@ namespace Eval
       goto Error;
     fs.close();
     size = SQ_NB_PLUS1 * (int)SQ_NB_PLUS1 * ((int)(fe_end)+1) * (int)sizeof(ValueKkp);
-    fs.open(KKP_BIN, ios::in | ios::binary);
+    fs.open((string)Options["EvalDir"] + KKP_BIN, ios::in | ios::binary);
     if (fs.fail())
       goto Error;
     fs.read((char*)&kkp, size);
@@ -142,7 +142,8 @@ namespace Eval
     Square sq_wk1 = Inv(pos.king_square(WHITE));
 
     auto& pos_ = *const_cast<Position*>(&pos);
-    auto list = pos_.eval_list()->piece_list();
+    auto list_fb = pos_.eval_list()->piece_list_fb();
+    auto list_fw = pos_.eval_list()->piece_list_fw();
 
     int i, j;
     BonaPiece k0, k1;
@@ -154,14 +155,14 @@ namespace Eval
 
     for (i = 0; i < PIECE_NO_KING; i++)
     {
-      k0 = list[i].fb;
-      k1 = list[i].fw;
+      k0 = list_fb[i];
+      k1 = list_fw[i];
       sumKKP += kkp[sq_bk0][sq_wk1][k0];
 
       for (j = 0; j < i; j++)
       {
-        sumBKPP += kpp[sq_bk0][k0][list[j].fb];
-        sumWKPP -= kpp[sq_wk1][k1][list[j].fw];
+        sumBKPP += kpp[sq_bk0][k0][list_fb[j]];
+        sumWKPP -= kpp[sq_wk1][k1][list_fw[j]];
       }
     }
 
@@ -195,7 +196,7 @@ namespace Eval
 
     // すでに計算されている。rootか？
     int sumKKP, sumBKPP, sumWKPP;
-    if (st->sumKKP != INT_MAX)
+    if (st->sumKKP != VALUE_NOT_EVALUATED)
     {
       sumKKP = st->sumKKP;
       sumBKPP = st->sumBKPP;
@@ -225,7 +226,7 @@ namespace Eval
     auto now = st;
     auto prev = st->previous;
 
-    if (prev->sumKKP == INT_MAX)
+    if (prev->sumKKP == VALUE_NOT_EVALUATED)
     {
 #ifdef USE_EHASH
       HASH_KEY key2 = prev->key();
@@ -236,7 +237,7 @@ namespace Eval
         prev->sumKKP = e.sumKKP;
         prev->sumBKPP = e.sumBKPP;
         prev->sumWKPP = e.sumWKPP;
-        ASSERT_LV3(e.sumKKP != INT_MAX);
+        ASSERT_LV3(e.sumKKP != VALUE_NOT_EVALUATED);
       }
       else
 #endif
@@ -260,7 +261,8 @@ namespace Eval
       auto sq_bk0 = pos.king_square(BLACK);
       auto sq_wk1 = Inv(pos.king_square(WHITE));
 
-      auto now_list = pos.eval_list()->piece_list();
+      auto now_list_fb = pos.eval_list()->piece_list_fb();
+      auto now_list_fw = pos.eval_list()->piece_list_fw();
 
       int i, j;
       auto& dp = now->dirtyPiece;
@@ -288,11 +290,11 @@ namespace Eval
           // 片側まるごと計算
           for (i = 0; i < PIECE_NO_KING; i++)
           {
-            k0 = now_list[i].fb;
+            k0 = now_list_fb[i];
             sumKKP += Eval::kkp[sq_bk0][sq_wk1][k0];
 
             for (j = 0; j < i; j++)
-              sumBKPP += Eval::kpp[sq_bk0][k0][now_list[j].fb];
+              sumBKPP += Eval::kpp[sq_bk0][k0][now_list_fb[j]];
           }
 
           // もうひとつの駒がないならこれで計算終わりなのだが。
@@ -307,13 +309,13 @@ namespace Eval
             // WKは移動していないのでこれは前のままでいい。
             for (i = 0; i < dirty; ++i)
             {
-              sumWKPP += Eval::kpp[sq_wk1][k1][now_list[i].fw];
-              sumWKPP -= Eval::kpp[sq_wk1][k3][now_list[i].fw];
+              sumWKPP += Eval::kpp[sq_wk1][k1][now_list_fw[i]];
+              sumWKPP -= Eval::kpp[sq_wk1][k3][now_list_fw[i]];
             }
             for (++i; i < PIECE_NO_KING; ++i)
             {
-              sumWKPP += Eval::kpp[sq_wk1][k1][now_list[i].fw];
-              sumWKPP -= Eval::kpp[sq_wk1][k3][now_list[i].fw];
+              sumWKPP += Eval::kpp[sq_wk1][k1][now_list_fw[i]];
+              sumWKPP -= Eval::kpp[sq_wk1][k3][now_list_fw[i]];
             }
           }
 
@@ -328,12 +330,12 @@ namespace Eval
 
           for (i = 0; i < PIECE_NO_KING; i++)
           {
-            k0 = now_list[i].fb; // これ、KKPテーブルにk1側も入れておいて欲しい気はするが..
-            k1 = now_list[i].fw;
+            k0 = now_list_fb[i]; // これ、KKPテーブルにk1側も入れておいて欲しい気はするが..
+            k1 = now_list_fw[i];
             sumKKP += Eval::kkp[sq_bk0][sq_wk1][k0];
 
             for (j = 0; j < i; j++)
-              sumWKPP -= Eval::kpp[sq_wk1][k1][now_list[j].fw];
+              sumWKPP -= Eval::kpp[sq_wk1][k1][now_list_fw[j]];
           }
 
           if (k == 2)
@@ -344,13 +346,13 @@ namespace Eval
             dirty = dp.pieceNo[1];
             for (i = 0; i < dirty; ++i)
             {
-              sumBKPP -= Eval::kpp[sq_bk0][k0][now_list[i].fb];
-              sumBKPP += Eval::kpp[sq_bk0][k2][now_list[i].fb];
+              sumBKPP -= Eval::kpp[sq_bk0][k0][now_list_fb[i]];
+              sumBKPP += Eval::kpp[sq_bk0][k2][now_list_fb[i]];
             }
             for (++i; i < PIECE_NO_KING; ++i)
             {
-              sumBKPP -= Eval::kpp[sq_bk0][k0][now_list[i].fb];
-              sumBKPP += Eval::kpp[sq_bk0][k2][now_list[i].fb];
+              sumBKPP -= Eval::kpp[sq_bk0][k0][now_list_fb[i]];
+              sumBKPP += Eval::kpp[sq_bk0][k2][now_list_fb[i]];
             }
           }
         }
@@ -361,10 +363,10 @@ namespace Eval
         // ----------------------------
 
 #define ADD_BWKPP(W0,W1,W2,W3) { \
-          sumBKPP -= Eval::kpp[sq_bk0][W0][now_list[i].fb]; \
-          sumWKPP += Eval::kpp[sq_wk1][W1][now_list[i].fw]; \
-          sumBKPP += Eval::kpp[sq_bk0][W2][now_list[i].fb]; \
-          sumWKPP -= Eval::kpp[sq_wk1][W3][now_list[i].fw]; \
+          sumBKPP -= Eval::kpp[sq_bk0][W0][now_list_fb[i]]; \
+          sumWKPP += Eval::kpp[sq_wk1][W1][now_list_fw[i]]; \
+          sumBKPP += Eval::kpp[sq_bk0][W2][now_list_fb[i]]; \
+          sumWKPP -= Eval::kpp[sq_wk1][W3][now_list_fw[i]]; \
 }
 
         if (k == 1)
@@ -475,6 +477,12 @@ namespace Eval
     return pos.side_to_move() == BLACK ? score : -score;
   }
 
+  void evaluate_with_no_return(const Position& pos)
+  {
+    if (pos.state()->sumKKP == VALUE_NOT_EVALUATED)
+      evaluate(pos);
+  }
+
   // 現在の局面の評価値の内訳を表示する。
   void print_eval_stat(Position& pos)
   {
@@ -483,14 +491,15 @@ namespace Eval
     Square sq_bk0 = pos.king_square(BLACK);
     Square sq_wk1 = Inv(pos.king_square(WHITE));
 
-    auto list = pos.eval_list()->piece_list();
+    auto list_fb = pos.eval_list()->piece_list_fb();
+    auto list_fw = pos.eval_list()->piece_list_fw();
 
     int i, j;
     BonaPiece k0, k1;
 
     // 38枚の駒を表示
     for (i = 0; i < PIECE_NO_KING; ++i)
-      cout << int(list[i].fb) << " = " << list[i].fb << " , " << int(list[i].fw) << " =  " << list[i].fw << endl;
+      cout << int(list_fb[i]) << " = " << list_fb[i] << " , " << int(list_fw[i]) << " =  " << list_fw[i] << endl;
 
     int32_t sumBKPP, sumWKPP, sumKKP;
 
@@ -501,24 +510,24 @@ namespace Eval
 
     for (i = 0; i < PIECE_NO_KING; i++)
     {
-      k0 = list[i].fb;
-      k1 = list[i].fw;
+      k0 = list_fb[i];
+      k1 = list_fw[i];
 
       cout << "KKP : " << sq_bk0 << " " << Inv(sq_wk1) << " " << k0 << " = " << kkp[sq_bk0][sq_wk1][k0] << "\n";
       sumKKP += kkp[sq_bk0][sq_wk1][k0];
 
       for (j = 0; j <= i; j++)
       {
-        cout << "BKPP : " << sq_bk0 << " " << k0 << " " << list[j].fb << " = " << kpp[sq_bk0][k0][list[j].fb] << "\n";
-        cout << "WKPP : " << sq_wk1 << " " << k1 << " " << list[j].fw << " = " << kpp[sq_wk1][k1][list[j].fw] << "\n";
+        cout << "BKPP : " << sq_bk0 << " " << k0 << " " << list_fb[j] << " = " << kpp[sq_bk0][k0][list_fb[j]] << "\n";
+        cout << "WKPP : " << sq_wk1 << " " << k1 << " " << list_fw[j] << " = " << kpp[sq_wk1][k1][list_fw[j]] << "\n";
 
-        sumBKPP += kpp[sq_bk0][k0][list[j].fb];
-        sumWKPP += kpp[sq_wk1][k1][list[j].fw];
+        sumBKPP += kpp[sq_bk0][k0][list_fb[j]];
+        sumWKPP += kpp[sq_wk1][k1][list_fw[j]];
 
         //        cout << "sumWKPP = " << sumWKPP << " sumBKPP " << sumBKPP << " sumWKPP " << sumWKPP << endl;
 
         // i==jにおいて0以外やったらあかんで!!
-        ASSERT(!(i == j && kpp[sq_bk0][k0][list[j].fb] != 0));
+        ASSERT(!(i == j && kpp[sq_bk0][k0][list_fb[j]] != 0));
       }
     }
 

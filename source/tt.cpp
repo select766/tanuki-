@@ -21,7 +21,7 @@ void TranspositionTable::resize(size_t mbSize) {
   if (!mem)
   {
     std::cout << "info string Error : Failed to allocate " << mbSize
-      << "MB for transposition table." << std::endl;
+      << "MB for transposition table. ClusterCount = " << newClusterCount << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -35,7 +35,13 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
 
   // 最初のTT_ENTRYのアドレス(このアドレスからTT_ENTRYがClusterSize分だけ連なっている)
   // keyの下位bitをいくつか使って、このアドレスを求めるので、自ずと下位bitはいくらかは一致していることになる。
-  TTEntry* const tte = &table[(size_t)(key) & (clusterCount - 1)].entry[0];
+  TTEntry* const tte = first_entry(key);
+
+#ifdef  USE_FALSE_PROBE_IN_TT
+  // 置換表にhitさせないモードであるなら、見つからなかったことにして
+  // つねに先頭要素を返せば良い。
+  return found = false, &tte[0];
+#else
 
   // 上位16bitが合致するTT_ENTRYを探す
   const uint16_t key16 = key >> 48;
@@ -47,7 +53,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
     // 1. keyが合致しているentryを見つけた。(found==trueにしてそのTT_ENTRYのアドレスを返す)
     // 2. 空のエントリーを見つけた(そこまではkeyが合致していないので、found==falseにして新規TT_ENTRYのアドレスとして返す)
     if (!tte[i].key16)
-      return found = false, &tte[i];
+      return found = false, &tte[i];      // このケースにおいてrefreshは必要ない。save()のときにgenerationを書き出すため。
 
     if (tte[i].key16 == key16)
     {
@@ -67,8 +73,8 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
     // 以上に基いてスコアリングする。
     // 以上の合計が一番小さいTTEntryを使う。
 
-    if (replace->depth8 - ((259 + generation8 - replace->genBound8) & 0xFC) * 2 * ONE_PLY
-      >   tte[i].depth8 - ((259 + generation8 - tte[i].genBound8  ) & 0xFC) * 2 * ONE_PLY)
+    if (replace->depth8 - ((259 + generation8 - replace->genBound8) & 0xFC) * 2
+      >   tte[i].depth8 - ((259 + generation8 -   tte[i].genBound8) & 0xFC) * 2)
       replace = &tte[i];
 
   // generationは256になるとオーバーフローして0になるのでそれをうまく処理できなければならない。
@@ -80,6 +86,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
   // ( 256 + a - b + c) & 0xfc として c = 3としても結果に影響は及ぼさない、かつ、このゴミを無視した計算が出来る。
   
   return found = false, replace;
+#endif
 }
 
 int TranspositionTable::hashfull() const

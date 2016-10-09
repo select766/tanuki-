@@ -15,10 +15,6 @@
 // 探索時に用いるスレッド
 // --------------------
 
-// std::mutexをもっと速い実装に差し替えたい時のためにwrapしておく。
-typedef std::mutex Mutex;
-typedef std::condition_variable ConditionVariable;
-
 // 探索時に用いる、それぞれのスレッド
 // これを思考スレッド数だけ確保する。
 // ただしメインスレッドはこのclassを継承してMainThreadにして使う。
@@ -99,16 +95,27 @@ struct Thread
   // このスレッドに関して、終了した反復深化の深さ(Depth型ではないので注意)
   int completedDepth;
 
-#ifdef USE_MOVE_PICKER
+  // 探索でsearch()が呼び出された回数を集計する用。
+  std::atomic_bool resetCalls;
+  int callsCnt;
+
+#if defined( USE_MOVE_PICKER_2015 ) || defined( USE_MOVE_PICKER_2016Q2 ) || defined( USE_MOVE_PICKER_2016Q3 )
+  // ある種のMovePickerではオーダリングのために、
   // スレッドごとにhistoryとcounter movesのtableを持たないといけない。
 
   HistoryStats history;
   MoveStats counterMoves;
 #endif
 
-  // 探索でsearch()が呼び出された回数を集計する用。
-  std::atomic_bool resetCalls;
-  int callsCnt;
+#if defined( USE_MOVE_PICKER_2016Q2 ) || defined( USE_MOVE_PICKER_2016Q3 )
+  FromToStats fromTo;
+#endif
+
+#if defined( YANEURAOU_2016_LATE_ENGINE )
+  // コア数が多いか、長い持ち時間においては、スレッドごとにCounterMoveHistoryを確保したほうが良い。
+  // cf. https://github.com/official-stockfish/Stockfish/commit/5c58d1f5cb4871595c07e6c2f6931780b5ac05b5
+  CounterMoveHistoryStats counterMoveHistory;
+#endif
 
   // ------------------------------
   //       constructor ..

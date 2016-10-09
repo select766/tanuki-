@@ -7,17 +7,36 @@
 
 // --- ターゲットCPUの選択
 
-// AVX2(Haswell以降)でサポートされた命令を使うか。
-// このシンボルをdefineしなければ、pext命令をソフトウェアでエミュレートする。
-// 古いCPUのPCで開発をしたていて、遅くてもいいからともかく動いて欲しいときにそうすると良い。
+#ifndef USE_MAKEFILE
 
-//#define USE_AVX2
+// USE_AVX512 : AVX-512(サーバー向けSkylake以降)でサポートされた命令を使うか。
+// USE_AVX2   : AVX2(Haswell以降)でサポートされた命令を使うか。pextなど。
+// USE_SSE42  : SSE4.2でサポートされた命令を使うか。popcnt命令など。
+// USE_SSE41  : SSE4.1でサポートされた命令を使うか。_mm_testz_si128など。
+// USE_SSE2   : SSE2  でサポートされた命令を使うか。
+// NO_SSE     : SSEは使用しない。
+// (Windowsの64bit環境だと自動的にSSE2は使えるはず)
+// noSSE ⊂ SSE2 ⊂ SSE4.1 ⊂ SSE4.2 ⊂ AVX2 ⊂  AVX-512
 
-// SSE4.2以降でサポートされた命令を使うか。
-// このシンボルをdefineしなければ、popcnt命令をソフトウェアでエミュレートする。
-// 古いCPUのPCで開発をしたていて、遅くてもいいからともかく動いて欲しいときにそうすると良い。
+// Visual Studioのプロジェクト設定で「構成のプロパティ」→「C / C++」→「コード生成」→「拡張命令セットを有効にする」
+// のところの設定の変更も忘れずに。
 
-#define USE_SSE42
+// ターゲットCPUのところだけdefineしてください。(残りは自動的にdefineされます。)
+
+//#define USE_AVX512
+#define USE_AVX2
+//#define USE_SSE42
+//#define USE_SSE41
+//#define USE_SSE2
+//#define NO_SSE
+
+#else
+
+// Makefileを使ってbuildするときは、
+// $ make avx2
+// のようにしてビルドすれば自動的にAVX2用がビルドされます。
+
+#endif
 
 
 // 通例hash keyは64bitだが、これを128にするとPosition::state()->long_key()から128bit hash keyが
@@ -72,22 +91,29 @@
 // 確保するのはもったいないので、そのテーブルを確保するかどうかを選択するためのオプション。
 // 評価関数を用いるなら、どれか一つを選択すべし。
 
-// #define EVAL_NO_USE   // 評価関数を用いないとき。
-// #define EVAL_MATERIAL // 駒得のみの評価関数
-// #define EVAL_PP       // ツツカナ型 2駒関係
-// #define EVAL_KPP      // Bonanza型 3駒関係
-// #define EVAL_PPE      // 技巧型 2駒+利き
+// #define EVAL_NO_USE    // 評価関数を用いないとき。
+// #define EVAL_MATERIAL  // 駒得のみの評価関数
+// #define EVAL_PP        // ツツカナ型 2駒関係
+// #define EVAL_KPP       // Bonanza型 3駒関係
+// #define EVAL_KPPT      // Bonanza型 3駒関係、手番つき(Apery WCSC26相当)
+// #define EVAL_KPPT_FAST // KPPTのAVX2/AVX-512による高速化。(非公開)
+// #define EVAL_PPET      // 技巧型 2駒+利き+手番(開発予定)
+
+// KPPT評価関数の学習に使うときのモード
+// #define EVAL_LEARN
 
 // 長い利き(遠方駒の利き)のライブラリを用いるか。
 // 超高速1手詰め判定などではこのライブラリが必要。
 // do_move()のときに利きの差分更新を行なうので、do_move()は少し遅くなる。(その代わり、利きが使えるようになる)
 //#define LONG_EFFECT_LIBRARY
 
-// 超高速1手詰め判定ルーチンを用いるか。
-//#define MATE_1PLY
+// 1手詰め判定ルーチンを用いるか。
+// LONG_EFFECT_LIBRARYが有効なときは、利きを利用した高速な一手詰め。
+// LONG_EFFECT_LIBRARYが無効なときは、Bonanza6風の一手詰め。
+//#define USE_MATE_1PLY
 
 // Position::see()を用いるか。これはSEE(Static Exchange Evaluation : 静的取り合い評価)の値を返す関数。
-//#define USE_SEE
+// #define USE_SEE
 
 // PV(読み筋)を表示するときに置換表の指し手をかき集めてきて表示するか。
 // 自前でPVを管理してRootMoves::pvを更新するなら、この機能を使う必要はない。
@@ -99,7 +125,7 @@
 // #define ENABLE_MAKEBOOK_CMD
 
 // 標準で用意されているMovePickerを用いるか
-// #define USE_MOVE_PICKER
+// #define USE_MOVE_PICKER_2016Q2
 
 // 入玉時の宣言勝ちを用いるか
 // #define USE_ENTERING_KING_WIN
@@ -107,16 +133,37 @@
 // TimeMangementクラスに、今回の思考時間を計算する機能を追加するか。
 // #define USE_TIME_MANAGEMENT
 
-// MovePickerのなかで使っているCounterMoveにおいて、移動させる駒種も含めるか。
-// (これを含めると同じ移動をする別の駒をCounterMoveとしてみなさなくなり、ちょっと枝刈り性能が上がるはず)
-// #define KEEP_PIECE_IN_COUNTER_MOVE
-
 // 置換表のなかでevalを持たない
 // #define NO_EVAL_IN_TT
+
+// ONE_PLY == 1にするためのモード。これを指定していなければONE_PLY == 2
+// #define ONE_PLY_EQ_1
 
 // オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
 // #define USE_DROPBIT_IN_STATS
 
+// 指し手生成のときに上位16bitにto(移動後の升)に来る駒を格納する。
+// #define KEEP_PIECE_IN_GENERATE_MOVES
+
+// 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
+// #define USE_EVAL_HASH
+
+// sfenを256bitにpackする機能、unpackする機能を有効にする。
+// これをdefineするとPosition::packe_sfen(),unpack_sfen()が使えるようになる。
+// #define USE_SFEN_PACKER
+
+// 置換表のprobeに必ず失敗する設定
+// 自己生成棋譜からの学習でqsearch()のPVが欲しいときに
+// 置換表にhitして枝刈りされたときにPVが得られないの悔しいので
+// #define USE_FALSE_PROBE_IN_TT
+
+// 評価関数パラメーターを共有メモリを用いて他プロセスのものと共有する。
+// 少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
+// 評価関数をshared memoryを用いて他のプロセスと共有する機能。(対応しているのはいまのところKPPT評価関数のみ。かつWindows限定)
+// #define USE_SHARED_MEMORY_IN_EVAL
+
+// USIプロトコルでgameoverコマンドが送られてきたときに gameover_handler()を呼び出す。
+// #define USE_GAMEOVER_HANDLER
 
 // --------------------
 // release configurations
@@ -130,6 +177,7 @@
 #define EVAL_KPP
 #define USE_TT_PV
 #define KEEP_LAST_MOVE
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_NANO_PLUS_ENGINE
@@ -138,9 +186,10 @@
 #define EVAL_KPP
 #define USE_TT_PV
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_MINI_ENGINE
@@ -148,68 +197,88 @@
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
+#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_CLASSIC_ENGINE
 #define ENGINE_NAME "YaneuraOu classic"
-// 開発中なのでassertを有効に。
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
+#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_CLASSIC_TCE_ENGINE
 #define ENGINE_NAME "YaneuraOu classic-tce"
-//#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 #define EVAL_KPP
 #define USE_SEE
-#define USE_MOVE_PICKER
+#define USE_MOVE_PICKER_2015
 #define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
 #define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
 #endif
 
 #ifdef YANEURAOU_2016_MID_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Mid"
-// 開発中なのでassertを有効に。
-#define ASSERT_LV 3
-#define ENABLE_TEST_CMD
-#define EVAL_KPP
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
 #define USE_SEE
-#define USE_MOVE_PICKER
-#define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MOVE_PICKER_2016Q2
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
-#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+// デバッグ絡み
+//#define ASSERT_LV 3
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+//#define USE_SFEN_PACKER
+//#define EVAL_LEARN
+// 定跡生成絡み
+//#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+//#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
 #define ENGINE_NAME "YaneuraOu 2016 Late"
-// 開発中なのでassertを有効に。
-#define ASSERT_LV 3
-#define ENABLE_TEST_CMD
-#define EVAL_KPP
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
 #define USE_SEE
-#define USE_MOVE_PICKER
-#define LONG_EFFECT_LIBRARY
-#define MATE_1PLY
+#define USE_MOVE_PICKER_2016Q3
+#define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_COUNTER_MOVE
-#define USE_DROPBIT_IN_STATS
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+// デバッグ絡み
+//#define ASSERT_LV 3
+//#define USE_DEBUG_ASSERT
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+//#define USE_SFEN_PACKER
+//#define EVAL_LEARN
+// 定跡生成絡み
+//#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+//#define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+//#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
 #endif
 
 
@@ -247,7 +316,7 @@
 #define KEEP_LAST_MOVE
 #undef  MAX_PLY_NUM
 #define MAX_PLY_NUM 2000
-#define MATE_1PLY
+#define USE_MATE_1PLY
 #define EVAL_NO_USE
 #define LONG_EFFECT_LIBRARY
 #endif
@@ -271,6 +340,15 @@
 #include <memory>
 #include <map>
 #include <iostream>
+#include <fstream>
+#include <mutex>
+#include <thread>   // このあとMutexをtypedefするので
+#include <condition_variable>
+#include <cstring>  // std::memcpy()
+#include <cmath>    // log(),std::round()
+#include <climits>  // INT_MAX
+#include <ctime>    // std::ctime()
+#include <random>   // random_device
 
 // --------------------
 //   diable warnings
@@ -284,6 +362,17 @@
 // C4800 : 'unsigned int': ブール値を 'true' または 'false' に強制的に設定します
 // →　static_cast<bool>(...)において出る。
 #pragma warning(disable : 4800)
+
+// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
+#pragma warning(disable : 4996)
+#endif
+
+// C4102 : ラベルは 1 度も参照されません。
+#pragma warning(disable : 4102)
+
+
+// for GCC
+#if defined(__GNUC__)
 #endif
 
 // for Clang
@@ -292,8 +381,6 @@
 //#pragma clang diagnostic ignored "-Wparentheses"      // while (m = mp.next()) {.. } みたいな副作用についての警告
 //#pragma clang diagnostic ignored "-Wmicrosoft"        // 括弧のなかからの gotoでの警告
 
-// for GCC
-// かきかけ
 
 // --------------------
 //      configure
@@ -306,7 +393,7 @@
 #ifndef USE_DEBUG_ASSERT
 #define ASSERT(X) { if (!(X)) *(int*)1 =0; }
 #else
-#define ASSERT(X) { if (!(X)) std::cout << "\nError : ASSERT(" << #X << ")\n"; }
+#define ASSERT(X) { if (!(X)) { std::cout << "\nError : ASSERT(" << #X << ")\n"; *(int*)1 =0;} }
 #endif
 
 // ASSERT LVに応じたassert
@@ -321,7 +408,6 @@
 #define ASSERT_LV4(X) ASSERT_LV_EX(4, X)
 #define ASSERT_LV5(X) ASSERT_LV_EX(5, X)
 
-
 // --- declaration of unreachablity
 
 // switchにおいてdefaultに到達しないことを明示して高速化させる
@@ -335,9 +421,37 @@
 #define UNREACHABLE ASSERT_LV3(false);
 #endif
 
-// --------------------
-//      configure
-// --------------------
+// --- alignment tools
+
+// 構造体などのアライメントを揃えるための宣言子
+
+#if defined(_MSC_VER)
+#define ALIGNED(X) __declspec(align(X))
+#elif defined(__GNUC__)
+#define ALIGNED(X) __attribute__ ((aligned(X)))
+#else
+#define ALIGNED(X) 
+#endif
+
+// --- for linux
+
+#if !defined(_MSC_VER)
+// stricmpはlinux系では存在しないらしく、置き換える。
+#define _stricmp strcasecmp
+
+// あと、getline()したときにテキストファイルが'\r\n'だと
+// '\r'が末尾に残るのでこの'\r'を除去するためにwrapperを書く。
+// そのため、fstreamに対してgetline()を呼び出すときは、
+// std::getline()ではなく単にgetline()と書いて、この関数を使うべき。
+inline bool getline(std::fstream& fs, std::string& s)
+{
+	bool b = (bool)std::getline(fs, s);
+	if (s.size() && s[s.size() - 1] == '\r')
+		s.erase(s.size() - 1);
+	return b;
+}
+
+#endif
 
 // --- output for Japanese notation
 
@@ -359,42 +473,112 @@ const bool pretty_jp = false;
 #define HASH_KEY Key256
 #endif
 
+// --- Dropbit
 
-// --- 32-bit OS or 64-bit OS
+// USE_DROPBIT_IN_STATSがdefineされているときは、Moveの上位16bitに格納するPieceとして駒打ちは +32(PIECE_DROP)　にする。
+#ifdef USE_DROPBIT_IN_STATS
+#define PIECE_DROP 32
+#else
+#define PIECE_DROP 0
+#endif
+
+// ----------------------------
+//      CPU environment
+// ----------------------------
 
 // ターゲットが64bitOSかどうか
-#if defined(_WIN64) && defined(_MSC_VER)
+#if (defined(_WIN64) && defined(_MSC_VER)) || (defined(__GNUC__) && defined(__x86_64__))
 const bool Is64Bit = true;
+#define IS_64BIT
 #else
 const bool Is64Bit = false;
 #endif
 
-
-// --- Counter Move
-
-// KEEP_PIECE_IN_COUNTER_MOVEがdefineされていたなら、
-// 移動させた駒を上位16bitに格納しておく。
-// bit24...16 = 移動させた駒(Piece。後手の駒含む)
-// bit15... 0 = 本来のMove
-
-#ifdef KEEP_PIECE_IN_COUNTER_MOVE
-typedef uint32_t Move32;
-#define COUNTER_MOVE Move32
-// 指し手の上位に駒種(移動前の駒)を格納してMove32化する。
-#define make_move32(move) ((Move32)((move) + (pos.moved_piece_before(move) << 16)))
+#if defined(USE_AVX512)
+#define TARGET_CPU "AVX-512"
+#elif defined(USE_AVX2)
+#define TARGET_CPU "AVX2"
+#elif defined(USE_SSE42)
+#define TARGET_CPU "SSE4.2"
+#elif defined(USE_SSE41)
+#define TARGET_CPU "SSE4.1"
+#elif defined(USE_SSE2)
+#define TARGET_CPU "SSE2"
 #else
-#define COUNTER_MOVE Move 
+#define TARGET_CPU "noSSE"
 #endif
 
-// --- Long Effect Library
+// 上位のCPUをターゲットとするなら、その下位CPUの命令はすべて使えるはずなので…。
 
-// 1手詰め判定は、LONG_EFFECT_LIBRARYに依存している。
-#ifdef MATE_1PLY
-#define LONG_EFFECT_LIBRARY
+#ifdef USE_AVX512
+#define USE_AVX2
+#endif
+
+#ifdef USE_AVX2
+#define USE_SSE42
+#endif
+
+#ifdef USE_SSE42
+#define USE_SSE41
+#endif
+
+#ifdef USE_SSE41
+#define USE_SSE2
+#endif
+
+// ----------------------------
+//     mutex wrapper
+// ----------------------------
+
+// std::mutexをもっと速い実装に差し替えたい時のためにwrapしておく。
+typedef std::mutex Mutex;
+typedef std::condition_variable ConditionVariable;
+
+
+// ----------------------------
+//     mkdir wrapper
+// ----------------------------
+
+#if defined(_MSC_VER)
+
+// Windows用
+
+#include <codecvt>	// mkdirするのにwstringが欲しいのでこれが必要
+
+// フォルダを作成する。日本語は使っていないものとする。
+// カレントフォルダ相対で指定する。
+// 成功すれば0、失敗すれば非0が返る。
+inline int MKDIR(std::string dir_name)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+	return _wmkdir(cv.from_bytes(dir_name).c_str());
+}
+#elif defined(_LINUX)
+// linux環境において、この_LINUXというシンボルはmakefileにて定義されるものとする。
+
+// Linux用のmkdir実装。
+#include "sys/stat.h"
+
+inline int MKDIR(std::string dir_name)
+{
+	return ::mkdir(dir_name.c_str(), 0777);
+}
+
+#else
+
+// Linux環境かどうかを判定するためにはmakefileを分けないといけなくなってくるな..
+// linuxでフォルダ掘る機能は、とりあえずナシでいいや..。評価関数ファイルの保存にしか使ってないし…。
+inline int MKDIR(std::string dir_name)
+{
+	return 0;
+}
+
 #endif
 
 
-// --- evaluate function
+// ----------------------------
+//     evaluate function
+// ----------------------------
 
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
 #if defined(EVAL_MATERIAL)
@@ -405,13 +589,15 @@ typedef uint32_t Move32;
 #define EVAL_TYPE_NAME "KPP"
 #elif defined(EVAL_PPE)
 #define EVAL_TYPE_NAME "PPE"
+#elif defined(EVAL_KPPT)
+#define EVAL_TYPE_NAME "KPPT"
 #else
 #define EVAL_TYPE_NAME ""
 #endif
 
-// PP,KPP,PPEならdo_move()のときに移動した駒の管理をして差分計算
+// PP,KPP,KPPT,PPEならdo_move()のときに移動した駒の管理をして差分計算
 // また、それらの評価関数は駒割りの計算(EVAL_MATERIAL)に依存するので、それをdefineしてやる。
-#if defined(EVAL_PP) || defined(EVAL_KPP) || defined(EVAL_PPE)
+#if defined(EVAL_PP) || defined(EVAL_KPP) || defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST) || defined(EVAL_PPE)
 #define USE_EVAL_DIFF
 #endif
 

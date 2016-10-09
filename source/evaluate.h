@@ -3,6 +3,11 @@
 
 #include "shogi.h"
 
+// 手番込みの評価関数であれば手番を込みで値を計算するhelper classを使う。
+#if defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST)
+#include "eval/kppt_evalsum.h"
+#endif
+
 // --------------------
 //    評価関数
 // --------------------
@@ -21,12 +26,45 @@ namespace Eval {
   // 評価関数本体
   Value evaluate(const Position& pos);
 
+  // 評価関数本体
+  // このあとのdo_move()のあとのevaluate()で差分計算ができるように、
+  // 現在の前局面から差分計算ができるときだけ計算しておく。
+  // 評価値自体は返さない。
+  void evaluate_with_no_return(const Position& pos);
+
   // 駒割り以外の全計算して、その合計を返す。Position::set()で一度だけ呼び出される。
   // あるいは差分計算が不可能なときに呼び出される。
   Value compute_eval(const Position& pos);
 
+  // 評価関数パラメーターのチェックサムを返す。
+#if defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST)
+  s32 calc_check_sum();
+#else
+  inline s32 calc_check_sum(){ return 0; }
+#endif
+
   // 評価値の内訳表示(デバッグ用)
   void print_eval_stat(Position& pos);
+
+#if defined(EVAL_LEARN) && defined(EVAL_KPPT)
+  // 学習のための初期化(評価関数の読み込み時に行う。)
+  void eval_learn_init();
+
+  // 学習のときの勾配配列の初期化
+  void init_grad();
+
+  // 現在の局面で出現している特徴すべてに対して、勾配の差分値を勾配配列に加算する。
+  void add_grad(Position& pos , Color rootColor , double delt_grad);
+
+  // 現在の勾配をもとにSGDかAdaGradか何かする。
+  // epochは学習の反復回数が何回目であるか。
+  void update_weights(u64 mini_batch_size,u64 epoch);
+
+  // 評価関数パラメーターをファイルに保存する。
+  // ファイルの末尾につける拡張子を指定できる。
+  void save_eval(std::string suffix);
+
+#endif
 
 #ifdef EVAL_NO_USE
 
@@ -34,6 +72,8 @@ namespace Eval {
   enum { PawnValue = 86 };
 
 #else
+
+#if defined (EVAL_PP) || defined(EVAL_KPP)
   // Bona6の駒割りを初期値に。それぞれの駒の価値。
   enum {
     PawnValue = 86,
@@ -51,6 +91,26 @@ namespace Eval {
     DragonValue = 942,
     KingValue = 15000,
   };
+#elif defined (EVAL_KPPT) || defined (EVAL_KPPT_FAST)
+
+  // Aperyの駒割り
+  enum {
+    PawnValue = 90,
+    LanceValue = 315,
+    KnightValue = 405,
+    SilverValue = 495,
+    GoldValue = 540,
+    BishopValue = 855,
+    RookValue = 990,
+    ProPawnValue = 540,
+    ProLanceValue = 540,
+    ProKnightValue = 540,
+    ProSilverValue = 540,
+    HorseValue = 945,
+    DragonValue = 1395,
+    KingValue = 15000,
+  };
+#endif
 
   // 駒の価値のテーブル(後手の駒は負の値)
   extern int PieceValue[PIECE_NB];
@@ -58,23 +118,32 @@ namespace Eval {
   // 駒の交換値(＝捕獲したときの価値の上昇値)
   // 例)「と」を取ったとき、評価値の変動量は手駒歩+盤面の「と」。
   // MovePickerとSEEの計算で用いる。
-  extern int PieceValueCapture[PIECE_NB];
+  extern int CapturePieceValue[PIECE_NB];
 
   // 駒を成ったときの成る前との価値の差。SEEで用いる。
   // 駒の成ったものと成っていないものとの価値の差
+  // ※　PAWNでもPRO_PAWNでも　と金 - 歩 の価値が返る。
   extern int ProDiffPieceValue[PIECE_NB];
 
   // --- 評価関数で使う定数 KPP(玉と任意2駒)のPに相当するenum
 
   // BonanzaのようにKPPを求めるときに、39の地点の歩のように、
   // 升×駒種に対して一意な番号が必要となる。これをBonaPiece型と呼ぶことにする。
-  enum BonaPiece : int16_t
+#ifndef EVAL_KPPT_FAST
+  enum BonaPiece: int32_t
+#else
+  // KPPT_FASTでは、高速化のためにVPGATHERDDを用いる関係で4バイトのほうが好都合。
+  enum BonaPiece : int32_t
+#endif
   {
     // f = friend(≒先手)の意味。e = enemy(≒後手)の意味
 
     BONA_PIECE_ZERO = 0, // 無効な駒。駒落ちのときなどは、不要な駒をここに移動させる。
 
     // --- 手駒
+
+#if defined (EVAL_PP) || defined(EVAL_KPP)
+
     f_hand_pawn = BONA_PIECE_ZERO + 1,
     e_hand_pawn = f_hand_pawn + 18,
     f_hand_lance = e_hand_pawn + 18,
@@ -91,7 +160,29 @@ namespace Eval {
     e_hand_rook = f_hand_rook + 2,
     fe_hand_end = e_hand_rook + 2,
 
-    // Bonanzaのように番号を詰めない。
+#elif defined (EVAL_KPPT) || defined(EVAL_KPPT_FAST)
+    // Apery(WCSC26)方式。0枚目の駒があるので少し隙間がある。
+    // 定数自体は1枚目の駒のindexなので、KPPの時と同様の処理で問題ない。
+
+    f_hand_pawn = BONA_PIECE_ZERO + 1,//0//0+1
+    e_hand_pawn = 20,//f_hand_pawn + 19,//19+1
+    f_hand_lance = 39,//e_hand_pawn + 19,//38+1
+    e_hand_lance = 44,//f_hand_lance + 5,//43+1
+    f_hand_knight = 49,//e_hand_lance + 5,//48+1
+    e_hand_knight = 54,//f_hand_knight + 5,//53+1
+    f_hand_silver = 59,//e_hand_knight + 5,//58+1
+    e_hand_silver = 64,//f_hand_silver + 5,//63+1
+    f_hand_gold = 69,//e_hand_silver + 5,//68+1
+    e_hand_gold = 74,//f_hand_gold + 5,//73+1
+    f_hand_bishop = 79,//e_hand_gold + 5,//78+1
+    e_hand_bishop = 82,//f_hand_bishop + 3,//81+1
+    f_hand_rook = 85,//e_hand_bishop + 3,//84+1
+    e_hand_rook = 88,//f_hand_rook + 3,//87+1
+    fe_hand_end = 90,//e_hand_rook + 3,//90
+
+#endif                     
+
+    // Bonanzaのように盤上のありえない升の歩や香の番号を詰めない。
     // 理由1) 学習のときに相対PPで1段目に香がいるときがあって、それが逆変換において正しく表示するのが難しい。
     // 理由2) 縦型BitboardだとSquareからの変換に困る。
 
@@ -151,7 +242,17 @@ namespace Eval {
   struct EvalList {
 
     // 評価関数(FV38型)で用いる駒番号のリスト
-    inline ExtBonaPiece* piece_list() const { return const_cast<ExtBonaPiece*>(pieceList); }
+    inline BonaPiece* piece_list_fb() const { return const_cast<BonaPiece*>(pieceListFb); }
+    inline BonaPiece* piece_list_fw() const { return const_cast<BonaPiece*>(pieceListFw); }
+
+    // 指定されたpiece_noの駒をExtBonaPiece型に変換して返す。
+    ExtBonaPiece bona_piece(PieceNo piece_no) const
+    { 
+      ExtBonaPiece bp;
+      bp.fb = pieceListFb[piece_no];
+      bp.fw = pieceListFw[piece_no];
+      return bp;
+    }
 
     // 盤上のsqの升にpiece_noのpcの駒を配置する
     void put_piece(PieceNo piece_no, Square sq, Piece pc) {
@@ -170,7 +271,15 @@ namespace Eval {
     // 駒落ちに対応させる時のために、未使用の駒の値はBONA_PIECE_ZEROにしておく。
     // 通常の評価関数を駒落ちの評価関数として流用できる。
     // piece_no_listのほうはデバッグが捗るように-1で初期化。
-    void clear() { for (auto& p : pieceList) p.fb = p.fw = BONA_PIECE_ZERO; memset(piece_no_list, -1, sizeof(PieceNo)); }
+    void clear()
+    {
+      for (auto& p : pieceListFb)
+        p = BONA_PIECE_ZERO;
+      for (auto& p : pieceListFw)
+        p = BONA_PIECE_ZERO;
+      for (auto& v : piece_no_list)
+        v = PieceNo(-1);
+    }
 
   protected:
 
@@ -178,13 +287,14 @@ namespace Eval {
     inline void set_piece(PieceNo piece_no, BonaPiece fb, BonaPiece fw)
     {
       ASSERT_LV3(is_ok(piece_no));
-      pieceList[piece_no].fb = fb;
-      pieceList[piece_no].fw = fw;
+      pieceListFb[piece_no] = fb;
+      pieceListFw[piece_no] = fw;
       piece_no_list[fb] = piece_no;
     }
 
     // 駒リスト。駒番号(PieceNo)いくつの駒がどこにあるのか(BonaPiece)を示す。FV38などで用いる。
-    ExtBonaPiece pieceList[PIECE_NO_NB];
+    alignas(32) BonaPiece pieceListFb[PIECE_NO_NB];
+    alignas(32) BonaPiece pieceListFw[PIECE_NO_NB];
 
     // あるBonaPieceに対して、その駒番号(PieceNo)を保持している配列
     PieceNo piece_no_list[fe_end2];

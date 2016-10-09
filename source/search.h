@@ -6,6 +6,12 @@
 #include "position.h"
 #include "misc.h"
 
+#if defined(USE_MOVE_PICKER_2016Q2) || defined(USE_MOVE_PICKER_2016Q3)
+// CounterMoveStatsの前方宣言。
+template<typename T, bool CM> struct Stats;
+typedef Stats<Value, true> CounterMoveStats;
+#endif
+
 // 探索関係
 namespace Search {
 
@@ -22,10 +28,6 @@ namespace Search {
 
     // pv[0]には、このコンストラクタの引数で渡されたmを設定する。
     explicit RootMove(Move m) : pv(1,m) {}
-
-    // this->pvに読み筋(PV)が保存されているとして、
-    // これを置換表に保存する。
-    void insert_pv_in_tt(Position& pos);
 
     // ponderの指し手がないときにponderの指し手を置換表からひねり出す。pv[1]に格納する。
     // ponder_candidateが2手目の局面で合法手なら、それをpv[1]に格納する。
@@ -83,15 +85,23 @@ namespace Search {
     int max_game_ply;
 
     // depth    : 探索深さ固定(0以外を指定してあるなら)
-    // movetime : 思考時間固定(0以外が指定してあるなら) : 単位は[ms]
-    // mate     : 詰み専用探索(USIの'go mate'コマンドを使ったとき)
-    //  詰み探索モードのときは、ここに思考時間が指定されている。
-    //  この思考時間いっぱいまで考えて良い。
-    // infinite : 思考時間無制限かどうかのフラグ。非0なら無制限。
-    // ponder   : ponder中であるかのフラグ
-    //  これがtrueのときはbestmoveがあっても探索を停止せずに"ponderhit"か"stop"が送られてきてから停止する。
-    //  ※ ただし今回用の探索時間を超えていれば、stopOnPonderhitフラグをtrueにしてあるのでponderhitに対して即座に停止する。
-    int depth, movetime, mate, infinite, ponder;
+	int depth;
+
+	// movetime : 思考時間固定(0以外が指定してあるなら) : 単位は[ms]
+	int movetime;
+
+	// mate     : 詰み専用探索(USIの'go mate'コマンドを使ったとき)
+	//  詰み探索モードのときは、ここに思考時間が指定されている。
+	//  この思考時間いっぱいまで考えて良い。
+	int mate;
+
+	// infinite : 思考時間無制限かどうかのフラグ。非0なら無制限。
+	int infinite;
+
+	// ponder   : ponder中であるかのフラグ
+	//  これがtrueのときはbestmoveがあっても探索を停止せずに"ponderhit"か"stop"が送られてきてから停止する。
+	//  ※ ただし今回用の探索時間を超えていれば、stopOnPonderhitフラグをtrueにしてあるのでponderhitに対して即座に停止する。
+	int ponder;
 
     // "go rtime 100"とすると100～300msぐらい考える。
     int rtime;
@@ -136,10 +146,13 @@ namespace Search {
     int ply;                 // rootからの手数
     Move currentMove;        // そのスレッドの探索においてこの局面で現在選択されている指し手
     Move excludedMove;       // singular extension判定のときに置換表の指し手をそのnodeで除外して探索したいのでその除外する指し手
-    COUNTER_MOVE killers[2]; // killer move
+    Move killers[2];         // killer move
     Value staticEval;        // 評価関数を呼び出して得た値。NULL MOVEのときに親nodeでの評価値が欲しいので保存しておく。
     bool skipEarlyPruning;   // 指し手生成前に行なう枝刈りを省略するか。(NULL MOVEの直後など)
     int moveCount;           // このnodeでdo_move()した生成した何手目の指し手か。(1ならおそらく置換表の指し手だろう)
+#if defined (USE_MOVE_PICKER_2016Q2)||defined (USE_MOVE_PICKER_2016Q3)
+    CounterMoveStats* counterMoves; // MovePickerから使いたいのでここにCounterMoveStatsを格納することになった。
+#endif
   };
 
 } // end of namespace Search
