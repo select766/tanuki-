@@ -12,17 +12,16 @@ hakubishin (tanuki-sdt4 ver) is a shogi engine (AI player) based on YaneuraOu (h
 Please follow the steps below.
 
 1. Install WinBoard 4.8.0. The installation path is "C:\WinBoard-4.8.0".
-2. Download "apery_twig_sdt3.7z" from http://hiraokatakuya.github.io/apery/, and extract to "C:\WinBoard-4.8.0\apery_twig_sdt3".
-3. Download "tanuki-2016-09-10.7z" from https://github.com/nodchip/tanuki-/releases, and extract to "C:\WinBoard-4.8.0\apery_twig_sdt3\bin".
-4. Start "C:\WinBoard-4.8.0\WinBoard\winboard.exe".
-5. Check "Advanced options", and set -uxiAdapter {UCI2WB -%variant "%fcp" "%fd"). Please refer #8 (comment) about this step.
-6. Add "tanuki- WCSC26" with the following settings:
-      Engine (.exe or .jar): C:\WinBoard-4.8.0\apery_twig_sdt3\bin\tanuki-wcsc26-sse42-gcc-lazy-smp.exe
+2. Download "tanuki-sdt4-2016-10-09.7z" from https://github.com/nodchip/hakubishin-/releases, and extract to "C:\WinBoard-4.8.0\tanuki-sdt4-2016-10-09".
+3. Start "C:\WinBoard-4.8.0\WinBoard\winboard.exe".
+4. Check "Advanced options", and set -uxiAdapter {UCI2WB -%variant "%fcp" "%fd"). Please refer #8 (comment) about this step.
+5. Add "tanuki-sdt4" with the following settings:
+      Engine (.exe or .jar): C:\WinBoard-4.8.0\tanuki-sdt4-2016-10-09\tanuki-sdt4.exe
       command-line parameters: empty
       Special WinBoard options: empty
       directory: empty
       UCCI/USI [uses specified /uxiAdapter]: on
-7. Engine > Engine #1 Settings... > Set "Minimum_Thinking_Time" to "0".
+6. Engine > Engine #1 Settings... > Set "Minimum_Thinking_Time" to "0".
 
 The steps will be changed in future versions.
 
