@@ -255,7 +255,7 @@
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
-#define ENGINE_NAME "YaneuraOu 2016 Late"
+#define ENGINE_NAME "tanuki-sdt4"
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
 #define USE_SEE
