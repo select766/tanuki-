@@ -48,7 +48,7 @@ void Learner::ConvertRawKifu() {
     std::mt19937_64 mt(start.time_since_epoch().count() + thread_index);
 
     std::string sfen;
-    while (std::getline(ifs, sfen)) {
+    while (position_index < num_positions && std::getline(ifs, sfen)) {
       pos.set(sfen);
       //sync_cout << pos << sync_endl;
       pos.set_this_thread(&thread);
