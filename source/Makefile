@@ -46,6 +46,7 @@ SOURCES  = shogi.cpp                                                           \
 	extra/long_effect.cpp                                                      \
 	extra/mate1ply_with_effect.cpp                                             \
 	extra/mate1ply_without_effect.cpp                                          \
+	extra/mate_n_ply.cpp                                                       \
 	extra/move_picker_2016Q2.cpp                                               \
 	extra/move_picker_2016Q3.cpp                                               \
 	extra/test_cmd.cpp                                                         \
@@ -71,10 +72,10 @@ SOURCES  = shogi.cpp                                                           \
 	learn/multi_think.cpp				                                       \
 	learn/evaluate_kppt_learn.cpp   
 																               
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_2016_LATE_ENGINE)				               
-	SOURCES += engine/2016-late-engine/2016-late-search.cpp                    \
-				eval/evaluate_kppt_fast.cpp                                    
-endif
+#ifeq ($(YANEURAOU_EDITION),YANEURAOU_2016_LATE_ENGINE)				               
+#	SOURCES += engine/2016-late-engine/2016-late-search.cpp                    \
+#				eval/evaluate_kppt_fast.cpp                                    
+#endif
 
 OBJECTS  = $(addprefix $(OBJDIR)/, $(SOURCES:.cpp=.o))
 DEPENDS  = $(OBJECTS:.o=.d)

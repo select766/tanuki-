@@ -285,9 +285,6 @@
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp">
       <Filter>リソース ファイル\engine\help-mate-engine</Filter>
     </ClCompile>
-    <ClCompile Include="eval\evaluate_kppt_fast.cpp">
-      <Filter>リソース ファイル\eval</Filter>
-    </ClCompile>
     <ClCompile Include="experimental_learner.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
@@ -304,6 +301,9 @@
       <Filter>リソース ファイル\learn</Filter>
     </ClCompile>
     <ClCompile Include="extra\move_picker_2016Q3.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\mate_n_ply.cpp">
       <Filter>リソース ファイル\extra</Filter>
     </ClCompile>
   </ItemGroup>
@@ -412,10 +412,13 @@
     <None Include="..\script\calc_rating.py">
       <Filter>script</Filter>
     </None>
-    <None Include="..\script\engine_invoker.py">
+    <None Include="..\script\analyze_result_log.py">
       <Filter>script</Filter>
     </None>
-    <None Include="..\script\engine_invoker2.py">
+    <None Include="..\script\engine_invoker1.py">
+      <Filter>script</Filter>
+    </None>
+    <None Include="..\script\engine_invoker4.py">
       <Filter>script</Filter>
     </None>
   </ItemGroup>

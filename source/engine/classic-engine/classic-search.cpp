@@ -211,7 +211,7 @@ namespace YaneuraOuClassic
     // さらに、1手前で置換表の指し手が反駁されたときは、追加でペナルティを与える。
     // 1手前は置換表の指し手であるのでNULL MOVEではありえない。
     if ((ss - 1)->moveCount == 1
-      && !pos.captured_piece_type()
+      && !pos.captured_piece()
       && is_ok((ss - 2)->currentMove))
     {
       // 直前がcaptureではないから、2手前に動かした駒は捕獲されずに盤上にあるはずであり、
@@ -484,7 +484,7 @@ namespace YaneuraOuClassic
 
         // futilityBaseはこの局面のevalにmargin値を加算しているのだが、それがalphaを超えないし、
         // かつseeがプラスではない指し手なので悪い手だろうから枝刈りしてしまう。
-        if (futilityBase <= alpha && pos.see(move) <= VALUE_ZERO)
+        if (futilityBase <= alpha && !pos.see_ge(move, VALUE_ZERO + 1))
         {
           bestValue = std::max(bestValue, futilityBase);
           continue;
@@ -503,8 +503,8 @@ namespace YaneuraOuClassic
         && !pos.capture(move);
 
       if (  (!InCheck || evasionPrunable)
-          &&  !(move & MOVE_PROMOTE)
-          &&  pos.see_sign(move) < VALUE_ZERO)
+          && !(move & MOVE_PROMOTE)
+          && !pos.see_ge(move, VALUE_ZERO))
           continue;
 
       // -----------------------
@@ -956,7 +956,7 @@ namespace YaneuraOuClassic
 
       // このnodeの指し手としては置換表の指し手を返したあとは、直前の指し手で捕獲された駒による評価値の上昇を
       // 上回るようなcaptureの指し手のみを生成する。
-      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::CapturePieceValue[pos.captured_piece_type()]);
+      MovePicker mp(pos, ttMove, thisThread->history, (Value)Eval::CapturePieceValue[pos.captured_piece()]);
 
       while ((move = mp.next_move()) != MOVE_NONE)
         if (pos.legal(move))
@@ -1095,7 +1095,7 @@ namespace YaneuraOuClassic
       Depth extension = DEPTH_ZERO;
 
       // 王手となる指し手でSEE >= 0であれば残り探索深さに1手分だけ足す。
-      if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
+      if (givesCheck && pos.see_ge(move, VALUE_ZERO))
         extension = ONE_PLY;
 
       //
@@ -1202,7 +1202,7 @@ namespace YaneuraOuClassic
         }
 
         // 次の子nodeにおいて浅い深さになる場合、負のSSE値を持つ指し手の枝刈り
-        if (predictedDepth < 4 * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
+        if (predictedDepth < 4 * ONE_PLY && !pos.see_ge(move, VALUE_ZERO))
           continue;
       }
 
@@ -1399,7 +1399,7 @@ namespace YaneuraOuClassic
     else if (depth >= 3 * ONE_PLY
       && !bestMove                        // bestMoveが無い == fail low
       && !InCheck
-      && !pos.captured_piece_type()
+      && !pos.captured_piece()
       && is_ok((ss - 1)->currentMove)
       && is_ok((ss - 2)->currentMove))
     {

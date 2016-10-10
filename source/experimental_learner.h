@@ -3,10 +3,12 @@
 
 #include <sstream>
 
+#include "position.h"
+
 namespace Learner
 {
   struct Record {
-    uint8_t packed[32];
+    PackedSfen packed;
     int16_t value;
   };
 

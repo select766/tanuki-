@@ -2,6 +2,257 @@
 やねうら王 更新履歴
 
 
+■　2016/10/07 V3.94
+
+・Position::see_ge()、g++で警告出てていたの修正。
+・その他、g++で警告出ていたもの一通り修正。
+
+
+■　2016/10/06 V3.93
+
+・Stockfish : Do not use SEE in evasion scoring 
+・Stockfish : Replace Position::see and Position::see_sign by Position::see_ge 
+・USE_SIMPLE_SEE削除。
+・2016 Late用のデフォルトパラメーター(Stockfishと同じもの)を公開。
+・上の修正にともなって、Score<Evasion>、LVAするの忘れていたの修正。
+・score<EVASION>、capture_or_promotionで分岐するように変更。→　revert
+
+
+■　2016/10/05 V3.92
+
+・MovePickerのupdate、abs()の括弧の位置がおかしかったの修正。(thanks > merom686さん)
+・offsetof()を使うときはstddef.hをincludeするように修正。(thanks > Qhapaqさん)
+
+
+■　2016/10/04 V3.91
+
+・Stockfish : Allow inCheck pruning
+・makebook mergeコマンドで、different nodeのカウントをしていないところがあったので修正。
+
+
+■　2016/10/04 V3.90
+
+・教師局面生成時および定跡生成時に、置換表世代を定期的にインクリメントする処理追加。
+・test bookcheckコマンド追加。
+・makebook thinkコマンド、与えた定跡ファイルが、moves以下までしかないときに正しく局面を
+　思考対象としていなかったのを修正。
+・makebook thinkコマンド、複数台での分散生成に対応。
+
+
+■　2016/10/02 V3.89
+
+・learnコマンド、targetdirを指定したときに読み込むファイルpathがおかしかったの修正。
+・learn.cpp、PackedSfenまわりリファクタリング。
+・learnコマンド、OpenMP無効なら警告を出すように変更。
+・learnコマンドのsave()で、OpenMP無効時も勾配の更新をしないように変更。
+・evalmergeコマンドの追加。
+・2016 Lateでmakebookコマンドが無効になっていたの修正。
+
+
+■　2016/10/01 V3.88
+
+・KPPTのAVX2化。(thanks! > tanuki-さん)
+・GENSFEN_SAVE_FIRST_MOVE追加。PVの初手も保存するように変更。
+・gensfenコマンドで教師局面を生成するとき、PV leafのevaluate()の値を保存するように変更。
+・教師局面からの学習 : 教師のPVの初手と異なる場合、それを学習対象としないように変更。
+・learnコマンドのoptionのdir→basedirに変更。
+・learnコマンドのoptionにtargetdir追加。
+・教師局面からの学習 : search_depthよりPVが短い場合(置換表にhitするなどした場合)、その局面は出力しないように変更。
+
+
+■　2016/10/01 V3.87
+
+・N手詰め、まだバグっていたのでまたまた修正。(thanks! > tttakさん)
+
+
+■　2016/09/29 V3.86
+
+・N手詰め、まだバグっていたので修正。(thanks! > tttakさん)
+
+
+■　2016/09/29 V3.85
+
+・Stockfishのコード、razor_margin[3]を下回るときに静止探索を呼び出しているが、razor_margin[ZERO_DEPTH]
+　を下回るときでないとrazoringとしておかしい。これはStockfishのバグだろう。修正した。
+・Stockfish公式のほうも同じ修正が入った。
+→　Stockfish : Remove useless razoring condition
+
+
+■　2016/09/29 V3.84
+
+・mate_n_ply()でlegal()の判定忘れていたの修正。
+・pythonの自己対戦スクリプト、保守できないので1と4だけ残す。
+
+
+■　2016/09/29 V3.83
+
+・2016 Late、razoring marginパラメーターで変更できてなかった。修正。
+・2016 Late、razoring margin、関数を通さず、テーブルを直接参照するように変更した。
+・USI拡張コマンド.txtでbenchコマンドの説明が間違っていたの修正。
+
+
+■　2016/09/29 V3.82
+
+・N手詰め、バグっていたの修正。(thanks! > tttakさん)
+・position.hのcheck_info_update()を呼び出す必要があるという注意書き、削除。
+
+■　2016/09/28 V3.81
+
+・2016 LateのRANDOM_PARAMETER、値を3択ではなく、intervalの範囲で複数の値が試行できるように変更。
+・Makefileのソースのところに extra/mate_n_ply.cpp 追加してなかったので追加。
+・PARAM_SINGULAR_MARGINのスケール16倍に変更。
+
+
+■　2016/09/27 V3.80
+
+・3手詰めやめて、N手詰めに拡張。
+・2016 Late、weak_mate_n_ply()を使うかどうかをパラメーター化
+・PARAM_WEAK_MATE_PLY追加。
+・2016 Late、以下のパラメーター追加。
+	"PARAM_REDUCTION_ALPHA",
+	"PARAM_FUTILITY_MOVE_COUNT_ALPHA0","PARAM_FUTILITY_MOVE_COUNT_ALPHA1",
+	"PARAM_FUTILITY_MOVE_COUNT_BETA0","PARAM_FUTILITY_MOVE_COUNT_BETA1",
+
+
+■　2016/09/27 V3.79
+
+・2016 Late、LMRのreductionテーブルの初期化タイミングの変更。
+・reduction_table、FutilityMoveCountsをパラメーター化の準備。
+・mate3()実装。
+・MovePickerの書き換えでclassic-tceまでがコンパイル通らなくなっていたの修正。
+
+
+■　2016/09/26 V3.78
+
+・PARAM_SINGULAR_SEARCH_DEPTHをPARAM_SINGULAR_SEARCH_DEPTH_ALPHAにリネーム。
+・PARAM_PRUNING_BY_MOVE_COUNT_DEPTHの値が反映していなかったの修正。
+・&PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH0削除。
+・parent nodeでの負のsee()を持つときの枝刈りに関する旧コード、削除。
+・2016 LateにENABLE_OUTPUT_GAME_RESULT追加。
+・2016 Lateからdynamic marginに関するコード削除
+
+
+■　2016/09/26 V3.77
+
+・2016 LateにPARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH3追加。
+・PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1,2を追加。
+・PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH1→PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH0に名前変更。以下、1,2も同様。
+・pythonの自己対戦スクリプト、定跡のランダムシャッフルするオプションを追加。
+・PARAM_NULL_MOVE_MARGIN追加。
+・PARAM_SINGULAR_SEARCH_DEPTHの初期値がおかしかったの修正。
+
+
+■　2016/09/25 V3.76
+
+・PARAMで"fixed"と書かれているものは無いものとして扱うように変更。→　バグっていたので修正。
+・2016 late、古いほうのreduction tableの初期化コード、削除。
+・2016 late、mate1の呼び出しもパラメーター化する。USE_MATE_1PLY_IN_SEARCH、USE_MATE_1PLY_IN_QSEARCH削除。
+・USE_RANDOM_PARAMETERSのとき、2択のパラメーターの採択確率に偏りがあったのを修正。
+
+
+■　2016/09/25 V3.75
+
+・singularのPARAM、2を掛けていたの修正。
+・PARAMで"fixed"と書かれているものは無いものとして扱うように変更。
+・Stockfish : Rename shift_bb() to shift()
+・Bitboard::shift()追加。
+・movegen.cpp、mate1ply()など、Bitboard::shift()を用いるように変更
+
+
+■　2016/09/25 V3.74
+
+・2016 MidのMovePicker、QUIETS→SEARCH_QUIETSに置換もれがあったの修正。
+・PARAM_FUTILITY_AT_PARENT_NODE_GAMMAの順番変更。
+・PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTHまわり変更。
+・PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH2を用意。
+・Stockfish : Allowing singular extension in mate positions
+
+
+■　2016/09/24 V3.73
+
+・analyze_result_log.py、win、drawやloseが0の場合に対応。
+　→　まだなおってなかった。修正した。
+・2016-mid-param.hの冒頭のifdefのシンボル、変更。
+
+
+■　2016/09/24 V3.72
+
+・2016 Late用のパラメーターファイル名変更。
+・2016 LateにUSE_RANDOM_PARAMETERS機能追加。
+・2016 Lateのほう、パラメーターファイル、MASTERとSLAVEに分けるのやめる。
+・pythonの対戦スクリプトにPARAMETERS_LOG_FILE_PATHの追加。
+・pythonの対戦スクリプト、gameoverコマンド正しく返すように修正。
+・ランダムパラメーターのログファイルを分析するpythonのスクリプト追加。
+・lateのパラメーターファイルは非公開に変更して、残りはGitHubに公開。
+	// やねうら王ライブラリを用いる電王トーナメント参加者様へ。
+	// Lateは書きかけなので使わないほうが無難です。(ただし使用を禁止するわけではないです)
+
+
+■　2016/09/24 V3.71
+
+・Stockfish : Fix pin-aware SEE
+・Stockfish : Simplify pinners conditions in SEE()
+
+
+■　2016/09/21～2016/09/22 V3.70
+
+・ADAMの学習率0.5に変更。更新式、doubleの精度で計算するように変更。
+・LOSS_FUNCTIONにCROSS_ENTOROPY_FOR_VALUE追加。
+・AdaGradの学習率調整。
+
+
+■　2016/09/18～2016/09/20 V3.69
+
+・自己対戦用のpythonスクリプトV3を用意。エンジンそれぞれに対して異なる持ち時間設定で対局できるようにした。
+・Stockfish : Fix a warning with MSVC
+・Stockfish : Fix indentation in struct FromToStats
+・教師局面の生成、USE_RANDOM_LEGAL_MOVE追加。(こちらをdefaultに変更する。)
+・教師局面の生成、最大手数を512に変更。
+・MultiThinkGenSfen::thread_workerでconst intのMAX_PLYがglobalのMAX_PLYと被っていたの修正。
+・USE_DEBUG_ASSERT有効のときに、エラーメッセージ出力後、停止するように変更。
+・教師局面からの学習で、クロスバリデーションのために保存している局面は2周目でも学習には使用しないように変更。
+・教師局面からの学習、weight_updateをOpen MPで並列化した。(Open MPを有効にしてコンパイルすること)
+・教師局面からの学習に、やねんざメソッド実装。
+・解説.txtにOpenMPのことを追記。
+・教師局面からの学習のときに、kppのmin,max,sumを出力する機能を追加。
+・教師局面からの学習、局面をメモリ上のバッファから読み込んだ時点で局面数をカウントしていたの修正。
+・教師局面からの学習設定としてUSE_KPP_MIRROR_WRITE追加。デフォルトではこれをオフに。
+
+
+■　2016/09/17 V3.68
+
+・Stockfish : Renaming in MovePicker
+・Stockfish : Pinned aware SEE
+・Positionクラスにattackers_to(to,occ)追加。
+・Position::see()、リファクタリング。
+・SIMPLE_SEEでないほうのコード、削除。スッキリ。
+・min_attackerで角・飛車に馬、龍が混じっていたの修正。
+・move_picker_2016Q3.hのMovePicker::pick_the_best()を.cpp側に移動。
+・Position::pawn_promotion()追加。
+・Stockfish : Use per-thread counterMoveHistory
+	→　コア数が多いと効果があるが、コア数が少ないか持ち時間が少ないとマイナスの効果があるようだ。
+・CSAルール改正に伴い、MinumumThinkingTimeのデフォルト値を2000から1000に変更。
+・自己対戦用のpythonスクリプト、score cp XXX のところに数字以外が送られてくるエンジン向けに修正。
+
+
+■　2016/09/16 V3.67
+
+・GEN_SFENのときでも、探索部で連続王手の千日手は有効にしておく。
+・Stockfish : Change from [Color][PieceType] to [Piece]
+・Stockfish : Prune dangerous moves at low depth
+・Stockfish : Integrate next_stage() logic into next_move()
+・move_piceker_2016Q3.cpp、変数名をStockfishに合わせた。
+・調整パラメーターにPARAM_FUTILITY_AT_PARENT_NODE_GAMMA追加。
+・GEN_MOVE_TYPEにQUIETSをaliasとして追加。
+・指し手生成で回避手、王手の指し手生成のときにcapture_or_pawn_promotion()の判定要らなかった。修正。
+
+
+■　2016/09/05 V3.66
+
+・movegenで歩成りの王手生成時の上位8bitに格納する駒が間違っていたバグ修正。(ysさん、thanks!)
+・learn.cppでsize_tを使っていたところ、一部u64に変更。
+
+
 ■　2016/09/03 V3.65
 
 ・nanoがビルド通らなかったの修正。

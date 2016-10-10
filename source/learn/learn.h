@@ -1,22 +1,16 @@
 ﻿#ifndef _LEARN_H_
 #define _LEARN_H_
 
-//
-//    学習時の各種設定
-//
-
-// ----------------------
-//     configure
-// ----------------------
+// =====================
+//  学習時の設定
+// =====================
 
 // 以下のいずれかを選択すれば、そのあとの細々したものは自動的に選択される。
 // 以下のいずれも選択しない場合は、そのあとの細々したものをひとつひとつ設定する必要がある。
 
-
 // デフォルトの学習設定
 
 #define LEARN_DEFAULT
-
 
 // やねうら王2016Late用デフォルトの学習設定。
 //
@@ -27,11 +21,18 @@
 //#define LEARN_YANEURAOU_2016_LATE
 //#define EVAL_SAVE_ONLY_ONCE
 
-
+// =====================
 // 教師局面生成時の設定
+// =====================
 
 // 教師局面生成時に千日手・優等・劣等局面の判定をなくすなら、LEARN_GENSFENをdefineすること。
-//#define LEARN_GENSFEN
+// (やねうら王2016Lateでサポート)
+//#define GENSFEN_USE_NO_REPETITION
+// →　意味ないようなので将来的に削除するかも。
+
+// 教師局面の生成時にPVの初手も保存するならこれをdefineすること。
+// 2016年9月までに公開したした教師データを用いる場合、これをdefineしてはならない。
+#define GENSFEN_SAVE_FIRST_MOVE
 
 
 // ----------------------
@@ -71,6 +72,13 @@
 //#define USE_ADAM_UPDATE
 
 
+// 6) やねんざメソッドによるupdate
+// これは、勾配の符号だけを見てweightを調整する。ただし出現回数があまりにも低い特徴に関しては無視する。
+
+// #define USE_YANENZA_UPDATE
+
+
+
 // ----------------------
 //    学習時の設定
 // ----------------------
@@ -88,6 +96,12 @@
 
 #define LEARN_READ_SFEN_SIZE (1000 * 1000 * 5)
 
+// KPPの評価値、ミラーを考慮するか(ミラーの位置にある評価値を同じ値にする)
+// #define USE_KPP_MIRROR_WRITE
+
+// KKPの評価値、フリップを考慮するか(盤面を180度回転させた位置にある評価値を同じ値にする)
+// #define USE_KKP_FLIP_WRITE
+
 // ----------------------
 //    目的関数の選択
 // ----------------------
@@ -101,6 +115,9 @@
 // 詳しい説明は、learner.cppを見ること。
 
 //#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+
+// 目的関数が交差エントロピーだが、勝率の関数を通さない版
+// #define LOSS_FUNCTION_IS_CROSS_ENTOROPY_FOR_VALUE
 
 
 // ※　他、色々追加するかも。
@@ -163,6 +180,7 @@
 // ----------------------
 
 // kkpの一番大きな値を表示させることで学習が進んでいるかのチェックに用いる。
+// これを使うとOpen MPと相性が悪くて、update_weights()が非常に遅くなる。
 //#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
 
 // 学習時にsfenファイルを1万局面読み込むごとに'.'を出力する。
@@ -170,8 +188,7 @@
 
 // 学習時のrmseとタイムスタンプの出力をこの回数に1回に減らす
 #define LEARN_RMSE_OUTPUT_INTERVAL 1
-#define LEARN_TIMESTAMP_OUTPUT_INTERVAL 3
-
+#define LEARN_TIMESTAMP_OUTPUT_INTERVAL 10
 
 // ----------------------
 //  学習のときの浮動小数
@@ -203,7 +220,11 @@ typedef float LearnFloatType;
 // 用いる定跡は、Options["BookFile"]が反映される。
 
 // 2駒の入れ替えを5手に1回ぐらいの確率で行なう。
-#define USE_SWAPPING_PIECES
+// #define USE_SWAPPING_PIECES
+
+// ときどき合法手のなかからランダムに1手選ぶ。(Apery方式)
+#define USE_RANDOM_LEGAL_MOVE
+
 
 // タイムスタンプの出力をこの回数に一回に抑制する。
 // スレッドを論理コアの最大数まで酷使するとコンソールが詰まるので…。
@@ -215,6 +236,7 @@ typedef float LearnFloatType;
 
 #ifdef LEARN_DEFAULT
 #define USE_SGD_UPDATE
+#define USE_KPP_MIRROR_WRITE
 #undef LEARN_MINI_BATCH_SIZE
 #define LEARN_MINI_BATCH_SIZE (1000 * 1000 * 1)
 #define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
@@ -228,14 +250,25 @@ typedef float LearnFloatType;
 //#define USE_YANE_SGD_UPDATE
 //#define USE_YANE_GRAD_UPDATE
 //#define USE_ADAM_UPDATE
-#undef LEARN_MINI_BATCH_SIZE
-#define LEARN_MINI_BATCH_SIZE (1000 * 1000 * 1)
-//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+//#define USE_ADA_GRAD_UPDATE
+//#define USE_YANENZA_UPDATE
+
 #define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
+//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+//define LOSS_FUNCTION_IS_CROSS_ENTOROPY_FOR_VALUE
+
+#undef LEARN_MINI_BATCH_SIZE
+#define LEARN_MINI_BATCH_SIZE (1000 * 100)
 #define USE_QSEARCH_FOR_SHALLOW_VALUE
 #define DISABLE_TT_PROBE
 #undef EVAL_FILE_NAME_CHANGE_INTERVAL
 #define EVAL_FILE_NAME_CHANGE_INTERVAL 1000000000
+
+#undef LEARN_RMSE_OUTPUT_INTERVAL
+#define LEARN_RMSE_OUTPUT_INTERVAL 10
+//#define LEARN_RMSE_OUTPUT_INTERVAL 1
+//#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
+
 #endif
 
 // ----------------------
@@ -253,12 +286,16 @@ typedef float LearnFloatType;
 #define LEARN_UPDATE "YaneGrad"
 #elif defined(USE_ADAM_UPDATE)
 #define LEARN_UPDATE "Adam"
+#elif defined(USE_YANENZA_UPDATE)
+#define LEARN_UPDATE "Yanenza"
 #endif
 
 #if defined(LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
 #define LOSS_FUNCTION "WINNING_PERCENTAGE"
 #elif defined(LOSS_FUNCTION_IS_CROSS_ENTOROPY)
 #define LOSS_FUNCTION "CROSS_ENTOROPY"
+#elif defined(LOSS_FUNCTION_IS_CROSS_ENTOROPY_FOR_VALUE)
+#define LOSS_FUNCTION "CROSS_ENTOROPY_FOR_VALUE"
 #endif
 
 #endif // ifndef _LEARN_H_

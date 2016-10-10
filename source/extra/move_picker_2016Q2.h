@@ -82,13 +82,10 @@ struct Stats {
     ASSERT_LV4(is_ok(to));
 
     // abs(v) <= 324に制限する。
+	// → returnするのが良いかどうかはわからない。
 
-    //v = max((Value)-324, v);
-    //v = min((Value)+324, v);
-
-    // ToDo : ↑と↓と、どちらが良いのか..
-    if (abs(int(v) >= 324))
-      return ;
+	if (abs(int(v)) >= 324)
+		return;
 
     table[to][pc] -= table[to][pc] * abs(int(v)) / (CM ? 936 : 324);
     table[to][pc] += int(v) * 32;
