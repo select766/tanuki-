@@ -72,7 +72,7 @@ void Learner::ConvertRawKifu() {
       record.value = value;
       writer.Write(record);
       int local_position_index = position_index++;
-      ShowProgress(start, local_position_index, num_positions, 10000);
+      ShowProgress(start, local_position_index, num_positions, 1000000);
     }
   }
 }
