@@ -169,6 +169,9 @@
     <ClInclude Include="extra\move_picker_2016Q3.h">
       <Filter>リソース ファイル\extra</Filter>
     </ClInclude>
+    <ClInclude Include="raw_kifu_converter.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -305,6 +308,9 @@
     </ClCompile>
     <ClCompile Include="extra\mate_n_ply.cpp">
       <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="raw_kifu_converter.cpp">
+      <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -20,7 +20,14 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_CONVERTER_NUM_POSITIONS = "ConverterNumPositions";
+  constexpr char* OPTION_CONVERTER_RAW_KIFU_FILE_PATH_FORMAT = "ConverterRawKifuFilePathFormat";
+  constexpr char* OPTION_CONVERTER_MIN_SEARCH_DEPTH = "ConverterMinSearchDepth";
+  constexpr char* OPTION_CONVERTER_MAX_SEARCH_DEPTH = "ConverterMaxSearchDepth";
+  constexpr char* OPTION_CONVERTER_KIFU_TAG = "ConverterKifuTag";
 
+  void ShowProgress(const std::chrono::time_point<std::chrono::system_clock>& start,
+    int64_t current_data, int64_t total_data, int64_t show_per);
   void Learn(std::istringstream& iss);
   void MeasureError();
   void BenchmarkKifuReader();

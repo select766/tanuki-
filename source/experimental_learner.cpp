@@ -333,6 +333,31 @@ namespace
   }
 }
 
+void Learner::ShowProgress(const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data, int64_t total_data, int64_t show_per) {
+  if (!current_data || current_data % show_per) {
+    return;
+  }
+  auto current = std::chrono::system_clock::now();
+  auto elapsed = current - start;
+  double elapsed_sec =
+    static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+  int remaining_sec = static_cast<int>(elapsed_sec / current_data * (total_data - current_data));
+  int h = remaining_sec / 3600;
+  int m = remaining_sec / 60 % 60;
+  int s = remaining_sec % 60;
+
+  time_t     current_time;
+  struct tm  *local_time;
+
+  time(&current_time);
+  local_time = localtime(&current_time);
+  std::printf("%lld / %lld (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+    current_data, total_data,
+    local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
+    local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+  std::fflush(stdout);
+}
+
 void Learner::Learn(std::istringstream& iss) {
   sync_cout << "Learner::Learn()" << sync_endl;
 

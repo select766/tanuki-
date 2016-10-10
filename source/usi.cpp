@@ -1,10 +1,11 @@
 ﻿#include <sstream>
 #include <queue>
 
-#include "kifu_generator.h"
 #include "experimental_learner.h"
+#include "kifu_generator.h"
 #include "misc.h"
 #include "position.h"
+#include "raw_kifu_converter.h"
 #include "search.h"
 #include "shogi.h"
 #include "thread.h"
@@ -290,7 +291,13 @@ namespace USI
     o[Learner::OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
     o[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(16, 1, MAX_PLY);
     o[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
-    o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
+    o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("10000000000");
+    o[Learner::OPTION_CONVERTER_NUM_POSITIONS] << Option("10000000000");
+    o[Learner::OPTION_CONVERTER_RAW_KIFU_FILE_PATH_FORMAT] << Option("raw_kifu/raw_kifu.%02d.sfen");
+    o[Learner::OPTION_CONVERTER_MIN_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
+    o[Learner::OPTION_CONVERTER_MAX_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
+    o[Learner::OPTION_CONVERTER_KIFU_TAG] << Option("default_tag");
+
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 	}
@@ -746,7 +753,11 @@ void USI::loop(int argc, char* argv[])
       Learner::BenchmarkKifuReader();
       break;
     }
-		else
+    else if (token == "convert_raw_kifu" || token == "c") {
+      Learner::ConvertRawKifu();
+      break;
+    }
+    else
 		{
 			//    簡略表現として、
 			//> threads 1
