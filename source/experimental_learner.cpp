@@ -333,7 +333,9 @@ namespace
   }
 }
 
-void Learner::ShowProgress(const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data, int64_t total_data, int64_t show_per) {
+void Learner::ShowProgress(
+  const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
+  int64_t total_data, int64_t show_per) {
   if (!current_data || current_data % show_per) {
     return;
   }
@@ -481,30 +483,10 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
-    // 残り時間表示
-    if (num_processed_positions && num_processed_positions % (kMiniBatchSize * 10) == 0) {
-      auto current = std::chrono::system_clock::now();
-      auto elapsed = current - start;
-      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (max_positions_for_learning - num_processed_positions));
-      int h = remaining_sec / 3600;
-      int m = remaining_sec / 60 % 60;
-      int s = remaining_sec % 60;
-
-      time_t     current_time;
-      struct tm  *local_time;
-
-      time(&current_time);
-      local_time = localtime(&current_time);
-      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-        num_processed_positions, max_positions_for_learning,
-        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-      std::fflush(stdout);
-    }
+    ShowProgress(start, num_processed_positions, max_positions_for_learning, kMiniBatchSize * 10);
 
     int num_records = static_cast<int>(std::min(
-        max_positions_for_learning - num_processed_positions, kMiniBatchSize));
+      max_positions_for_learning - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
@@ -527,57 +509,57 @@ void Learner::Learn(std::istringstream& iss) {
         Value value;
         Color rootColor;
         pos.set_this_thread(&thread);
-		if (!search_shallowly(pos, value, rootColor)) {
-			continue;
-		}
+        if (!search_shallowly(pos, value, rootColor)) {
+          continue;
+        }
 
-		WeightType delta = CalculateGradient(record_value, value);
-		// 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
-		WeightType delta_color = (rootColor == BLACK ? delta : -delta);
-		// 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
-		WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
+        WeightType delta = CalculateGradient(record_value, value);
+        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+        WeightType delta_color = (rootColor == BLACK ? delta : -delta);
+        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+        WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
 
-		// 値を更新する
-		Square sq_bk = pos.king_square(BLACK);
-		Square sq_wk = pos.king_square(WHITE);
-		const auto& list0 = pos.eval_list()->piece_list_fb();
-		const auto& list1 = pos.eval_list()->piece_list_fw();
+        // 値を更新する
+        Square sq_bk = pos.king_square(BLACK);
+        Square sq_wk = pos.king_square(WHITE);
+        const auto& list0 = pos.eval_list()->piece_list_fb();
+        const auto& list1 = pos.eval_list()->piece_list_fw();
 
-		// 勾配の値を加算する
+        // 勾配の値を加算する
 
-		// KK
-		weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-		weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+        // KK
+        weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+        weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-		for (int i = 0; i < PIECE_NO_KING; ++i) {
-			Eval::BonaPiece k0 = list0[i];
-			Eval::BonaPiece k1 = list1[i];
-			for (int j = 0; j < i; ++j) {
-				Eval::BonaPiece l0 = list0[j];
-				Eval::BonaPiece l1 = list1[j];
+        for (int i = 0; i < PIECE_NO_KING; ++i) {
+          Eval::BonaPiece k0 = list0[i];
+          Eval::BonaPiece k1 = list1[i];
+          for (int j = 0; j < i; ++j) {
+            Eval::BonaPiece l0 = list0[j];
+            Eval::BonaPiece l1 = list1[j];
 
-				// 常にp0 < p1となるようにアクセスする
+            // 常にp0 < p1となるようにアクセスする
 
-				// KPP
-				Eval::BonaPiece p0b = std::min(k0, l0);
-				Eval::BonaPiece p1b = std::max(k0, l0);
-				weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-				weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+            // KPP
+            Eval::BonaPiece p0b = std::min(k0, l0);
+            Eval::BonaPiece p1b = std::max(k0, l0);
+            weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+            weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-				// KPP
-				Eval::BonaPiece p0w = std::min(k1, l1);
-				Eval::BonaPiece p1w = std::max(k1, l1);
-				weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
-				weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
-			}
+            // KPP
+            Eval::BonaPiece p0w = std::min(k1, l1);
+            Eval::BonaPiece p1w = std::max(k1, l1);
+            weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
+            weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+          }
 
-			// KKP
-			weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-			weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
-		}
+          // KKP
+          weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+          weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+        }
 
-		// 局面は元に戻さなくても問題ない
-	  }
+        // 局面は元に戻さなくても問題ない
+      }
 
       // 重みを更新する
       double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
@@ -747,32 +729,12 @@ void Learner::MeasureError() {
   double sum_squared_error_of_winning_percentage = 0.0;
   double sum_cross_entropy = 0.0;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
-    // 残り時間表示
-    if (num_processed_positions) {
-      auto current = std::chrono::system_clock::now();
-      auto elapsed = current - start;
-      double elapsed_sec = static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions * (kMaxPositionsForErrorMeasurement - num_processed_positions));
-      int h = remaining_sec / 3600;
-      int m = remaining_sec / 60 % 60;
-      int s = remaining_sec % 60;
-
-      time_t     current_time;
-      struct tm  *local_time;
-
-      time(&current_time);
-      local_time = localtime(&current_time);
-      std::printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-        num_processed_positions, kMaxPositionsForErrorMeasurement,
-        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-      std::fflush(stdout);
-    }
+    ShowProgress(start, num_processed_positions, kMaxPositionsForErrorMeasurement, kMiniBatchSize);
 
     int64_t max_positions_for_learning;
     std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
     int num_records = static_cast<int>(std::min(
-        max_positions_for_learning - num_processed_positions, kMiniBatchSize));
+      max_positions_for_learning - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
@@ -831,28 +793,7 @@ void Learner::BenchmarkKifuReader() {
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
-    // 残り時間表示
-    if (num_processed_positions && num_processed_positions % 100'0000LL == 0) {
-      auto current = std::chrono::system_clock::now();
-      auto elapsed = current - start;
-      double elapsed_sec = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-      int remaining_sec = static_cast<int>(elapsed_sec / num_processed_positions *
-        (kMaxPositionsForBenchmark - num_processed_positions));
-      int h = remaining_sec / 3600;
-      int m = remaining_sec / 60 % 60;
-      int s = remaining_sec % 60;
-
-      time_t     current_time;
-      struct tm  *local_time;
-
-      time(&current_time);
-      local_time = localtime(&current_time);
-      printf("%I64d / %I64d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-        num_processed_positions, kMaxPositionsForBenchmark,
-        local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-        local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-    }
+    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
