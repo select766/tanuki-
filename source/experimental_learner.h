@@ -21,6 +21,9 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
 
+  void ShowProgress(
+    const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
+    int64_t total_data, int64_t show_per);
   void Learn(std::istringstream& iss);
   void MeasureError();
   void BenchmarkKifuReader();
