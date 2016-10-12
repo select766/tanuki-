@@ -11,12 +11,6 @@
 #include "search.h"
 #include "thread.h"
 
-// Gradient Noise
-#define GRADIENT_NOISE
-
-// 平均化確率的勾配降下法
-//#define AVERAGING
-
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -58,10 +52,6 @@ namespace
     // Adam用変数
     WeightType m;
     WeightType v;
-#ifdef AVERAGING
-    // 平均化確率的勾配降下法用変数
-    WeightType sum_w;
-#endif
 
     void AddGradient(double gradient);
     template<typename T>
@@ -83,10 +73,6 @@ namespace
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
-#ifdef GRADIENT_NOISE
-  constexpr double kGradientNoiseEta = 5.0;
-  constexpr double kGradientNoiseTau = 0.55;
-#endif
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -177,11 +163,6 @@ namespace
     WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
     w -= delta;
 
-#ifdef AVERAGING
-    // 平均化確率的勾配降下法
-    sum_w += w;
-#endif
-
     // 重みテーブルに書き戻す
     eval_weight = static_cast<T>(std::round(w));
 
@@ -191,11 +172,7 @@ namespace
   template<typename T>
   void Weight::Finalize(int num_mini_batches, T& eval_weight)
   {
-#ifdef AVERAGING
-    int64_t value = static_cast<int64_t>(std::round(sum_w / num_mini_batches));
-#else
     int64_t value = static_cast<int64_t>(std::round(w));
-#endif
     value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
     value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
     eval_weight = static_cast<T>(value);
@@ -211,14 +188,7 @@ namespace
     Thread& thread = *pos.this_thread();
     root_color = pos.side_to_move();
 
-#if 0
-    // evaluate()の値を直接使う場合
-    // evaluate()は手番から見た評価値を返すので
-    // 符号の反転はしなくて良い
-    value = Eval::evaluate(pos);
-
-#elif 1
-    // 0手読み+静止探索を行う場合
+    // 0手読み+静止探索を行う
     auto valueAndPv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
 
     // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
@@ -236,46 +206,6 @@ namespace
     if (root_color != pos.side_to_move()) {
       value = -value;
     }
-
-#elif 0
-    // 1手読み+静止探索を行う場合
-    auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, 1);
-    value = valueAndPv.first;
-
-    // 静止した局面まで進める
-    StateInfo stateInfo[MAX_PLY];
-    const std::vector<Move>& pv = valueAndPv.second;
-    for (int play = 0; play < static_cast<int>(pv.size()); ++play) {
-      pos.do_move(pv[play], stateInfo[play]);
-    }
-
-    // TODO(nodchip): extract_pv_from_tt()を実装して使う
-
-    //int play = 0;
-    //// Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-    //// 全計算はPosition::set()の中で行われているので差分計算ができる
-    //Value value_pv = Eval::evaluate(pos);
-    //for (auto m : thread.rootMoves[0].pv) {
-    //  pos.do_move(m, stateInfo[play++]);
-    //  value_pv = Eval::evaluate(pos);
-    //}
-
-    //// Eval::evaluate()は常に手番から見た評価値を返すので
-    //// 探索開始局面と手番が違う場合は符号を反転する
-    //if (root_color != pos.side_to_move()) {
-    //  value_pv = -value_pv;
-    //}
-
-    //// 浅い探索の評価値とPVの末端ノードの評価値が食い違う場合は
-    //// 処理に含めないようfalseを返す
-    //// 全体の9%程度しかないので無視しても大丈夫だと思いたい…。
-    //if (value != value_pv) {
-    //  return false;
-    //}
-
-#else
-    static_assert(false, "Choose a method to search shallowly.");
-#endif
 
     return true;
   }
@@ -314,22 +244,10 @@ namespace
 
   // 損失関数
   WeightType CalculateGradient(Value record_value, Value value) {
-#if 0
-    // 評価値の差の二乗和
-    return static_cast<WeightType>((value - record_value) * kFvScale);
-#elif 0
-    // 評価値から推定した勝率の差の二乗和
-    double p = winning_percentage(record_value);
-    double q = winning_percentage(value);
-    return (q - p) * dsigmoid(static_cast<int>(value) / 600.0);
-#elif 1
     // 評価値から推定した勝率の分布の交差エントロピー
     double p = winning_percentage(record_value);
     double q = winning_percentage(value);
     return q - p;
-#else
-    static_assert(false, "Select a loss function.");
-#endif
   }
 }
 
@@ -565,12 +483,6 @@ void Learner::Learn(std::istringstream& iss) {
       double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
       double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
 
-#ifdef GRADIENT_NOISE
-      std::random_device random_device;
-      std::mt19937_64 mt19937_64(random_device());
-      std::normal_distribution<> normal_distribution(0.0, kGradientNoiseEta / pow(1.0 + num_mini_batches, kGradientNoiseTau));
-#endif
-
       // 並列化を効かせたいのでdimension_indexで回す
 #pragma omp for schedule(guided)
       for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
@@ -587,9 +499,6 @@ void Learner::Learn(std::istringstream& iss) {
           }
 
           auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
-#ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
-#endif
           weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
             Eval::kpp[k][p0][p1][weight_kind]);
           Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
@@ -602,9 +511,6 @@ void Learner::Learn(std::istringstream& iss) {
           WeightKind weight_kind;
           RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
           auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
-#ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
-#endif
           weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
             Eval::kkp[k0][k1][p][weight_kind]);
 
@@ -615,9 +521,6 @@ void Learner::Learn(std::istringstream& iss) {
           WeightKind weight_kind;
           RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
           auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
-#ifdef GRADIENT_NOISE
-          weight.AddGradient(normal_distribution(mt19937_64));
-#endif
           weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
             Eval::kk[k0][k1][weight_kind]);
 
@@ -689,10 +592,6 @@ void Learner::Learn(std::istringstream& iss) {
       ASSERT_LV3(false);
     }
   }
-
-#ifdef AVERAGING
-  save_eval(output_folder_path_base, 99999999999LL);
-#endif
 }
 
 void Learner::MeasureError() {
