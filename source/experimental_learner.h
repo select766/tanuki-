@@ -10,7 +10,9 @@ namespace Learner
   struct Record {
     PackedSfen packed;
     int16_t value;
+    Move pv[7];
   };
+  static_assert(sizeof(Record) == 64, "Size of Record is not 64");
 
   constexpr char* OPTION_GENERATOR_NUM_GAMES = "GeneratorNumGames";
   constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";

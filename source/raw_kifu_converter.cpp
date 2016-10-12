@@ -67,11 +67,15 @@ void Learner::ConvertRawKifu() {
         break;
       }
 
-      Learner::Record record;
+      Learner::Record record = { 0 };
       pos.sfen_pack(record.packed);
       record.value = value;
+      int pv_size = search_depth;
+      pv_size = std::min<int>(pv_size, sizeof(record.pv) / sizeof(record.pv[0]));
+      pv_size = std::min(pv_size, static_cast<int>(pv.size()));
+      std::copy(pv.begin(), pv.begin() + pv_size, record.pv);
       writer.Write(record);
-      int local_position_index = position_index++;
+      int64_t local_position_index = position_index++;
       ShowProgress(start, local_position_index, num_positions, 1000000);
     }
   }
