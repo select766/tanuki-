@@ -132,7 +132,7 @@ error_measurement
 '''.format(os.path.join(learner_output_folder_path, subfolder), num_threads).encode('utf-8')
       print(input.decode('utf-8'))
       print(flush=True)
-      completed_process = subprocess.run([local_game_server_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
+      completed_process = subprocess.run([learner_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
       stdout = completed_process.stdout.decode('utf-8')
       print(stdout)
       matched = re.compile('info string rmse_value=(.+) rmse_winning_percentage=(.+) mean_cross_entropy=(.+) norm=(.+)').search(stdout)
