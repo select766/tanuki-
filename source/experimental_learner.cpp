@@ -615,10 +615,8 @@ void Learner::MeasureError() {
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
     ShowProgress(start, num_processed_positions, kMaxPositionsForErrorMeasurement, kMiniBatchSize);
 
-    int64_t max_positions_for_learning;
-    std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
     int num_records = static_cast<int>(std::min(
-      max_positions_for_learning - num_processed_positions, kMiniBatchSize));
+      kMaxPositionsForErrorMeasurement - num_processed_positions, kMiniBatchSize));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
