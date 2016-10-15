@@ -302,36 +302,16 @@ void Learner::Learn(std::istringstream& iss) {
     }
   }
 
-  std::vector<int64_t> write_eval_per_positions = {
-      std::numeric_limits<int64_t>::max(),
-
-    10'0000LL,
-    20'0000LL,
-    50'0000LL,
-
-    100'0000LL,
-    200'0000LL,
-    500'0000LL,
-
-    1000'0000LL,
-    2000'0000LL,
-    5000'0000LL,
-
-    1'0000'0000LL,
-    2'0000'0000LL,
-    5'0000'0000LL,
-
-      10'0000'0000LL,
-      20'0000'0000LL,
-      30'0000'0000LL,
-      40'0000'0000LL,
-      50'0000'0000LL,
-      60'0000'0000LL,
-      70'0000'0000LL,
-      80'0000'0000LL,
-      90'0000'0000LL,
-      100'0000'0000LL,
-  };
+  std::vector<int64_t> write_eval_per_positions;
+  for (int64_t base = 1; base <= 9; ++base) {
+    write_eval_per_positions.push_back(base * 10'0000LL);
+    write_eval_per_positions.push_back(base * 100'0000LL);
+    write_eval_per_positions.push_back(base * 1000'0000LL);
+    write_eval_per_positions.push_back(base * 1'0000'0000LL);
+    write_eval_per_positions.push_back(base * 10'0000'0000LL);
+    write_eval_per_positions.push_back(base * 100'0000'0000LL);
+  }
+  write_eval_per_positions.push_back(std::numeric_limits<int64_t>::max());
   std::sort(write_eval_per_positions.begin(), write_eval_per_positions.end());
   int write_eval_per_positions_index = 0;
 
@@ -400,6 +380,8 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  // 未学習の評価関数ファイルを出力しておく
+  save_eval(output_folder_path_base, 0);
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
     ShowProgress(start, num_processed_positions, max_positions_for_learning, kMiniBatchSize * 10);
 
@@ -535,7 +517,10 @@ void Learner::Learn(std::istringstream& iss) {
 
     if (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
       save_eval(output_folder_path_base, num_processed_positions);
-      ++write_eval_per_positions_index;
+      while (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
+        ++write_eval_per_positions_index;
+        ASSERT_LV3(write_eval_per_positions_index < static_cast<int>(write_eval_per_positions.size()));
+      }
     }
 
     if (num_processed_positions >= next_record_index_to_decay_learning_rate) {
