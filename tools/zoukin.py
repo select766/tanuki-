@@ -191,6 +191,16 @@ def main():
     dest='skip_first_self_play',
     help='Skip the first self play')
   parser.add_argument(
+    '--skip_self_play',
+    action='store_true',
+    dest='skip_self_play',
+    help='Skip the self plays')
+  parser.add_argument(
+    '--skip_first_kifu_generation_for_test',
+    action='store_true',
+    dest='skip_first_kifu_generation_for_test',
+    help='Skip the first kifu generation for test')
+  parser.add_argument(
     '--original_eval_folder_path',
     action='store',
     dest='original_eval_folder_path',
@@ -298,12 +308,16 @@ def main():
   num_games_for_generator_test = args.num_games_for_generator_test
   num_positions_for_learning = args.num_positions_for_learning
   num_iterations = args.num_iterations
+  skip_first_self_play = args.skip_first_self_play
+  skip_first_kifu_generation_for_test = args.skip_first_kifu_generation_for_test
 
   skip_kifu_generation = skip_first_kifu_generation
   kifu_folder_path = initial_kifu_folder_path
   eval_folder_path = initial_eval_folder_path
   previous_eval_folder_path = eval_folder_path
   skip_learn = skip_first_learn
+  skip_self_play = args.skip_self_play or skip_first_self_play
+  skip_kifu_generation_for_test = skip_first_kifu_generation_for_test
   for iteration in range(num_iterations):
     if not skip_kifu_generation:
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
@@ -328,12 +342,14 @@ def main():
                  local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
         SelfPlay(previous_eval_folder_path, new_eval_folder_path_base, vs_base_result_file_path,
                  local_game_server_exe_file_path, num_threads_for_selfplay, num_games_for_selfplay)
-    skip_self_play = False
+    skip_self_play = args.skip_self_play
 
-    shutil.rmtree(KIFU_FOR_TEST_FOLDER_PATH, ignore_errors=True)
-    os.mkdir(KIFU_FOR_TEST_FOLDER_PATH)
-    GenerateKifu(eval_folder_path, KIFU_FOR_TEST_FOLDER_PATH, generate_kifu_exe_file_path,
-                 num_threads_for_learning, num_games_for_generator_test, 'test')
+    if not skip_kifu_generation_for_test:
+      shutil.rmtree(KIFU_FOR_TEST_FOLDER_PATH, ignore_errors=True)
+      os.mkdir(KIFU_FOR_TEST_FOLDER_PATH)
+      GenerateKifu(eval_folder_path, KIFU_FOR_TEST_FOLDER_PATH, generate_kifu_exe_file_path,
+                   num_threads_for_learning, num_games_for_generator_test, 'test')
+    skip_kifu_generation_for_test = False
 
     CalculateError(new_eval_folder_path_base, learner_exe_file_path, num_threads_for_learning)
 
