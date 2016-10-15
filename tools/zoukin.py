@@ -268,6 +268,13 @@ def main():
     dest='num_positions_for_learning',
     required=True,
     help='Number of the positions for learning. ex) 10000')
+  parser.add_argument(
+    '--num_iterations',
+    action='store',
+    type=int,
+    dest='num_iterations',
+    required=True,
+    help='Number of the iterations. ex) 100')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -290,13 +297,14 @@ def main():
   num_games_for_generator_train = args.num_games_for_generator_train
   num_games_for_generator_test = args.num_games_for_generator_test
   num_positions_for_learning = args.num_positions_for_learning
+  num_iterations = args.num_iterations
 
   skip_kifu_generation = skip_first_kifu_generation
   kifu_folder_path = initial_kifu_folder_path
   eval_folder_path = initial_eval_folder_path
   previous_eval_folder_path = eval_folder_path
   skip_learn = skip_first_learn
-  while True:
+  for iteration in range(num_iterations):
     if not skip_kifu_generation:
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
       GenerateKifu(
