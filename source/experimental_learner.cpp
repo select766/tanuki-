@@ -72,7 +72,7 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
-  constexpr int64_t kMiniBatchSize = 10'0000LL;
+  constexpr int64_t kMiniBatchSize = 100'0000LL;
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
