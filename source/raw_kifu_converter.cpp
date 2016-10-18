@@ -15,6 +15,7 @@ namespace Learner {
 }
 
 void Learner::ConvertRawKifu() {
+  sync_cout << "Learner::ConvertRawKifu()" << sync_endl;
 #ifdef USE_FALSE_PROBE_IN_TT
   sync_cout << "Please undefine USE_FALSE_PROBE_IN_TT." << sync_endl;
   ASSERT_LV3(false);
