@@ -29,6 +29,7 @@ namespace Learner
   void Learn(std::istringstream& iss);
   void MeasureError();
   void BenchmarkKifuReader();
+  void MeasureFillingFactor();
 }
 
 #endif

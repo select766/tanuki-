@@ -2,8 +2,9 @@
 
 #include <array>
 #include <ctime>
-#include <fstream>
 #include <direct.h>
+#include <fstream>
+#include <numeric>
 #include <omp.h>
 
 #include "kifu_reader.h"
@@ -690,4 +691,88 @@ void Learner::BenchmarkKifuReader() {
   double elapsed_sec = static_cast<double>(
     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
   sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
+}
+
+void Learner::MeasureFillingFactor() {
+  sync_cout << "Learner::MeasureFillingFactor()" << sync_endl;
+
+  Eval::eval_learn_init();
+
+  auto start = std::chrono::system_clock::now();
+
+  sync_cout << "Initializing kifu reader..." << sync_endl;
+  std::unique_ptr<Learner::KifuReader> kifu_reader =
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+
+  int64_t max_positions_for_learning;
+  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
+    >> max_positions_for_learning;
+
+  sync_cout << "Reading kifu..." << sync_endl;
+  std::vector<Record> records;
+  int vector_length = KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
+  std::vector<int> filled(vector_length);
+  int thread_index = omp_get_thread_num();
+  for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
+    ShowProgress(start, num_processed_positions, max_positions_for_learning, 100'0000LL);
+
+    int num_records = static_cast<int>(std::min(
+      max_positions_for_learning - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+    num_processed_positions += num_records;
+
+    for (const auto& record : records) {
+      Thread& thread = *Threads[thread_index];
+      Position& pos = thread.rootPos;
+      pos.set_this_thread(&thread);
+      pos.set_from_packed_sfen(record.packed);
+
+      // 値を更新する
+      Square sq_bk = pos.king_square(BLACK);
+      Square sq_wk = pos.king_square(WHITE);
+      const auto& list0 = pos.eval_list()->piece_list_fb();
+      const auto& list1 = pos.eval_list()->piece_list_fw();
+
+      // KK
+      filled[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)] = 1;
+      filled[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)] = 1;
+
+      for (int i = 0; i < PIECE_NO_KING; ++i) {
+        Eval::BonaPiece k0 = list0[i];
+        Eval::BonaPiece k1 = list1[i];
+        for (int j = 0; j < i; ++j) {
+          Eval::BonaPiece l0 = list0[j];
+          Eval::BonaPiece l1 = list1[j];
+
+          // 常にp0 < p1となるようにアクセスする
+
+          // KPP
+          Eval::BonaPiece p0b = std::min(k0, l0);
+          Eval::BonaPiece p1b = std::max(k0, l0);
+          filled[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)] = 1;
+
+          // KPP
+          Eval::BonaPiece p0w = std::min(k1, l1);
+          Eval::BonaPiece p1w = std::max(k1, l1);
+          filled[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)] = 1;
+        }
+
+        // KKP
+        filled[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)] = 1;
+        filled[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)] = 1;
+      }
+    }
+  }
+
+  auto elapsed = std::chrono::system_clock::now() - start;
+  double elapsed_sec = static_cast<double>(
+    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
+  sync_cout << "Filling factor: "
+    << std::accumulate(filled.begin(), filled.end(), 0) / static_cast<double>(vector_length)
+    << sync_endl;
 }
