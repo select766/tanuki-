@@ -40,7 +40,11 @@ void Learner::ConvertRawKifu() {
     char raw_kifu_file_path[1024];
     sprintf(raw_kifu_file_path, raw_kifu_file_path_format.c_str(), thread_index);
     std::ifstream ifs(raw_kifu_file_path);
-    ASSERT_LV3(ifs);
+    if (!ifs) {
+      sync_cout << "Failed to open a raw kifu file: raw_kifu_file_path=" << raw_kifu_file_path
+        << sync_endl;
+      exit(1);
+    }
     char output_kifu_file_path[1024];
     sprintf(output_kifu_file_path, "%s/kifu.%s.%d-%d.%lld.%02d.bin", kifu_dir.c_str(),
       kifu_tag.c_str(), min_search_depth, max_search_depth, num_positions, thread_index);
