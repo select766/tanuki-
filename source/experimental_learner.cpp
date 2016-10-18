@@ -288,6 +288,7 @@ void Learner::Learn(std::istringstream& iss) {
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 #ifndef USE_FALSE_PROBE_IN_TT
+  sync_cout << "Please define USE_FALSE_PROBE_IN_TT." << sync_endl;
   ASSERT_LV3(false)
 #endif
 
