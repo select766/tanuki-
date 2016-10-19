@@ -61,6 +61,7 @@ namespace
 void Learner::GenerateKifu()
 {
 #ifdef USE_FALSE_PROBE_IN_TT
+  sync_cout << "Please undefine USE_FALSE_PROBE_IN_TT." << sync_endl;
   ASSERT_LV3(false);
 #endif
 
@@ -68,6 +69,7 @@ void Learner::GenerateKifu()
 
   // ’èÕ‚Ì“Ç‚Ýž‚Ý
   if (!ReadBook()) {
+    sync_cout << "Failed to read the book." << sync_endl;
     return;
   }
 
