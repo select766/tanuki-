@@ -14,7 +14,7 @@ namespace Learner
   };
   static_assert(sizeof(Record) == 64, "Size of Record is not 64");
 
-  constexpr char* OPTION_GENERATOR_NUM_GAMES = "GeneratorNumGames";
+  constexpr char* OPTION_GENERATOR_NUM_POSITIONS = "GeneratorNumPositions";
   constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";
   constexpr char* OPTION_GENERATOR_MAX_SEARCH_DEPTH = "GeneratorMaxSearchDepth";
   constexpr char* OPTION_GENERATOR_KIFU_TAG = "GeneratorKifuTag";

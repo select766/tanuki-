@@ -33,7 +33,7 @@ namespace
   bool ReadBook()
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
-      std::string book_file_name = Options[Learner::OPTION_GENERATOR_BOOK_FILE_NAME];
+    std::string book_file_name = Options[Learner::OPTION_GENERATOR_BOOK_FILE_NAME];
     std::ifstream fs_book;
     fs_book.open(book_file_name);
 
@@ -92,51 +92,29 @@ void Learner::GenerateKifu()
   int min_book_move = Options[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE];
   int max_book_move = Options[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
-  int num_games = Options[Learner::OPTION_GENERATOR_NUM_GAMES];
+  int64_t num_positions;
+  std::istringstream((std::string)Options[Learner::OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
 
   auto start = std::chrono::system_clock::now();
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
-  std::atomic_int global_game_index = 0;
+  std::atomic_int global_position_index = 0;
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
     std::string output_file_name_tag = Options[Learner::OPTION_GENERATOR_KIFU_TAG];
-    std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%d.%03d.bin", kifu_directory.c_str(),
-        output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_games, thread_index);
+    std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
+      output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
+      thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
-	std::random_device random_device;
-	std::mt19937_64 mt19937_64(random_device());
+    std::random_device random_device;
+    std::mt19937_64 mt19937_64(random_device());
 
-#pragma omp for schedule(guided)
-    for (int game_index = 0; game_index < num_games; ++game_index) {
-      int current_game_index = global_game_index++;
-      if (current_game_index && current_game_index % 10000 == 0) {
-        auto current = std::chrono::system_clock::now();
-        auto elapsed = current - start;
-        double elapsed_sec =
-          static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (num_games - current_game_index));
-        int h = remaining_sec / 3600;
-        int m = remaining_sec / 60 % 60;
-        int s = remaining_sec % 60;
-
-        time_t     current_time;
-        struct tm  *local_time;
-
-        time(&current_time);
-        local_time = localtime(&current_time);
-        std::printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-          current_game_index, num_games,
-          local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-          local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-        std::fflush(stdout);
-      }
-
+    while (global_position_index < num_positions) {
       Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;
       pos.set_hirate();
@@ -146,7 +124,7 @@ void Learner::GenerateKifu()
       std::istringstream is(opening);
       std::string token;
       int num_book_move = num_book_move_distribution(mt19937_64);
-      while (pos.game_ply() < num_book_move)
+      while (global_position_index < num_positions && pos.game_ply() < num_book_move)
       {
         if (!(is >> token)) {
           break;
@@ -298,6 +276,8 @@ void Learner::GenerateKifu()
           pos.sfen_pack(record.packed);
           record.value = value;
           kifu_writer->Write(record);
+          int64_t position_index = global_position_index++;
+          ShowProgress(start, position_index, num_positions, 1000000);
         }
 
         SetupStates->push(StateInfo());
