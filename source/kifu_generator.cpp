@@ -100,6 +100,7 @@ void Learner::GenerateKifu()
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
   std::atomic_int global_position_index = 0;
+  bool enable_swap = Options[Learner::OPTION_GENERATOR_ENABLE_SWAP];
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
@@ -147,7 +148,7 @@ void Learner::GenerateKifu()
       while (pos.game_ply() < kMaxGamePlay) {
         // 一定の確率で自駒2駒を入れ替える
         // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
-        if (swap_distribution(mt19937_64) == 0 &&
+        if (enable_swap && swap_distribution(mt19937_64) == 0 &&
           pos.pos_is_ok() &&
           !pos.is_mated() &&
           !pos.in_check() &&

@@ -21,6 +21,7 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_BOOK_FILE_NAME = "GeneratorStartposFileName";
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
+  constexpr char* OPTION_GENERATOR_ENABLE_SWAP = "GeneratorEnableSwap";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
 
   void ShowProgress(
