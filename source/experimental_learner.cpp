@@ -749,16 +749,16 @@ void Learner::MeasureFillingFactor() {
           // 常にp0 < p1となるようにアクセスする
 
           // KPP
-          Eval::BonaPiece p0b = std::min(k0, l0);
-          Eval::BonaPiece p1b = std::max(k0, l0);
-          filled[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)] = 1;
-          filled[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)] = 1;
+          filled[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)] = 1;
+          filled[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)] = 1;
 
           // KPP
-          Eval::BonaPiece p0w = std::min(k1, l1);
-          Eval::BonaPiece p1w = std::max(k1, l1);
-          filled[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)] = 1;
-          filled[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)] = 1;
+          filled[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)] = 1;
+          filled[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)] = 1;
+          filled[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)] = 1;
         }
 
         // KKP
@@ -773,7 +773,7 @@ void Learner::MeasureFillingFactor() {
     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
   sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
   sync_cout << "Filling factor: "
-    << std::accumulate(filled.begin(), filled.end(), 0) / static_cast<double>(vector_length)
+    << std::count(filled.begin(), filled.end(), 1) / static_cast<double>(vector_length)
     << sync_endl;
 }
 
