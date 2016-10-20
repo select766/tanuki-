@@ -101,6 +101,7 @@ void Learner::GenerateKifu()
   // スレッド間で共有する
   std::atomic_int global_position_index = 0;
   bool enable_swap = Options[Learner::OPTION_GENERATOR_ENABLE_SWAP];
+  int value_threshold = Options[Learner::OPTION_GENERATOR_VALUE_THRESHOLD];
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
@@ -261,11 +262,6 @@ void Learner::GenerateKifu()
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         Value value = valueAndPv.first;
-        if (value < -VALUE_MATE) {
-          // 詰みの局面なので書き出さない
-          break;
-        }
-
         const std::vector<Move>& pv = valueAndPv.second;
         if (pv.empty()) {
           break;
@@ -283,6 +279,10 @@ void Learner::GenerateKifu()
 
         SetupStates->push(StateInfo());
         pos.do_move(pv[0], SetupStates->top());
+
+        if (std::abs(value) > value_threshold) {
+          break;
+        }
       }
     }
   }

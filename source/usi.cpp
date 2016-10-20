@@ -292,6 +292,7 @@ namespace USI
     o[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
     o[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
     o[Learner::OPTION_GENERATOR_ENABLE_SWAP] << Option(true);
+    o[Learner::OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
     o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("10000000000");
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
