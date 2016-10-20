@@ -56,7 +56,7 @@ isready
 usinewgame
 go btime 1000 byoyomi 1
 '''.encode('utf-8')
-            completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, check=True)
+            completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, stdout=subprocess.PIPE, check=True)
             output = completed_process.stdout.decode('utf-8')
             print(output)
             matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(output)
