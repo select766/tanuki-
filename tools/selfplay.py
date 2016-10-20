@@ -55,7 +55,7 @@ setoption name Threads value 48
 isready
 usinewgame
 go btime 1000 byoyomi 1
-'''
+'''.encode('utf-8')
             completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, check=True)
             output = completed_process.stdout
             print(output)
@@ -81,7 +81,7 @@ def CalculateError(learner_output_folder_path, learner_exe_file_path):
 setoption name KifuDir value kifu_for_test
 setoption name Threads value 48
 error_measurement
-'''.format(os.path.join(learner_output_folder_path, subfolder))
+'''.format(os.path.join(learner_output_folder_path, subfolder)).encode('utf-8')
             completed_process = subprocess.run([learner_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
             output = completed_process.stdout
             print(output)
