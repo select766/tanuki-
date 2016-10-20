@@ -702,7 +702,7 @@ void Learner::MeasureFillingFactor() {
 
   sync_cout << "Initializing kifu reader..." << sync_endl;
   std::unique_ptr<Learner::KifuReader> kifu_reader =
-    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], false);
 
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
@@ -775,4 +775,60 @@ void Learner::MeasureFillingFactor() {
   sync_cout << "Filling factor: "
     << std::accumulate(filled.begin(), filled.end(), 0) / static_cast<double>(vector_length)
     << sync_endl;
+}
+
+void Learner::CalculateValueHistogram() {
+  sync_cout << "Learner::CalculateValueHistogram()" << sync_endl;
+
+  Eval::eval_learn_init();
+
+  auto start = std::chrono::system_clock::now();
+
+  sync_cout << "Initializing kifu reader..." << sync_endl;
+  std::unique_ptr<Learner::KifuReader> kifu_reader =
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+
+  sync_cout << "Reading kifu..." << sync_endl;
+  std::vector<Record> records;
+  std::vector<int64_t> counter(1024);
+  int offset = 60050;
+  int64_t num_within_2000 = 0;
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
+    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
+
+    int num_records = static_cast<int>(std::min(
+      kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+
+    for (const auto& record : records) {
+      int value = record.value;
+      int index = (value + offset) / 100;
+      if (index < 0 || counter.size() <= index) {
+        continue;
+      }
+      ++counter[index];
+
+      if (std::abs(value) <= 2000) {
+        ++num_within_2000;
+      }
+    }
+
+    num_processed_positions += num_records;
+  }
+
+  std::string output_file_path = Options[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH];
+  std::ofstream ofs(output_file_path);
+  for (int value = -32000; value <= 32000; value += 100) {
+    int index = (value + offset) / 100;
+    ofs << value << "," << counter[index] << std::endl;
+  }
+
+  sync_cout << "Ratio of |value| <= 2000: " << num_within_2000 / static_cast<double>(kMaxPositionsForBenchmark) << sync_endl;
+
+  auto elapsed = std::chrono::system_clock::now() - start;
+  double elapsed_sec = static_cast<double>(
+    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
 }

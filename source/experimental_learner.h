@@ -22,6 +22,7 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
 
   void ShowProgress(
     const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
@@ -30,6 +31,7 @@ namespace Learner
   void MeasureError();
   void BenchmarkKifuReader();
   void MeasureFillingFactor();
+  void CalculateValueHistogram();
 }
 
 #endif
