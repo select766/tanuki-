@@ -201,29 +201,6 @@ namespace Eval
 		FloatPair g2;
 #endif
 
-#ifdef USE_YANE_GRAD_UPDATE
-
-		// YaneGradの更新式
-
-		//  gを勾配、wを評価関数パラメーター、ηを学習率、εを微小値とする。
-		// 　※　α = 0.99とかに設定しておき、v[i]が大きくなりすぎて他のパラメーターがあとから動いたときに、このv[i]が追随できないのを防ぐ。
-		//   ※　また比較的大きなεを加算しておき、vが小さいときに変な方向に行くことを抑制する。
-		//   v = αv + g^2
-		//   w = w - ηg/sqrt(v+ε)
-
-		// YaneGradのα値
-		LearnFloatType Weight::alpha = 0.99f;
-
-		// 学習率η
-		static LearnFloatType eta;
-
-		// 最初のほうの更新量を抑制する項を独自に追加しておく。
-		const LearnFloatType epsilon = 1.0f;
-
-		// AdaGradのg2
-		FloatPair g2;
-#endif
-
 
 #if defined (USE_ADAM_UPDATE)
 		// 普通のAdam
@@ -239,9 +216,17 @@ namespace Eval
 		static constexpr double gamma = LearnFloatType(0.999);
 		
 		static constexpr double epsilon = LearnFloatType(10e-8);
+
+#if !defined (LEARN_UPDATE_EVERYTIME)
 		static constexpr double eta = LearnFloatType(32.0/64.0);
 //		static constexpr LearnFloatType  eta = LearnFloatType(1.0);
-		
+#else
+		// mini-batch size 1Mに対して…。
+		// 0.03でも発散気味。よくわからない。
+		static constexpr double eta = LearnFloatType(0.01 / 64.0);
+#endif
+
+
 		FloatPair v;
 		FloatPair r;
 
@@ -273,7 +258,7 @@ namespace Eval
 		// 勾配gにもとづいて、wをupdateする。
 		// update後、gは0になる。
 		// wをupdateしたならtrueを返す。
-		bool update(bool skip_update)
+		bool update()
 		{
 #if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE)
 
@@ -325,32 +310,25 @@ namespace Eval
 #endif
 
 #ifdef USE_ADA_GRAD_UPDATE
-			if (g[0] == 0 && g[1] == 0)
-				return false;
+
+			// 普通のAdaGrad
 
 			// g2[i] += g * g;
 			// w[i] -= η * g / sqrt(g2[i]);
 			// g = 0 // mini-batchならこのタイミングで勾配配列クリア。
 
-			g2 += FloatPair{ g[0] * g[0] , g[1] * g[1] };
+			// ゼロ除算を避けるため、abs(g)が小さいときはskipしたほうが良い。
+			if (g[0] != 0)
+			{
+				g2[0] += g[0] * g[0];
+				w[0] -= eta * g[0] / sqrt(g2[0]);
+			}
 
-			// 値が小さいうちはskipする
-			if (g2[0] < 0.1f || g2[0] < 0.1f)
-				goto FINISH;
-
-			if (!skip_update)
-				w = FloatPair{ w[0] - eta * g[0] / sqrt(g2[0]) ,w[1] - eta2 * g[1] / sqrt(g2[1]) };
-#endif
-
-#ifdef USE_YANE_GRAD_UPDATE
-			if (g[0] == 0 && g[1] == 0)
-				return false;
-
-			g2 = FloatPair{ alpha * g2[0] + g[0] * g[0] , alpha * g2[1] + g[1] * g[1] };
-
-			// skip_updateのときはg2の更新に留める。
-			if (!skip_update)
-				w = FloatPair{ w[0] - eta * g[0] / sqrt(g2[0] + epsilon) ,w[1] - eta2 * g[1] / sqrt(g2[1] + epsilon) };
+			if (g[1] != 0)
+			{
+				g2[1] += g[1] * g[1];
+				w[1] -= eta2 * g[1] / sqrt(g2[1]);
+			}
 #endif
 
 #ifdef USE_ADAM_UPDATE
@@ -370,10 +348,9 @@ namespace Eval
 			// sqrt()の中身がゼロになりうるので、1回目の割り算を先にしないとアンダーフローしてしまう。
 			// 例) epsilon * bt = 0
 			// あと、doubleでないと計算精度が足りなくて死亡する。
-			if (!skip_update)
-				w = FloatPair{ w[0] - LearnFloatType( eta  / (sqrt((double)r[0] / rt) + epsilon) * v[0] / bt) ,
-							   w[1] - LearnFloatType( eta  / (sqrt((double)r[1] / rt) + epsilon) * v[1] / bt)
-				};
+			w = FloatPair{ w[0] - LearnFloatType( eta  / (sqrt((double)r[0] / rt) + epsilon) * v[0] / bt) ,
+							w[1] - LearnFloatType( eta  / (sqrt((double)r[1] / rt) + epsilon) * v[1] / bt)
+			};
 
 
 #endif
@@ -438,12 +415,12 @@ namespace Eval
 		FINISH:;
 			g = { 0,0 };
 
-			return !skip_update;
+			return true;
 		}
 	};
 
 
-#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE) || defined(USE_ADA_GRAD_UPDATE) || defined(USE_YANE_GRAD_UPDATE)
+#if defined (USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE) || defined(USE_ADA_GRAD_UPDATE)
 	LearnFloatType Weight::eta;
 #elif defined USE_ADAM_UPDATE
 	// 1.0 - pow(beta,epoch)
@@ -538,6 +515,10 @@ namespace Eval
 		// KK
 		kk_w[sq_bk][sq_wk].add_grad( f , g );
 
+#ifdef LEARN_UPDATE_EVERYTIME
+		kk_w[sq_bk][sq_wk].update();
+#endif
+
 		for (i = 0; i < PIECE_NO_KING; ++i)
 		{
 			k0 = list_fb[i];
@@ -555,9 +536,22 @@ namespace Eval
 				// kpp_w[Inv(sq_wk)][k1][l1].add_grad(ValueKppFloat{ -f ,  g });
 
 #if 1
+
+#if !defined( LEARN_UPDATE_EVERYTIME)
 				// KPPの手番ありのとき
 				((Weight*)kpp_w_)[get_kpp_index(sq_bk, k0, l0)].add_grad( f ,  g );
 				((Weight*)kpp_w_)[get_kpp_index(Inv(sq_wk), k1, l1)].add_grad( -f ,  g );
+#else
+				kpp_w[sq_bk][k0][l0].add_grad(f, g);
+				kpp_w[sq_bk][l0][k0].add_grad(f, g);
+				kpp_w[Inv(sq_wk)][k1][l1].add_grad(-f, g);
+				kpp_w[Inv(sq_wk)][l1][k1].add_grad(-f, g);
+
+				kpp_w[sq_bk][k0][l0].update();
+				kpp_w[sq_bk][l0][k0].update();
+				kpp_w[Inv(sq_wk)][k1][l1].update();
+				kpp_w[Inv(sq_wk)][l1][k1].update();
+#endif
 
 #else
 				// KPPの手番はなしのとき
@@ -583,23 +577,19 @@ namespace Eval
 			// KKP
 
 			kkp_w[sq_bk][sq_wk][k0].add_grad( f , g );
+
+#ifdef LEARN_UPDATE_EVERYTIME
+			kkp_w[sq_bk][sq_wk][k0].update();
+#endif
+
 		}
 
 	}
 
 
-// 現在の勾配をもとにSGDかAdaGradか何かする。
+	// 現在の勾配をもとにSGDかAdaGradか何かする。
 	void update_weights(u64 mini_batch_size , u64 epoch)
 	{
-		// 3回目まではwのupdateを保留する。
-		// ただし、SGDは履歴がないのでこれを行なう必要がない。
-		bool skip_update =
-#if defined(USE_SGD_UPDATE) || defined(USE_YANE_SGD_UPDATE) || defined(USE_YANENZA_UPDATE)
-			false;
-#else
-			epoch <= 3;
-#endif
-
 		// kppの最小値、最大値、絶対値の和を表示させることで学習が進んでいるかのチェックに用いる。
 #ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
 		FloatPair min_kpp = { 0.0f , 0.0f };
@@ -655,16 +645,13 @@ namespace Eval
 		// AdaGrad
 #elif defined USE_ADA_GRAD_UPDATE
 
-		// この係数、mini-batch sizeの影響を受けるのどうかと思う..
+#ifdef LEARN_UPDATE_EVERYTIME
+		// mini-batch size = 1Mに対して0.2f～0.4fぐらいが適切
+		Weight::eta = 0.5f;
 
+#else
+		// この係数、mini-batch sizeの影響を受けるのどうかと思うが..
 		Weight::eta = 3.0f;
-
-		// YaneGrad
-#elif defined USE_YANE_GRAD_UPDATE
-#if defined (LOSS_FUNCTION_IS_CROSS_ENTOROPY)
-		Weight::eta = 5.0f;
-#elif defined (LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
-		Weight::eta = 20.0f;
 #endif
 
 		// Adam
@@ -695,7 +682,9 @@ namespace Eval
 					auto& w = kk_w[k1][k2];
 
 					// wの値にupdateがあったなら、値を制限して、かつ、kkに反映させる。
-					if (w.update(skip_update))
+#if ! defined(LEARN_UPDATE_EVERYTIME)
+					if (w.update())
+#endif
 					{
 						// 絶対値を抑制する。
 						SET_A_LIMIT_TO(w.w, LearnFloatType((s32)INT16_MIN * 4), LearnFloatType((s32)INT16_MAX * 4));
@@ -728,6 +717,15 @@ namespace Eval
 						w2.count = 0;
 #endif
 
+#if defined (USE_ADA_GRAD_UPDATE) && defined(LEARN_UPDATE_EVERYTIME)
+						// g2を指数移動平均で減衰させておかないと値が動かなくなって良くないような..
+						w.g2[0] *= 0.999f;
+						w.g2[1] *= 0.999f;
+						w2.g2[0] *= 0.999f;
+						w2.g2[1] *= 0.999f;
+#endif
+						
+
 #ifdef DISPLAY_STATS_IN_UPDATE_WEIGHTS
 						min_kpp = { min(min_kpp[0], w.w[0]) , min(min_kpp[1], w.w[1]) };
 						max_kpp = { max(max_kpp[0], w.w[0]) , max(max_kpp[1], w.w[1]) };
@@ -743,7 +741,9 @@ namespace Eval
 
 #endif
 
-						if (w.update(skip_update))
+#if ! defined(LEARN_UPDATE_EVERYTIME)
+						if (w.update())
+#endif
 						{
 							// 絶対値を抑制する。
 							SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));
@@ -772,7 +772,9 @@ namespace Eval
 
 						// cout << "\n" << w.g[0] << " & " << w.g[1];
 
-						if (w.update(skip_update))
+#if ! defined(LEARN_UPDATE_EVERYTIME)
+						if (w.update())
+#endif
 						{
 							// 絶対値を抑制する。
 							SET_A_LIMIT_TO(w.w, (LearnFloatType)(INT16_MIN / 2), (LearnFloatType)(INT16_MAX / 2));

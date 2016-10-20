@@ -255,8 +255,8 @@ namespace USI
     // 1.2秒ほど早く指さないとfloodgateで切れ負けしかねない。
     o["NetworkDelay2"] << Option(1120, 0, 10000);
 
-    // 最小思考時間[ms]
-    o["MinimumThinkingTime"] << Option(1000, 1000, 100000);
+	// 最小思考時間[ms]
+	o["MinimumThinkingTime"] << Option(2000, 1000, 100000);
 
     // 引き分けまでの最大手数。256手ルールのときに256。0なら無制限。
     o["MaxMovesToDraw"] << Option(0, 0, 100000, [](const Option& o) { max_game_ply = (o == 0) ? INT_MAX : (int)o; });

@@ -18,6 +18,7 @@ setoption name Hash value 256
 setoption name EvalDir value {0}
 setoption name NetworkDelay value 0
 setoption name NetworkDelay2 value 0
+setoption name MinimumThinkingTime value 1000
 '''
 
 

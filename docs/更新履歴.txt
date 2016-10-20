@@ -2,6 +2,50 @@
 やねうら王 更新履歴
 
 
+■　2016/10/16 V3.99
+
+・AdaGradの更新式、調整。
+・解説.txtに推奨設定のところ追記。
+・YaneGrad削除。
+・LEARN_READ_SFEN_SIZEのデフォルト値 10Mに変更。
+・2016lateのInCheck→inCheckに変更。
+・Stockfish[pull req.] : Explicit Logic/Speedup
+・Stockfish[pull req.] : Remove assignments to currentMove that don't serve any purpose
+・Stockfish[pull req.] : Simplify next_move by always scoring evasions.
+
+
+■　2016/10/13 V3.98
+
+・ResignValueの実装、バグっていたようなので修正。
+・AVX2用のバイナリが差し替わっていなかったので修正。
+
+
+■　2016/10/13 V3.97
+
+・MinimumThinkingTime、電王トーナメントでは2秒未満が計測1秒らしかったので、デフォルトを2秒に戻しておく。
+・投了スコアを設定できるように変更。ResignValue
+・*_ja.txtの置換表サイズの単位表記を大文字に修正。
+・解説.txtに推奨対局設定を追加。
+
+
+■　2016/10/13 V3.96
+
+・bitop.hにBLSRマクロ追加。(thanks! > merom686さん)
+・gen_sfen時にfail low/highしたら生成を終了するように変更。
+・learn.hにLEARN_UPDATE_EVERYTIME追加。
+・KPPTのAVX2のコード、Late以外にも開放。
+
+
+■　2016/10/12 V3.95
+
+・真やねうら定跡公開。
+・やねうら王2016Late(≒真やねうら王)の公開のための準備。
+・やねうら王2016Lateの探索パラメーターファイルを公開に変更。
+・教師局面の生成部、KINGの二度移動が新しいコードにおいて生成出来ていなかったの修正。
+・極やねうら王の定跡ファイル、読み込み対応。
+・AdaGradのg2に関するif式修正。(thanks! > 読み太の塚本さん)
+
+
 ■　2016/10/07 V3.94
 
 ・Position::see_ge()、g++で警告出てていたの修正。
@@ -11,7 +55,8 @@
 ■　2016/10/06 V3.93
 
 ・Stockfish : Do not use SEE in evasion scoring 
-・Stockfish : Replace Position::see and Position::see_sign by Position::see_ge 
+・Stockfish[pull req.] : Replace Position::see and Position::see_sign by Position::see_ge 
+・Stockfish : Optimisation of Position::see and Position::see_sign
 ・USE_SIMPLE_SEE削除。
 ・2016 Late用のデフォルトパラメーター(Stockfishと同じもの)を公開。
 ・上の修正にともなって、Score<Evasion>、LVAするの忘れていたの修正。

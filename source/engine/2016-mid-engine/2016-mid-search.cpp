@@ -92,15 +92,17 @@ void USI::extra_option(USI::OptionsMap & o)
 
 	//  no_book          定跡なし
 	//  standard_book.db 標準定跡
-	//  yaneura_book1.db やねうら大定跡(公開用1)
-	//  yaneura_book2.db やねうら超定跡(公開用2)
-	//  yaneura_book3.db やねうら裏定跡(大会用)
+	//	yaneura_book1.db やねうら大定跡(公開用 concept proof)
+	//	yaneura_book2.db 超やねうら定跡(大会用2015)
+	//	yaneura_book3.db 真やねうら定跡(大会用2016)
+	//	yaneura_book4.db 極やねうら定跡(大会用2017)
 	//  user_book1.db    ユーザー定跡1
 	//  user_book2.db    ユーザー定跡2
 	//  user_book3.db    ユーザー定跡3
 
-	std::vector<std::string> book_list = { "no_book" , "standard_book.db", "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db"
-	  , "user_book1.db", "user_book2.db", "user_book3.db" };
+	std::vector<std::string> book_list = { "no_book" , "standard_book.db"
+		, "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db", "yaneura_book4.db"
+		, "user_book1.db", "user_book2.db", "user_book3.db" };
 	o["BookFile"] << Option(book_list, book_list[1], [](auto& o) { book_name = string(o); });
 	book_name = book_list[1];
 
@@ -2655,7 +2657,7 @@ ID_END:;
 		// ベストなスレッドの指し手を返す。
 		sync_cout << "bestmove " << bestThread->rootMoves[0].pv[0];
 
-		// pomderの指し手の出力。
+		// ponderの指し手の出力。
 		// pvにはbestmoveのときの読み筋(PV)が格納されているので、ponderとしてpv[1]があればそれを出力してやる。
 		// また、pv[1]がない場合(rootでfail highを起こしたなど)、置換表からひねり出してみる。
 		if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos, ponder_candidate))

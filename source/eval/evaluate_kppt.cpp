@@ -409,7 +409,9 @@ Error:;
 
 		const auto* pkppb = kpp[sq_bk][ebp.fb];
 		const auto* pkppw = kpp[Inv(sq_wk)][ebp.fw];
-#if defined (USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
+
+#if defined (USE_AVX2)
+		
 		__m256i zero = _mm256_setzero_si256();
 		__m256i sum0 = zero;
 		__m256i sum1 = zero;
@@ -554,11 +556,11 @@ Error:;
 			{
 				const auto ppkppw = kpp[Inv(sq_wk)];
 
-#if defined(USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
-				// ΣWKPP = 0
+#if defined(USE_AVX2)
+                // ΣWKPP = 0
 				diff.p[1][0] = 0;
 				diff.p[1][1] = 0;
-
+				
 				__m256i zero = _mm256_setzero_si256();
 				__m256i diffp1 = zero;
 				for (int i = 0; i < PIECE_NO_KING; ++i)
@@ -660,9 +662,7 @@ Error:;
 
         const auto* ppkppb = kpp[sq_bk];
 
-#if defined(USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
-				diff.p[0][0] = 0;
-				diff.p[0][1] = 0;
+#if defined(USE_AVX2)
 
 				__m256i zero = _mm256_setzero_si256();
 				__m256i diffp0 = zero;

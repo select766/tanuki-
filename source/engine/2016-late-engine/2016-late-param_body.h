@@ -1,15 +1,5 @@
-﻿#ifndef _2016_LATE_PARAMETERS_H_
-#define _2016_LATE_PARAMETERS_H_
-
-#if 1
-// 2016年の電王トーナメントが終わったので公開。
-#include "2016-late-param_body.h"
-
-#else
-
-// Stockfishと同じで良いなら以下のパラメーターを使うと良い。
-// (このパラメーターが2016 Midより強いかどうかは調べていない。)
-
+﻿#ifndef _2016_LATE_PARAMETERS_
+#define _2016_LATE_PARAMETERS_
 
 // パラメーターの説明に "fixed"と書いてあるパラメーターはランダムパラメーター化するときでも変化しない。
 // 「前提depth」は、これ以上ならその枝刈りを適用する(かも)の意味。
@@ -26,7 +16,7 @@
 // depth手先で評価値が変動する幅が = depth * PARAM_FUTILITY_MARGIN_DEPTH
 // 元の値 = 150
 // [PARAM] min:100,max:240,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA = 150;
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA = 143;
 
 // 
 // 元の値 = 200
@@ -37,24 +27,24 @@ PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA = 200;
 // 静止探索でのfutility pruning
 // 元の値 = 128
 // [PARAM] min:50,max:160,step:2,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET = 128;
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET = 145;
 
 // futility pruningの適用depth。
 // 元の値 = 7
 // 7より8のほうが良さげなので固定。
 // [PARAM] min:5,max:13,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 7;
+PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 10;
 
 // 親nodeでのfutilityの適用depth。
 // この枝刈り、depthの制限自体が要らないような気がする。
 // 元の値 = 7
 // [PARAM] min:5,max:13,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = 7;
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = 13;
 
 // 親nodeでのfutility margin
 // 元の値 = 256
 // [PARAM] min:100,max:300,step:2,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = 256;
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = 246;
 
 // これ、あまり下手にいじると他のパラメーターに影響がありすぎるので固定。
 // 元の値 = 8
@@ -69,12 +59,12 @@ PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_SEE_DEPTH2 = 7;
 // depthが2乗されるので影響大きい
 // 元の値 = 35
 // [PARAM] min:20,max:50,step:1,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = 35;
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = 41;
 
 // depthが2乗されるので影響大きい
 // 元の値 = 35
 // [PARAM] min:20,max:60,step:1,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 35;
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 51;
 
 
 //
@@ -90,16 +80,16 @@ PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA = 823;
 
 // 元の値 = 67
 // [PARAM] min:50,max:100,step:2,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA = 67;
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA = 53;
 
 // 元の値 = 35
 // [PARAM] min:10,max:60,step:1,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_NULL_MOVE_MARGIN = 35;
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN = 32;
 
 // null moveでbeta値を上回ったときに、これ以下ならreturnするdepth。適用depth。
 // 元の値 = 12
 // [PARAM] min:4,max:15,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH = 12;
+PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH = 13;
 
 
 //
@@ -109,12 +99,12 @@ PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH = 12;
 // probcutの前提depth
 // 元の値 = 5
 // [PARAM] min:3,max:10,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_PROBCUT_DEPTH = 5;
+PARAM_DEFINE PARAM_PROBCUT_DEPTH = 4;
 
 // probcutのmargin
 // 元の値 = 200
 // [PARAM] min:100,max:300,step:2,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_PROBCUT_MARGIN = 200;
+PARAM_DEFINE PARAM_PROBCUT_MARGIN = 216;
 
 
 //
@@ -132,7 +122,7 @@ PARAM_DEFINE PARAM_SINGULAR_EXTENSION_DEPTH = 8;
 // rBeta = std::max(ttValue - PARAM_SINGULAR_MARGIN * depth / (8 * ONE_PLY), -VALUE_MATE);
 // 元の値 = 256
 // [PARAM] min:128,max:400,step:4,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_SINGULAR_MARGIN = 256;
+PARAM_DEFINE PARAM_SINGULAR_MARGIN = 200;
 
 // singular extensionで浅い探索をするときの深さに関する係数
 // このパラメーター、長い時間でないと調整できないし下手に調整すべきではない。
@@ -148,13 +138,13 @@ PARAM_DEFINE PARAM_SINGULAR_SEARCH_DEPTH_ALPHA = 16;
 // move countによる枝刈りをする深さ。適用depth。
 // 元の値 = 16
 // [PARAM] min:8,max:32,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH = 16;
+PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH = 17;
 
 // historyによる枝刈りをする深さ。適用depth。
 // これ、将棋ではそこそこ上げたほうが長い時間では良さげ。
 // 元の値 = 3
 // [PARAM] min:2,max:32,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH = 3;
+PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH = 9;
 
 
 // historyの値によってreductionするときの係数
@@ -171,7 +161,7 @@ PARAM_DEFINE PARAM_REDUCTION_BY_HISTORY = 8000;
 // historyの値によってreductionするときの係数
 // 元の値 = 256
 // [PARAM] min:128,max:384,step:1,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_IID_MARGIN_ALPHA = 256;
+PARAM_DEFINE PARAM_IID_MARGIN_ALPHA = 261;
 
 
 //
@@ -184,15 +174,15 @@ PARAM_DEFINE PARAM_RAZORING_MARGIN1 = 483;
 
 // 元の値 = 570
 // [PARAM] min:400,max:700,step:5,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_RAZORING_MARGIN2 = 570;
+PARAM_DEFINE PARAM_RAZORING_MARGIN2 = 555;
 
 // 元の値 = 603
 // [PARAM] min:400,max:700,step:5,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_RAZORING_MARGIN3 = 603;
+PARAM_DEFINE PARAM_RAZORING_MARGIN3 = 593;
 
 // 元の値 = 554
 // [PARAM] min:400,max:700,step:5,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_RAZORING_MARGIN4 = 554;
+PARAM_DEFINE PARAM_RAZORING_MARGIN4 = 539;
 
 
 //
@@ -216,7 +206,7 @@ PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA0 = 240;
 
 // 元の値 = 290
 // [PARAM] min:150,max:400,step:1,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA1 = 290;
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA1 = 288;
 
 // 元の値 = 773
 // [PARAM] min:500,max:2000,step:2,interval:2,time_rate:1,fixed
@@ -224,7 +214,7 @@ PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA0 = 773;
 
 // 元の値 = 1045
 // [PARAM] min:500,max:2000,step:2,interval:2,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA1 = 1045;
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA1 = 1041;
 
 
 //
@@ -256,7 +246,6 @@ PARAM_DEFINE PARAM_SEARCH_MATE1 = 1;
 // 元の値 = 1
 // [PARAM] min:1,max:5,step:2,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_WEAK_MATE_PLY = 1;
-#endif
 
 
 #endif
