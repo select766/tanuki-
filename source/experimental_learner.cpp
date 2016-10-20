@@ -705,8 +705,12 @@ void Learner::MeasureFillingFactor() {
     std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], false);
 
   int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
-    >> max_positions_for_learning;
+  if (!(std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
+    >> max_positions_for_learning)) {
+    sync_cout << "Failed to parse an option: " << Learner::OPTION_LEARNER_NUM_POSITIONS  << "="
+      << (std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS] << sync_endl;
+    std::exit(1);
+  }
 
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
