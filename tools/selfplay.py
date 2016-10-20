@@ -37,6 +37,7 @@ def AdoptSubfolder(subfolder):
 
 
 def CalculateWinningPercentage(base_eval_folder_path, learner_output_folder_path):
+    print("CalculateWinningPercentage()", flush=True)
     subfolders = GetSubfolders(learner_output_folder_path)
     output_cvs_file_path = os.path.join(learner_output_folder_path, 'winning_percentage.' + GetDateTimeString() + '.csv')
     with open(output_cvs_file_path, 'w', newline='') as output_file:
@@ -44,7 +45,7 @@ def CalculateWinningPercentage(base_eval_folder_path, learner_output_folder_path
         for subfolder in subfolders:
             if not AdoptSubfolder(subfolder):
                 continue
-            print(subfolder)
+            print(subfolder, flush=True)
 
             with open('engine-config1.txt', 'w') as engine_config1_file:
                 engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(base_eval_folder_path))
@@ -58,7 +59,7 @@ go btime 1000 byoyomi 1
 '''.encode('utf-8')
             completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, stdout=subprocess.PIPE, check=True)
             output = completed_process.stdout.decode('utf-8')
-            print(output)
+            print(output, flush=True)
             matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(output)
             lose = float(matched.group(1))
             draw = float(matched.group(2))
@@ -70,13 +71,14 @@ go btime 1000 byoyomi 1
 
 
 def CalculateError(learner_output_folder_path, learner_exe_file_path):
+    print("CalculateError()", flush=True)
     subfolders = GetSubfolders(learner_output_folder_path)
     output_cvs_file_path = os.path.join(learner_output_folder_path, 'error.' + GetDateTimeString() + '.csv')
     with open(output_cvs_file_path, 'w', newline='') as output_file:
         csvwriter = csv.writer(output_file)
         csvwriter.writerow(['', 'rmse_value', 'rmse_winning_percentage', 'mean_cross_entropy', 'norm'])
         for subfolder in subfolders:
-            print(subfolder)
+            print(subfolder, flush=True)
             input = '''setoption name EvalDir value {0}
 setoption name KifuDir value kifu_for_test
 setoption name Threads value 48
@@ -84,7 +86,7 @@ error_measurement
 '''.format(os.path.join(learner_output_folder_path, subfolder)).encode('utf-8')
             completed_process = subprocess.run([learner_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
             output = completed_process.stdout.decode('utf-8')
-            print(output)
+            print(output, flush=True)
             matched = re.compile('info string rmse_value=(.+) rmse_winning_percentage=(.+) mean_cross_entropy=(.+) norm=(.+)').search(output)
             rmse_value = float(matched.group(1))
             rmse_winning_percentage = float(matched.group(2))
