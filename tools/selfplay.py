@@ -57,7 +57,7 @@ usinewgame
 go btime 1000 byoyomi 1
 '''.encode('utf-8')
             completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, check=True)
-            output = completed_process.stdout
+            output = completed_process.stdout.decode('utf-8')
             print(output)
             matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(output)
             lose = float(matched.group(1))
@@ -83,7 +83,7 @@ setoption name Threads value 48
 error_measurement
 '''.format(os.path.join(learner_output_folder_path, subfolder)).encode('utf-8')
             completed_process = subprocess.run([learner_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
-            output = completed_process.stdout
+            output = completed_process.stdout.decode('utf-8')
             print(output)
             matched = re.compile('info string rmse_value=(.+) rmse_winning_percentage=(.+) mean_cross_entropy=(.+) norm=(.+)').search(output)
             rmse_value = float(matched.group(1))
