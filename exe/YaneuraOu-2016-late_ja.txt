@@ -55,3 +55,4 @@ PvInterval PVの出力の抑制時間[ms]
 
 nodestime nodes as time
 EngineNuma EngineNuma
+ResignValue 投了スコア

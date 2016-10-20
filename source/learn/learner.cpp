@@ -364,16 +364,15 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
 
 			{
 				// search_depth手読みの評価値とPV(最善応手列)
-				auto pv_value1 = search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
+				// 探索窓を狭めておいても問題ないはず。
+				auto pv_value1 = search(pos, (Value)-eval_limit, (Value)eval_limit, search_depth);
 				auto value1 = pv_value1.first;
 				auto pv1 = pv_value1.second;
 
-#if 1
 				// 評価値の絶対値がこの値以上の局面については
 				// その局面を学習に使うのはあまり意味がないのでこの試合を終了する。
 				if (abs(value1) >= eval_limit)
 					break;
-#endif	
 
 				// 何らかの千日手局面に突入したので局面生成を終了する。
 				auto draw_type = pos.is_repetition();
@@ -621,7 +620,7 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
 					MoveList<LEGAL> list(pos);
 					ExtMove* it2 = (ExtMove*)list.begin();
 					for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
-						if (type_of(pos.moved_piece_after(it->move)) != KING)
+						if (type_of(pos.moved_piece_after(it->move)) == KING)
 							*it2++ = *it;
 							
 					auto size = it2 - list.begin();
@@ -1057,24 +1056,15 @@ struct SfenReader
 			}
 
 			// sfensの用意が出来たので、折を見てコピー
-			while (true)
 			{
-				{
-					std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<Mutex> lk(mutex);
 
-					// 300個ぐらいなのでこの時間は無視できるはず…。
-					auto size2 = packed_sfens_pool.size();
-					packed_sfens_pool.resize(size2+size);
-					for (u64 i = 0; i < size; ++i)
-						packed_sfens_pool[size2 + i] = ptrs[i];
-
-					break;
-				}
-
-				// read_buffer1が空くのを待つ。これは優先されるのでsleepの周期が短いのは許される。
-				sleep(1);
+				// 300個ぐらいなのでこの時間は無視できるはず…。
+				auto size2 = packed_sfens_pool.size();
+				packed_sfens_pool.resize(size2+size);
+				for (u64 i = 0; i < size; ++i)
+					packed_sfens_pool[size2 + i] = ptrs[i];
 			}
-
 		}
 	}
 
@@ -1208,7 +1198,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 40コアでやると100万局面ごとにupdate_weightsするとして、特定のスレッドが
 			// つきっきりになってしまうのあまりよくないような気も…。
 			static u64 rmse_output_count = 0;
-			if ((rmse_output_count++ % LEARN_RMSE_OUTPUT_INTERVAL) == 0)
+			if ((++rmse_output_count % LEARN_RMSE_OUTPUT_INTERVAL) == 0)
 			{
 				// この計算自体も並列化すべきのような…。
 				// この計算をしているときにあまり処理が進みすぎると困るので停止させておくか…。
@@ -1465,6 +1455,8 @@ void learn(Position& pos, istringstream& is)
 	// 評価関数パラメーターの読み込み
 	is_ready();
 
+	cout << "\ninit_grad..";
+
 	// 評価関数パラメーターの勾配配列の初期化
 	Eval::init_grad();
 
@@ -1472,7 +1464,7 @@ void learn(Position& pos, istringstream& is)
 	omp_set_num_threads((int)Options["Threads"]);
 #endif
 
-	cout << "init done." << endl;
+	cout << "\ninit done." << endl;
 
 	// 局面ファイルをバックグラウンドで読み込むスレッドを起動
 	// (これを開始しないとmseの計算が出来ない。)
@@ -1482,6 +1474,14 @@ void learn(Position& pos, istringstream& is)
 
 	// mse計算用にデータ1万件ほど取得しておく。
 	sr.read_for_mse();
+
+#ifdef LEARN_UPDATE_EVERYTIME
+	// 毎回updateするなら学習率の初期化のために最初に呼び出しておく必要がある。
+	Eval::update_weights(mini_batch_size, 1);
+#endif
+
+	// この時点で一度rmseを計算(0 sfenのタイミング)
+	//sr.calc_rmse();
 
 	// -----------------------------------
 	//   評価関数パラメーターの学習の開始

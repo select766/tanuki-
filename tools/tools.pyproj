@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>34e1b03c-ef28-4724-a7d8-334ca4727c90</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>zoukin.py</StartupFile>
+    <StartupFile>selfplay.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>..\exe</WorkingDirectory>
