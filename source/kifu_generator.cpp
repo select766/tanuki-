@@ -274,7 +274,7 @@ void Learner::GenerateKifu()
           record.value = value;
           kifu_writer->Write(record);
           int64_t position_index = global_position_index++;
-          ShowProgress(start, position_index, num_positions, 1000000);
+          ShowProgress(start, position_index, num_positions, 1000'0000);
         }
 
         SetupStates->push(StateInfo());
