@@ -850,10 +850,11 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
 
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
-  std::map<int, int> appearance_frequency;
+  int vector_length = KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
+  std::vector<int> appearance_frequencies(vector_length);
   int thread_index = omp_get_thread_num();
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
-    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
+    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 10'0000LL);
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
@@ -875,8 +876,8 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
       const auto& list1 = pos.eval_list()->piece_list_fw();
 
       // KK
-      ++appearance_frequency[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)];
-      ++appearance_frequency[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)];
+      ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)];
+      ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)];
 
       for (int i = 0; i < PIECE_NO_KING; ++i) {
         Eval::BonaPiece k0 = list0[i];
@@ -888,29 +889,35 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
           // 常にp0 < p1となるようにアクセスする
 
           // KPP
-          ++appearance_frequency[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
-          ++appearance_frequency[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
-          ++appearance_frequency[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)];
-          ++appearance_frequency[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)];
+          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
+          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
+          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)];
+          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)];
 
           // KPP
-          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
-          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
-          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)];
-          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)];
+          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
+          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
+          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)];
+          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)];
         }
 
         // KKP
-        ++appearance_frequency[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)];
-        ++appearance_frequency[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)];
+        ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)];
+        ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)];
       }
     }
+  }
+
+  // 出現頻度, 特徴量因子の数
+  std::map<int, int> result;
+  for (int appearance_frequency : appearance_frequencies) {
+    ++result[appearance_frequency];
   }
 
   std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
   sync_cout << "Writing the result to " << output_file_path << sync_endl;
   std::ofstream ofs(output_file_path);
-  for (const auto& p : appearance_frequency) {
+  for (const auto& p : result) {
     ofs << p.first << "," << p.second << std::endl;
   }
 
