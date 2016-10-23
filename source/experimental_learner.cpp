@@ -868,7 +868,7 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
     num_processed_positions += num_records;
   }
 
-  std::string output_file_path = Options[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH];
+  std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
   std::ofstream ofs(output_file_path);
   for (const auto& p : appearance_frequency) {
     ofs << p.first << "," << p.second << std::endl;
