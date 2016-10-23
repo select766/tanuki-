@@ -854,7 +854,7 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
   std::vector<int> appearance_frequencies(vector_length);
   int thread_index = omp_get_thread_num();
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
-    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 10'0000LL);
+    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
 
     int num_records = static_cast<int>(std::min(
       kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
