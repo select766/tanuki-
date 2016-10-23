@@ -836,3 +836,46 @@ void Learner::CalculateValueHistogram() {
     std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
   sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
 }
+
+void Learner::CalculateAppearanceFrequencyHistogram() {
+  sync_cout << "Learner::CalculateAppearanceFrequencyHistogram()" << sync_endl;
+
+  Eval::eval_learn_init();
+
+  auto start = std::chrono::system_clock::now();
+
+  sync_cout << "Initializing kifu reader..." << sync_endl;
+  std::unique_ptr<Learner::KifuReader> kifu_reader =
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+
+  sync_cout << "Reading kifu..." << sync_endl;
+  std::vector<Record> records;
+  std::map<int, int> appearance_frequency;
+  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
+    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
+
+    int num_records = static_cast<int>(std::min(
+      kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
+    if (!kifu_reader->Read(num_records, records)) {
+      break;
+    }
+
+    for (const auto& record : records) {
+      int value = record.value;
+      ++appearance_frequency[value];
+    }
+
+    num_processed_positions += num_records;
+  }
+
+  std::string output_file_path = Options[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH];
+  std::ofstream ofs(output_file_path);
+  for (const auto& p : appearance_frequency) {
+    ofs << p.first << "," << p.second << std::endl;
+  }
+
+  auto elapsed = std::chrono::system_clock::now() - start;
+  double elapsed_sec = static_cast<double>(
+    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
+}

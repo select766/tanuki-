@@ -293,6 +293,7 @@ namespace USI
     o[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
     o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
     o[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
+    o[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
   }
@@ -758,6 +759,10 @@ void USI::loop(int argc, char* argv[])
     }
     else if (token == "calculate_value_histogram") {
       Learner::CalculateValueHistogram();
+      break;
+    }
+    else if (token == "calculate_appearance_frequency_histogram") {
+      Learner::CalculateAppearanceFrequencyHistogram();
       break;
     }
     else
