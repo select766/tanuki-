@@ -707,7 +707,7 @@ void Learner::MeasureFillingFactor() {
   int64_t max_positions_for_learning;
   if (!(std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
     >> max_positions_for_learning)) {
-    sync_cout << "Failed to parse an option: " << Learner::OPTION_LEARNER_NUM_POSITIONS  << "="
+    sync_cout << "Failed to parse an option: " << Learner::OPTION_LEARNER_NUM_POSITIONS << "="
       << (std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS] << sync_endl;
     std::exit(1);
   }
@@ -852,7 +852,6 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
   std::vector<Record> records;
   int vector_length = KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
   std::vector<int> appearance_frequencies(vector_length);
-  int thread_index = omp_get_thread_num();
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
     ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
 
@@ -863,52 +862,59 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
     }
     num_processed_positions += num_records;
 
-    for (const auto& record : records) {
-      Thread& thread = *Threads[thread_index];
-      Position& pos = thread.rootPos;
-      pos.set_this_thread(&thread);
-      pos.set_from_packed_sfen(record.packed);
+#pragma omp parallel
+    {
+      int thread_index = omp_get_thread_num();
+#pragma omp for schedule(guided)
+      for (int record_index = 0; record_index < num_records; ++record_index) {
+        const auto& record = records[record_index];
+        Thread& thread = *Threads[thread_index];
+        Position& pos = thread.rootPos;
+        pos.set_this_thread(&thread);
+        pos.set_from_packed_sfen(record.packed);
 
-      // 値を更新する
-      Square sq_bk = pos.king_square(BLACK);
-      Square sq_wk = pos.king_square(WHITE);
-      const auto& list0 = pos.eval_list()->piece_list_fb();
-      const auto& list1 = pos.eval_list()->piece_list_fw();
+        // 値を更新する
+        Square sq_bk = pos.king_square(BLACK);
+        Square sq_wk = pos.king_square(WHITE);
+        const auto& list0 = pos.eval_list()->piece_list_fb();
+        const auto& list1 = pos.eval_list()->piece_list_fw();
 
-      // KK
-      ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)];
-      ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)];
+        // KK
+        ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)];
+        ++appearance_frequencies[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)];
 
-      for (int i = 0; i < PIECE_NO_KING; ++i) {
-        Eval::BonaPiece k0 = list0[i];
-        Eval::BonaPiece k1 = list1[i];
-        for (int j = 0; j < i; ++j) {
-          Eval::BonaPiece l0 = list0[j];
-          Eval::BonaPiece l1 = list1[j];
+        for (int i = 0; i < PIECE_NO_KING; ++i) {
+          Eval::BonaPiece k0 = list0[i];
+          Eval::BonaPiece k1 = list1[i];
+          for (int j = 0; j < i; ++j) {
+            Eval::BonaPiece l0 = list0[j];
+            Eval::BonaPiece l1 = list1[j];
 
-          // 常にp0 < p1となるようにアクセスする
+            // 常にp0 < p1となるようにアクセスする
 
-          // KPP
-          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
-          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
-          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)];
-          ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)];
+            // KPP
+            ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
+            ++appearance_frequencies[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
+            ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)];
+            ++appearance_frequencies[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)];
 
-          // KPP
-          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
-          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
-          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)];
-          ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)];
+            // KPP
+            ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
+            ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
+            ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)];
+            ++appearance_frequencies[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)];
+          }
+
+          // KKP
+          ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)];
+          ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)];
         }
-
-        // KKP
-        ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)];
-        ++appearance_frequencies[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)];
       }
     }
   }
 
   // 出現頻度, 特徴量因子の数
+  sync_cout << "Calculating appearance frequencies." << sync_endl;
   std::map<int, int> result;
   for (int appearance_frequency : appearance_frequencies) {
     ++result[appearance_frequency];
