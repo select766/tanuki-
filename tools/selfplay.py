@@ -79,9 +79,12 @@ def CalculateError(learner_output_folder_path, learner_exe_file_path):
         csvwriter.writerow(['', 'rmse_value', 'rmse_winning_percentage', 'mean_cross_entropy', 'norm'])
         for subfolder in subfolders:
             print(subfolder, flush=True)
-            input = '''setoption name EvalDir value {0}
+            input = '''usi
+            setoption name EvalDir value {0}
 setoption name KifuDir value kifu_for_test
 setoption name Threads value 48
+isready
+usinewgame
 error_measurement
 '''.format(os.path.join(learner_output_folder_path, subfolder)).encode('utf-8')
             completed_process = subprocess.run([learner_exe_file_path], input=input, stdout=subprocess.PIPE, check=True)
