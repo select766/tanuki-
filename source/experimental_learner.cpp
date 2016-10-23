@@ -851,6 +851,7 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
   std::map<int, int> appearance_frequency;
+  int thread_index = omp_get_thread_num();
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
     ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
 
@@ -859,13 +860,51 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
+    num_processed_positions += num_records;
 
     for (const auto& record : records) {
-      int value = record.value;
-      ++appearance_frequency[value];
-    }
+      Thread& thread = *Threads[thread_index];
+      Position& pos = thread.rootPos;
+      pos.set_this_thread(&thread);
+      pos.set_from_packed_sfen(record.packed);
 
-    num_processed_positions += num_records;
+      // 値を更新する
+      Square sq_bk = pos.king_square(BLACK);
+      Square sq_wk = pos.king_square(WHITE);
+      const auto& list0 = pos.eval_list()->piece_list_fb();
+      const auto& list1 = pos.eval_list()->piece_list_fw();
+
+      // KK
+      ++appearance_frequency[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)];
+      ++appearance_frequency[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)];
+
+      for (int i = 0; i < PIECE_NO_KING; ++i) {
+        Eval::BonaPiece k0 = list0[i];
+        Eval::BonaPiece k1 = list1[i];
+        for (int j = 0; j < i; ++j) {
+          Eval::BonaPiece l0 = list0[j];
+          Eval::BonaPiece l1 = list1[j];
+
+          // 常にp0 < p1となるようにアクセスする
+
+          // KPP
+          ++appearance_frequency[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_COLOR)];
+          ++appearance_frequency[KppIndexToRawIndex(sq_bk, k0, l0, WEIGHT_KIND_TURN)];
+          ++appearance_frequency[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_COLOR)];
+          ++appearance_frequency[KppIndexToRawIndex(sq_bk, l0, k0, WEIGHT_KIND_TURN)];
+
+          // KPP
+          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_COLOR)];
+          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), k1, l1, WEIGHT_KIND_TURN)];
+          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_COLOR)];
+          ++appearance_frequency[KppIndexToRawIndex(Inv(sq_wk), l1, k1, WEIGHT_KIND_TURN)];
+        }
+
+        // KKP
+        ++appearance_frequency[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)];
+        ++appearance_frequency[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)];
+      }
+    }
   }
 
   std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
