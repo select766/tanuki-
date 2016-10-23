@@ -916,15 +916,18 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
   // èoåªïpìx, ì¡í•ó àˆéqÇÃêî
   sync_cout << "Calculating appearance frequencies." << sync_endl;
   std::map<int, int> result;
+  int cutoff = 1000;
   for (int appearance_frequency : appearance_frequencies) {
-    ++result[appearance_frequency];
+    ++result[appearance_frequency / cutoff * cutoff];
   }
+
+  int last = result.rbegin()->first;
 
   std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
   sync_cout << "Writing the result to " << output_file_path << sync_endl;
   std::ofstream ofs(output_file_path);
-  for (const auto& p : result) {
-    ofs << p.first << "," << p.second << std::endl;
+  for (int i = 0; i <= last; ++cutoff) {
+    ofs << i << "," << result[i] << std::endl;
   }
 
   auto elapsed = std::chrono::system_clock::now() - start;
