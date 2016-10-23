@@ -926,7 +926,7 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
   std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
   sync_cout << "Writing the result to " << output_file_path << sync_endl;
   std::ofstream ofs(output_file_path);
-  for (int i = 0; i <= last; ++cutoff) {
+  for (int i = 0; i <= last; i += cutoff) {
     ofs << i << "," << result[i] << std::endl;
   }
 
