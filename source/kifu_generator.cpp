@@ -99,7 +99,7 @@ void Learner::GenerateKifu()
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
-  std::atomic_int global_position_index = 0;
+  std::atomic_int64_t global_position_index = 0;
   bool enable_swap = Options[Learner::OPTION_GENERATOR_ENABLE_SWAP];
   int value_threshold = Options[Learner::OPTION_GENERATOR_VALUE_THRESHOLD];
 #pragma omp parallel
