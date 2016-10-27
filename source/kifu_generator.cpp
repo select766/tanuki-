@@ -92,7 +92,8 @@ void Learner::GenerateKifu()
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
   int num_games = Options[Learner::OPTION_GENERATOR_NUM_GAMES];
 
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
@@ -108,32 +109,12 @@ void Learner::GenerateKifu()
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
 	std::random_device random_device;
-	std::mt19937_64 mt19937_64(random_device());
+	std::mt19937_64 mt19937_64(start + thread_index);
 
 #pragma omp for schedule(guided)
     for (int game_index = 0; game_index < num_games; ++game_index) {
       int current_game_index = global_game_index++;
-      if (current_game_index && current_game_index % 10000 == 0) {
-        auto current = std::chrono::system_clock::now();
-        auto elapsed = current - start;
-        double elapsed_sec =
-          static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-        int remaining_sec = static_cast<int>(elapsed_sec / current_game_index * (num_games - current_game_index));
-        int h = remaining_sec / 3600;
-        int m = remaining_sec / 60 % 60;
-        int s = remaining_sec % 60;
-
-        time_t     current_time;
-        struct tm  *local_time;
-
-        time(&current_time);
-        local_time = localtime(&current_time);
-        std::printf("%d / %d (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
-          current_game_index, num_games,
-          local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-          local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
-        std::fflush(stdout);
-      }
+      ShowProgress(start, current_game_index, num_games, 10000);
 
       Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;

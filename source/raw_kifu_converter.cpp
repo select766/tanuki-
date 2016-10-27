@@ -33,7 +33,8 @@ void Learner::ConvertRawKifu() {
   std::uniform_int_distribution<> search_depth_distribution(min_search_depth, max_search_depth);
   std::atomic_int64_t position_index = 0;
   mkdir(kifu_dir.c_str());
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
@@ -51,7 +52,7 @@ void Learner::ConvertRawKifu() {
     KifuWriter writer(output_kifu_file_path);
     Thread& thread = *Threads[thread_index];
     Position& pos = thread.rootPos;
-    std::mt19937_64 mt(start.time_since_epoch().count() + thread_index);
+    std::mt19937_64 mt(start + thread_index);
 
     std::string sfen;
     while (position_index < num_positions && std::getline(ifs, sfen)) {
