@@ -126,7 +126,8 @@ bool Learner::KifuReader::EnsureOpen() {
   find = FindFirstFileA(search_name.c_str(), &find_data);
 
   if (find == INVALID_HANDLE_VALUE) {
-    sync_cout << "info string Failed to find kifu files." << sync_endl;
+    sync_cout << "Failed to find kifu files." << sync_endl;
+    sync_cout << "search_name=" << search_name << sync_endl;
     return false;
   }
 
