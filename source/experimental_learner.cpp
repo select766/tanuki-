@@ -252,30 +252,34 @@ namespace
   }
 }
 
-void Learner::ShowProgress(
-  const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
-  int64_t total_data, int64_t show_per) {
+void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
+    int64_t show_per) {
   if (!current_data || current_data % show_per) {
     return;
   }
-  auto current = std::chrono::system_clock::now();
-  auto elapsed = current - start;
-  double elapsed_sec =
-    static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-  int remaining_sec = static_cast<int>(elapsed_sec / current_data * (total_data - current_data));
-  int h = remaining_sec / 3600;
-  int m = remaining_sec / 60 % 60;
-  int s = remaining_sec % 60;
+  time_t current_time;
+  std::time(&current_time);
+  if (start_time == current_time) {
+      return;
+  }
 
-  time_t     current_time;
-  struct tm  *local_time;
-
-  time(&current_time);
-  local_time = localtime(&current_time);
-  std::printf("%lld / %lld (%04d-%02d-%02d %02d:%02d:%02d remaining %02d:%02d:%02d)\n",
+  time_t elapsed_time = current_time - start_time;
+  int hour = elapsed_time / 3600;
+  int minute = elapsed_time / 60 % 60;
+  int second = elapsed_time % 60;
+  double data_per_time = current_data / static_cast<double>(current_time - start_time);
+  time_t expected_time = current_time + (total_data - current_data) / data_per_time;
+  struct tm *current_tm = std::localtime(&current_time);
+  struct tm *expected_tm = std::localtime(&expected_time);
+  std::printf(
+      "%lld / %lld\n"
+      "        elapsed time = %02d:%02d:%02d\n"
+      "   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
+      "    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
     current_data, total_data,
-    local_time->tm_year + 1900, local_time->tm_mon + 1, local_time->tm_mday,
-    local_time->tm_hour, local_time->tm_min, local_time->tm_sec, h, m, s);
+    hour, minute, second,
+    current_tm->tm_year + 1900, current_tm->tm_mon + 1, current_tm->tm_mday, current_tm->tm_hour, current_tm->tm_min, current_tm->tm_sec,
+    expected_tm->tm_year + 1900, expected_tm->tm_mon + 1, expected_tm->tm_mday, expected_tm->tm_hour, expected_tm->tm_min, expected_tm->tm_sec);
   std::fflush(stdout);
 }
 
@@ -375,7 +379,8 @@ void Learner::Learn(std::istringstream& iss) {
   std::vector<Record> records;
 
   // 全学習データに対してループを回す
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
   int num_mini_batches = 0;
   double learning_rate = kInitialLearningRate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
@@ -608,7 +613,8 @@ void Learner::MeasureError() {
   // 作成・破棄のコストが高いためループの外に宣言する
   std::vector<Record> records;
 
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
   double sum_squared_error_of_value = 0.0;
   double sum_norm = 0.0;
   double sum_squared_error_of_winning_percentage = 0.0;
@@ -667,7 +673,8 @@ void Learner::BenchmarkKifuReader() {
 
   Eval::eval_learn_init();
 
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
 
   sync_cout << "Initializing kifu reader..." << sync_endl;
   std::unique_ptr<Learner::KifuReader> kifu_reader =
@@ -686,11 +693,6 @@ void Learner::BenchmarkKifuReader() {
 
     num_processed_positions += num_records;
   }
-
-  auto elapsed = std::chrono::system_clock::now() - start;
-  double elapsed_sec = static_cast<double>(
-    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
 }
 
 void Learner::MeasureFillingFactor() {
@@ -698,7 +700,8 @@ void Learner::MeasureFillingFactor() {
 
   Eval::eval_learn_init();
 
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
 
   sync_cout << "Initializing kifu reader..." << sync_endl;
   std::unique_ptr<Learner::KifuReader> kifu_reader =
@@ -768,10 +771,6 @@ void Learner::MeasureFillingFactor() {
     }
   }
 
-  auto elapsed = std::chrono::system_clock::now() - start;
-  double elapsed_sec = static_cast<double>(
-    std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
-  sync_cout << "Elapsed time: " << elapsed_sec << sync_endl;
   sync_cout << "Filling factor: "
     << std::accumulate(filled.begin(), filled.end(), 0) / static_cast<double>(vector_length)
     << sync_endl;

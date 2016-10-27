@@ -95,7 +95,8 @@ void Learner::GenerateKifu()
   int64_t num_positions;
   std::istringstream((std::string)Options[Learner::OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
 
-  auto start = std::chrono::system_clock::now();
+  time_t start;
+  std::time(&start);
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
@@ -114,7 +115,7 @@ void Learner::GenerateKifu()
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
     std::random_device random_device;
-    std::mt19937_64 mt19937_64(random_device());
+    std::mt19937_64 mt19937_64(start + thread_index);
 
     while (global_position_index < num_positions) {
       Thread& thread = *Threads[thread_index];

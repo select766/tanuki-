@@ -25,9 +25,8 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
 
-  void ShowProgress(
-    const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
-    int64_t total_data, int64_t show_per);
+  void ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
+      int64_t show_per);
   void Learn(std::istringstream& iss);
   void MeasureError();
   void BenchmarkKifuReader();
