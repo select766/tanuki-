@@ -22,6 +22,9 @@ namespace Learner
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_LEARNER_PV_STRAP_MAX_DEPTH = "LearnerPvStrapMaxDepth";
+  constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
+  constexpr char* OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH = "AppearanceFrequencyHistogramOutputFilePath";
 
   void ShowProgress(
     const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,

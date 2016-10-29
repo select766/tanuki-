@@ -178,38 +178,6 @@ namespace
     eval_weight = static_cast<T>(value);
   }
 
-  // 浅く探索する
-  // pos 探索対象の局面
-  // value 浅い探索の評価値
-  // rootColor 探索対象の局面の手番
-  // return 浅い探索の評価値とPVの末端ノードの評価値が一致していればtrue
-  //        そうでない場合はfalse
-  bool search_shallowly(Position& pos, Value& value, Color& root_color) {
-    Thread& thread = *pos.this_thread();
-    root_color = pos.side_to_move();
-
-    // 0手読み+静止探索を行う
-    auto valueAndPv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
-
-    // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-    // 全計算はPosition::set()の中で行われているので差分計算ができる
-    value = Eval::evaluate(pos);
-    StateInfo stateInfo[MAX_PLY];
-    const std::vector<Move>& pv = valueAndPv.second;
-    for (int play = 0; play < static_cast<int>(pv.size()) && pv[play] != MOVE_NONE; ++play) {
-      pos.do_move(pv[play], stateInfo[play]);
-      value = Eval::evaluate(pos);
-    }
-
-    // Eval::evaluate()は常に手番から見た評価値を返すので
-    // 探索開始局面と手番が違う場合は符号を反転する
-    if (root_color != pos.side_to_move()) {
-      value = -value;
-    }
-
-    return true;
-  }
-
   double sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
   }
@@ -249,6 +217,61 @@ namespace
     double q = winning_percentage(value);
     return q - p;
   }
+
+  // 浅い探索付きの*Strapを行う
+  void Strap(const Learner::Record& record, int pv_strap_max_depth,
+    std::function<void(Value record_value, Value value, Color root_color, Position& pos)> f) {
+    int thread_index = omp_get_thread_num();
+    Thread& thread = *Threads[thread_index];
+    Position& pos = thread.rootPos;
+    pos.set_from_packed_sfen(record.packed);
+    pos.set_this_thread(&thread);
+
+    // 現局面及び記録されたPV中の各局面から浅い探索を行い
+    // 浅い探索のPVの末端ノードの特徴量に対応する勾配の和を計算する
+    StateInfo state_info[MAX_PLY];
+    for (int recorded_pv_play_index = 0; ; ++recorded_pv_play_index) {
+      Color root_color = pos.side_to_move();
+
+      // 0手読み+静止探索を行う
+      auto value_and_pv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+
+      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+      // 全計算はPosition::set()の中で行われているので差分計算ができる
+      Value value = Eval::evaluate(pos);
+      StateInfo stateInfo[MAX_PLY];
+      std::vector<Move>& pv = value_and_pv.second;
+      for (int shallow_search_pv_play_index = 0;
+        shallow_search_pv_play_index < static_cast<int>(pv.size());
+        ++shallow_search_pv_play_index) {
+        pos.do_move(pv[shallow_search_pv_play_index], stateInfo[shallow_search_pv_play_index]);
+        value = Eval::evaluate(pos);
+      }
+
+      // Eval::evaluate()は常に手番から見た評価値を返すので
+      // 探索開始局面と手番が違う場合は符号を反転する
+      if (root_color != pos.side_to_move()) {
+        value = -value;
+      }
+
+      f(static_cast<Value>(record.value), value, root_color, pos);
+
+      // 局面を浅い探索のroot局面にもどす
+      for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
+        pos.undo_move(*rit);
+      }
+
+      if (recorded_pv_play_index >= pv_strap_max_depth ||
+        recorded_pv_play_index >= sizeof(record.pv) / sizeof(record.pv[0]) ||
+        record.pv[recorded_pv_play_index] == Move::MOVE_NONE ||
+        !pos.pseudo_legal(record.pv[recorded_pv_play_index]) ||
+        !pos.legal(record.pv[recorded_pv_play_index])) {
+        break;
+      }
+
+      pos.do_move(record.pv[recorded_pv_play_index], state_info[recorded_pv_play_index]);
+    }
+  }
 }
 
 void Learner::ShowProgress(
@@ -287,10 +310,10 @@ void Learner::Learn(std::istringstream& iss) {
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 #ifndef USE_FALSE_PROBE_IN_TT
-  ASSERT_LV3(false)
+  ASSERT_LV3(false);
 #endif
 
-    Eval::eval_learn_init();
+  Eval::eval_learn_init();
 
   omp_set_num_threads((int)Options["Threads"]);
 
@@ -337,7 +360,8 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+  std::unique_ptr<Learner::KifuReader> kifu_reader =
+    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
 
   Eval::load_eval();
 
@@ -400,6 +424,9 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
+  // 未学習の評価関数ファイルを出力しておく
+  save_eval(output_folder_path_base, 0);
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
     ShowProgress(start, num_processed_positions, max_positions_for_learning, kMiniBatchSize * 10);
 
@@ -417,66 +444,53 @@ void Learner::Learn(std::istringstream& iss) {
       // num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(guided)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        Thread& thread = *Threads[thread_index];
-        Position& pos = thread.rootPos;
-        pos.set_this_thread(&thread);
+        auto f = [&weights](Value record_value, Value value, Color root_color, Position& pos) {
+          WeightType delta = CalculateGradient(record_value, value);
+          // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
+          WeightType delta_color = (root_color == BLACK ? delta : -delta);
+          // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
+          WeightType delta_turn = (root_color == pos.side_to_move() ? delta : -delta);
 
-        pos.set_from_packed_sfen(records[record_index].packed);
-        Value record_value = static_cast<Value>(records[record_index].value);
+          // 値を更新する
+          Square sq_bk = pos.king_square(BLACK);
+          Square sq_wk = pos.king_square(WHITE);
+          const auto& list0 = pos.eval_list()->piece_list_fb();
+          const auto& list1 = pos.eval_list()->piece_list_fw();
 
-        Value value;
-        Color rootColor;
-        pos.set_this_thread(&thread);
-        if (!search_shallowly(pos, value, rootColor)) {
-          continue;
-        }
+          // 勾配の値を加算する
 
-        WeightType delta = CalculateGradient(record_value, value);
-        // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
-        WeightType delta_color = (rootColor == BLACK ? delta : -delta);
-        // 手番から見た評価値の差分。sum.p[?][1]に足したり引いたりする。
-        WeightType delta_turn = (rootColor == pos.side_to_move() ? delta : -delta);
+          // KK
+          weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+          weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-        // 値を更新する
-        Square sq_bk = pos.king_square(BLACK);
-        Square sq_wk = pos.king_square(WHITE);
-        const auto& list0 = pos.eval_list()->piece_list_fb();
-        const auto& list1 = pos.eval_list()->piece_list_fw();
+          for (int i = 0; i < PIECE_NO_KING; ++i) {
+            Eval::BonaPiece k0 = list0[i];
+            Eval::BonaPiece k1 = list1[i];
+            for (int j = 0; j < i; ++j) {
+              Eval::BonaPiece l0 = list0[j];
+              Eval::BonaPiece l1 = list1[j];
 
-        // 勾配の値を加算する
+              // 常にp0 < p1となるようにアクセスする
 
-        // KK
-        weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-        weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+              // KPP
+              Eval::BonaPiece p0b = std::min(k0, l0);
+              Eval::BonaPiece p1b = std::max(k0, l0);
+              weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+              weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
 
-        for (int i = 0; i < PIECE_NO_KING; ++i) {
-          Eval::BonaPiece k0 = list0[i];
-          Eval::BonaPiece k1 = list1[i];
-          for (int j = 0; j < i; ++j) {
-            Eval::BonaPiece l0 = list0[j];
-            Eval::BonaPiece l1 = list1[j];
+              // KPP
+              Eval::BonaPiece p0w = std::min(k1, l1);
+              Eval::BonaPiece p1w = std::max(k1, l1);
+              weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
+              weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+            }
 
-            // 常にp0 < p1となるようにアクセスする
-
-            // KPP
-            Eval::BonaPiece p0b = std::min(k0, l0);
-            Eval::BonaPiece p1b = std::max(k0, l0);
-            weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-            weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
-
-            // KPP
-            Eval::BonaPiece p0w = std::min(k1, l1);
-            Eval::BonaPiece p1w = std::max(k1, l1);
-            weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
-            weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+            // KKP
+            weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
+            weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
           }
-
-          // KKP
-          weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-          weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
-        }
-
-        // 局面は元に戻さなくても問題ない
+        };
+        Strap(records[record_index], pv_strap_max_depth, f);
       }
 
       // 重みを更新する
@@ -610,6 +624,7 @@ void Learner::MeasureError() {
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
+  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
 
   Eval::load_eval();
 
@@ -641,29 +656,19 @@ void Learner::MeasureError() {
     // ミニバッチ
 #pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy) schedule(guided)
     for (int record_index = 0; record_index < num_records; ++record_index) {
-      int thread_index = omp_get_thread_num();
-      Thread& thread = *Threads[thread_index];
-      Position& pos = thread.rootPos;
-      pos.set_this_thread(&thread);
-
-      pos.set_from_packed_sfen(records[record_index].packed);
-      Value record_value = static_cast<Value>(records[record_index].value);
-
-      Value value;
-      Color rootColor;
-      pos.set_this_thread(&thread);
-      if (!search_shallowly(pos, value, rootColor)) {
-        continue;
-      }
-
-      double diff_value = record_value - value;
-      sum_squared_error_of_value += diff_value * diff_value;
-      double p = winning_percentage(record_value);
-      double q = winning_percentage(value);
-      double diff_winning_percentage = p - q;
-      sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
-      sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
-      sum_norm += abs(value);
+      auto f = [&sum_squared_error_of_value, &sum_squared_error_of_winning_percentage,
+        &sum_cross_entropy, &sum_norm](Value record_value, Value value, Color root_color,
+          Position& pos) {
+        double diff_value = record_value - value;
+        sum_squared_error_of_value += diff_value * diff_value;
+        double p = winning_percentage(record_value);
+        double q = winning_percentage(value);
+        double diff_winning_percentage = p - q;
+        sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
+        sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+        sum_norm += abs(value);
+      };
+      Strap(records[record_index], pv_strap_max_depth, f);
     }
 
     num_processed_positions += num_records;
@@ -682,6 +687,8 @@ void Learner::BenchmarkKifuReader() {
   sync_cout << "Learner::BenchmarkKifuReader()" << sync_endl;
 
   Eval::eval_learn_init();
+
+  omp_set_num_threads((int)Options["Threads"]);
 
   auto start = std::chrono::system_clock::now();
 
