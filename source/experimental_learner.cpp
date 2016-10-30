@@ -227,6 +227,11 @@ namespace
     Position& pos = thread.rootPos;
     pos.set_from_packed_sfen(record.packed);
     pos.set_this_thread(&thread);
+    if (!pos.pos_is_ok()) {
+      sync_cout << "Position is not ok! Exiting..." << sync_endl;
+      sync_cout << pos << sync_endl;
+      std::exit(1);
+    }
 
     // Œ»‹Ç–Ê‹y‚Ñ‹L˜^‚³‚ê‚½PV’†‚ÌŠe‹Ç–Ê‚©‚çó‚¢’Tõ‚ðs‚¢
     // ó‚¢’Tõ‚ÌPV‚Ì––’[ƒm[ƒh‚Ì“Á’¥—Ê‚É‘Î‰ž‚·‚éŒù”z‚Ì˜a‚ðŒvŽZ‚·‚é
