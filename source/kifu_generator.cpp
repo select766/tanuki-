@@ -259,8 +259,7 @@ void Learner::GenerateKifu()
           break;
         }
         int search_depth = search_depth_distribution(mt19937_64);
-        auto valueAndPv = Learner::search(pos, static_cast<Value>(-value_threshold),
-          static_cast<Value>(value_threshold), search_depth);
+        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         Value value = valueAndPv.first;
@@ -269,7 +268,7 @@ void Learner::GenerateKifu()
           break;
         }
 
-        if (std::abs(value) >= value_threshold) {
+        if (std::abs(value) > value_threshold) {
           break;
         }
 
