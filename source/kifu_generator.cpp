@@ -268,6 +268,10 @@ void Learner::GenerateKifu()
           break;
         }
 
+        if (std::abs(value) > value_threshold) {
+          break;
+        }
+
         // 局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
           Learner::Record record = { 0 };
@@ -287,10 +291,6 @@ void Learner::GenerateKifu()
 
         SetupStates->push(StateInfo());
         pos.do_move(pv[0], SetupStates->top());
-
-        if (std::abs(value) > value_threshold) {
-          break;
-        }
       }
     }
   }
