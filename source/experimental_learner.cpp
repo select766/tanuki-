@@ -12,6 +12,9 @@
 #include "search.h"
 #include "thread.h"
 
+using USI::Option;
+using USI::OptionsMap;
+
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -62,7 +65,6 @@ namespace
     void Finalize(int num_mini_batches, T& eval_weight);
   };
 
-
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -74,6 +76,11 @@ namespace
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
+
+  constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_LEARNER_PV_STRAP_MAX_DEPTH = "LearnerPvStrapMaxDepth";
+  constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
+  constexpr char* OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH = "AppearanceFrequencyHistogramOutputFilePath";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -252,15 +259,22 @@ namespace
   }
 }
 
+void Learner::InitializeLearner(USI::OptionsMap& o) {
+  o[OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
+  o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
+  o[OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
+  o[OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
+}
+
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
-    int64_t show_per) {
+  int64_t show_per) {
   if (!current_data || current_data % show_per) {
     return;
   }
   time_t current_time;
   std::time(&current_time);
   if (start_time == current_time) {
-      return;
+    return;
   }
 
   time_t elapsed_time = current_time - start_time;
@@ -272,10 +286,10 @@ void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64
   struct tm current_tm = *std::localtime(&current_time);
   struct tm expected_tm = *std::localtime(&expected_time);
   std::printf(
-      "%lld / %lld\n"
-      "        elapsed time = %02d:%02d:%02d\n"
-      "   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
-      "    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
+    "%lld / %lld\n"
+    "        elapsed time = %02d:%02d:%02d\n"
+    "   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
+    "    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
     current_data, total_data,
     hour, minute, second,
     current_tm.tm_year + 1900, current_tm.tm_mon + 1, current_tm.tm_mday, current_tm.tm_hour, current_tm.tm_min, current_tm.tm_sec,
@@ -385,7 +399,8 @@ void Learner::Learn(std::istringstream& iss) {
   double learning_rate = kInitialLearningRate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
   // 未学習の評価関数ファイルを出力しておく
   save_eval(output_folder_path_base, 0);
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
@@ -708,8 +723,12 @@ void Learner::MeasureFillingFactor() {
     std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
 
   int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
-    >> max_positions_for_learning;
+  if (!(std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS])
+    >> max_positions_for_learning)) {
+    sync_cout << "Failed to parse an option: " << OPTION_LEARNER_NUM_POSITIONS << "="
+      << (std::string)Options[OPTION_LEARNER_NUM_POSITIONS] << sync_endl;
+    std::exit(1);
+  }
 
   sync_cout << "Reading kifu..." << sync_endl;
   std::vector<Record> records;
