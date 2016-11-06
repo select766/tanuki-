@@ -138,7 +138,6 @@ void Learner::GenerateKifu()
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
-    std::random_device random_device;
     std::mt19937_64 mt19937_64(start + thread_index);
 
     while (global_position_index < num_positions) {
