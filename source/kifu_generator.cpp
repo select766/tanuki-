@@ -14,6 +14,8 @@
 #include "thread.h"
 
 using Search::RootMove;
+using USI::Option;
+using USI::OptionsMap;
 
 namespace Learner
 {
@@ -27,13 +29,23 @@ namespace
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
 
+  constexpr char* OPTION_GENERATOR_NUM_POSITIONS = "GeneratorNumPositions";
+  constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";
+  constexpr char* OPTION_GENERATOR_MAX_SEARCH_DEPTH = "GeneratorMaxSearchDepth";
+  constexpr char* OPTION_GENERATOR_KIFU_TAG = "GeneratorKifuTag";
+  constexpr char* OPTION_GENERATOR_BOOK_FILE_NAME = "GeneratorStartposFileName";
+  constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
+  constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
+  constexpr char* OPTION_GENERATOR_ENABLE_SWAP = "GeneratorEnableSwap";
+  constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
+
   std::vector<std::string> book;
   std::uniform_int_distribution<> swap_distribution(0, 9);
 
   bool ReadBook()
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
-    std::string book_file_name = Options[Learner::OPTION_GENERATOR_BOOK_FILE_NAME];
+    std::string book_file_name = Options[OPTION_GENERATOR_BOOK_FILE_NAME];
     std::ifstream fs_book;
     fs_book.open(book_file_name);
 
@@ -56,6 +68,18 @@ namespace
     std::cout << std::endl;
     return true;
   }
+}
+
+void Learner::InitializeGenerator(USI::OptionsMap& o) {
+  o[OPTION_GENERATOR_NUM_POSITIONS] << Option("10000000000");
+  o[OPTION_GENERATOR_MIN_SEARCH_DEPTH] << Option(3, 1, MAX_PLY);
+  o[OPTION_GENERATOR_MAX_SEARCH_DEPTH] << Option(4, 1, MAX_PLY);
+  o[OPTION_GENERATOR_KIFU_TAG] << Option("default_tag");
+  o[OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
+  o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
+  o[OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
+  o[OPTION_GENERATOR_ENABLE_SWAP] << Option(true);
+  o[OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
 }
 
 void Learner::GenerateKifu()
@@ -86,14 +110,14 @@ void Learner::GenerateKifu()
   std::string kifu_directory = (std::string)Options["KifuDir"];
   _mkdir(kifu_directory.c_str());
 
-  int min_search_depth = Options[Learner::OPTION_GENERATOR_MIN_SEARCH_DEPTH];
-  int max_search_depth = Options[Learner::OPTION_GENERATOR_MAX_SEARCH_DEPTH];
+  int min_search_depth = Options[OPTION_GENERATOR_MIN_SEARCH_DEPTH];
+  int max_search_depth = Options[OPTION_GENERATOR_MAX_SEARCH_DEPTH];
   std::uniform_int_distribution<> search_depth_distribution(min_search_depth, max_search_depth);
-  int min_book_move = Options[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE];
-  int max_book_move = Options[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE];
+  int min_book_move = Options[OPTION_GENERATOR_MIN_BOOK_MOVE];
+  int max_book_move = Options[OPTION_GENERATOR_MAX_BOOK_MOVE];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
   int64_t num_positions;
-  std::istringstream((std::string)Options[Learner::OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
+  std::istringstream((std::string)Options[OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
 
   time_t start;
   std::time(&start);
@@ -101,13 +125,13 @@ void Learner::GenerateKifu()
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
   std::atomic_int64_t global_position_index = 0;
-  bool enable_swap = Options[Learner::OPTION_GENERATOR_ENABLE_SWAP];
-  int value_threshold = Options[Learner::OPTION_GENERATOR_VALUE_THRESHOLD];
+  bool enable_swap = Options[OPTION_GENERATOR_ENABLE_SWAP];
+  int value_threshold = Options[OPTION_GENERATOR_VALUE_THRESHOLD];
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
-    std::string output_file_name_tag = Options[Learner::OPTION_GENERATOR_KIFU_TAG];
+    std::string output_file_name_tag = Options[OPTION_GENERATOR_KIFU_TAG];
     std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
       output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
       thread_index);
