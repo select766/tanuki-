@@ -12,6 +12,9 @@
 #include "search.h"
 #include "thread.h"
 
+using USI::Option;
+using USI::OptionsMap;
+
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -62,7 +65,6 @@ namespace
     void Finalize(int num_mini_batches, T& eval_weight);
   };
 
-
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -74,6 +76,11 @@ namespace
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 10'0000LL;
+
+  constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_LEARNER_PV_STRAP_MAX_DEPTH = "LearnerPvStrapMaxDepth";
+  constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
+  constexpr char* OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH = "AppearanceFrequencyHistogramOutputFilePath";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -275,6 +282,13 @@ namespace
   }
 }
 
+void Learner::InitializeLearner(USI::OptionsMap& o) {
+  o[OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
+  o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
+  o[OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
+  o[OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
+}
+
 void Learner::ShowProgress(
   const std::chrono::time_point<std::chrono::system_clock>& start, int64_t current_data,
   int64_t total_data, int64_t show_per) {
@@ -404,7 +418,7 @@ void Learner::Learn(std::istringstream& iss) {
   double learning_rate = kInitialLearningRate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
   int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
   // 未学習の評価関数ファイルを出力しておく
   save_eval(output_folder_path_base, 0);
@@ -712,10 +726,10 @@ void Learner::MeasureFillingFactor() {
     std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], false);
 
   int64_t max_positions_for_learning;
-  if (!(std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS])
+  if (!(std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS])
     >> max_positions_for_learning)) {
-    sync_cout << "Failed to parse an option: " << Learner::OPTION_LEARNER_NUM_POSITIONS << "="
-      << (std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS] << sync_endl;
+    sync_cout << "Failed to parse an option: " << OPTION_LEARNER_NUM_POSITIONS << "="
+      << (std::string)Options[OPTION_LEARNER_NUM_POSITIONS] << sync_endl;
     std::exit(1);
   }
 
@@ -836,7 +850,7 @@ void Learner::CalculateValueHistogram() {
     num_processed_positions += num_records;
   }
 
-  std::string output_file_path = Options[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH];
+  std::string output_file_path = Options[OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH];
   std::ofstream ofs(output_file_path);
   for (int value = -32000; value <= 32000; value += 100) {
     int index = (value + offset) / 100;
@@ -937,7 +951,7 @@ void Learner::CalculateAppearanceFrequencyHistogram() {
 
   //int last = result.rbegin()->first;
 
-  std::string output_file_path = Options[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
+  std::string output_file_path = Options[OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH];
   sync_cout << "Writing the result to " << output_file_path << sync_endl;
   FILE* file = std::fopen(output_file_path.c_str(), "wt");
   std::setvbuf(file, nullptr, _IOFBF, 1024 * 1024);

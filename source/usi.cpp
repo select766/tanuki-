@@ -284,17 +284,8 @@ namespace USI
     o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
-    o[Learner::OPTION_GENERATOR_NUM_GAMES] << Option(2000'0000, 1, std::numeric_limits<int>::max());
-    o[Learner::OPTION_GENERATOR_MIN_SEARCH_DEPTH] << Option(3, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_MAX_SEARCH_DEPTH] << Option(4, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_KIFU_TAG] << Option("default_tag");
-    o[Learner::OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
-    o[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(16, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
-    o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
-    o[Learner::OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
-    o[Learner::OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
-    o[Learner::OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
+    Learner::InitializeGenerator(o);
+    Learner::InitializeLearner(o);
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
   }
