@@ -11,7 +11,7 @@ setoption name GeneratorStartposFileName value startpos.sfen
 setoption name GeneratorMinBookMove value 0
 setoption name GeneratorMaxBookMove value 32
 setoption name GeneratorValueThreshold value 
-setoption name GeneratorMoveKingTo24Probability value 0.0
+setoption name GeneratorDoRandomKingMoveProbability value 0.0
 setoption name GeneratorSwapTwoPiecesProbability value 0.0
 setoption name GeneratorDoRandomMoveProbability value 0.0
 setoption name GeneratorDoRandomMoveAfterBook value false

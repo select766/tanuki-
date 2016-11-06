@@ -37,7 +37,7 @@ namespace
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
   constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
-  constexpr char* OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY = "GeneratorMoveKingTo24Probability";
+  constexpr char* OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY = "GeneratorDoRandomKingMoveProbability";
   constexpr char* OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY = "GeneratorSwapTwoPiecesProbability";
   constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY = "GeneratorDoRandomMoveProbability";
   constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK = "GeneratorDoRandomMoveAfterBook";
@@ -84,57 +84,29 @@ namespace
     return value;
   }
 
-  // 玉が2回移動する指し手
-  // https://github.com/HiraokaTakuya/apery/blob/master/src/usi.cpp
-  void MoveKingTo24(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
-    Move moves[24];
-    int num_moves = 0;
-    for (Rank delta_rank = static_cast<Rank>(-2); delta_rank <= 2; ++delta_rank) {
-      for (File delta_file = static_cast<File>(-2); delta_file <= 2; ++delta_file) {
-        if (delta_rank == 0 && delta_file == 0) {
-          continue;
-        }
-        Color us = pos.side_to_move();
-        Color them = ~us;
-        Square king_square = pos.king_square(us);
-        Rank king_rank = rank_of(king_square);
-        File king_file = file_of(king_square);
+  // 王が移動する指し手からランダムに1手選んで指す
+  bool DoRandomKingMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+    MoveList<LEGAL> list(pos);
+    ExtMove* it2 = (ExtMove*)list.begin();
+    for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
+      if (type_of(pos.moved_piece_after(it->move)) == KING)
+        *it2++ = *it;
 
-        Rank new_king_rank = king_rank + delta_rank;
-        if (!is_ok(new_king_rank)) {
-          continue;
-        }
-
-        File new_king_file = king_file + delta_file;
-        if (!is_ok(new_king_file)) {
-          continue;
-        }
-
-        // 移動先に相手の駒が利いている場合は何もしない
-        Square new_king_sqaure = new_king_file | new_king_rank;
-        if (pos.effected_to(them, new_king_sqaure)) {
-          continue;
-        }
-        if (pos.pieces() & new_king_sqaure) {
-          continue;
-        }
-        Move move = make_move(king_square, new_king_sqaure);
-        moves[num_moves++] = move;
-      }
+    auto size = it2 - list.begin();
+    if (size == 0) {
+      return false;
     }
 
-    if (num_moves == 0) {
-      return;
-    }
-
-    Move move = moves[std::uniform_int_distribution<>(0, num_moves - 1)(mt)];
+    // ランダムにひとつ選ぶ
     state_stack->push(StateInfo());
-    pos.do_move(move, state_stack->top());
+    pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
+      state_stack->top());
+    return true;
   }
 
   // 2駒をランダムに入れ替える
   // https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-  void SwapTwoPieces(Position& pos, std::mt19937_64& mt) {
+  bool SwapTwoPieces(Position& pos, std::mt19937_64& mt) {
     for (int retry = 0; retry < 10; ++retry) {
       // 手番側の駒を2駒入れ替える。
 
@@ -168,48 +140,22 @@ namespace
           sync_cout << pos << sq1 << sq2 << sync_endl;
         }
 
-        break;
+        return true;
       }
     }
+
+    return false;
   }
 
   // 合法手の中からランダムに1手指す
   //https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-  void DoRandomMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+  bool DoRandomMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
     // 合法手のなかからランダムに1手選ぶフェーズ
     MoveList<LEGAL> list(pos);
     Move m = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
-
-    // これが玉の移動であれば、1/2の確率で再度玉を移動させて、なるべく色んな位置の玉に対するデータを集める。
-    // ただし王手がかかっている局面だと手抜くと玉を取られてしまうのでNG
-    bool king_move = type_of(pos.moved_piece_after(m)) == KING;
     state_stack->push(StateInfo());
     pos.do_move(m, state_stack->top());
-
-    if (king_move && !pos.in_check() && (mt() & 1)) {
-      // 手番を変更する。
-      state_stack->push(StateInfo());
-      pos.do_null_move(state_stack->top());
-
-      // 再度、玉の移動する指し手をランダムに選ぶ
-      MoveList<LEGAL> list(pos);
-      ExtMove* it2 = (ExtMove*)list.begin();
-      for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
-        if (type_of(pos.moved_piece_after(it->move)) == KING)
-          *it2++ = *it;
-
-      auto size = it2 - list.begin();
-      if (size == 0) {
-        // 局面を戻しておく。
-        pos.undo_null_move();
-      }
-      else {
-        // ランダムにひとつ選ぶ
-        state_stack->push(StateInfo());
-        pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
-          state_stack->top());
-      }
-    }
+    return true;
   }
 }
 
@@ -222,7 +168,7 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
   o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
   o[OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
   o[OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
-  o[OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY] << Option("0.1");
+  o[OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY] << Option("0.1");
   o[OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY] << Option("0.1");
   o[OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY] << Option("0.1");
   o[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK] << Option(true);
@@ -263,10 +209,10 @@ void Learner::GenerateKifu()
   int max_book_move = Options[OPTION_GENERATOR_MAX_BOOK_MOVE];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
   int64_t num_positions = ParseOptionOrDie<int64_t>(OPTION_GENERATOR_NUM_POSITIONS);
+  double do_random_king_move_probability =
+    ParseOptionOrDie<double>(OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY);
   double swap_two_pieces_probability =
     ParseOptionOrDie<double>(OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY);
-  double move_king_to_24_probability =
-    ParseOptionOrDie<double>(OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY);
   double do_random_move_probability =
     ParseOptionOrDie<double>(OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY);
   bool do_random_move_after_book = (bool)Options[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK];
@@ -363,24 +309,28 @@ void Learner::GenerateKifu()
           ShowProgress(start, position_index, num_positions, 1000'0000);
         }
 
+        // 指定した確率に従って特別な指し手を指す
         double r = probability_distribution(mt19937_64);
-        if (r < move_king_to_24_probability) {
+        bool special_move_is_done = false;
+        if (r < do_random_king_move_probability) {
           if (!pos.in_check()) {
-            MoveKingTo24(pos, mt19937_64, SetupStates);
+            special_move_is_done = DoRandomKingMove(pos, mt19937_64, SetupStates);
           }
         }
-        else if (r < move_king_to_24_probability + swap_two_pieces_probability) {
+        else if (r < do_random_king_move_probability + swap_two_pieces_probability) {
           if (!pos.in_check() && pos.pieces(pos.side_to_move()).pop_count() >= 6) {
-            SwapTwoPieces(pos, mt19937_64);
+            special_move_is_done = SwapTwoPieces(pos, mt19937_64);
           }
         }
-        else if (r < move_king_to_24_probability + swap_two_pieces_probability +
+        else if (r < do_random_king_move_probability + swap_two_pieces_probability +
           do_random_move_probability) {
           if (!pos.in_check()) {
-            DoRandomMove(pos, mt19937_64, SetupStates);
+            special_move_is_done = DoRandomMove(pos, mt19937_64, SetupStates);
           }
         }
-        else {
+
+        // 特別な指し手が指されなかった場合は探索による指し手を指す
+        if (!special_move_is_done) {
           SetupStates->push(StateInfo());
           pos.do_move(pv[0], SetupStates->top());
         }
