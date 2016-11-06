@@ -5,7 +5,6 @@
 #include "kifu_generator.h"
 #include "misc.h"
 #include "position.h"
-#include "raw_kifu_converter.h"
 #include "search.h"
 #include "shogi.h"
 #include "thread.h"
@@ -284,20 +283,8 @@ namespace USI
 		o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
-    o[Learner::OPTION_GENERATOR_NUM_GAMES] << Option(2000'0000, 1, std::numeric_limits<int>::max());
-    o[Learner::OPTION_GENERATOR_MIN_SEARCH_DEPTH] << Option(3, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_MAX_SEARCH_DEPTH] << Option(4, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_KIFU_TAG] << Option("default_tag");
-    o[Learner::OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
-    o[Learner::OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(16, 1, MAX_PLY);
-    o[Learner::OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
-    o[Learner::OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
-    o[Learner::OPTION_LEARNING_RATE] << Option("0.5");
-    o[Learner::OPTION_CONVERTER_NUM_POSITIONS] << Option("10000000000");
-    o[Learner::OPTION_CONVERTER_RAW_KIFU_FILE_PATH_FORMAT] << Option("raw_kifu/raw_kifu.%02d.sfen");
-    o[Learner::OPTION_CONVERTER_MIN_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
-    o[Learner::OPTION_CONVERTER_MAX_SEARCH_DEPTH] << Option(6, 1, MAX_PLY);
-    o[Learner::OPTION_CONVERTER_KIFU_TAG] << Option("default_tag");
+    Learner::InitializeGenerator(o);
+    Learner::InitializeLearner(o);
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
@@ -752,10 +739,6 @@ void USI::loop(int argc, char* argv[])
     }
     else if (token == "kifu_reader_benchmark") {
       Learner::BenchmarkKifuReader();
-      break;
-    }
-    else if (token == "convert_raw_kifu" || token == "c") {
-      Learner::ConvertRawKifu();
       break;
     }
     else

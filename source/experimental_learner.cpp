@@ -11,6 +11,9 @@
 #include "search.h"
 #include "thread.h"
 
+using USI::Option;
+using USI::OptionsMap;
+
 namespace Learner
 {
   std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
@@ -61,7 +64,6 @@ namespace
     void Finalize(int num_mini_batches, T& eval_weight);
   };
 
-
   constexpr int kFvScale = 32;
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
@@ -72,6 +74,12 @@ namespace
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 100'0000LL;
+
+  constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
+  constexpr char* OPTION_LEARNER_PV_STRAP_MAX_DEPTH = "LearnerPvStrapMaxDepth";
+  constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
+  constexpr char* OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH = "AppearanceFrequencyHistogramOutputFilePath";
+  constexpr char* OPTION_LEARNING_RATE = "LearningRate";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -252,6 +260,14 @@ namespace
   }
 }
 
+void Learner::InitializeLearner(USI::OptionsMap& o) {
+  o[OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
+  o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
+  o[OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
+  o[OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
+  o[OPTION_LEARNING_RATE] << Option("0.5");
+}
+
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
     int64_t show_per) {
   if (!current_data || current_data % show_per) {
@@ -384,10 +400,11 @@ void Learner::Learn(std::istringstream& iss) {
   std::time(&start);
   int num_mini_batches = 0;
   double learning_rate;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNING_RATE]) >> learning_rate;
+  std::istringstream((std::string)Options[OPTION_LEARNING_RATE]) >> learning_rate;
   int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
   int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[Learner::OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
+  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
   // 未学習の評価関数ファイルを出力しておく
   save_eval(output_folder_path_base, 0);
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
@@ -674,6 +691,8 @@ void Learner::BenchmarkKifuReader() {
   sync_cout << "Learner::BenchmarkKifuReader()" << sync_endl;
 
   Eval::eval_learn_init();
+
+  omp_set_num_threads((int)Options["Threads"]);
 
   time_t start;
   std::time(&start);
