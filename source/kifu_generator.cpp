@@ -36,11 +36,14 @@ namespace
   constexpr char* OPTION_GENERATOR_BOOK_FILE_NAME = "GeneratorStartposFileName";
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
-  constexpr char* OPTION_GENERATOR_ENABLE_SWAP = "GeneratorEnableSwap";
   constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
+  constexpr char* OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY = "GeneratorMoveKingTo24Probability";
+  constexpr char* OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY = "GeneratorSwapTwoPiecesProbability";
+  constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY = "GeneratorDoRandomMoveProbability";
+  constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK = "GeneratorDoRandomMoveAfterBook";
 
   std::vector<std::string> book;
-  std::uniform_int_distribution<> swap_distribution(0, 9);
+  std::uniform_real_distribution<> probability_distribution;
 
   bool ReadBook()
   {
@@ -68,6 +71,146 @@ namespace
     std::cout << std::endl;
     return true;
   }
+
+  template<typename T>
+  T ParseOptionOrDie(const char* name) {
+    std::string value_string = (std::string)Options[name];
+    std::istringstream iss(value_string);
+    T value;
+    if (!(iss >> value)) {
+      sync_cout << "Failed to parse an option. Exitting...: name=" << name << " value=" << value << sync_endl;
+      std::exit(1);
+    }
+    return value;
+  }
+
+  // 玉が2回移動する指し手
+  // https://github.com/HiraokaTakuya/apery/blob/master/src/usi.cpp
+  void MoveKingTo24(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+    Move moves[24];
+    int num_moves = 0;
+    for (Rank delta_rank = static_cast<Rank>(-2); delta_rank <= 2; ++delta_rank) {
+      for (File delta_file = static_cast<File>(-2); delta_file <= 2; ++delta_file) {
+        if (delta_rank == 0 && delta_file == 0) {
+          continue;
+        }
+        Color us = pos.side_to_move();
+        Color them = ~us;
+        Square king_square = pos.king_square(us);
+        Rank king_rank = rank_of(king_square);
+        File king_file = file_of(king_square);
+
+        Rank new_king_rank = king_rank + delta_rank;
+        if (!is_ok(new_king_rank)) {
+          continue;
+        }
+
+        File new_king_file = king_file + delta_file;
+        if (!is_ok(new_king_file)) {
+          continue;
+        }
+
+        // 移動先に相手の駒が利いている場合は何もしない
+        Square new_king_sqaure = new_king_file | new_king_rank;
+        if (pos.effected_to(them, new_king_sqaure)) {
+          continue;
+        }
+        if (pos.pieces() & new_king_sqaure) {
+          continue;
+        }
+        Move move = make_move(king_square, new_king_sqaure);
+        moves[num_moves++] = move;
+      }
+    }
+
+    if (num_moves == 0) {
+      return;
+    }
+
+    Move move = moves[std::uniform_int_distribution<>(0, num_moves - 1)(mt)];
+    state_stack->push(StateInfo());
+    pos.do_move(move, state_stack->top());
+  }
+
+  // 2駒をランダムに入れ替える
+  // https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
+  void SwapTwoPieces(Position& pos, std::mt19937_64& mt) {
+    for (int retry = 0; retry < 10; ++retry) {
+      // 手番側の駒を2駒入れ替える。
+
+      // 与えられたBitboardからランダムに1駒を選び、そのSquareを返す。
+      auto get_one = [&mt](Bitboard pieces) {
+        // 駒の数
+        int num = pieces.pop_count();
+
+        // 何番目かの駒
+        int n = std::uniform_int_distribution<>(1, num)(mt);
+        Square sq = SQ_NB;
+        for (int i = 0; i < n; ++i) {
+          sq = pieces.pop();
+        }
+        return sq;
+      };
+
+      // この升の2駒を入れ替える。
+      auto pieces = pos.pieces(pos.side_to_move());
+
+      auto sq1 = get_one(pieces);
+      // sq1を除くbitboard
+      auto sq2 = get_one(pieces ^ sq1);
+
+      // sq2は王しかいない場合、SQ_NBになるから、これを調べておく
+      // この指し手に成功したら、それはdo_moveの代わりであるから今回、do_move()は行わない。
+
+      if (sq2 != SQ_NB && pos.do_move_by_swapping_pieces(sq1, sq2)) {
+        // 検証用のassert
+        if (!is_ok(pos)) {
+          sync_cout << pos << sq1 << sq2 << sync_endl;
+        }
+
+        break;
+      }
+    }
+  }
+
+  // 合法手の中からランダムに1手指す
+  //https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
+  void DoRandomMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+    // 合法手のなかからランダムに1手選ぶフェーズ
+    MoveList<LEGAL> list(pos);
+    Move m = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
+
+    // これが玉の移動であれば、1/2の確率で再度玉を移動させて、なるべく色んな位置の玉に対するデータを集める。
+    // ただし王手がかかっている局面だと手抜くと玉を取られてしまうのでNG
+    bool king_move = type_of(pos.moved_piece_after(m)) == KING;
+    state_stack->push(StateInfo());
+    pos.do_move(m, state_stack->top());
+
+    if (king_move && !pos.in_check() && (mt() & 1)) {
+      // 手番を変更する。
+      state_stack->push(StateInfo());
+      pos.do_null_move(state_stack->top());
+
+      // 再度、玉の移動する指し手をランダムに選ぶ
+      MoveList<LEGAL> list(pos);
+      ExtMove* it2 = (ExtMove*)list.begin();
+      for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
+        if (type_of(pos.moved_piece_after(it->move)) == KING)
+          *it2++ = *it;
+
+      auto size = it2 - list.begin();
+      if (size == 0) {
+        // 局面を戻しておく。
+        pos.undo_null_move();
+      }
+      else {
+        // ランダムにひとつ選ぶ
+        state_stack->push(StateInfo());
+        pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
+          state_stack->top());
+      }
+    }
+  }
 }
 
 void Learner::InitializeGenerator(USI::OptionsMap& o) {
@@ -78,8 +221,11 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
   o[OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
   o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
   o[OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
-  o[OPTION_GENERATOR_ENABLE_SWAP] << Option(true);
   o[OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
+  o[OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY] << Option("0.1");
+  o[OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY] << Option("0.1");
+  o[OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY] << Option("0.1");
+  o[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK] << Option(true);
 }
 
 void Learner::GenerateKifu()
@@ -89,7 +235,7 @@ void Learner::GenerateKifu()
   ASSERT_LV3(false);
 #endif
 
-  std::srand(std::time(nullptr));
+  std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
   // 定跡の読み込み
   if (!ReadBook()) {
@@ -116,8 +262,15 @@ void Learner::GenerateKifu()
   int min_book_move = Options[OPTION_GENERATOR_MIN_BOOK_MOVE];
   int max_book_move = Options[OPTION_GENERATOR_MAX_BOOK_MOVE];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
-  int64_t num_positions;
-  std::istringstream((std::string)Options[OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
+  int64_t num_positions = ParseOptionOrDie<int64_t>(OPTION_GENERATOR_NUM_POSITIONS);
+  double swap_two_pieces_probability =
+    ParseOptionOrDie<double>(OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY);
+  double move_king_to_24_probability =
+    ParseOptionOrDie<double>(OPTION_GENERATOR_MOVE_KING_TO_24_PROBABILITY);
+  double do_random_move_probability =
+    ParseOptionOrDie<double>(OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY);
+  bool do_random_move_after_book = (bool)Options[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK];
+  int value_threshold = Options[OPTION_GENERATOR_VALUE_THRESHOLD];
 
   time_t start;
   std::time(&start);
@@ -125,8 +278,6 @@ void Learner::GenerateKifu()
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
   std::atomic_int64_t global_position_index = 0;
-  bool enable_swap = Options[OPTION_GENERATOR_ENABLE_SWAP];
-  int value_threshold = Options[OPTION_GENERATOR_VALUE_THRESHOLD];
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
@@ -138,7 +289,6 @@ void Learner::GenerateKifu()
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
-    std::random_device random_device;
     std::mt19937_64 mt19937_64(start + thread_index);
 
     while (global_position_index < num_positions) {
@@ -171,113 +321,12 @@ void Learner::GenerateKifu()
         pos.do_move(m, SetupStates->top());
       }
 
+      if (do_random_move_after_book) {
+        // 開始局面からランダムに手を指して、局面をバラけさせる
+        DoRandomMove(pos, mt19937_64, SetupStates);
+      }
+
       while (pos.game_ply() < kMaxGamePlay) {
-        // 一定の確率で自駒2駒を入れ替える
-        // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
-        if (enable_swap && swap_distribution(mt19937_64) == 0 &&
-          pos.pos_is_ok() &&
-          !pos.is_mated() &&
-          !pos.in_check() &&
-          !pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
-          std::string originalSfen = pos.sfen();
-          int counter = 0;
-          for (; counter < kMaxSwapTrials; ++counter) {
-            pos.set(originalSfen);
-
-            // 自駒2駒を入れ替える
-            std::vector<Square> myPieceSquares;
-            for (Square square = SQ_11; square < SQ_NB; ++square) {
-              Piece piece = pos.piece_on(square);
-              if (piece == NO_PIECE) {
-                continue;
-              }
-              else if (color_of(piece) == pos.side_to_move()) {
-                myPieceSquares.push_back(square);
-              }
-            }
-
-            // 一時領域として使用するマスを選ぶ
-            Square square0;
-            Square square1;
-            int num_trials_to_select_squares;
-            // 無限ループに陥る場合があるので制限をかける
-            for (num_trials_to_select_squares = 0;
-              num_trials_to_select_squares < kMaxTrialsToSelectSquares;
-              ++num_trials_to_select_squares) {
-              std::uniform_int_distribution<> square_index_distribution(0, myPieceSquares.size() - 1);
-              square0 = myPieceSquares[square_index_distribution(mt19937_64)];
-              square1 = myPieceSquares[square_index_distribution(mt19937_64)];
-              // 同じ種類の駒を選ばないようにする
-              if (pos.piece_on(square0) != pos.piece_on(square1)) {
-                break;
-              }
-            }
-
-            if (num_trials_to_select_squares == kMaxTrialsToSelectSquares) {
-              break;
-            }
-
-            Piece piece0 = pos.piece_on(square0);
-            PieceNo pieceNo0 = pos.piece_no_of(piece0, square0);
-            Piece piece1 = pos.piece_on(square1);
-            PieceNo pieceNo1 = pos.piece_no_of(piece1, square1);
-
-            // 玉が相手の駒の利きのある升に移動する場合はやり直す
-            // TODO(tanuki-): 必要かどうかわからないので調べる
-            if (type_of(piece0) == KING && pos.attackers_to(~pos.side_to_move(), square1)) {
-              continue;
-            }
-            if (type_of(piece1) == KING && pos.attackers_to(~pos.side_to_move(), square0)) {
-              continue;
-            }
-
-            // 2つの駒を入れ替える
-            pos.remove_piece(square0);
-            pos.remove_piece(square1);
-            pos.put_piece(square0, piece1, pieceNo1);
-            pos.put_piece(square1, piece0, pieceNo0);
-
-            // 不正な局面になった場合はやり直す
-            // ランダムに入れ替えると2歩・9段目の歩香・89段目の桂など
-            // 不正な状態になる場合があるため
-            if (!pos.pos_is_ok()) {
-              continue;
-            }
-
-            // 1手詰めになった場合もやり直す
-            // TODO(tanuki-): やり直しの条件を絞り込む
-            if (pos.mate1ply()) {
-              continue;
-            }
-
-            // 詰んでしまっている場合もやり直す
-            // TODO(tanuki-): やり直しの条件を絞り込む
-            if (pos.is_mated()) {
-              continue;
-            }
-
-            // 王手がかかっている場合もキャンセル
-            if (pos.in_check()) {
-              continue;
-            }
-
-            // 入れ替えた駒で相手の王を取れる場合もやり直す
-            if (pos.attackers_to(pos.side_to_move(), pos.king_square(~pos.side_to_move()))) {
-              continue;
-            }
-
-            // ハッシュ・利き等の内部状態を更新するためsfen化してsetする
-            pos.set(pos.sfen());
-
-            break;
-          };
-
-          // 何度やり直してもうまくいかない場合は諦める
-          if (counter >= kMaxSwapTrials) {
-            pos.set(originalSfen);
-          }
-        }
-
         pos.set_this_thread(&thread);
         if (pos.is_mated()) {
           break;
@@ -292,6 +341,7 @@ void Learner::GenerateKifu()
           break;
         }
 
+        // 評価値の絶対値の上限を超えている場合は書き出さないようにする
         if (std::abs(value) > value_threshold) {
           break;
         }
@@ -313,8 +363,27 @@ void Learner::GenerateKifu()
           ShowProgress(start, position_index, num_positions, 1000'0000);
         }
 
-        SetupStates->push(StateInfo());
-        pos.do_move(pv[0], SetupStates->top());
+        double r = probability_distribution(mt19937_64);
+        if (r < move_king_to_24_probability) {
+          if (!pos.in_check()) {
+            MoveKingTo24(pos, mt19937_64, SetupStates);
+          }
+        }
+        else if (r < move_king_to_24_probability + swap_two_pieces_probability) {
+          if (!pos.in_check() && pos.pieces(pos.side_to_move()).pop_count() >= 6) {
+            SwapTwoPieces(pos, mt19937_64);
+          }
+        }
+        else if (r < move_king_to_24_probability + swap_two_pieces_probability +
+          do_random_move_probability) {
+          if (!pos.in_check()) {
+            DoRandomMove(pos, mt19937_64, SetupStates);
+          }
+        }
+        else {
+          SetupStates->push(StateInfo());
+          pos.do_move(pv[0], SetupStates->top());
+        }
       }
     }
   }
