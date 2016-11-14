@@ -93,9 +93,12 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path_base, result_file_path, 
       engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
     with open('engine-config2.txt', 'w') as engine_config2_file:
       engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(os.path.join(new_eval_folder_path_base, subfolder)))
-    input = '''setoption name Threads value {0}
-go btime {1} byoyomi 1
-quit
+    input = '''usi
+setoption name Threads value {0}
+setoption name BookSfenFile value records2016_10818.sfen
+isready
+usinewgame
+go btime {1} wtime 24 byoyomi 1
 '''.format(num_threads, num_games).encode('utf-8')
     print(input.decode('utf-8'))
     print(flush=True)

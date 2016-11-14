@@ -53,9 +53,10 @@ def CalculateWinningPercentage(base_eval_folder_path, learner_output_folder_path
                 engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(os.path.join(learner_output_folder_path, subfolder)))
             input = '''usi
 setoption name Threads value 48
+setoption name BookSfenFile value records2016_10818.sfen
 isready
 usinewgame
-go btime 1000 byoyomi 1
+go btime 1000 wtime 24 byoyomi 1
 '''.encode('utf-8')
             completed_process = subprocess.run(['YaneuraOu-local-server.exe'], input=input, stdout=subprocess.PIPE, check=True)
             output = completed_process.stdout.decode('utf-8')
