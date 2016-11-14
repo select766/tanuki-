@@ -26,6 +26,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="analyze_frequency.py" />
     <Compile Include="zoukin.py">
       <SubType>Code</SubType>
     </Compile>
