@@ -52,7 +52,7 @@ def CalculateWinningPercentage(base_eval_folder_path, learner_output_folder_path
             with open('engine-config2.txt', 'w') as engine_config2_file:
                 engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(os.path.join(learner_output_folder_path, subfolder)))
             input = '''usi
-setoption name Threads value 48
+setoption name Threads value 24
 setoption name BookSfenFile value records2016_10818.sfen
 isready
 usinewgame
