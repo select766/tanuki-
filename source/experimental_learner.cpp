@@ -68,8 +68,6 @@ namespace
   constexpr WeightType kEps = 1e-8;
   constexpr WeightType kAdamBeta1 = 0.9;
   constexpr WeightType kAdamBeta2 = 0.999;
-  constexpr WeightType kLearningRateDecayRate = 1.0;
-  constexpr int64_t kNumPositionsToDecayLearningRate = 5'0000'0000LL;
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
@@ -80,6 +78,8 @@ namespace
   constexpr char* OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH = "ValueHistogramOutputFilePath";
   constexpr char* OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH = "AppearanceFrequencyHistogramOutputFilePath";
   constexpr char* OPTION_LEARNING_RATE = "LearningRate";
+  constexpr char* OPTION_LEARNING_RATE_DECAY_RATE = "LearningRateDecayRate";
+  constexpr char* OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE = "NumPositionsToDecayLearningRate";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -261,11 +261,13 @@ namespace
 }
 
 void Learner::InitializeLearner(USI::OptionsMap& o) {
-  o[OPTION_LEARNER_NUM_POSITIONS] << Option("2000000000");
+  o[OPTION_LEARNER_NUM_POSITIONS] << Option("10000000000");
   o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
   o[OPTION_VALUE_HISTOGRAM_OUTPUT_FILE_PATH] << Option("value_histogram.csv");
   o[OPTION_APPEARANCE_FREQUENCY_HISTOGRAM_OUTPUT_FILE_PATH] << Option("appearance_frequency_histogram.csv");
-  o[OPTION_LEARNING_RATE] << Option("0.5");
+  o[OPTION_LEARNING_RATE] << Option("1.0");
+  o[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE] << Option("1.0");
+  o[OPTION_LEARNING_RATE_DECAY_RATE] << Option("1000000000");
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
@@ -401,7 +403,13 @@ void Learner::Learn(std::istringstream& iss) {
   int num_mini_batches = 0;
   double learning_rate;
   std::istringstream((std::string)Options[OPTION_LEARNING_RATE]) >> learning_rate;
-  int64_t next_record_index_to_decay_learning_rate = kNumPositionsToDecayLearningRate;
+  double learning_rate_decay_rate;
+  std::istringstream((std::string)Options[OPTION_LEARNING_RATE_DECAY_RATE]) >>
+      learning_rate_decay_rate;
+  int64_t num_positions_to_decay_learning_rate;
+  std::istringstream((std::string)Options[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE]) >>
+      num_positions_to_decay_learning_rate;
+  int64_t next_positionsto_decay_learning_rate = num_positions_to_decay_learning_rate;
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
   int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
@@ -548,9 +556,9 @@ void Learner::Learn(std::istringstream& iss) {
       }
     }
 
-    if (num_processed_positions >= next_record_index_to_decay_learning_rate) {
-      learning_rate *= kLearningRateDecayRate;
-      next_record_index_to_decay_learning_rate += kNumPositionsToDecayLearningRate;
+    if (num_processed_positions >= next_positionsto_decay_learning_rate) {
+      learning_rate *= learning_rate_decay_rate;
+      next_positionsto_decay_learning_rate += num_positions_to_decay_learning_rate;
       std::printf("Decayed the learning rate: learning_rate=%f\n", learning_rate);
       std::fflush(stdout);
     }
