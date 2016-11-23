@@ -29,13 +29,15 @@ namespace
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
 
-  constexpr char* OPTION_GENERATOR_NUM_GAMES = "GeneratorNumGames";
+  constexpr char* OPTION_GENERATOR_NUM_POSITIONS = "GeneratorNumPositions";
   constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";
   constexpr char* OPTION_GENERATOR_MAX_SEARCH_DEPTH = "GeneratorMaxSearchDepth";
   constexpr char* OPTION_GENERATOR_KIFU_TAG = "GeneratorKifuTag";
   constexpr char* OPTION_GENERATOR_BOOK_FILE_NAME = "GeneratorStartposFileName";
   constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
   constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
+  constexpr char* OPTION_GENERATOR_ENABLE_SWAP = "GeneratorEnableSwap";
+  constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
 
   std::vector<std::string> book;
   std::uniform_int_distribution<> swap_distribution(0, 9);
@@ -69,18 +71,21 @@ namespace
 }
 
 void Learner::InitializeGenerator(USI::OptionsMap& o) {
-  o[OPTION_GENERATOR_NUM_GAMES] << Option(2000'0000, 1, std::numeric_limits<int>::max());
+  o[OPTION_GENERATOR_NUM_POSITIONS] << Option("10000000000");
   o[OPTION_GENERATOR_MIN_SEARCH_DEPTH] << Option(3, 1, MAX_PLY);
   o[OPTION_GENERATOR_MAX_SEARCH_DEPTH] << Option(4, 1, MAX_PLY);
   o[OPTION_GENERATOR_KIFU_TAG] << Option("default_tag");
   o[OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
-  o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(16, 1, MAX_PLY);
+  o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
   o[OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
+  o[OPTION_GENERATOR_ENABLE_SWAP] << Option(true);
+  o[OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
 }
 
 void Learner::GenerateKifu()
 {
 #ifdef USE_FALSE_PROBE_IN_TT
+  sync_cout << "Please undefine USE_FALSE_PROBE_IN_TT." << sync_endl;
   ASSERT_LV3(false);
 #endif
 
@@ -88,6 +93,7 @@ void Learner::GenerateKifu()
 
   // 定跡の読み込み
   if (!ReadBook()) {
+    sync_cout << "Failed to read the book." << sync_endl;
     return;
   }
 
@@ -110,31 +116,31 @@ void Learner::GenerateKifu()
   int min_book_move = Options[OPTION_GENERATOR_MIN_BOOK_MOVE];
   int max_book_move = Options[OPTION_GENERATOR_MAX_BOOK_MOVE];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
-  int num_games = Options[OPTION_GENERATOR_NUM_GAMES];
+  int64_t num_positions;
+  std::istringstream((std::string)Options[OPTION_GENERATOR_NUM_POSITIONS]) >> num_positions;
 
   time_t start;
   std::time(&start);
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
-  std::atomic_int global_game_index = 0;
+  std::atomic_int64_t global_position_index = 0;
+  bool enable_swap = Options[OPTION_GENERATOR_ENABLE_SWAP];
+  int value_threshold = Options[OPTION_GENERATOR_VALUE_THRESHOLD];
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
     std::string output_file_name_tag = Options[OPTION_GENERATOR_KIFU_TAG];
-    std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%d.%03d.bin", kifu_directory.c_str(),
-      output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_games, thread_index);
+    std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
+      output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
+      thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
-	std::mt19937_64 mt19937_64(start + thread_index);
+    std::mt19937_64 mt19937_64(start + thread_index);
 
-#pragma omp for schedule(guided)
-    for (int game_index = 0; game_index < num_games; ++game_index) {
-      int current_game_index = global_game_index++;
-      ShowProgress(start, current_game_index, num_games, 10000);
-
+    while (global_position_index < num_positions) {
       Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;
       pos.set_hirate();
@@ -144,7 +150,7 @@ void Learner::GenerateKifu()
       std::istringstream is(opening);
       std::string token;
       int num_book_move = num_book_move_distribution(mt19937_64);
-      while (pos.game_ply() < num_book_move)
+      while (global_position_index < num_positions && pos.game_ply() < num_book_move)
       {
         if (!(is >> token)) {
           break;
@@ -167,7 +173,7 @@ void Learner::GenerateKifu()
       while (pos.game_ply() < kMaxGamePlay) {
         // 一定の確率で自駒2駒を入れ替える
         // TODO(tanuki-): 前提条件が絞り込めていないので絞り込む
-        if (swap_distribution(mt19937_64) == 0 &&
+        if (enable_swap && swap_distribution(mt19937_64) == 0 &&
           pos.pos_is_ok() &&
           !pos.is_mated() &&
           !pos.in_check() &&
@@ -280,22 +286,30 @@ void Learner::GenerateKifu()
 
         // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
         Value value = valueAndPv.first;
-        if (value < -VALUE_MATE) {
-          // 詰みの局面なので書き出さない
-          break;
-        }
-
         const std::vector<Move>& pv = valueAndPv.second;
         if (pv.empty()) {
           break;
         }
 
+        if (std::abs(value) > value_threshold) {
+          break;
+        }
+
         // 局面が不正な場合があるので再度チェックする
         if (pos.pos_is_ok()) {
-          Learner::Record record;
+          Learner::Record record = { 0 };
           pos.sfen_pack(record.packed);
+
           record.value = value;
+
+          int num_pv = search_depth;
+          num_pv = std::min<int>(num_pv, sizeof(record.pv) / sizeof(record.pv[0]));
+          num_pv = std::min<int>(num_pv, static_cast<int>(pv.size()));
+          copy(pv.begin(), pv.begin() + num_pv, record.pv);
+
           kifu_writer->Write(record);
+          int64_t position_index = global_position_index++;
+          ShowProgress(start, position_index, num_positions, 1000'0000);
         }
 
         SetupStates->push(StateInfo());
