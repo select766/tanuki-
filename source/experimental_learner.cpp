@@ -291,8 +291,8 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   o[OPTION_LEARNER_NUM_POSITIONS] << Option("10000000000");
   o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
   o[OPTION_LEARNING_RATE] << Option("1.0");
-  o[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE] << Option("1.0");
-  o[OPTION_LEARNING_RATE_DECAY_RATE] << Option("1000000000");
+  o[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE] << Option("1000000000");
+  o[OPTION_LEARNING_RATE_DECAY_RATE] << Option("1.0");
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,

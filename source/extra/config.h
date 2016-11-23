@@ -155,7 +155,7 @@
 // 置換表のprobeに必ず失敗する設定
 // 自己生成棋譜からの学習でqsearch()のPVが欲しいときに
 // 置換表にhitして枝刈りされたときにPVが得られないの悔しいので
- //#define USE_FALSE_PROBE_IN_TT
+#define USE_FALSE_PROBE_IN_TT
 
 // 評価関数パラメーターを共有メモリを用いて他プロセスのものと共有する。
 // 少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
@@ -446,10 +446,10 @@
 // std::getline()ではなく単にgetline()と書いて、この関数を使うべき。
 inline bool getline(std::fstream& fs, std::string& s)
 {
-	bool b = (bool)std::getline(fs, s);
-	if (s.size() && s[s.size() - 1] == '\r')
-		s.erase(s.size() - 1);
-	return b;
+  bool b = (bool)std::getline(fs, s);
+  if (s.size() && s[s.size() - 1] == '\r')
+    s.erase(s.size() - 1);
+  return b;
 }
 
 #endif
@@ -551,8 +551,8 @@ typedef std::condition_variable ConditionVariable;
 // 成功すれば0、失敗すれば非0が返る。
 inline int MKDIR(std::string dir_name)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
-	return _wmkdir(cv.from_bytes(dir_name).c_str());
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+  return _wmkdir(cv.from_bytes(dir_name).c_str());
 }
 #elif defined(_LINUX)
 // linux環境において、この_LINUXというシンボルはmakefileにて定義されるものとする。
@@ -562,7 +562,7 @@ inline int MKDIR(std::string dir_name)
 
 inline int MKDIR(std::string dir_name)
 {
-	return ::mkdir(dir_name.c_str(), 0777);
+  return ::mkdir(dir_name.c_str(), 0777);
 }
 
 #else
@@ -571,7 +571,7 @@ inline int MKDIR(std::string dir_name)
 // linuxでフォルダ掘る機能は、とりあえずナシでいいや..。評価関数ファイルの保存にしか使ってないし…。
 inline int MKDIR(std::string dir_name)
 {
-	return 0;
+  return 0;
 }
 
 #endif
