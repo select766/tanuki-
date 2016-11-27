@@ -62,13 +62,13 @@ bool Learner::KifuReader::Read(Record& record) {
           // ファイルを開くのに失敗したら
           // 読み込みを終了する
           sync_cout << "into string Failed to open a kifu file: "
-            << file_paths_[0] << sync_endl;
+            << file_paths_[file_index_] << sync_endl;
           return false;
         }
 
         if (std::setvbuf(file_, nullptr, _IOFBF, kBufferSize)) {
           sync_cout << "into string Failed to set a file buffer: "
-            << file_paths_[0] << sync_endl;
+            << file_paths_[file_index_] << sync_endl;
         }
 
         if (std::fread(&record, sizeof(record), 1, file_) != 1) {
