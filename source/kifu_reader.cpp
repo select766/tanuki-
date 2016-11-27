@@ -15,12 +15,6 @@ namespace {
 
 Learner::KifuReader::KifuReader(const std::string& folder_name, bool shuffle)
   : folder_name_(folder_name), shuffle_(shuffle) {
-  for (int i = 0; i < kBatchSize; ++i) {
-    permutation_.push_back(i);
-  }
-  if (shuffle) {
-    std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::random_device()()));
-  }
 }
 
 Learner::KifuReader::~KifuReader() {
@@ -97,6 +91,20 @@ bool Learner::KifuReader::Read(Record& record) {
 
   if (records_.empty()) {
     return false;
+  }
+
+  // 読み込んだ局面数がkBatchSizeに満たない場合、
+  // permutation配列経由のアクセスで範囲外アクセスが起こる。
+  // これを防ぐため、permutation配列を再作成する。
+  if (records_.size() != permutation_.size()) {
+    permutation_.clear();
+    for (int i = 0; i < kBatchSize; ++i) {
+      permutation_.push_back(i);
+    }
+    if (shuffle_) {
+      std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::time(nullptr)));
+    }
+
   }
 
   record = records_[permutation_[record_index_]];
