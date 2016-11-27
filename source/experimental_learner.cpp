@@ -74,13 +74,13 @@ namespace
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
   constexpr int64_t kMiniBatchSize = 100'0000LL;
 
-  constexpr char* OPTION_LEARNER_NUM_POSITIONS = "LearnerNumPositions";
-  constexpr char* OPTION_LEARNER_PV_STRAP_MAX_DEPTH = "LearnerPvStrapMaxDepth";
-  constexpr char* OPTION_LEARNING_RATE = "LearningRate";
-  constexpr char* OPTION_LEARNING_RATE_DECAY_RATE = "LearningRateDecayRate";
-  constexpr char* OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE = "NumPositionsToDecayLearningRate";
-  constexpr char* OPTION_KIFU_FOR_TESTDIR = "KifuForTestDir";
-  constexpr char* OPTION_LEARNER_NUM_POSITIONS_FOR_TEST = "LearnerNumPositionsForTest";
+  constexpr char* kOptionValueLearnerNumPositions = "LearnerNumPositions";
+  constexpr char* kOptionValueLearnerPvStrapMaxDepth = "LearnerPvStrapMaxDepth";
+  constexpr char* kOptionValueLearningRate = "LearningRate";
+  constexpr char* kOptionValueLearningRateDecayRate = "LearningRateDecayRate";
+  constexpr char* kOptionValueNumPositionsToDecayLearningRate = "NumPositionsToDecayLearningRate";
+  constexpr char* kOptionValueKifuForTestDir = "KifuForTestDir";
+  constexpr char* kOptionValueLearnerNumPositionsForTest = "LearnerNumPositionsForTest";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -282,13 +282,13 @@ namespace
 }
 
 void Learner::InitializeLearner(USI::OptionsMap& o) {
-  o[OPTION_LEARNER_NUM_POSITIONS] << Option("10000000000");
-  o[OPTION_LEARNER_PV_STRAP_MAX_DEPTH] << Option(0, 0, MAX_PLY);
-  o[OPTION_LEARNING_RATE] << Option("1.0");
-  o[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE] << Option("1000000000");
-  o[OPTION_LEARNING_RATE_DECAY_RATE] << Option("1.0");
-  o[OPTION_KIFU_FOR_TESTDIR] << Option("kifu_for_test");
-  o[OPTION_LEARNER_NUM_POSITIONS_FOR_TEST] << Option("10000000");
+  o[kOptionValueLearnerNumPositions] << Option("10000000000");
+  o[kOptionValueLearnerPvStrapMaxDepth] << Option(0, 0, MAX_PLY);
+  o[kOptionValueLearningRate] << Option("1.0");
+  o[kOptionValueNumPositionsToDecayLearningRate] << Option("1000000000");
+  o[kOptionValueLearningRateDecayRate] << Option("1.0");
+  o[kOptionValueKifuForTestDir] << Option("kifu_for_test");
+  o[kOptionValueLearnerNumPositionsForTest] << Option("1000000");
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
@@ -303,11 +303,12 @@ void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64
   }
 
   time_t elapsed_time = current_time - start_time;
-  int hour = elapsed_time / 3600;
+  int hour = static_cast<int>(elapsed_time / 3600);
   int minute = elapsed_time / 60 % 60;
   int second = elapsed_time % 60;
   double data_per_time = current_data / static_cast<double>(current_time - start_time);
-  time_t expected_time = current_time + (total_data - current_data) / data_per_time;
+  time_t expected_time = 
+    static_cast<time_t>(current_time + (total_data - current_data) / data_per_time);
   struct tm current_tm = *std::localtime(&current_time);
   struct tm expected_tm = *std::localtime(&expected_time);
   std::printf(
@@ -358,8 +359,7 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader =
-    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+  auto kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
 
   Eval::load_eval();
 
@@ -419,21 +419,24 @@ void Learner::Learn(std::istringstream& iss) {
   time_t start;
   std::time(&start);
   int num_mini_batches = 0;
-  double learning_rate;
-  std::istringstream((std::string)Options[OPTION_LEARNING_RATE]) >> learning_rate;
-  double learning_rate_decay_rate;
-  std::istringstream((std::string)Options[OPTION_LEARNING_RATE_DECAY_RATE]) >>
-    learning_rate_decay_rate;
-  int64_t num_positions_to_decay_learning_rate;
-  std::istringstream((std::string)Options[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE]) >>
-    num_positions_to_decay_learning_rate;
+  double learning_rate = Options[kOptionValueLearningRate].cast<double>();
+  double learning_rate_decay_rate = Options[kOptionValueLearningRateDecayRate].cast<double>();
+  int64_t num_positions_to_decay_learning_rate =
+    Options[kOptionValueNumPositionsToDecayLearningRate].cast<int64_t>();
   int64_t next_positionsto_decay_learning_rate = num_positions_to_decay_learning_rate;
-  int64_t max_positions_for_learning;
-  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
-  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
-  std::string kifu_for_test_dir = Options[OPTION_KIFU_FOR_TESTDIR];
-  int64_t num_positions_for_test = 0;
-  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS_FOR_TEST]) >> num_positions_for_test;
+  int64_t max_positions_for_learning = Options[kOptionValueLearnerNumPositions].cast<int64_t>();
+  int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
+  std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
+  int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
+
+  sync_cout << "learning_rate=" << learning_rate << sync_endl;
+  sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
+  sync_cout << "num_positions_to_decay_learning_rate=" << num_positions_to_decay_learning_rate
+    << sync_endl;
+  sync_cout << "max_positions_for_learning=" << max_positions_for_learning << sync_endl;
+  sync_cout << "pv_strap_max_depth=" << pv_strap_max_depth << sync_endl;
+  sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
+  sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
 
   auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
   std::vector<Record> records_for_test;
@@ -710,8 +713,8 @@ void Learner::MeasureError() {
 
   std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-  std::unique_ptr<Learner::KifuReader> kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
-  int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
+  auto kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
+  int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
 
   Eval::load_eval();
 
