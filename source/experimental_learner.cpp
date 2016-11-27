@@ -79,6 +79,8 @@ namespace
   constexpr char* OPTION_LEARNING_RATE = "LearningRate";
   constexpr char* OPTION_LEARNING_RATE_DECAY_RATE = "LearningRateDecayRate";
   constexpr char* OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE = "NumPositionsToDecayLearningRate";
+  constexpr char* OPTION_KIFU_FOR_TESTDIR = "KifuForTestDir";
+  constexpr char* OPTION_LEARNER_NUM_POSITIONS_FOR_TEST = "LearnerNumPositionsForTest";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -285,6 +287,8 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   o[OPTION_LEARNING_RATE] << Option("1.0");
   o[OPTION_NUM_POSITIONS_TO_DECAY_LEARNING_RATE] << Option("1000000000");
   o[OPTION_LEARNING_RATE_DECAY_RATE] << Option("1.0");
+  o[OPTION_KIFU_FOR_TESTDIR] << Option("kifu_for_test");
+  o[OPTION_LEARNER_NUM_POSITIONS_FOR_TEST] << Option("10000000");
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
@@ -345,10 +349,6 @@ void Learner::Learn(std::istringstream& iss) {
 
   std::vector<int64_t> write_eval_per_positions;
   for (int64_t base = 1; base <= 9; ++base) {
-    write_eval_per_positions.push_back(base * 10'0000LL);
-    write_eval_per_positions.push_back(base * 100'0000LL);
-    write_eval_per_positions.push_back(base * 1000'0000LL);
-    write_eval_per_positions.push_back(base * 1'0000'0000LL);
     write_eval_per_positions.push_back(base * 10'0000'0000LL);
     write_eval_per_positions.push_back(base * 100'0000'0000LL);
   }
@@ -431,16 +431,28 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t max_positions_for_learning;
   std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS]) >> max_positions_for_learning;
   int pv_strap_max_depth = Options[OPTION_LEARNER_PV_STRAP_MAX_DEPTH];
+  std::string kifu_for_test_dir = Options[OPTION_KIFU_FOR_TESTDIR];
+  int64_t num_positions_for_test = 0;
+  std::istringstream((std::string)Options[OPTION_LEARNER_NUM_POSITIONS_FOR_TEST]) >> num_positions_for_test;
+
+  auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
+  std::vector<Record> records_for_test;
+  if (!kifu_reader_for_test->Read(num_positions_for_test, records_for_test)) {
+    sync_cout << "Failed to read kifu for test." << sync_endl;
+    std::exit(1);
+  }
+
   // 未学習の評価関数ファイルを出力しておく
   save_eval(output_folder_path_base, 0);
 
+  // 損失関数ログの作成
   char train_loss_file_name[_MAX_PATH];
-  std::sprintf(train_loss_file_name, "%s/train_loss_%I64d.csv", output_folder_path_base.c_str(),
+  std::sprintf(train_loss_file_name, "%s/loss_%I64d.csv", output_folder_path_base.c_str(),
     start);
-  FILE* file_train_loss = std::fopen(train_loss_file_name, "w");
-  std::fprintf(file_train_loss, ",rmse_value,rmse_winning_percentage,mean_cross_entropy,norm\n");
-  std::fflush(file_train_loss);
-    
+  FILE* file_loss = std::fopen(train_loss_file_name, "w");
+  std::fprintf(file_loss, ",train_rmse_value,train_rmse_winning_percentage,train_mean_cross_entropy,test_rmse_value,test_rmse_winning_percentage,test_mean_cross_entropy,norm\n");
+  std::fflush(file_loss);
+
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
     ShowProgress(start, num_processed_positions, max_positions_for_learning, kMiniBatchSize * 10);
 
@@ -451,31 +463,36 @@ void Learner::Learn(std::istringstream& iss) {
     }
     ++num_mini_batches;
 
-    double sum_squared_error_of_value = 0.0;
+    double sum_train_squared_error_of_value = 0.0;
     double sum_norm = 0.0;
-    double sum_squared_error_of_winning_percentage = 0.0;
-    double sum_cross_entropy = 0.0;
+    double sum_train_squared_error_of_winning_percentage = 0.0;
+    double sum_train_cross_entropy = 0.0;
+    double sum_test_squared_error_of_value = 0.0;
+    double sum_test_squared_error_of_winning_percentage = 0.0;
+    double sum_test_cross_entropy = 0.0;
 
 #pragma omp parallel
     {
       int thread_index = omp_get_thread_num();
       // ミニバッチ
       // num_records個の学習データの勾配の和を求めて重みを更新する
-#pragma omp for schedule(guided) reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy)
+#pragma omp for schedule(guided) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        auto f = [&weights, &sum_squared_error_of_value, &sum_norm,
-          &sum_squared_error_of_winning_percentage, &sum_cross_entropy](Value record_value,
-            Value value, Color root_color, Position& pos) {
+        auto f = [&weights, &sum_train_squared_error_of_value, &sum_norm,
+          &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy](
+            Value record_value, Value value, Color root_color, Position& pos) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
           WeightType delta = q - p;
 
           double diff_value = record_value - value;
-          sum_squared_error_of_value += diff_value * diff_value;
+          sum_train_squared_error_of_value += diff_value * diff_value;
           double diff_winning_percentage = p - q;
-          sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
-          sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+          sum_train_squared_error_of_winning_percentage +=
+            diff_winning_percentage * diff_winning_percentage;
+          sum_train_cross_entropy +=
+            (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
           sum_norm += abs(value);
 
           // 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
@@ -523,6 +540,28 @@ void Learner::Learn(std::istringstream& iss) {
           }
         };
         Strap(records[record_index], pv_strap_max_depth, f);
+      }
+
+      // 損失関数を計算する
+#pragma omp for schedule(guided) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy)
+      for (int record_index = 0; record_index < num_records; ++record_index) {
+        auto f = [&weights, &sum_test_squared_error_of_value,
+          &sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy](
+            Value record_value, Value value, Color root_color, Position& pos) {
+          // 評価値から推定した勝率の分布の交差エントロピー
+          double p = winning_percentage(record_value);
+          double q = winning_percentage(value);
+          WeightType delta = q - p;
+
+          double diff_value = record_value - value;
+          sum_test_squared_error_of_value += diff_value * diff_value;
+          double diff_winning_percentage = p - q;
+          sum_test_squared_error_of_winning_percentage +=
+            diff_winning_percentage * diff_winning_percentage;
+          sum_test_cross_entropy +=
+            (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+        };
+        Strap(records_for_test[record_index], pv_strap_max_depth, f);
       }
 
       // 重みを更新する
@@ -577,15 +616,20 @@ void Learner::Learn(std::istringstream& iss) {
       }
     }
 
-    // train lossを出力する
-    fprintf(file_train_loss, "%I64d,%f,%f,%f,%f\n", num_processed_positions,
-      std::sqrt(sum_squared_error_of_value / num_records),
-      std::sqrt(sum_squared_error_of_winning_percentage / num_records),
-      sum_cross_entropy / num_records, sum_norm / num_records);
-    std::fflush(file_train_loss);
+    // 損失関数の値を出力する
+    fprintf(file_loss, "%I64d,%f,%f,%f,%f,%f,%f,%f\n", num_processed_positions,
+      std::sqrt(sum_train_squared_error_of_value / num_records),
+      std::sqrt(sum_train_squared_error_of_winning_percentage / num_records),
+      sum_train_cross_entropy / num_records,
+      std::sqrt(sum_test_squared_error_of_value / num_records),
+      std::sqrt(sum_test_squared_error_of_winning_percentage / num_records),
+      sum_test_cross_entropy / num_records,
+      sum_norm / num_records);
+    std::fflush(file_loss);
 
     num_processed_positions += num_records;
 
+    // 評価関数ファイルの書き出し
     if (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
       save_eval(output_folder_path_base, num_processed_positions);
       while (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
@@ -594,6 +638,7 @@ void Learner::Learn(std::istringstream& iss) {
       }
     }
 
+    // 学習率の減衰
     if (num_processed_positions >= next_positionsto_decay_learning_rate) {
       learning_rate *= learning_rate_decay_rate;
       next_positionsto_decay_learning_rate += num_positions_to_decay_learning_rate;
