@@ -8,7 +8,7 @@
 #include "misc.h"
 
 namespace {
-  constexpr int kBatchSize = 1000'0000;
+  constexpr int kBatchSize = 1'0000'0000;
   constexpr Value kCloseOutValueThreshold = Value(VALUE_INFINITE);
   constexpr int kBufferSize = 1 << 24; // 16MB
 }
