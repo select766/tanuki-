@@ -3,6 +3,7 @@
 
 #include "experimental_learner.h"
 #include "kifu_generator.h"
+#include "kifu_reader.h"
 #include "misc.h"
 #include "position.h"
 #include "search.h"
@@ -286,6 +287,7 @@ namespace USI
 
     Learner::InitializeGenerator(o);
     Learner::InitializeLearner(o);
+    Learner::KifuReader::Initialize(o);
 
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);

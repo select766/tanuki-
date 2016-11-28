@@ -6,19 +6,28 @@
 #undef NOMINMAX
 
 #include "misc.h"
+#include "shogi.h"
+
+using USI::Option;
+using USI::OptionsMap;
 
 namespace {
-  constexpr int kBatchSize = 1'0000'0000;
   constexpr Value kCloseOutValueThreshold = Value(VALUE_INFINITE);
   constexpr int kBufferSize = 1 << 24; // 16MB
+  constexpr char* kOptionValueReadBatchSize = "ReadBatchSize";
 }
 
 Learner::KifuReader::KifuReader(const std::string& folder_name, bool shuffle)
-  : folder_name_(folder_name), shuffle_(shuffle) {
+  : folder_name_(folder_name), shuffle_(shuffle),
+    read_match_size_((int)Options[kOptionValueReadBatchSize]){
 }
 
 Learner::KifuReader::~KifuReader() {
   Close();
+}
+
+void Learner::KifuReader::Initialize(USI::OptionsMap& o) {
+    o[kOptionValueReadBatchSize] << Option(1000'0000, 0, INT_MAX);
 }
 
 bool Learner::KifuReader::Read(int num_records, std::vector<Record>& records) {
@@ -38,7 +47,7 @@ bool Learner::KifuReader::Read(Record& record) {
 
   if (record_index_ >= static_cast<int>(records_.size())) {
     records_.clear();
-    while (records_.size() < kBatchSize) {
+    while (records_.size() < read_match_size_) {
       if (std::fread(&record, sizeof(record), 1, file_) != 1) {
         // ファイルの終端に辿り着いた
         if (++file_index_ >= static_cast<int>(file_paths_.size())) {
@@ -98,7 +107,7 @@ bool Learner::KifuReader::Read(Record& record) {
   // これを防ぐため、permutation配列を再作成する。
   if (records_.size() != permutation_.size()) {
     permutation_.clear();
-    for (int i = 0; i < kBatchSize; ++i) {
+    for (int i = 0; i < read_match_size_; ++i) {
       permutation_.push_back(i);
     }
     if (shuffle_) {
