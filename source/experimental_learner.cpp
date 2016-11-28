@@ -72,7 +72,6 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
-  constexpr int64_t kMiniBatchSize = 100'0000LL;
 
   constexpr char* kOptionValueLearnerNumPositions = "LearnerNumPositions";
   constexpr char* kOptionValueLearnerPvStrapMaxDepth = "LearnerPvStrapMaxDepth";
@@ -81,6 +80,7 @@ namespace
   constexpr char* kOptionValueNumPositionsToDecayLearningRate = "NumPositionsToDecayLearningRate";
   constexpr char* kOptionValueKifuForTestDir = "KifuForTestDir";
   constexpr char* kOptionValueLearnerNumPositionsForTest = "LearnerNumPositionsForTest";
+  constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
 
   int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
     return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
@@ -289,6 +289,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   o[kOptionValueLearningRateDecayRate] << Option("1.0");
   o[kOptionValueKifuForTestDir] << Option("kifu_for_test");
   o[kOptionValueLearnerNumPositionsForTest] << Option("1000000");
+  o[kOptionValueMiniBatchSize] << Option("1000000");
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
@@ -428,6 +429,7 @@ void Learner::Learn(std::istringstream& iss) {
   int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
   std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
   int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
+  int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
 
   sync_cout << "learning_rate=" << learning_rate << sync_endl;
   sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -437,6 +439,7 @@ void Learner::Learn(std::istringstream& iss) {
   sync_cout << "pv_strap_max_depth=" << pv_strap_max_depth << sync_endl;
   sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
   sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
+  sync_cout << "mini_batch_size=" << mini_batch_size << sync_endl;
 
   auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
   std::vector<Record> records_for_test;
@@ -457,10 +460,10 @@ void Learner::Learn(std::istringstream& iss) {
   std::fflush(file_loss);
 
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
-    ShowProgress(start, num_processed_positions, max_positions_for_learning, kMiniBatchSize * 10);
+    ShowProgress(start, num_processed_positions, max_positions_for_learning, mini_batch_size * 10);
 
     int num_records = static_cast<int>(std::min(
-      max_positions_for_learning - num_processed_positions, kMiniBatchSize));
+      max_positions_for_learning - num_processed_positions, mini_batch_size));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
@@ -715,6 +718,7 @@ void Learner::MeasureError() {
 
   auto kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
   int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
+  int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();;
 
   Eval::load_eval();
 
@@ -734,10 +738,10 @@ void Learner::MeasureError() {
   double sum_squared_error_of_winning_percentage = 0.0;
   double sum_cross_entropy = 0.0;
   for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
-    ShowProgress(start, num_processed_positions, kMaxPositionsForErrorMeasurement, kMiniBatchSize);
+    ShowProgress(start, num_processed_positions, kMaxPositionsForErrorMeasurement, mini_batch_size);
 
     int num_records = static_cast<int>(std::min(
-      kMaxPositionsForErrorMeasurement - num_processed_positions, kMiniBatchSize));
+      kMaxPositionsForErrorMeasurement - num_processed_positions, mini_batch_size));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
@@ -778,6 +782,7 @@ void Learner::BenchmarkKifuReader() {
   Eval::eval_learn_init();
 
   omp_set_num_threads((int)Options["Threads"]);
+  int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
 
   time_t start;
   std::time(&start);
@@ -792,7 +797,7 @@ void Learner::BenchmarkKifuReader() {
     ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
 
     int num_records = static_cast<int>(std::min(
-      kMaxPositionsForBenchmark - num_processed_positions, kMiniBatchSize));
+      kMaxPositionsForBenchmark - num_processed_positions, mini_batch_size));
     if (!kifu_reader->Read(num_records, records)) {
       break;
     }
