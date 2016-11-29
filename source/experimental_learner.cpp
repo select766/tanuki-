@@ -234,49 +234,34 @@ namespace
       std::exit(1);
     }
 
-    // 現局面及び記録されたPV中の各局面から浅い探索を行い
-    // 浅い探索のPVの末端ノードの特徴量に対応する勾配の和を計算する
-    StateInfo state_info[MAX_PLY];
-    for (int recorded_pv_play_index = 0; ; ++recorded_pv_play_index) {
-      Color root_color = pos.side_to_move();
+    Color root_color = pos.side_to_move();
 
-      // 0手読み+静止探索を行う
-      auto value_and_pv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+    // 0手読み+静止探索を行う
+    auto value_and_pv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
 
-      // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
-      // 全計算はPosition::set()の中で行われているので差分計算ができる
-      Value value = Eval::evaluate(pos);
-      StateInfo stateInfo[MAX_PLY];
-      std::vector<Move>& pv = value_and_pv.second;
-      for (int shallow_search_pv_play_index = 0;
-        shallow_search_pv_play_index < static_cast<int>(pv.size());
-        ++shallow_search_pv_play_index) {
-        pos.do_move(pv[shallow_search_pv_play_index], stateInfo[shallow_search_pv_play_index]);
-        value = Eval::evaluate(pos);
-      }
+    // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
+    // 全計算はPosition::set()の中で行われているので差分計算ができる
+    Value value = Eval::evaluate(pos);
+    StateInfo stateInfo[MAX_PLY];
+    std::vector<Move>& pv = value_and_pv.second;
+    for (int shallow_search_pv_play_index = 0;
+      shallow_search_pv_play_index < static_cast<int>(pv.size());
+      ++shallow_search_pv_play_index) {
+      pos.do_move(pv[shallow_search_pv_play_index], stateInfo[shallow_search_pv_play_index]);
+      value = Eval::evaluate(pos);
+    }
 
-      // Eval::evaluate()は常に手番から見た評価値を返すので
-      // 探索開始局面と手番が違う場合は符号を反転する
-      if (root_color != pos.side_to_move()) {
-        value = -value;
-      }
+    // Eval::evaluate()は常に手番から見た評価値を返すので
+    // 探索開始局面と手番が違う場合は符号を反転する
+    if (root_color != pos.side_to_move()) {
+      value = -value;
+    }
 
-      f(static_cast<Value>(record.value), value, root_color, pos);
+    f(static_cast<Value>(record.value), value, root_color, pos);
 
-      // 局面を浅い探索のroot局面にもどす
-      for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
-        pos.undo_move(*rit);
-      }
-
-      if (recorded_pv_play_index >= pv_strap_max_depth ||
-        recorded_pv_play_index >= sizeof(record.pv) / sizeof(record.pv[0]) ||
-        record.pv[recorded_pv_play_index] == Move::MOVE_NONE ||
-        !pos.pseudo_legal(record.pv[recorded_pv_play_index]) ||
-        !pos.legal(record.pv[recorded_pv_play_index])) {
-        break;
-      }
-
-      pos.do_move(record.pv[recorded_pv_play_index], state_info[recorded_pv_play_index]);
+    // 局面を浅い探索のroot局面にもどす
+    for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
+      pos.undo_move(*rit);
     }
   }
 }
