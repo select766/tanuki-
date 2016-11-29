@@ -299,11 +299,6 @@ void Learner::GenerateKifu()
 
           record.value = value;
 
-          int num_pv = search_depth;
-          num_pv = std::min<int>(num_pv, sizeof(record.pv) / sizeof(record.pv[0]));
-          num_pv = std::min<int>(num_pv, static_cast<int>(pv.size()));
-          copy(pv.begin(), pv.begin() + num_pv, record.pv);
-
           kifu_writer->Write(record);
           int64_t position_index = global_position_index++;
           ShowProgress(start, position_index, num_positions, 1000'0000);

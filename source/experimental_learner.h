@@ -11,9 +11,8 @@ namespace Learner
   struct Record {
     PackedSfen packed;
     int16_t value;
-    Move pv[7];
   };
-  static_assert(sizeof(Record) == 64, "Size of Record is not 64");
+  static_assert(sizeof(Record) == 34, "Size of Record is not 64");
 
   void InitializeLearner(USI::OptionsMap& o);
   void ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
