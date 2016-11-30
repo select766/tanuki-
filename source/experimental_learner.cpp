@@ -31,6 +31,7 @@ namespace Eval
   extern const int FV_SCALE = 32;
 
   void save_eval();
+  void eval_learn_init();
   extern BonaPiece inv_piece[fe_end];
   extern BonaPiece mir_piece[fe_end];
 }
@@ -475,6 +476,8 @@ void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64
 
 void Learner::Learn(std::istringstream& iss) {
   sync_cout << "Learner::Learn()" << sync_endl;
+
+  Eval::eval_learn_init();
 
   ASSERT_LV3(
     Kk::MaxIndex() == 
