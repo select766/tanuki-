@@ -603,7 +603,8 @@ void Learner::Learn(std::istringstream& iss) {
     int num_records = static_cast<int>(std::min(
       max_positions_for_learning - num_processed_positions, mini_batch_size));
     if (!kifu_reader->Read(num_records, records)) {
-      break;
+      sync_cout << "Failed to read kifu for train." << sync_endl;
+      std::exit(1);
     }
     ++num_mini_batches;
 
