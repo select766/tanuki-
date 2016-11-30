@@ -3,6 +3,7 @@
 #include <array>
 #include <ctime>
 #include <direct.h>
+#include <experimental/generator>
 #include <fstream>
 #include <numeric>
 #include <omp.h>
@@ -11,9 +12,6 @@
 #include "position.h"
 #include "search.h"
 #include "thread.h"
-
-using USI::Option;
-using USI::OptionsMap;
 
 namespace Learner
 {
@@ -33,7 +31,16 @@ namespace Eval
   extern const int FV_SCALE = 32;
 
   void save_eval();
+  extern BonaPiece inv_piece[fe_end];
+  extern BonaPiece mir_piece[fe_end];
 }
+
+using Eval::BonaPiece;
+using Eval::fe_end;
+using Eval::inv_piece;
+using Eval::mir_piece;
+using USI::Option;
+using USI::OptionsMap;
 
 namespace
 {
@@ -82,79 +89,236 @@ namespace
   constexpr char* kOptionValueLearnerNumPositionsForTest = "LearnerNumPositionsForTest";
   constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
 
-  int KppIndexToRawIndex(Square k, Eval::BonaPiece p0, Eval::BonaPiece p1, WeightKind weight_kind) {
-    return static_cast<int>(static_cast<int>(static_cast<int>(k) * Eval::fe_end + p0) * Eval::fe_end + p1) * WEIGHT_KIND_NB + weight_kind;
-  }
+  class Kpp {
+  public:
+    Kpp(Square king, BonaPiece piece0, BonaPiece piece1, WeightKind weight_kind)
+      : king_(king), piece0_(piece0), piece1_(piece1), weight_kind_(weight_kind) {
+    }
 
-  int KkpIndexToRawIndex(Square k0, Square k1, Eval::BonaPiece p, WeightKind weight_kind) {
-    return KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO) +
-      static_cast<int>(static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * Eval::fe_end + p) * COLOR_NB + weight_kind;
-  }
+    // Inclusive
+    static int MinIndex() {
+      return 0;
+    }
 
-  int KkIndexToRawIndex(Square k0, Square k1, WeightKind weight_kind) {
-    return KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO) +
-      (static_cast<int>(static_cast<int>(k0) * SQ_NB + k1) * COLOR_NB) + weight_kind;
-  }
+    // Exclusive
+    static int MaxIndex() {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      return k * p * p * w;
+    }
 
-  bool IsKppIndex(int index) {
-    return 0 <= index &&
-      index < KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
-  }
+    static bool IsValid(int dimension) {
+      return MinIndex() <= dimension && dimension < MaxIndex();
+    }
 
-  bool IsKkpIndex(int index) {
-    return 0 <= index &&
-      !IsKppIndex(index) &&
-      index < KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
-  }
+    int ToIndex() const {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      int index = ((king_ * p + piece0_) * p + piece1_) * w + weight_kind_;
+      ASSERT_LV3(IsValid(index));
+      return index;
+    }
 
-  bool IsKkIndex(int index) {
-    return 0 <= index &&
-      !IsKppIndex(index) &&
-      !IsKkpIndex(index) &&
-      index < KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
-  }
+    auto ToLowerDimensions() const {
+      yield Kpp(king_, piece0_, piece1_, weight_kind_);
+      yield Kpp(king_, piece1_, piece0_, weight_kind_);
+      yield Kpp(king_, mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
+      yield Kpp(king_, mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
+    }
 
-  void RawIndexToKppIndex(int dimension_index, Square& k, Eval::BonaPiece& p0, Eval::BonaPiece& p1, WeightKind& weight_kind) {
-    int original_dimension_index = dimension_index;
-    ASSERT_LV3(IsKppIndex(dimension_index));
-    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
-    dimension_index /= WEIGHT_KIND_NB;
-    p1 = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
-    dimension_index /= Eval::fe_end;
-    p0 = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
-    dimension_index /= Eval::fe_end;
-    k = static_cast<Square>(dimension_index);
-    ASSERT_LV3(k < SQ_NB);
-    ASSERT_LV3(KppIndexToRawIndex(k, p0, p1, weight_kind) == original_dimension_index);
-  }
+    int ToNormalizedIndex() const {
+      int best_index = std::numeric_limits<int>::max();
+      for (const auto& kpp : ToLowerDimensions()) {
+        best_index = std::min(best_index, kpp.ToIndex());
+      }
+      return best_index;
+    }
 
-  void RawIndexToKkpIndex(int dimension_index, Square& k0, Square& k1, Eval::BonaPiece& p, WeightKind& weight_kind) {
-    int original_dimension_index = dimension_index;
-    ASSERT_LV3(IsKkpIndex(dimension_index));
-    dimension_index -= KppIndexToRawIndex(SQ_NB, Eval::BONA_PIECE_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
-    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
-    dimension_index /= WEIGHT_KIND_NB;
-    p = static_cast<Eval::BonaPiece>(dimension_index % Eval::fe_end);
-    dimension_index /= Eval::fe_end;
-    k1 = static_cast<Square>(dimension_index % SQ_NB);
-    dimension_index /= SQ_NB;
-    k0 = static_cast<Square>(dimension_index);
-    ASSERT_LV3(k0 < SQ_NB);
-    ASSERT_LV3(KkpIndexToRawIndex(k0, k1, p, weight_kind) == original_dimension_index);
-  }
+    static Kpp ForIndex(int index) {
+      int original_index = index;
+      ASSERT_LV3(IsValid(index));
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      index -= MinIndex();
+      int weight_kind = index % w;
+      index /= w;
+      int piece1 = index % p;
+      index /= p;
+      int piece0 = index % p;
+      index /= p;
+      int king = index;
+      ASSERT_LV3(king < k);
+      Kpp kpp(static_cast<Square>(king), static_cast<BonaPiece>(piece0),
+        static_cast<BonaPiece>(piece1), static_cast<WeightKind>(weight_kind));
+      ASSERT_LV3(kpp.ToIndex() == original_index);
+      return kpp;
+    }
 
-  void RawIndexToKkIndex(int dimension_index, Square& k0, Square& k1, WeightKind& weight_kind) {
-    int original_dimension_index = dimension_index;
-    ASSERT_LV3(IsKkIndex(dimension_index));
-    dimension_index -= KkpIndexToRawIndex(SQ_NB, SQ_ZERO, Eval::BONA_PIECE_ZERO, WEIGHT_KIND_ZERO);
-    weight_kind = static_cast<WeightKind>(dimension_index % WEIGHT_KIND_NB);
-    dimension_index /= WEIGHT_KIND_NB;
-    k1 = static_cast<Square>(dimension_index % SQ_NB);
-    dimension_index /= SQ_NB;
-    k0 = static_cast<Square>(dimension_index);
-    ASSERT_LV3(k0 < SQ_NB);
-    ASSERT_LV3(KkIndexToRawIndex(k0, k1, weight_kind) == original_dimension_index);
-  }
+    Square king() const { return king_; }
+    BonaPiece piece0() const { return piece0_; }
+    BonaPiece piece1() const { return piece1_; }
+    WeightKind weight_kind() const { return weight_kind_; }
+
+  private:
+    Square king_;
+    BonaPiece piece0_;
+    BonaPiece piece1_;
+    WeightKind weight_kind_;
+  };
+
+  class Kkp {
+  public:
+    Kkp(Square king0, Square king1, BonaPiece piece, WeightKind weight_kind)
+      : king0_(king0), king1_(king1), piece_(piece), weight_kind_(weight_kind) {
+    }
+
+    // Inclusive
+    static int MinIndex() {
+      return Kpp::MaxIndex();
+    }
+
+    // Exclusive
+    static int MaxIndex() {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      return MinIndex() + k * k * p * w;
+    }
+
+    static bool IsValid(int dimension) {
+      return MinIndex() <= dimension && dimension < MaxIndex();
+    }
+
+    int ToIndex() const {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      int index = MinIndex() + ((king0_ * k + king1_) * p + piece_) * w + weight_kind_;
+      ASSERT_LV3(IsValid(index));
+      return index;
+    }
+
+    auto ToLowerDimensions() const {
+      yield Kkp(king0_, king1_, piece_, weight_kind_);
+      yield Kkp(Mir(king0_), Mir(king1_), piece_, weight_kind_);
+    }
+
+    int ToNormalizedIndex() const {
+      int best_index = std::numeric_limits<int>::max();
+      for (const auto& kpp : ToLowerDimensions()) {
+        best_index = std::min(best_index, kpp.ToIndex());
+      }
+      return best_index;
+    }
+
+    static Kkp ForIndex(int index) {
+      int original_index = index;
+      ASSERT_LV3(IsValid(index));
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      index -= MinIndex();
+      int weight_kind = index % w;
+      index /= w;
+      int piece = index % p;
+      index /= p;
+      int king1 = index % k;
+      index /= k;
+      int king0 = index;
+      ASSERT_LV3(king0 < k);
+      Kkp kkp(static_cast<Square>(king0), static_cast<Square>(king1),
+        static_cast<BonaPiece>(piece), static_cast<WeightKind>(weight_kind));
+      ASSERT_LV3(kkp.ToIndex() == original_index);
+      return kkp;
+    }
+
+    Square king0() const { return king0_; }
+    Square king1() const { return king1_; }
+    BonaPiece piece() const { return piece_; }
+    WeightKind weight_kind() const { return weight_kind_; }
+
+  private:
+    Square king0_;
+    Square king1_;
+    BonaPiece piece_;
+    WeightKind weight_kind_;
+  };
+
+  class Kk {
+  public:
+    Kk(Square king0, Square king1, WeightKind weight_kind)
+      : king0_(king0), king1_(king1), weight_kind_(weight_kind) {
+    }
+
+    // Inclusive
+    static int MinIndex() {
+      return Kkp::MaxIndex();
+    }
+
+    // Exclusive
+    static int MaxIndex() {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      return MinIndex() + k * k * w;
+    }
+
+    static bool IsValid(int dimension) {
+      return MinIndex() <= dimension && dimension < MaxIndex();
+    }
+
+    int ToIndex() const {
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      int index = MinIndex() + (king0_ * k + king1_) * w + weight_kind_;
+      ASSERT_LV3(IsValid(index));
+      return index;
+    }
+
+    auto ToLowerDimensions() const {
+      yield Kk(king0_, king1_, weight_kind_);
+    }
+
+    int ToNormalizedIndex() const {
+      int best_index = std::numeric_limits<int>::max();
+      for (const auto& kpp : ToLowerDimensions()) {
+        best_index = std::min(best_index, kpp.ToIndex());
+      }
+      return best_index;
+    }
+
+    static Kk ForIndex(int index) {
+      int original_index = index;
+      ASSERT_LV3(IsValid(index));
+      constexpr int k = SQ_NB;
+      constexpr int p = fe_end;
+      constexpr int w = WEIGHT_KIND_NB;
+      index -= MinIndex();
+      int weight_kind = index % w;
+      index /= w;
+      int king1 = index % k;
+      index /= k;
+      int king0 = index;
+      ASSERT_LV3(king0 < k);
+      Kk kk(static_cast<Square>(king0), static_cast<Square>(king1),
+        static_cast<WeightKind>(weight_kind));
+      ASSERT_LV3(kk.ToIndex() == original_index);
+      return kk;
+    }
+
+    Square king0() const { return king0_; }
+    Square king1() const { return king1_; }
+    WeightKind weight_kind() const { return weight_kind_; }
+
+  private:
+    Square king0_;
+    Square king1_;
+    WeightKind weight_kind_;
+  };
 
   void Weight::AddGradient(double gradient) {
     sum_gradient += gradient;
@@ -293,7 +457,7 @@ void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64
   int minute = elapsed_time / 60 % 60;
   int second = elapsed_time % 60;
   double data_per_time = current_data / static_cast<double>(current_time - start_time);
-  time_t expected_time = 
+  time_t expected_time =
     static_cast<time_t>(current_time + (total_data - current_data) / data_per_time);
   struct tm current_tm = *std::localtime(&current_time);
   struct tm expected_tm = *std::localtime(&expected_time);
@@ -313,7 +477,7 @@ void Learner::Learn(std::istringstream& iss) {
   sync_cout << "Learner::Learn()" << sync_endl;
 
   ASSERT_LV3(
-    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
+    Kk::MaxIndex() == 
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
@@ -349,7 +513,7 @@ void Learner::Learn(std::istringstream& iss) {
 
   Eval::load_eval();
 
-  int vector_length = KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO);
+  int vector_length = Kk::MaxIndex();
 
   std::vector<Weight> weights(vector_length);
   memset(&weights[0], 0, sizeof(weights[0]) * weights.size());
@@ -358,33 +522,22 @@ void Learner::Learn(std::istringstream& iss) {
   // 並列化を効かせたいのでdimension_indexで回す
 #pragma omp parallel for schedule(guided)
   for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
-    if (IsKppIndex(dimension_index)) {
-      Square k;
-      Eval::BonaPiece p0;
-      Eval::BonaPiece p1;
-      WeightKind weight_kind;
-      RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
-      weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].w =
-        static_cast<WeightType>(Eval::kpp[k][p0][p1][weight_kind]);
+    if (Kpp::IsValid(dimension_index)) {
+      Kpp kpp = Kpp::ForIndex(dimension_index);
+      weights[dimension_index].w = static_cast<WeightType>(
+        Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
 
     }
-    else if (IsKkpIndex(dimension_index)) {
-      Square k0;
-      Square k1;
-      Eval::BonaPiece p;
-      WeightKind weight_kind;
-      RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-      weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].w =
-        static_cast<WeightType>(Eval::kkp[k0][k1][p][weight_kind]);
+    else if (Kkp::IsValid(dimension_index)) {
+      Kkp kkp = Kkp::ForIndex(dimension_index);
+      weights[dimension_index].w = static_cast<WeightType>(
+        Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
 
     }
-    else if (IsKkIndex(dimension_index)) {
-      Square k0;
-      Square k1;
-      WeightKind weight_kind;
-      RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-      weights[KkIndexToRawIndex(k0, k1, weight_kind)].w =
-        static_cast<WeightType>(Eval::kk[k0][k1][weight_kind]);
+    else if (Kk::IsValid(dimension_index)) {
+      Kk kk = Kk::ForIndex(dimension_index);
+      weights[dimension_index].w = static_cast<WeightType>(
+        Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
 
     }
     else {
@@ -500,8 +653,8 @@ void Learner::Learn(std::istringstream& iss) {
           // 勾配の値を加算する
 
           // KK
-          weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-          weights[KkIndexToRawIndex(sq_bk, sq_wk, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_COLOR).ToNormalizedIndex()].AddGradient(delta_color);
+          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_TURN).ToNormalizedIndex()].AddGradient(delta_turn);
 
           for (int i = 0; i < PIECE_NO_KING; ++i) {
             Eval::BonaPiece k0 = list0[i];
@@ -515,19 +668,25 @@ void Learner::Learn(std::istringstream& iss) {
               // KPP
               Eval::BonaPiece p0b = std::min(k0, l0);
               Eval::BonaPiece p1b = std::max(k0, l0);
-              weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-              weights[KppIndexToRawIndex(sq_bk, p0b, p1b, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
+                .AddGradient(delta_color);
+              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_TURN).ToNormalizedIndex()]
+                .AddGradient(delta_turn);
 
               // KPP
               Eval::BonaPiece p0w = std::min(k1, l1);
               Eval::BonaPiece p1w = std::max(k1, l1);
-              weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR)].AddGradient(-delta_color);
-              weights[KppIndexToRawIndex(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
+                .AddGradient(-delta_color);
+              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN).ToNormalizedIndex()]
+                .AddGradient(delta_turn);
             }
 
             // KKP
-            weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR)].AddGradient(delta_color);
-            weights[KkpIndexToRawIndex(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN)].AddGradient(delta_turn);
+            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
+              .AddGradient(delta_color);
+            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN).ToNormalizedIndex()]
+              .AddGradient(delta_turn);
           }
         };
         Strap(records[record_index], pv_strap_max_depth, f);
@@ -562,44 +721,44 @@ void Learner::Learn(std::istringstream& iss) {
       // 並列化を効かせたいのでdimension_indexで回す
 #pragma omp for schedule(guided)
       for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
-        if (IsKppIndex(dimension_index)) {
-          Square k;
-          Eval::BonaPiece p0;
-          Eval::BonaPiece p1;
-          WeightKind weight_kind;
-          RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
-
-          // 常にp0 < p1となるようにアクセスする
-          if (p0 > p1) {
+        if (Kpp::IsValid(dimension_index)) {
+          Kpp kpp = Kpp::ForIndex(dimension_index);
+          int normalized_index = kpp.ToNormalizedIndex();
+          if (normalized_index != dimension_index) {
             continue;
           }
-
-          auto& weight = weights[KppIndexToRawIndex(k, p0, p1, weight_kind)];
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kpp[k][p0][p1][weight_kind]);
-          Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
-
+          auto& weight = weights[normalized_index];
+          int16_t value = 0;
+          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
+          for (const auto& lower : kpp.ToLowerDimensions()) {
+            Eval::kpp[lower.king()][lower.piece0()][lower.piece1()][lower.weight_kind()] = value;
+          }
         }
-        else if (IsKkpIndex(dimension_index)) {
-          Square k0;
-          Square k1;
-          Eval::BonaPiece p;
-          WeightKind weight_kind;
-          RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-          auto& weight = weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)];
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kkp[k0][k1][p][weight_kind]);
-
+        else if (Kkp::IsValid(dimension_index)) {
+          Kkp kkp = Kkp::ForIndex(dimension_index);
+          int normalized_index = kkp.ToNormalizedIndex();
+          if (normalized_index != dimension_index) {
+            continue;
+          }
+          auto& weight = weights[normalized_index];
+          int16_t value = 0;
+          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
+          for (const auto& lower : kkp.ToLowerDimensions()) {
+            Eval::kkp[lower.king0()][lower.king1()][lower.piece()][lower.weight_kind()] = value;
+          }
         }
-        else if (IsKkIndex(dimension_index)) {
-          Square k0;
-          Square k1;
-          WeightKind weight_kind;
-          RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-          auto& weight = weights[KkIndexToRawIndex(k0, k1, weight_kind)];
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-            Eval::kk[k0][k1][weight_kind]);
-
+        else if (Kk::IsValid(dimension_index)) {
+          Kk kk = Kk::ForIndex(dimension_index);
+          int normalized_index = kk.ToNormalizedIndex();
+          if (normalized_index != dimension_index) {
+            continue;
+          }
+          auto& weight = weights[normalized_index];
+          int16_t value = 0;
+          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
+          for (const auto& lower : kk.ToLowerDimensions()) {
+            Eval::kk[lower.king0()][lower.king1()][lower.weight_kind()] = value;
+          }
         }
         else {
           ASSERT_LV3(false);
@@ -638,52 +797,7 @@ void Learner::Learn(std::istringstream& iss) {
     }
   }
 
-  std::printf("Finalizing weights\n");
-  std::fflush(stdout);
-
-  // 平均化法をかけた後、評価関数テーブルに重みを書き出す
-#pragma omp parallel for schedule(guided)
-  for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
-    if (IsKppIndex(dimension_index)) {
-      Square k;
-      Eval::BonaPiece p0;
-      Eval::BonaPiece p1;
-      WeightKind weight_kind;
-      RawIndexToKppIndex(dimension_index, k, p0, p1, weight_kind);
-
-      // 常にp0 < p1となるようにアクセスする
-      if (p0 > p1) {
-        continue;
-      }
-
-      weights[KppIndexToRawIndex(k, p0, p1, weight_kind)].Finalize(
-        num_mini_batches, Eval::kpp[k][p0][p1][weight_kind]);
-      Eval::kpp[k][p1][p0][weight_kind] = Eval::kpp[k][p0][p1][weight_kind];
-
-    }
-    else if (IsKkpIndex(dimension_index)) {
-      Square k0;
-      Square k1;
-      Eval::BonaPiece p;
-      WeightKind weight_kind;
-      RawIndexToKkpIndex(dimension_index, k0, k1, p, weight_kind);
-      weights[KkpIndexToRawIndex(k0, k1, p, weight_kind)].Finalize(
-        num_mini_batches, Eval::kkp[k0][k1][p][weight_kind]);
-
-    }
-    else if (IsKkIndex(dimension_index)) {
-      Square k0;
-      Square k1;
-      WeightKind weight_kind;
-      RawIndexToKkIndex(dimension_index, k0, k1, weight_kind);
-      weights[KkIndexToRawIndex(k0, k1, weight_kind)].Finalize(
-        num_mini_batches, Eval::kk[k0][k1][weight_kind]);
-
-    }
-    else {
-      ASSERT_LV3(false);
-    }
-  }
+  sync_cout << "Finished..." << sync_endl;
 }
 
 void Learner::MeasureError() {
@@ -694,7 +808,7 @@ void Learner::MeasureError() {
   omp_set_num_threads((int)Options["Threads"]);
 
   ASSERT_LV3(
-    KkIndexToRawIndex(SQ_NB, SQ_ZERO, WEIGHT_KIND_ZERO) ==
+    Kk::MaxIndex() ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
