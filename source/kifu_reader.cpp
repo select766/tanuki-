@@ -1,5 +1,6 @@
 #include "kifu_reader.h"
 
+#include <numeric>
 #include <sstream>
 #define NOMINMAX
 #include <Windows.h>
@@ -106,10 +107,8 @@ bool Learner::KifuReader::Read(Record& record) {
   // permutation配列経由のアクセスで範囲外アクセスが起こる。
   // これを防ぐため、permutation配列を再作成する。
   if (records_.size() != permutation_.size()) {
-    permutation_.clear();
-    for (int i = 0; i < read_match_size_; ++i) {
-      permutation_.push_back(i);
-    }
+    permutation_.resize(records_.size());
+    std::iota(permutation_.begin(), permutation_.end(), 0);
     if (shuffle_) {
       std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::time(nullptr)));
     }
