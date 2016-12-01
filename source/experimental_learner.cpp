@@ -130,11 +130,12 @@ namespace
     }
 
     int ToNormalizedIndex() const {
-      int best_index = std::numeric_limits<int>::max();
-      for (const auto& kpp : ToLowerDimensions()) {
-        best_index = std::min(best_index, kpp.ToIndex());
-      }
-      return best_index;
+      return std::min({
+        Kpp(king_, piece0_, piece1_, weight_kind_).ToIndex(),
+      Kpp(king_, piece1_, piece0_, weight_kind_).ToIndex(),
+      Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_).ToIndex(),
+      Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_).ToIndex(),
+      });
     }
 
     static Kpp ForIndex(int index) {
@@ -208,11 +209,10 @@ namespace
     }
 
     int ToNormalizedIndex() const {
-      int best_index = std::numeric_limits<int>::max();
-      for (const auto& kpp : ToLowerDimensions()) {
-        best_index = std::min(best_index, kpp.ToIndex());
-      }
-      return best_index;
+      return std::min({
+        Kkp(king0_, king1_, piece_, weight_kind_).ToIndex(),
+      Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_).ToIndex(),
+      });
     }
 
     static Kkp ForIndex(int index) {
@@ -285,11 +285,9 @@ namespace
     }
 
     int ToNormalizedIndex() const {
-      int best_index = std::numeric_limits<int>::max();
-      for (const auto& kpp : ToLowerDimensions()) {
-        best_index = std::min(best_index, kpp.ToIndex());
-      }
-      return best_index;
+      return std::min({
+        Kk(king0_, king1_, weight_kind_).ToIndex(),
+      });
     }
 
     static Kk ForIndex(int index) {
@@ -480,7 +478,7 @@ void Learner::Learn(std::istringstream& iss) {
   Eval::eval_learn_init();
 
   ASSERT_LV3(
-    Kk::MaxIndex() == 
+    Kk::MaxIndex() ==
     static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
     static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
