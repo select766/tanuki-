@@ -125,8 +125,8 @@ namespace
     auto ToLowerDimensions() const {
       yield Kpp(king_, piece0_, piece1_, weight_kind_);
       yield Kpp(king_, piece1_, piece0_, weight_kind_);
-      yield Kpp(king_, mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
-      yield Kpp(king_, mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
+      yield Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
+      yield Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
     }
 
     int ToNormalizedIndex() const {
@@ -204,7 +204,7 @@ namespace
 
     auto ToLowerDimensions() const {
       yield Kkp(king0_, king1_, piece_, weight_kind_);
-      yield Kkp(Mir(king0_), Mir(king1_), piece_, weight_kind_);
+      yield Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
     }
 
     int ToNormalizedIndex() const {
