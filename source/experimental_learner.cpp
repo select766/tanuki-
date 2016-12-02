@@ -500,9 +500,8 @@ void Learner::Learn(std::istringstream& iss) {
   }
 
   std::vector<int64_t> write_eval_per_positions;
-  for (int64_t base = 1; base <= 9; ++base) {
-    write_eval_per_positions.push_back(base * 10'0000'0000LL);
-    write_eval_per_positions.push_back(base * 100'0000'0000LL);
+  for (int64_t i = 1; i <= 20; ++i) {
+      write_eval_per_positions.push_back(i * 5'0000'0000LL);
   }
   write_eval_per_positions.push_back(std::numeric_limits<int64_t>::max());
   std::sort(write_eval_per_positions.begin(), write_eval_per_positions.end());
