@@ -33,7 +33,7 @@ def GetDateTimeString():
 
 def AdoptSubfolder(subfolder):
     num_positions = int(subfolder)
-    return num_positions % 1000000000 == 0
+    return num_positions % 500000000 == 0
 
 
 def CalculateWinningPercentage(base_eval_folder_path, learner_output_folder_path):
