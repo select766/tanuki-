@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>34e1b03c-ef28-4724-a7d8-334ca4727c90</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>selfplay.py</StartupFile>
+    <StartupFile>zoukin.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>..\exe</WorkingDirectory>
@@ -14,7 +14,7 @@
     <RootNamespace>tools</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>--learner_output_folder_path_base=learner_output --kifu_output_folder_path_base=kifu --initial_eval_folder_path=eval\apery_wcsc26 --initial_kifu_folder_path=kifu\2016-09-07 --initial_new_eval_folder_path_base=eval --original_eval_folder_path=eval\apery_wcsc26 --generate_kifu_exe_file_path=YaneuraOu.2016-09-15.kifu_generator.exe --learner_exe_file_path=YaneuraOu.2016-09-15.learner.exe --local_game_server_exe_file_path=YaneuraOu-local-server.exe --vs_original_result_file_path=vs_original.2016-09-15.csv --vs_base_result_file_path=vs_base.2016-09-15.csv --num_threads_for_learning=12 --num_threads_for_selfplay=12 --num_games_for_selfplay=10 --num_games_for_generator_train=100 --num_games_for_generator_test=100 --num_positions_for_learning=10000 --num_iterations=1 --skip_self_play --skip_first_kifu_generation --skip_first_learn --skip_first_kifu_generation_for_test</CommandLineArguments>
+    <CommandLineArguments>--learner_output_folder_path_base=learner_output --kifu_output_folder_path_base=kifu --kifu_for_test_output_folder_path_base=kifu_for_test --initial_eval_folder_path=eval\apery_wcsc26 --initial_kifu_folder_path= --initial_kifu_for_test_folder_path= --initial_new_eval_folder_path_base=eval\apery_wcsc26 --initial_state=generate_kifu --original_eval_folder_path=eval\apery_wcsc26 --generate_kifu_exe_file_path=YaneuraOu.generate_kifu.2016-12-04.exe --learner_exe_file_path=YaneuraOu.learn.2016-12-04.exe --local_game_server_exe_file_path=YaneuraOu-local-server.exe --vs_original_result_file_path=vs_original.2016-12-04.csv --vs_base_result_file_path=vs_base.2016-12-04.csv --num_threads_to_generate_kifu=8 --num_threads_to_learn=8 --num_threads_to_selfplay=4 --num_games_to_selfplay=4 --num_positions_to_generator_train=1000000 --num_positions_to_generator_test=1000000 --num_positions_to_learn=1000000 --num_iterations=100 --search_depth=3</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
