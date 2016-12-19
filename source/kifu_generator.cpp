@@ -101,6 +101,7 @@ namespace
     state_stack->push(StateInfo());
     pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
       state_stack->top());
+    Eval::evaluate(pos);
     return true;
   }
 
@@ -135,6 +136,7 @@ namespace
       // この指し手に成功したら、それはdo_moveの代わりであるから今回、do_move()は行わない。
 
       if (sq2 != SQ_NB && pos.do_move_by_swapping_pieces(sq1, sq2)) {
+        Eval::evaluate(pos);
         // 検証用のassert
         if (!is_ok(pos)) {
           sync_cout << pos << sq1 << sq2 << sync_endl;
@@ -155,6 +157,7 @@ namespace
     Move m = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
     state_stack->push(StateInfo());
     pos.do_move(m, state_stack->top());
+    Eval::evaluate(pos);
     return true;
   }
 }
@@ -265,6 +268,8 @@ void Learner::GenerateKifu()
 
         SetupStates->push(StateInfo());
         pos.do_move(m, SetupStates->top());
+        // 差分計算のためevaluate()を呼び出す
+        Eval::evaluate(pos);
       }
 
       if (do_random_move_after_book) {
@@ -328,6 +333,8 @@ void Learner::GenerateKifu()
         if (!special_move_is_done) {
           SetupStates->push(StateInfo());
           pos.do_move(pv[0], SetupStates->top());
+          // 差分計算のためevaluate()を呼び出す
+          Eval::evaluate(pos);
         }
       }
     }
