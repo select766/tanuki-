@@ -85,7 +85,7 @@ namespace
   }
 
   // 王が移動する指し手からランダムに1手選んで指す
-  bool DoRandomKingMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+  bool DoRandomKingMove(Position& pos, std::mt19937_64& mt, StateInfo* state) {
     MoveList<LEGAL> list(pos);
     ExtMove* it2 = (ExtMove*)list.begin();
     for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
@@ -98,9 +98,8 @@ namespace
     }
 
     // ランダムにひとつ選ぶ
-    state_stack->push(StateInfo());
     pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
-      state_stack->top());
+      state[pos.game_ply()]);
     Eval::evaluate(pos);
     return true;
   }
@@ -151,12 +150,11 @@ namespace
 
   // 合法手の中からランダムに1手指す
   //https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-  bool DoRandomMove(Position& pos, std::mt19937_64& mt, Search::StateStackPtr& state_stack) {
+  bool DoRandomMove(Position& pos, std::mt19937_64& mt, StateInfo* state) {
     // 合法手のなかからランダムに1手選ぶフェーズ
     MoveList<LEGAL> list(pos);
     Move m = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
-    state_stack->push(StateInfo());
-    pos.do_move(m, state_stack->top());
+    pos.do_move(m, state[pos.game_ply()]);
     Eval::evaluate(pos);
     return true;
   }
@@ -244,7 +242,8 @@ void Learner::GenerateKifu()
       Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;
       pos.set_hirate();
-      auto SetupStates = Search::StateStackPtr(new aligned_stack<StateInfo>);
+      StateInfo state_infos[MAX_PLY * 2] = { 0 };
+      StateInfo* state = state_infos + 8;
 
       const std::string& opening = book[opening_index(mt19937_64)];
       std::istringstream is(opening);
@@ -266,15 +265,14 @@ void Learner::GenerateKifu()
           break;
         }
 
-        SetupStates->push(StateInfo());
-        pos.do_move(m, SetupStates->top());
+        pos.do_move(m, state[pos.game_ply()]);
         // 差分計算のためevaluate()を呼び出す
         Eval::evaluate(pos);
       }
 
       if (do_random_move_after_book) {
         // 開始局面からランダムに手を指して、局面をバラけさせる
-        DoRandomMove(pos, mt19937_64, SetupStates);
+        DoRandomMove(pos, mt19937_64, state);
       }
 
       while (pos.game_ply() < kMaxGamePlay) {
@@ -314,7 +312,7 @@ void Learner::GenerateKifu()
         bool special_move_is_done = false;
         if (r < do_random_king_move_probability) {
           if (!pos.in_check()) {
-            special_move_is_done = DoRandomKingMove(pos, mt19937_64, SetupStates);
+            special_move_is_done = DoRandomKingMove(pos, mt19937_64, state);
           }
         }
         else if (r < do_random_king_move_probability + swap_two_pieces_probability) {
@@ -325,14 +323,13 @@ void Learner::GenerateKifu()
         else if (r < do_random_king_move_probability + swap_two_pieces_probability +
           do_random_move_probability) {
           if (!pos.in_check()) {
-            special_move_is_done = DoRandomMove(pos, mt19937_64, SetupStates);
+            special_move_is_done = DoRandomMove(pos, mt19937_64, state);
           }
         }
 
         // 特別な指し手が指されなかった場合は探索による指し手を指す
         if (!special_move_is_done) {
-          SetupStates->push(StateInfo());
-          pos.do_move(pv[0], SetupStates->top());
+          pos.do_move(pv[0], state[pos.game_ply()]);
           // 差分計算のためevaluate()を呼び出す
           Eval::evaluate(pos);
         }
