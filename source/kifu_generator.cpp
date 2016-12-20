@@ -242,7 +242,7 @@ void Learner::GenerateKifu()
       Thread& thread = *Threads[thread_index];
       Position& pos = thread.rootPos;
       pos.set_hirate();
-      StateInfo state_infos[MAX_PLY * 2] = { 0 };
+      StateInfo state_infos[512] = { 0 };
       StateInfo* state = state_infos + 8;
 
       const std::string& opening = book[opening_index(mt19937_64)];
