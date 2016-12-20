@@ -244,6 +244,7 @@
 #define ONE_PLY_EQ_1
 // デバッグ絡み
 #define ASSERT_LV 3
+
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
 #define USE_SFEN_PACKER
