@@ -85,7 +85,7 @@ setoption name LearningRate value 2.0
 setoption name KifuForTestDir value {4}
 setoption name LearnerNumPositionsForTest value 1000000
 setoption name MiniBatchSize value 1000000
-setoption name ReadBatchSize value 100000000
+setoption name ReadBatchSize value 500000000
 isready
 usinewgame
 learn output_folder_path_base {5}
