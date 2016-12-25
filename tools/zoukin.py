@@ -46,6 +46,7 @@ def AdoptSubfolder(subfolder):
 
 def GenerateKifu(eval_folder_path, kifu_folder_path, num_threads, num_positions, search_depth,
                  kifu_tag, generate_kifu_exe_file_path):
+  print(locals(), flush=True)
   input = '''usi
 setoption name EvalDir value {0}
 setoption name KifuDir value {1}
@@ -73,6 +74,7 @@ generate_kifu
 
 def Learn(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
           kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path):
+  print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {0}
 setoption name MaxMovesToDraw value 300
@@ -95,6 +97,7 @@ learn output_folder_path_base {5}
 
 def SelfPlay(old_eval_folder_path, new_eval_folder_path_base, result_file_path,
              local_game_server_exe_file_path, num_threads, num_games):
+  print(locals(), flush=True)
   with open(result_file_path, 'a', newline='') as output_file:
     csvwriter = csv.writer(output_file)
     subfolder = OUTPUT_EVAL_FOLDER_NAME
