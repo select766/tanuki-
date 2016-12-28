@@ -48,14 +48,14 @@ def GenerateKifu(eval_folder_path, kifu_folder_path, num_threads, num_positions,
                  kifu_tag, generate_kifu_exe_file_path):
   print(locals(), flush=True)
   input = '''usi
-setoption name EvalDir value {0}
-setoption name KifuDir value {1}
-setoption name Threads value {2}
+setoption name EvalDir value {eval_folder_path}
+setoption name KifuDir value {kifu_folder_path}
+setoption name Threads value {num_threads}
 setoption name Hash value 16384
-setoption name GeneratorNumPositions value {3}
-setoption name GeneratorMinSearchDepth value {4}
-setoption name GeneratorMaxSearchDepth value {4}
-setoption name GeneratorKifuTag value {5}
+setoption name GeneratorNumPositions value {num_positions}
+setoption name GeneratorMinSearchDepth value {search_depth}
+setoption name GeneratorMaxSearchDepth value {search_depth}
+setoption name GeneratorKifuTag value {kifu_tag}
 setoption name GeneratorStartposFileName value startpos.sfen
 setoption name GeneratorMinBookMove value 0
 setoption name GeneratorValueThreshold value 3000
@@ -66,31 +66,42 @@ setoption name GeneratorDoRandomMoveAfterBook value 0.1
 isready
 usinewgame
 generate_kifu
-'''.format(eval_folder_path, kifu_folder_path, num_threads, num_positions, search_depth,
-           kifu_tag).encode('utf-8')
+'''.format(
+  eval_folder_path=eval_folder_path,
+  kifu_folder_path=kifu_folder_path,
+  num_threads=num_threads,
+  num_positions=num_positions,
+  search_depth=search_depth,
+  kifu_tag=kifu_tag).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
 
 
 def Learn(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
-          kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path):
+          kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path, learning_rate):
   print(locals(), flush=True)
   input = '''usi
-setoption name Threads value {0}
+setoption name Threads value {num_threads}
 setoption name MaxMovesToDraw value 300
-setoption name EvalDir value {1}
-setoption name KifuDir value {2}
-setoption name LearnerNumPositions value {3}
-setoption name LearningRate value 2.0
-setoption name KifuForTestDir value {4}
+setoption name EvalDir value {eval_folder_path}
+setoption name KifuDir value {kifu_folder_path}
+setoption name LearnerNumPositions value {num_positions_to_learn}
+setoption name LearningRate value {learning_rate}
+setoption name KifuForTestDir value {kif_for_test_folder_path}
 setoption name LearnerNumPositionsForTest value 1000000
 setoption name MiniBatchSize value 1000000
-setoption name ReadBatchSize value 500000000
+setoption name ReadBatchSize value {num_positions_to_learn}
 isready
 usinewgame
-learn output_folder_path_base {5}
-'''.format(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
-           kif_for_test_folder_path, output_folder_path_base).encode('utf-8')
+learn output_folder_path_base {output_folder_path_base}
+'''.format(
+  num_threads=num_threads,
+  eval_folder_path=eval_folder_path,
+  kifu_folder_path=kifu_folder_path,
+  num_positions_to_learn=num_positions_to_learn,
+  kif_for_test_folder_path=kif_for_test_folder_path,
+  output_folder_path_base=output_folder_path_base,
+  learning_rate=learning_rate).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
@@ -105,12 +116,12 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, result_file_path,
   with open(result_file_path, 'a', newline='') as output_file:
     csvwriter = csv.writer(output_file)
     input = '''usi
-setoption name Threads value {0}
+setoption name Threads value {num_threads}
 setoption name BookSfenFile value records2016_10818.sfen
 isready
 usinewgame
-go btime {1} wtime 24 byoyomi 1
-'''.format(num_threads, num_games).encode('utf-8')
+go btime {num_games} wtime 24 byoyomi 1
+'''.format(num_threads=num_threads, num_games=num_games).encode('utf-8')
     print(input.decode('utf-8'))
     print(flush=True)
     completed_process = subprocess.run([local_game_server_exe_file_path], input=input,
@@ -280,6 +291,13 @@ def main():
     dest='search_depth',
     required=True,
     help='Search depth. ex) 8')
+  parser.add_argument(
+    '--learning_rate',
+    action='store',
+    type=float,
+    dest='learning_rate',
+    required=True,
+    help='Learning rate. ex) 2.0')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -307,6 +325,7 @@ def main():
   num_positions_to_learn = args.num_positions_to_learn
   num_iterations = args.num_iterations
   search_depth = args.search_depth
+  learning_rate = args.learning_rate
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
@@ -338,7 +357,8 @@ def main():
     elif state == State.learn:
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
       Learn(num_threads_to_learn, old_eval_folder_path, kifu_folder_path, num_positions_to_learn,
-            kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path)
+            kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path,
+            learning_rate)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, OUTPUT_EVAL_FOLDER_NAME)
       state = State.self_play_with_original
 
