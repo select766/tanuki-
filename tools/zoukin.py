@@ -95,19 +95,15 @@ learn output_folder_path_base {5}
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
 
-def SelfPlay(old_eval_folder_path, new_eval_folder_path_base, result_file_path,
+def SelfPlay(old_eval_folder_path, new_eval_folder_path, result_file_path,
              local_game_server_exe_file_path, num_threads, num_games):
   print(locals(), flush=True)
+  with open('engine-config1.txt', 'w') as engine_config1_file:
+    engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
+  with open('engine-config2.txt', 'w') as engine_config2_file:
+    engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(new_eval_folder_path))
   with open(result_file_path, 'a', newline='') as output_file:
     csvwriter = csv.writer(output_file)
-    subfolder = OUTPUT_EVAL_FOLDER_NAME
-    print(subfolder)
-
-    with open('engine-config1.txt', 'w') as engine_config1_file:
-      engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
-    with open('engine-config2.txt', 'w') as engine_config2_file:
-      engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(
-        os.path.join(new_eval_folder_path_base, subfolder)))
     input = '''usi
 setoption name Threads value {0}
 setoption name BookSfenFile value records2016_10818.sfen
