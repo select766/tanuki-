@@ -28,6 +28,7 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
+  constexpr int kShowProgressPerPositions = 1000'0000;
 
   constexpr char* OPTION_GENERATOR_NUM_POSITIONS = "GeneratorNumPositions";
   constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";
@@ -304,7 +305,7 @@ void Learner::GenerateKifu()
 
           kifu_writer->Write(record);
           int64_t position_index = global_position_index++;
-          ShowProgress(start, position_index, num_positions, 1000'0000);
+          ShowProgress(start, position_index, num_positions, kShowProgressPerPositions);
         }
 
         // 指定した確率に従って特別な指し手を指す
