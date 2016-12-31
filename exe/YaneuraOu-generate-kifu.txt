@@ -3,7 +3,7 @@ setoption name EvalDir value eval
 setoption name KifuDir value kifu\debug
 setoption name Threads value 8
 setoption name Hash value 16384
-setoption name GeneratorNumPositions value 100000
+setoption name GeneratorNumPositions value 100000000
 setoption name GeneratorMinSearchDepth value 3
 setoption name GeneratorMaxSearchDepth value 3
 setoption name GeneratorKifuTag value debug
@@ -13,8 +13,9 @@ setoption name GeneratorMaxBookMove value 32
 setoption name GeneratorValueThreshold value 
 setoption name GeneratorDoRandomKingMoveProbability value 0.0
 setoption name GeneratorSwapTwoPiecesProbability value 0.0
-setoption name GeneratorDoRandomMoveProbability value 0.0
-setoption name GeneratorDoRandomMoveAfterBook value false
+setoption name GeneratorDoRandomMoveProbability value 0.1
+setoption name GeneratorDoRandomMoveAfterBook value true
+setoption name GeneratorWriteAnotherPosition value true
 isready
 usinewgame
 generate_kifu

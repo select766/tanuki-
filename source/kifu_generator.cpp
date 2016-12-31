@@ -30,18 +30,19 @@ namespace
   constexpr int kMaxTrialsToSelectSquares = 100;
   constexpr int kShowProgressPerPositions = 1000'0000;
 
-  constexpr char* OPTION_GENERATOR_NUM_POSITIONS = "GeneratorNumPositions";
-  constexpr char* OPTION_GENERATOR_MIN_SEARCH_DEPTH = "GeneratorMinSearchDepth";
-  constexpr char* OPTION_GENERATOR_MAX_SEARCH_DEPTH = "GeneratorMaxSearchDepth";
-  constexpr char* OPTION_GENERATOR_KIFU_TAG = "GeneratorKifuTag";
-  constexpr char* OPTION_GENERATOR_BOOK_FILE_NAME = "GeneratorStartposFileName";
-  constexpr char* OPTION_GENERATOR_MIN_BOOK_MOVE = "GeneratorMinBookMove";
-  constexpr char* OPTION_GENERATOR_MAX_BOOK_MOVE = "GeneratorMaxBookMove";
-  constexpr char* OPTION_GENERATOR_VALUE_THRESHOLD = "GeneratorValueThreshold";
-  constexpr char* OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY = "GeneratorDoRandomKingMoveProbability";
-  constexpr char* OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY = "GeneratorSwapTwoPiecesProbability";
-  constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY = "GeneratorDoRandomMoveProbability";
-  constexpr char* OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK = "GeneratorDoRandomMoveAfterBook";
+  constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
+  constexpr char* kOptionGeneratorMinSearchDepth = "GeneratorMinSearchDepth";
+  constexpr char* kOptionGeneratorMaxSearchDepth = "GeneratorMaxSearchDepth";
+  constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
+  constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
+  constexpr char* kOptionGeneratorMinBookMove = "GeneratorMinBookMove";
+  constexpr char* kOptionGeneratorMaxBookMove = "GeneratorMaxBookMove";
+  constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+  constexpr char* kOptionGeneratorDoRandomKingMoveProbability = "GeneratorDoRandomKingMoveProbability";
+  constexpr char* kOptionGeneratorSwapTwoPiecesProbability = "GeneratorSwapTwoPiecesProbability";
+  constexpr char* kOptionGeneratorDoRandomMoveProbability = "GeneratorDoRandomMoveProbability";
+  constexpr char* kOptionGeneratorDoRandomMoveAfterBook = "GeneratorDoRandomMoveAfterBook";
+  constexpr char* kOptionGeneratorWriteAnotherPosition = "GeneratorWriteAnotherPosition";
 
   std::vector<std::string> book;
   std::uniform_real_distribution<> probability_distribution;
@@ -49,7 +50,7 @@ namespace
   bool ReadBook()
   {
     // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
-    std::string book_file_name = Options[OPTION_GENERATOR_BOOK_FILE_NAME];
+    std::string book_file_name = Options[kOptionGeneratorStartposFileName];
     std::ifstream fs_book;
     fs_book.open(book_file_name);
 
@@ -101,6 +102,7 @@ namespace
     // ランダムにひとつ選ぶ
     pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
       state[pos.game_ply()]);
+    // 差分計算のためevaluate()を呼び出す
     Eval::evaluate(pos);
     return true;
   }
@@ -136,6 +138,7 @@ namespace
       // この指し手に成功したら、それはdo_moveの代わりであるから今回、do_move()は行わない。
 
       if (sq2 != SQ_NB && pos.do_move_by_swapping_pieces(sq1, sq2)) {
+        // 差分計算のためevaluate()を呼び出す
         Eval::evaluate(pos);
         // 検証用のassert
         if (!is_ok(pos)) {
@@ -151,29 +154,79 @@ namespace
 
   // 合法手の中からランダムに1手指す
   //https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-  bool DoRandomMove(Position& pos, std::mt19937_64& mt, StateInfo* state) {
+  bool DoRandomMove(Position& pos, std::mt19937_64& mt, StateInfo* state, Move& move) {
     // 合法手のなかからランダムに1手選ぶフェーズ
     MoveList<LEGAL> list(pos);
-    Move m = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
-    pos.do_move(m, state[pos.game_ply()]);
+    move = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
+    pos.do_move(move, state[pos.game_ply()]);
+    // 差分計算のためevaluate()を呼び出す
     Eval::evaluate(pos);
     return true;
+  }
+
+  enum SearchAndWriteResult {
+    kSearchAndWriteUnknown,
+    kSearchAndWriteSucceeded,
+    kSearchAndWriteInvalidState,
+    kSearchAndWriteValueThresholdExceeded,
+  };
+
+  // 探索を行い、問題がなければ結果を書き出す
+  // return 成功した場合はtrue、そうでない場合はfalse。falseの場合は対局を中止したほうが良い
+  SearchAndWriteResult SearchAndWrite(
+    const std::uniform_int_distribution<>& search_depth_distribution, int value_threshold,
+    time_t start_time, int64_t num_positions, std::mt19937_64& mt19937_64, Position& pos,
+    Learner::KifuWriter& kifu_writer, std::atomic_int64_t& global_position_index,
+    Move& pv_move) {
+    int search_depth = search_depth_distribution(mt19937_64);
+    auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
+
+    // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
+    Value value = valueAndPv.first;
+    const std::vector<Move>& pv = valueAndPv.second;
+    if (pv.empty()) {
+      return kSearchAndWriteInvalidState;
+    }
+
+    // 評価値の絶対値の上限を超えている場合は書き出さないようにする
+    if (std::abs(value) > value_threshold) {
+      return kSearchAndWriteValueThresholdExceeded;
+    }
+
+    // 局面が不正な場合があるので再度チェックする
+    if (!pos.pos_is_ok()) {
+      return kSearchAndWriteInvalidState;
+    }
+
+    Learner::Record record = { 0 };
+    pos.sfen_pack(record.packed);
+    record.value = value;
+
+    if (!kifu_writer.Write(record)) {
+      return kSearchAndWriteInvalidState;
+    }
+
+    int64_t position_index = global_position_index++;
+    Learner::ShowProgress(start_time, position_index, num_positions, kShowProgressPerPositions);
+    pv_move = pv[0];
+    return kSearchAndWriteSucceeded;
   }
 }
 
 void Learner::InitializeGenerator(USI::OptionsMap& o) {
-  o[OPTION_GENERATOR_NUM_POSITIONS] << Option("10000000000");
-  o[OPTION_GENERATOR_MIN_SEARCH_DEPTH] << Option(3, 1, MAX_PLY);
-  o[OPTION_GENERATOR_MAX_SEARCH_DEPTH] << Option(4, 1, MAX_PLY);
-  o[OPTION_GENERATOR_KIFU_TAG] << Option("default_tag");
-  o[OPTION_GENERATOR_BOOK_FILE_NAME] << Option("startpos.sfen");
-  o[OPTION_GENERATOR_MIN_BOOK_MOVE] << Option(0, 1, MAX_PLY);
-  o[OPTION_GENERATOR_MAX_BOOK_MOVE] << Option(32, 1, MAX_PLY);
-  o[OPTION_GENERATOR_VALUE_THRESHOLD] << Option(VALUE_MATE, 0, VALUE_MATE);
-  o[OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY] << Option("0.1");
-  o[OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY] << Option("0.1");
-  o[OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY] << Option("0.1");
-  o[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK] << Option(true);
+  o[kOptionGeneratorNumPositions] << Option("10000000000");
+  o[kOptionGeneratorMinSearchDepth] << Option(3, 1, MAX_PLY);
+  o[kOptionGeneratorMaxSearchDepth] << Option(4, 1, MAX_PLY);
+  o[kOptionGeneratorKifuTag] << Option("default_tag");
+  o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
+  o[kOptionGeneratorMinBookMove] << Option(0, 1, MAX_PLY);
+  o[kOptionGeneratorMaxBookMove] << Option(32, 1, MAX_PLY);
+  o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
+  o[kOptionGeneratorDoRandomKingMoveProbability] << Option("0.1");
+  o[kOptionGeneratorSwapTwoPiecesProbability] << Option("0.1");
+  o[kOptionGeneratorDoRandomMoveProbability] << Option("0.1");
+  o[kOptionGeneratorDoRandomMoveAfterBook] << Option(true);
+  o[kOptionGeneratorWriteAnotherPosition] << Option(true);
 }
 
 void Learner::GenerateKifu()
@@ -204,24 +257,26 @@ void Learner::GenerateKifu()
   std::string kifu_directory = (std::string)Options["KifuDir"];
   _mkdir(kifu_directory.c_str());
 
-  int min_search_depth = Options[OPTION_GENERATOR_MIN_SEARCH_DEPTH];
-  int max_search_depth = Options[OPTION_GENERATOR_MAX_SEARCH_DEPTH];
+  int min_search_depth = Options[kOptionGeneratorMaxSearchDepth];
+  int max_search_depth = Options[kOptionGeneratorMaxSearchDepth];
   std::uniform_int_distribution<> search_depth_distribution(min_search_depth, max_search_depth);
-  int min_book_move = Options[OPTION_GENERATOR_MIN_BOOK_MOVE];
-  int max_book_move = Options[OPTION_GENERATOR_MAX_BOOK_MOVE];
+  int min_book_move = Options[kOptionGeneratorMinBookMove];
+  int max_book_move = Options[kOptionGeneratorMaxBookMove];
   std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
-  int64_t num_positions = ParseOptionOrDie<int64_t>(OPTION_GENERATOR_NUM_POSITIONS);
+  int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
   double do_random_king_move_probability =
-    ParseOptionOrDie<double>(OPTION_GENERATOR_DO_RANDOM_KING_MOVE_PROBABILITY);
+    ParseOptionOrDie<double>(kOptionGeneratorDoRandomKingMoveProbability);
   double swap_two_pieces_probability =
-    ParseOptionOrDie<double>(OPTION_GENERATOR_SWAP_TWO_PIECES_PROBABILITY);
+    ParseOptionOrDie<double>(kOptionGeneratorSwapTwoPiecesProbability);
   double do_random_move_probability =
-    ParseOptionOrDie<double>(OPTION_GENERATOR_DO_RANDOM_MOVE_PROBABILITY);
-  bool do_random_move_after_book = (bool)Options[OPTION_GENERATOR_DO_RANDOM_MOVE_AFTER_BOOK];
-  int value_threshold = Options[OPTION_GENERATOR_VALUE_THRESHOLD];
+    ParseOptionOrDie<double>(kOptionGeneratorDoRandomMoveProbability);
+  bool do_random_move_after_book = (bool)Options[kOptionGeneratorDoRandomMoveAfterBook];
+  int value_threshold = Options[kOptionGeneratorValueThreshold];
+  std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
+  bool write_another_position = (bool)Options[kOptionGeneratorWriteAnotherPosition];
 
-  time_t start;
-  std::time(&start);
+  time_t start_time;
+  std::time(&start_time);
   ASSERT_LV3(book.size());
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
@@ -230,14 +285,13 @@ void Learner::GenerateKifu()
   {
     int thread_index = ::omp_get_thread_num();
     char output_file_path[1024];
-    std::string output_file_name_tag = Options[OPTION_GENERATOR_KIFU_TAG];
     std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
       output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
       thread_index);
     // 各スレッドに持たせる
     std::unique_ptr<Learner::KifuWriter> kifu_writer =
       std::make_unique<Learner::KifuWriter>(output_file_path);
-    std::mt19937_64 mt19937_64(start + thread_index);
+    std::mt19937_64 mt19937_64(start_time + thread_index);
 
     while (global_position_index < num_positions) {
       Thread& thread = *Threads[thread_index];
@@ -273,39 +327,20 @@ void Learner::GenerateKifu()
 
       if (do_random_move_after_book) {
         // 開始局面からランダムに手を指して、局面をバラけさせる
-        DoRandomMove(pos, mt19937_64, state);
+        Move move = Move::MOVE_NONE;
+        DoRandomMove(pos, mt19937_64, state, move);
+        // 差分計算のためevaluate()を呼び出す
+        Eval::evaluate(pos);
       }
 
-      while (pos.game_ply() < kMaxGamePlay) {
+      while (pos.game_ply() < kMaxGamePlay && !pos.is_mated()) {
         pos.set_this_thread(&thread);
-        if (pos.is_mated()) {
+
+        Move pv_move = Move::MOVE_NONE;
+        auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
+          num_positions, mt19937_64, pos, *kifu_writer, global_position_index, pv_move);
+        if (result != kSearchAndWriteSucceeded) {
           break;
-        }
-        int search_depth = search_depth_distribution(mt19937_64);
-        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
-
-        // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-        Value value = valueAndPv.first;
-        const std::vector<Move>& pv = valueAndPv.second;
-        if (pv.empty()) {
-          break;
-        }
-
-        // 評価値の絶対値の上限を超えている場合は書き出さないようにする
-        if (std::abs(value) > value_threshold) {
-          break;
-        }
-
-        // 局面が不正な場合があるので再度チェックする
-        if (pos.pos_is_ok()) {
-          Learner::Record record = { 0 };
-          pos.sfen_pack(record.packed);
-
-          record.value = value;
-
-          kifu_writer->Write(record);
-          int64_t position_index = global_position_index++;
-          ShowProgress(start, position_index, num_positions, kShowProgressPerPositions);
         }
 
         // 指定した確率に従って特別な指し手を指す
@@ -324,13 +359,34 @@ void Learner::GenerateKifu()
         else if (r < do_random_king_move_probability + swap_two_pieces_probability +
           do_random_move_probability) {
           if (!pos.in_check()) {
-            special_move_is_done = DoRandomMove(pos, mt19937_64, state);
+            Move dummy_move = Move::MOVE_NONE;
+            special_move_is_done = DoRandomMove(pos, mt19937_64, state, dummy_move);
           }
         }
 
         // 特別な指し手が指されなかった場合は探索による指し手を指す
         if (!special_move_is_done) {
-          pos.do_move(pv[0], state[pos.game_ply()]);
+          if (write_another_position) {
+            // ランダムに選んだ指し手を学習データに加える
+            Move move = Move::MOVE_NONE;
+            DoRandomMove(pos, mt19937_64, state, move);
+            // 差分計算のためevaluate()を呼び出す
+            Eval::evaluate(pos);
+
+            if (!pos.is_mated()) {
+              Move dummy_move = Move::MOVE_NONE;
+              auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
+                num_positions, mt19937_64, pos, *kifu_writer, global_position_index, dummy_move);
+              if (result != kSearchAndWriteSucceeded &&
+                result != kSearchAndWriteValueThresholdExceeded) {
+                break;
+              }
+            }
+
+            pos.undo_move(move);
+          }
+
+          pos.do_move(pv_move, state[pos.game_ply()]);
           // 差分計算のためevaluate()を呼び出す
           Eval::evaluate(pos);
         }

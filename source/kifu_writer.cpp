@@ -20,7 +20,7 @@ bool Learner::KifuWriter::Write(const Record& record) {
     return false;
   }
 
-  if (std::fwrite(&record, sizeof(record), 1, file_)) {
+  if (std::fwrite(&record, sizeof(record), 1, file_) != 1) {
     return false;
   }
 
