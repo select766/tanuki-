@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import sys
 
-OUTPUT_EVAL_FOLDER_NAME = '2000000000'
 ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-late.exe
 go byoyomi 1000
 setoption name Threads value 1
@@ -359,7 +358,7 @@ def main():
       Learn(num_threads_to_learn, old_eval_folder_path, kifu_folder_path, num_positions_to_learn,
             kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path,
             learning_rate)
-      new_eval_folder_path = os.path.join(new_eval_folder_path_base, OUTPUT_EVAL_FOLDER_NAME)
+      new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play_with_original
 
     elif state == State.self_play_with_original:
