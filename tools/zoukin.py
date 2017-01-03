@@ -134,7 +134,7 @@ go btime {num_games} wtime 24 byoyomi 1
     winning_percentage = 0.0
     if lose + draw + win > 0.0:
       winning_percentage = win / (lose + draw + win)
-    csvwriter.writerow([new_eval_folder_path, subfolder, winning_percentage])
+    csvwriter.writerow([new_eval_folder_path, winning_percentage])
 
 
 def GetSubfolders(folder_path):
