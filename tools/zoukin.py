@@ -134,7 +134,7 @@ go btime {num_games} wtime 24 byoyomi 1
     winning_percentage = 0.0
     if lose + draw + win > 0.0:
       winning_percentage = win / (lose + draw + win)
-    csvwriter.writerow([new_eval_folder_path_base, subfolder, winning_percentage])
+    csvwriter.writerow([new_eval_folder_path, winning_percentage])
 
 
 def GetSubfolders(folder_path):
@@ -329,7 +329,7 @@ def main():
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
   old_eval_folder_path = initial_eval_folder_path
-  new_eval_folder_path = initial_new_eval_folder_path_base
+  new_eval_folder_path = os.path.join(initial_new_eval_folder_path_base, str(num_positions_to_learn))
   state = initial_state
 
   iteration = 0
