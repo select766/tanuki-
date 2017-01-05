@@ -41,13 +41,25 @@ YaneuraOu mini is a shogi engine(AI player), stronger than Bonanza6 , educationa
 NDFの学習メソッドを用い、Hyperopt等を用いて各種パラメーターの調整を行い、技巧(2015)を超えた強さになりました。(R3650程度)
 →　第4回将棋電王トーナメントは無事終えました。真やねうら王は3位に入賞しました。応援してくださった皆様、本当にありがとうございました。
 
-## やねうら王2017 Early【非公開の予定】
+## やねうら王2017 Early
 
-2017年開発するかも。
+2017年Q1完成予定。R3750程度の予定。
+
+## やねうら王2017 Late(非公開予定)
+
+2017年10月ごろ完成予定。
+
+## やねうら王 王手将棋エディション
+
+王手すると勝ちという変則ルールの将棋。世界最強の王手将棋になりました。(R4250)
+
+## やねうら王 取る一手将棋エディション
+
+合法な取る手がある場合は、必ず取らないといけないという変則ルールの将棋。人類では勝てない最強の取る一手将棋を目指します。
 
 ## 連続自動対局フレームワーク
 
-連続自動対局を自動化できます。 
+連続自動対局を自動化できます。 python版のスクリプトも用意。今後は、python版のほうに注力します。
 
 ## やねうら王協力詰めsolver
 	
@@ -63,7 +75,16 @@ NDFの学習メソッドを用い、Hyperopt等を用いて各種パラメータ
 
 ## やねうら王評価関数バイナリ
 
-やねうら王2016Mid用/2016Late用 
+やねうら王 王手将棋エディション用
+
+- [王手将棋用評価関数ファイルV1](https://drive.google.com/file/d/0Bzbi5rbfN85NOEF6QWFienZrSDg/) [解説記事](http://yaneuraou.yaneu.com/2016/11/21/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E5%B0%82%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv1%E3%81%8C%E5%87%BA%E6%9D%A5%E3%81%BE%E3%81%97%E3%81%9F/)
+- [王手将棋用評価関数ファイルV2](https://drive.google.com/open?id=0Bzbi5rbfN85Nci02T3hkWm1yQlE) [解説記事](http://yaneuraou.yaneu.com/2016/11/22/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv2%E3%82%92%E5%85%AC%E9%96%8B%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F/)
+- [王手将棋用評価関数ファイルV3](https://drive.google.com/open?id=0Bzbi5rbfN85NVGJ3eHNtaHZhLXc) [解説記事](http://yaneuraou.yaneu.com/2016/11/23/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv3%E3%82%92%E5%85%AC%E9%96%8B%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F/)
+- [王手将棋用評価関数ファイルV4](https://drive.google.com/open?id=0Bzbi5rbfN85NcTIzaFVKU0ZfNU0) [解説記事](http://yaneuraou.yaneu.com/2016/11/23/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv4%E3%82%92%E5%85%AC%E9%96%8B%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F/)
+- [王手将棋用評価関数ファイルV5](https://drive.google.com/open?id=0Bzbi5rbfN85Na3ZOeE5zNUZpNkE) [解説記事](http://yaneuraou.yaneu.com/2016/11/24/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv5%E3%82%92%E5%85%AC%E9%96%8B%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F/)
+- [王手将棋用評価関数ファイルV6](https://drive.google.com/open?id=0Bzbi5rbfN85NeWxUWUFfMFdZSjQ) [解説記事](http://yaneuraou.yaneu.com/2016/11/29/%E7%8E%8B%E6%89%8B%E5%B0%86%E6%A3%8B%E7%94%A8%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%ABv6%E3%82%92%E5%85%AC%E9%96%8B%E3%81%97%E3%81%BE%E3%81%97%E3%81%9F/)
+
+やねうら王2016Mid用/2016Late用/2017Early用
 
 - [真やねうら王の評価関数ファイル](https://drive.google.com/open?id=0ByIGrGAuSfHHVVh0bEhxRHNpcGc) (Apery20161007の評価関数から追加学習させたものです。) 詳しい情報は[こちら。](http://yaneuraou.yaneu.com/2016/10/17/%E7%9C%9F%E3%82%84%E3%81%AD%E3%81%86%E3%82%89%E7%8E%8B%E3%81%AE%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6/)
 - [やねうら王で使える評価関数ファイル28バリエーション公開しました](http://yaneuraou.yaneu.com/2016/07/22/%E3%82%84%E3%81%AD%E3%81%86%E3%82%89%E7%8E%8B%E3%81%A7%E4%BD%BF%E3%81%88%E3%82%8B%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB28%E3%83%90%E3%83%AA%E3%82%A8%E3%83%BC%E3%82%B7/)

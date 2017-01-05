@@ -145,6 +145,12 @@
 // 指し手生成のときに上位16bitにto(移動後の升)に来る駒を格納する。
 // #define KEEP_PIECE_IN_GENERATE_MOVES
 
+// 探索スレッドごとにCounterMoveHistoryを持つ。
+// #define PER_THREAD_COUNTERMOVEHISTORY
+
+// 探索StackごとにHistoryを持つ。
+// #define PER_STACK_HISTORY
+
 // 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
 // #define USE_EVAL_HASH
 
@@ -245,9 +251,6 @@
 // デバッグ絡み
 #define ASSERT_LV 3
 #define ENABLE_TEST_CMD
-// 学習絡みのオプション
-#define USE_SFEN_PACKER
-#define EVAL_LEARN
 // 定跡生成絡み
 #define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
@@ -265,9 +268,67 @@
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
+#define ENABLE_TEST_CMD
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+#define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
+#endif
+
+#ifdef YANEURAOU_2017_EARLY_ENGINE
+#define ENGINE_NAME "YaneuraOu 2017 Early"
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
+#define USE_SEE
+#define USE_MOVE_PICKER_2016Q3
+#define USE_MATE_1PLY
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
 // デバッグ絡み
 //#define ASSERT_LV 3
 //#define USE_DEBUG_ASSERT
+
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+#define USE_SFEN_PACKER
+#define EVAL_LEARN
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+//#define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
+#endif
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+#define ENGINE_NAME "YaneuraOu MustCaptureShogi"
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
+#define USE_SEE
+#define USE_MOVE_PICKER_2016Q3
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
+// デバッグ絡み
+#define ASSERT_LV 3
+#define USE_DEBUG_ASSERT
+
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
 #define USE_SFEN_PACKER

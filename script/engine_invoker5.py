@@ -46,21 +46,36 @@ def pipe_non_blocking_set(fd):
 # -----------------------------------------------------------------
 
 win = lose = draw = 0
+win_black = lose_black = 0
 
 # レーティングの出力
-def output_rating(win,draw,lose,opt2):
+def output_rating(win,draw,lose,win_black,win_white,opt2):
 	total = win + lose
 	if total != 0 :
+		# 普通の勝率
 		win_rate = win / float(win+lose)
 	else:
 		win_rate = 0
+
+	if win != 0:
+		# 先手番のときの勝率内訳
+		win_rate_black = win_black / float(win)
+		# 後手番のときの勝率内訳
+		win_rate_white = win_white / float(win)
+	else:
+		win_rate_black = 0
+		win_rate_white = 0
 
 	if win_rate == 0 or win_rate == 1:
 		rating = ""
 	else:
 		rating = " R" + str(round(-400*math.log(1/win_rate-1,10),2))
 
-	print opt2 + "," + str(win) + " - " + str(draw) + " - " + str(lose) + "(" + str(round(win_rate*100,2)) + "%" + rating + ")"
+	print opt2 + "," + str(win) + " - " + str(draw) + " - " + str(lose) + \
+		"(" + str(round(win_rate*100,2)) + "%" + rating + ")" + \
+		" win black : white = " + \
+		str(round(win_rate_black*100,2)) + "% : " + \
+		str(round(win_rate_white*100,2)) + "%"
 	sys.stdout.flush()
 
 
@@ -127,7 +142,6 @@ def create_option(engines,engine_threads,evals,times,hashes,numa,PARAMETERS_LOG_
 #				option.append("setoption name EvalShare value false")
 #			else:
 #				option.append("setoption name EvalShare value true")
-			option.append("setoption name EngineNuma value " + str(numa))
 			if nodes_time:
 				option.append("setoption name nodestime value 600")
 			if PARAMETERS_LOG_FILE_PATH :
@@ -165,14 +179,21 @@ def create_option(engines,engine_threads,evals,times,hashes,numa,PARAMETERS_LOG_
 
 # engine1とengine2とを対戦させる
 #  threads    : この数だけ並列対局
-#  numa       : 実行するプロセッサグループ
+#  cpu        : 実行するプロセッサグループの数
+#               1つのプロセッサには threads/cpu だけスレッドを割り当てる
 #  book_sfens : 定跡
 #  opt2       : 勝敗の表示の先頭にT2,b2000 のように対局条件を文字列化して突っ込む用。
 #  book_moves : 定跡の手数
-def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,book_moves):
+def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,book_moves):
 
 	global win,lose,draw
 	win = lose = draw = 0
+
+	# engine0側にとって、
+	# 先手番での勝ちと後手番での勝ち(先手/後手のときの勝率計算用)
+	# 引き分けは上のdrawと同じ値になるから不要。
+	global win_black,win_white
+	win_black = win_white = 0
 
 	# home + "book/records1.sfen
 
@@ -181,10 +202,10 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 	sfen_no = 0;
 
 	cmds = []
-	for i in range(2):
+	for i in range(2*threads):
 		# working directoryを実行ファイルのあるフォルダ直下としてやる。
 		# 最後のdirectory separatorを探す
-		engine_path = engines_full[i]
+		engine_path = engines_full[i % 2]
 		pos = max(engine_path.rfind('\\') , engine_path.rfind('/'))
 		if pos <= 0:
 			working_dir = ""
@@ -192,7 +213,8 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 			working_dir = engine_path[:pos]
 		# print "working_dir = " + working_dir
 
-		cmds.append("cmd.exe /c start /B /WAIT /D " + working_dir + " /NODE " + str(numa) + " " + engines_full[i])
+		cmd = "cmd.exe /c start /B /WAIT /D " + working_dir + " /NODE " + str(int(i * cpu / (threads*2))) + " " + engines_full[i % 2]
+		cmds.append(cmd)
 
 	# 棋譜
 	sfens = [""]*threads
@@ -204,7 +226,7 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 	# 対局開始局面からの手数
 	moves = [0]*threads
 
-	# 次の対局で先手番のplayer(0 or 1)
+	# 今回の対局での先手番のplayer(0 or 1)
 	turns = [0]*threads
 
 	# process handle
@@ -225,8 +247,8 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 	term_procs = [False]*threads*2
 
 	for i in range(threads*2):
-#		proc = subprocess.Popen(cmds[i & 1] , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE , stdin = subprocess.PIPE , universal_newlines=True , bufsize=1)
-		proc = subprocess.Popen(cmds[i & 1] , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE , stdin = subprocess.PIPE )
+#		proc = subprocess.Popen(cmds[i] , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE , stdin = subprocess.PIPE , universal_newlines=True , bufsize=1)
+		proc = subprocess.Popen(cmds[i] , shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE , stdin = subprocess.PIPE )
 		pipe_non_blocking_set(proc.stdout.fileno())
 
 		procs[i] = proc
@@ -327,7 +349,6 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 
 				# 置換対象文字列が含まれているなら置換しておく。
 				opt = opt.replace("%%THREAD_NUMBER%%",str(i))
-
 				send_cmd(i,opt)
 
 	# loop for playing games
@@ -397,7 +418,6 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 
 						# 先手→後手、交互に行う。
 						go_cmd((i & ~1) + turns[i/2])
-						turns[i/2] = turns[i/2] ^ 1
 
 						# send go_cmd to player1
 						# go_cmd((i & ~1) )
@@ -469,6 +489,10 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 					if "resign" in line:
 						if (i%2)==1:
 							win += 1
+							if (turns[i/2] == 0):
+								win_black += 1
+							else:
+								win_white += 1
 							gameover = 1 # 1P勝ち
 						else:
 							lose += 1
@@ -478,6 +502,10 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 					elif "win" in line:
 						if (i%2)==0:
 							win += 1
+							if (turns[i/2] == 0):
+								win_black += 1
+							else:
+								win_white += 1
 							gameover = 1 # 1P勝ち
 						else:
 							lose += 1
@@ -513,6 +541,8 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 					if KifOutput:
 						kif_file.write("startpos moves " + sfens[i/2] + "\n")
 						kif_file.write(eval_values[i/2]+"\n")
+					# 手番を変更する。
+					turns[i/2] = turns[i/2] ^ 1
 
 			if update:
 				loop_count = win + lose + draw
@@ -537,7 +567,7 @@ def vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,
 
 				# output result at stated periods
 				if loop_count % 10 == 0 :
-					output_rating(win,draw,lose,opt2)
+					output_rating(win,draw,lose,win_black,win_white,opt2)
 					if FileLogging:
 						for i in range(len(states)):
 							log_file.write("["+str(i)+"] State = " + states[i] + "\n")
@@ -592,7 +622,9 @@ def engine_to_full(e):
 #   eval2:evaldir2
 #   cores:coreの数
 #   loop:loop回数
-#   numa:numaの番号
+#   cpu :cpuの数
+#  		実行するプロセッサグループの数
+#       1つのプロセッサには threads/cpu だけスレッドを割り当てる
 #   engine_threads:思考スレッド数
 #   hash1:engine1のhash size
 #   hash2:engine2のhash size
@@ -601,14 +633,14 @@ def engine_to_full(e):
 #        (ここに"_2.log"のような文字列が自動的に付与される。)
 
 # sample 
-#   > c:\python27\python.exe \\WS2012_860C_YAN\yanehome\script\engine_invoker2.py home:\\WS2012_860C_YAN\yanehome\ engine1:YaneuraOuV350.exe eval1:Apery20160505 engine2:YaneuraOuV350.exe eval2:Apery20160505 cores:8 loop:1000 numa:0 engine_threads:1 hash1:16 hash2:16 time:r100
+#   > c:\python27\python.exe \\WS2012_860C_YAN\yanehome\script\engine_invoker2.py home:\\WS2012_860C_YAN\yanehome\ engine1:YaneuraOuV350.exe eval1:Apery20160505 engine2:YaneuraOuV350.exe eval2:Apery20160505 cores:8 loop:1000 cpu:2 engine_threads:1 hash1:16 hash2:16 time:r100
 
 # HOMEPATH          : ホームディレクトリ
 # engine1,engine2   : エンジン1,2のpath
 # evaldir1,evaldir2 : 評価関数フォルダ1,2 (ホームディレクトリ配下のevalフォルダ内にあるものとする)
 # cores             : コアの数(これをengine_threadsで割った数だけ並列対局)
 # loop              : 対局回数
-# numa              : 実行するプロセッサグループ(256を指定すると0の意味になり、かつファイルロギングをする)
+# cpu               : PCに搭載されているCPUの数(256を指定すると1の意味になり、かつファイルロギングをする)
 # engine_threads    : 思考エンジンのスレッド数
 # hash1,hash2       : 思考エンジンのhashサイズ
 # time1…timeN      : 持ち時間の指定
@@ -639,6 +671,7 @@ play_time_list = ""
 book_moves = 24
 PARAMETERS_LOG_FILE_PATH = ""
 rand_book = 0
+cpu = 1
 
 # パラメーターのparse
 for param in sys.argv[1:]:
@@ -652,8 +685,8 @@ for param in sys.argv[1:]:
 			threads = int(data)
 		elif label == "loop":
 			loop = int(data)
-		elif label == "numa":
-			numa = int(data)
+		elif label == "cpu":
+			cpu = int(data)
 		elif label == "engine_threads":
 			engine_threads = int(data)
 		elif label == "hash1":
@@ -682,10 +715,10 @@ for param in sys.argv[1:]:
 if not (home.endswith('/') or home.endswith('\\')):
 	home += '\\'
 
-# numaに256が指定されているときは、FileLoggingを有効にする。
+# cpuに256が指定されているときは、FileLoggingを有効にする。
 fileLogging = False
-if numa == 256:
-	numa = 0
+if cpu == 256:
+	cpu = 1
 	fileLogging = True
 
 # expand eval_dir
@@ -748,9 +781,9 @@ for evaldir in evaldirs:
 		print "engine" + str(i+1) + " = " + engines[i] + " , eval = " + evals[i]
 
 	for play_time in play_time_list:
-		print "\nthreads = " + str(threads) + " , loop = " + str(loop) + " , numa = " + str(numa) + " , play_time = " + play_time
+		print "\nthreads = " + str(threads) + " , loop = " + str(loop) + " , max_cpu = " + str(cpu) + " , play_time = " + play_time
 
-		options = create_option(engines,engine_threads,evals_full,play_time,hashes,numa,PARAMETERS_LOG_FILE_PATH)
+		options = create_option(engines,engine_threads,evals_full,play_time,hashes,cpu,PARAMETERS_LOG_FILE_PATH)
 
 		for i in range(2):
 			print "option " + str(i+1) + " = " + ' / '.join(options[i])
@@ -761,12 +794,12 @@ for evaldir in evaldirs:
 		# 短くスレッド数と秒読み条件を文字列化
 		opt2 = "T"+str(engine_threads) + "," + play_time
 
-		vs_match(engines_full,options,threads,loop,numa,book_sfens,fileLogging,opt2,book_moves)
+		vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,book_moves)
 
 		# output final result
 		print "\nfinal result : "
 		for i in range(2):
 			print "engine" + str(i+1) + " = " + engines[i] + " , eval = " + evals[i]
 #		print "play_time = " + play_time + " , " ,
-		output_rating(win,draw,lose,opt2)
+		output_rating(win,draw,lose,win_black,win_white,opt2)
 

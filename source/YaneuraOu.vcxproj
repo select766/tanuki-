@@ -203,8 +203,11 @@
     <ClInclude Include="engine\2016-late-engine\2016-late-param.h" />
     <ClInclude Include="engine\2016-late-engine\2016-late-param_body.h" />
     <ClInclude Include="engine\2016-mid-engine\2016-mid-param.h" />
+    <ClInclude Include="engine\2017-early-engine\2017-early-param.h" />
+    <ClInclude Include="engine\check-shogi-engine\check-shogi-param.h" />
     <ClInclude Include="engine\help-mate-engine\help-mate-search.h" />
     <ClInclude Include="engine\mate-engine\mate-search.h" />
+    <ClInclude Include="engine\must-capture-shogi-engine\must-capture-shogi-param.h" />
     <ClInclude Include="evaluate.h" />
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
@@ -237,12 +240,15 @@
     <ClCompile Include="bitboard.cpp" />
     <ClCompile Include="engine\2016-late-engine\2016-late-search.cpp" />
     <ClCompile Include="engine\2016-mid-engine\2016-mid-search.cpp" />
+    <ClCompile Include="engine\2017-early-engine\2017-early-search.cpp" />
+    <ClCompile Include="engine\check-shogi-engine\check-shogi.cpp" />
     <ClCompile Include="engine\classic-engine\classic-search.cpp" />
     <ClCompile Include="engine\classic-tce-engine\classic-tce-search.cpp" />
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp" />
     <ClCompile Include="engine\local-game-server\local-game-server.cpp" />
     <ClCompile Include="engine\mate-engine\mate-search.cpp" />
     <ClCompile Include="engine\mini-engine\mini-search.cpp" />
+    <ClCompile Include="engine\must-capture-shogi-engine\must-capture-shogi.cpp" />
     <ClCompile Include="engine\nano-engine\nano-search.cpp" />
     <ClCompile Include="engine\nano-plus-engine\nano-plus-search.cpp" />
     <ClCompile Include="engine\random-player-engine\random-player-search.cpp" />
@@ -281,51 +287,21 @@
     <ClCompile Include="usi.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\docs\old\更新履歴2016Q2まで.txt" />
     <Text Include="..\docs\USI拡張コマンド.txt" />
     <Text Include="..\docs\やねうら大定跡.txt" />
-    <Text Include="..\docs\実験記録.txt" />
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
     <Text Include="..\exe\eval\readme.txt" />
-    <Text Include="..\exe\YaneuraOu-2016-late-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-2016-late_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-2016-mid-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-2016-mid_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-classic-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-classic-tce-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-classic-tce_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-classic_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-mini-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-mini_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-nano-plus-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-nano-plus_ja.txt" />
-    <Text Include="..\exe\YaneuraOu-nano-readme.txt" />
-    <Text Include="..\exe\YaneuraOu-nano_ja.txt" />
+    <Text Include="..\script\readme.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\exe\book\standard_book.db" />
-    <None Include="..\exe\YaneuraOu-2016-late-nosse.exe" />
-    <None Include="..\exe\YaneuraOu-2016-late-sse2.exe" />
-    <None Include="..\exe\YaneuraOu-2016-late-sse41.exe" />
-    <None Include="..\exe\YaneuraOu-2016-late-sse42.exe" />
-    <None Include="..\exe\YaneuraOu-2016-late.exe" />
-    <None Include="..\exe\YaneuraOu-2016-mid-nosse.exe" />
-    <None Include="..\exe\YaneuraOu-2016-mid-sse2.exe" />
-    <None Include="..\exe\YaneuraOu-2016-mid-sse41.exe" />
-    <None Include="..\exe\YaneuraOu-2016-mid-sse42.exe" />
-    <None Include="..\exe\YaneuraOu-2016-mid.exe" />
-    <None Include="..\exe\YaneuraOu-classic-tce.exe" />
-    <None Include="..\exe\YaneuraOu-classic.exe" />
-    <None Include="..\exe\YaneuraOu-local-server.exe" />
-    <None Include="..\exe\YaneuraOu-mini.exe" />
-    <None Include="..\exe\YaneuraOu-nano-plus.exe" />
-    <None Include="..\exe\YaneuraOu-nano.exe" />
     <None Include="..\README.md" />
     <None Include="..\script\analyze_result_log.py" />
+    <None Include="..\script\analyze_yane_log.py" />
     <None Include="..\script\calc_rating.py" />
     <None Include="..\script\engine_invoker1.py" />
-    <None Include="..\script\engine_invoker4.py" />
+    <None Include="..\script\engine_invoker5.py" />
     <None Include="Makefile" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
