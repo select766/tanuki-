@@ -96,8 +96,7 @@ learn output_folder_path_base {output_folder_path_base}
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
 
-def SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
-             num_threads, num_games):
+def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games):
   print(locals(), flush=True)
   args = [
     'C:\\Python27\\python.exe',
@@ -105,10 +104,10 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_f
     # hakubishin-private\exe以下から実行していると仮定する
     'home:{0}'.format(os.getcwd()),
     # {home}\exeからの相対パスに変換する
-    'engine1:{0}'.format(os.path.relpath(os.path.abspath(local_game_server_exe_file_path), os.path.join(os.getcwd(), 'exe'))),
+    'engine1:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
     # {home}\evalからの相対パスに変換する
     'eval1:{0}'.format(os.path.relpath(os.path.abspath(old_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
-    'engine2:{0}'.format(os.path.relpath(os.path.abspath(local_game_server_exe_file_path), os.path.join(os.getcwd(), 'exe'))),
+    'engine2:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
     'eval2:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
     'cores:{0}'.format(num_threads),
     'loop:{0}'.format(num_games),
@@ -348,13 +347,13 @@ def main():
       state = State.self_play_with_original
 
     elif state == State.self_play_with_original:
-      SelfPlay(original_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
-               num_threads_to_selfplay, num_games_to_selfplay)
+      SelfPlay(original_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
+               num_games_to_selfplay)
       state = State.self_play_with_base
 
     elif state == State.self_play_with_base:
-      SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
-               num_threads_to_selfplay, num_games_to_selfplay)
+      SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
+               num_games_to_selfplay)
       state = State.generate_kifu
       iteration += 1
       old_eval_folder_path = new_eval_folder_path
