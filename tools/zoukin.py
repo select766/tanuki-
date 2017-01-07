@@ -118,6 +118,7 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_f
     'hash2:256',
     'time:b1000',
     ]
+  print(args, flush=True)
   subprocess.run(args)
 
 
