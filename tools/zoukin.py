@@ -11,15 +11,6 @@ import shutil
 import subprocess
 import sys
 
-ENGINE_CONFIG_TXT_TEMPLATE = '''YaneuraOu-2016-late.exe
-go byoyomi 1000
-setoption name Threads value 1
-setoption name Hash value 256
-setoption name EvalDir value {0}
-setoption name NetworkDelay value 0
-setoption name NetworkDelay2 value 0
-'''
-
 
 class State(enum.Enum):
   generate_kifu = 1
@@ -105,36 +96,29 @@ learn output_folder_path_base {output_folder_path_base}
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
 
-def SelfPlay(old_eval_folder_path, new_eval_folder_path, result_file_path,
-             local_game_server_exe_file_path, num_threads, num_games):
+def SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
+             num_threads, num_games):
   print(locals(), flush=True)
-  with open('engine-config1.txt', 'w') as engine_config1_file:
-    engine_config1_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(old_eval_folder_path))
-  with open('engine-config2.txt', 'w') as engine_config2_file:
-    engine_config2_file.write(ENGINE_CONFIG_TXT_TEMPLATE.format(new_eval_folder_path))
-  with open(result_file_path, 'a', newline='') as output_file:
-    csvwriter = csv.writer(output_file)
-    input = '''usi
-setoption name Threads value {num_threads}
-setoption name BookSfenFile value records2016_10818.sfen
-isready
-usinewgame
-go btime {num_games} wtime 24 byoyomi 1
-'''.format(num_threads=num_threads, num_games=num_games).encode('utf-8')
-    print(input.decode('utf-8'))
-    print(flush=True)
-    completed_process = subprocess.run([local_game_server_exe_file_path], input=input,
-                                       stdout=subprocess.PIPE, check=True)
-    stdout = completed_process.stdout.decode('utf-8')
-    print(stdout)
-    matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(stdout)
-    lose = float(matched.group(1))
-    draw = float(matched.group(2))
-    win = float(matched.group(3))
-    winning_percentage = 0.0
-    if lose + draw + win > 0.0:
-      winning_percentage = win / (lose + draw + win)
-    csvwriter.writerow([new_eval_folder_path, winning_percentage])
+  args = [
+    'C:\\Python27\\python.exe',
+    '..\script\engine_invoker5.py',
+    # hakubishin-private\exe以下から実行していると仮定する
+    'home:{0}'.format(os.getcwd()),
+    # {home}\exeからの相対パスに変換する
+    'engine1:{0}'.format(os.path.relpath(os.path.abspath(local_game_server_exe_file_path), os.path.join(os.getcwd(), 'exe'))),
+    # {home}\evalからの相対パスに変換する
+    'eval1:{0}'.format(os.path.relpath(os.path.abspath(old_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
+    'engine2:{0}'.format(os.path.relpath(os.path.abspath(local_game_server_exe_file_path), os.path.join(os.getcwd(), 'exe'))),
+    'eval2:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
+    'cores:{0}'.format(num_threads),
+    'loop:{0}'.format(num_games),
+    'cpu:1',
+    'engine_threads:1',
+    'hash1:256',
+    'hash2:256',
+    'time:b1000',
+    ]
+  subprocess.run(args)
 
 
 def GetSubfolders(folder_path):
@@ -148,7 +132,7 @@ def main():
     action='store',
     dest='learner_output_folder_path_base',
     required=True,
-    help='Folder path baseof the output folders. ex) learner_output')
+    help='Folder path baseof the output folders. ex) eval')
   parser.add_argument(
     '--kifu_output_folder_path_base',
     action='store',
@@ -362,13 +346,13 @@ def main():
       state = State.self_play_with_original
 
     elif state == State.self_play_with_original:
-      SelfPlay(original_eval_folder_path, new_eval_folder_path, vs_original_result_file_path,
-               local_game_server_exe_file_path, num_threads_to_selfplay, num_games_to_selfplay)
+      SelfPlay(original_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
+               num_threads_to_selfplay, num_games_to_selfplay)
       state = State.self_play_with_base
 
     elif state == State.self_play_with_base:
-      SelfPlay(old_eval_folder_path, new_eval_folder_path, vs_base_result_file_path,
-               local_game_server_exe_file_path, num_threads_to_selfplay, num_games_to_selfplay)
+      SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_file_path,
+               num_threads_to_selfplay, num_games_to_selfplay)
       state = State.generate_kifu
       iteration += 1
       old_eval_folder_path = new_eval_folder_path

@@ -14,8 +14,10 @@
     <RootNamespace>tools</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>--learner_output_folder_path_base=learner_output --kifu_output_folder_path_base=kifu --kifu_for_test_output_folder_path_base=kifu_for_test --initial_eval_folder_path=eval\apery_wcsc26 --initial_kifu_folder_path= --initial_kifu_for_test_folder_path= --initial_new_eval_folder_path_base=eval\apery_wcsc26 --initial_state=generate_kifu --original_eval_folder_path=eval\apery_wcsc26 --generate_kifu_exe_file_path=YaneuraOu.generate_kifu.2016-12-04.exe --learner_exe_file_path=YaneuraOu.learn.2016-12-04.exe --local_game_server_exe_file_path=YaneuraOu-local-server.exe --vs_original_result_file_path=vs_original.2016-12-04.csv --vs_base_result_file_path=vs_base.2016-12-04.csv --num_threads_to_generate_kifu=8 --num_threads_to_learn=8 --num_threads_to_selfplay=4 --num_games_to_selfplay=4 --num_positions_to_generator_train=1000000 --num_positions_to_generator_test=1000000 --num_positions_to_learn=1000000 --num_iterations=100 --search_depth=3</CommandLineArguments>
+    <CommandLineArguments>--learner_output_folder_path_base=learner_output --kifu_output_folder_path_base=kifu --kifu_for_test_output_folder_path_base=kifu_for_test --initial_eval_folder_path=eval\apery_wcsc26 --initial_kifu_folder_path= --initial_kifu_for_test_folder_path= --initial_new_eval_folder_path_base=eval\apery_wcsc26 --original_eval_folder_path=eval\apery_wcsc26 --generate_kifu_exe_file_path=YaneuraOu.generate_kifu.2016-12-04.exe --learner_exe_file_path=YaneuraOu.learn.2016-12-04.exe --local_game_server_exe_file_path=YaneuraOu-local-server.exe --vs_original_result_file_path=vs_original.2016-12-04.csv --vs_base_result_file_path=vs_base.2016-12-04.csv --num_threads_to_generate_kifu=8 --num_threads_to_learn=8 --num_threads_to_selfplay=4 --num_games_to_selfplay=4 --num_positions_to_generator_train=1000000 --num_positions_to_generator_test=1000000 --num_positions_to_learn=1000000 --num_iterations=100 --search_depth=3 --learning_rate=0.5 --initial_state=self_play_with_original</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <InterpreterId>{9a7a9026-48c1-4688-9d5d-e5699d47d074}</InterpreterId>
+    <InterpreterVersion>3.5</InterpreterVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,6 +33,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="selfplay.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="{9a7a9026-48c1-4688-9d5d-e5699d47d074}\3.5" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
