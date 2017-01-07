@@ -119,7 +119,8 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, local_game_server_exe_f
     'time:b1000',
     ]
   print(args, flush=True)
-  subprocess.run(args)
+  if subprocess.run(args).returncode:
+    sys.exit('Failed to calculate the winning rate...');
 
 
 def GetSubfolders(folder_path):
