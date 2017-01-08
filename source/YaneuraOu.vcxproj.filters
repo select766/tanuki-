@@ -187,6 +187,12 @@
     <ClInclude Include="engine\must-capture-shogi-engine\must-capture-shogi-param.h">
       <Filter>リソース ファイル\engine\must-capture-shogi-engine</Filter>
     </ClInclude>
+    <ClInclude Include="experimental_progress.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="math.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -332,6 +338,12 @@
     </ClCompile>
     <ClCompile Include="engine\must-capture-shogi-engine\must-capture-shogi.cpp">
       <Filter>リソース ファイル\engine\must-capture-shogi-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="experimental_progress.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="math.cpp">
+      <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

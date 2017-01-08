@@ -8,6 +8,7 @@
 #include <omp.h>
 
 #include "kifu_reader.h"
+#include "math.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
@@ -186,16 +187,8 @@ namespace
     eval_weight = static_cast<T>(value);
   }
 
-  double sigmoid(double x) {
-    return 1.0 / (1.0 + std::exp(-x));
-  }
-
   double winning_percentage(Value value) {
-    return sigmoid(static_cast<int>(value) / 600.0);
-  }
-
-  double dsigmoid(double x) {
-    return sigmoid(x) * (1.0 - sigmoid(x));
+    return Math::sigmoid(static_cast<int>(value) / 600.0);
   }
 
   std::string GetDateTimeString() {

@@ -1,8 +1,9 @@
 ﻿#include <sstream>
 #include <queue>
 
-#include "kifu_generator.h"
 #include "experimental_learner.h"
+#include "experimental_progress.h"
+#include "kifu_generator.h"
 #include "misc.h"
 #include "position.h"
 #include "search.h"
@@ -286,6 +287,7 @@ namespace USI
 
     Learner::InitializeGenerator(o);
     Learner::InitializeLearner(o);
+    Progress::Initialize(o);
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
   }
@@ -755,6 +757,11 @@ void USI::loop(int argc, char* argv[])
     }
     else if (token == "calculate_appearance_frequency_histogram") {
       Learner::CalculateAppearanceFrequencyHistogram();
+      break;
+    }
+    else if (token == "learn_progress") {
+      Progress progress;
+      progress.Learn();
       break;
     }
     else
