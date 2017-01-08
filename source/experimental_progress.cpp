@@ -31,8 +31,8 @@ bool Progress::Initialize(USI::OptionsMap& o) {
   o[kProgressBookFile] << Option("wdoor.sfen");
   o[kProgressFilePath] << Option("progress.bin");
   o[kProgressNumIterations] << Option(1000, 0, INT_MAX);
-  o[kProgressLearningRate] << Option("0.001");
-  o[kProgressNumGamesForTraining] << Option(28000, 0, INT_MAX);
+  o[kProgressLearningRate] << Option("0.0002");
+  o[kProgressNumGamesForTraining] << Option(34000, 0, INT_MAX);
   o[kProgressNumGamesForTesting] << Option(1000, 0, INT_MAX);
   return true;
 }
