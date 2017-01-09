@@ -30,7 +30,7 @@ struct TTEntry {
   //   eval : 評価関数 or 静止探索の値
   //   m    : ベストな指し手
   //   gen  : TT.generation()
-  void save(Key k, Value v, Bound b,Depth d, Move m,
+  void save(Key k, Value v, Bound b, Depth d, Move m,
 #ifndef NO_EVAL_IN_TT
     Value eval,
 #endif
@@ -38,8 +38,8 @@ struct TTEntry {
   {
     ASSERT_LV3((-VALUE_INFINITE < v && v < VALUE_INFINITE) || v == VALUE_NONE);
 
-	// ToDo: 探索部によってはVALUE_INFINITEを書き込みたいのかも知れない…。うーん。
-	//  ASSERT_LV3((-VALUE_INFINITE <= v && v <= VALUE_INFINITE) || v == VALUE_NONE);
+    // ToDo: 探索部によってはVALUE_INFINITEを書き込みたいのかも知れない…。うーん。
+    //  ASSERT_LV3((-VALUE_INFINITE <= v && v <= VALUE_INFINITE) || v == VALUE_NONE);
 
     // このif式だが、
     // A = m!=MOVE_NONE
@@ -55,7 +55,7 @@ struct TTEntry {
     // これは、このnodeで、TT::probeでhitして、その指し手は試したが、それよりいい手が見つかって、枝刈り等が発生しているような
     // ケースが考えられる。ゆえに、今回の指し手のほうが、いまの置換表の指し手より価値があると考えられる。
 
-    if (m!=MOVE_NONE || (k >> 48) != key16)
+    if (m != MOVE_NONE || (k >> 48) != key16)
       move16 = (uint16_t)m;
 
     // このエントリーの現在の内容のほうが価値があるなら上書きしない。
@@ -66,17 +66,17 @@ struct TTEntry {
     // 1. or 2. or 3.
     if ((k >> 48) != key16
       || (d / ONE_PLY > depth8 - 4)
-    /*|| g != generation() // probe()において非0のkeyとマッチした場合、その瞬間に世代はrefreshされている。　*/
+      /*|| g != generation() // probe()において非0のkeyとマッチした場合、その瞬間に世代はrefreshされている。　*/
       || b == BOUND_EXACT
       )
     {
-      key16     = (uint16_t)(k >> 48);
-      value16   = (int16_t)v;
+      key16 = (uint16_t)(k >> 48);
+      value16 = (int16_t)v;
 #ifndef NO_EVAL_IN_TT
-      eval16    = (int16_t)eval;
+      eval16 = (int16_t)eval;
 #endif
       genBound8 = (uint8_t)(gen | b);
-      depth8    = (int8_t)(d / ONE_PLY);
+      depth8 = (int8_t)(d / ONE_PLY);
     }
   }
 
@@ -127,7 +127,7 @@ struct TranspositionTable {
   void resize(size_t mbSize);
 
   // 置換表のエントリーの全クリア
-  void clear() { memset(table, 0, clusterCount*sizeof(Cluster)); }
+  void clear() { memset(table, 0, clusterCount * sizeof(Cluster)); }
 
   // 新しい探索ごとにこの関数を呼び出す。(generationを加算する。)
   void new_search() { generation8 += 4; } // 下位2bitはTTEntryでBoundに使っているので4ずつ加算。
@@ -161,7 +161,7 @@ private:
 #endif
   };
 
-  static_assert(sizeof(Cluster) == CacheLineSize /2 , "Cluster size incorrect");
+  static_assert(sizeof(Cluster) == CacheLineSize / 2, "Cluster size incorrect");
 
   // この置換表が保持しているクラスター数。2の累乗。
   size_t clusterCount;
@@ -201,8 +201,8 @@ inline Value value_to_tt(Value v, int ply) {
 inline Value value_from_tt(Value v, int ply) {
 
   return  v == VALUE_NONE ? VALUE_NONE
-		: v >= VALUE_MATE_IN_MAX_PLY ? v - ply
-		: v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
+    : v >= VALUE_MATE_IN_MAX_PLY ? v - ply
+    : v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
 }
 
 // PV lineをコピーする。
@@ -210,9 +210,9 @@ inline Value value_from_tt(Value v, int ply) {
 // 番兵として末尾はMOVE_NONEにすることになっている。
 inline void update_pv(Move* pv, Move move, Move* childPv) {
 
-	for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
-		*pv++ = *childPv++;
-	*pv = MOVE_NONE;
+  for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+    *pv++ = *childPv++;
+  *pv = MOVE_NONE;
 }
 
 extern TranspositionTable TT;

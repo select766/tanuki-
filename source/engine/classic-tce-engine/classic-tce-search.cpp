@@ -348,7 +348,7 @@ namespace YaneuraOuClassicTce
     if ((Limits.use_time_management() &&
         ( elapsed > Time.maximum() - 10 || (Time.search_end > 0 && elapsed > Time.search_end - 10)))
       || (Limits.movetime && elapsed >= Limits.movetime)
-      || (Limits.nodes && Threads.nodes_searched() >= Limits.nodes))
+      || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
       Signals.stop = true;
   }
 
@@ -2232,7 +2232,7 @@ ID_END:;
     // ベストなスレッドの指し手を返す。
     sync_cout << "bestmove " << bestThread->rootMoves[0].pv[0];
 
-    // pomderの指し手の出力。
+    // ponderの指し手の出力。
     // pvにはbestmoveのときの読み筋(PV)が格納されているので、ponderとしてpv[1]があればそれを出力してやる。
     // また、pv[1]がない場合(rootでfail highを起こしたなど)、置換表からひねり出してみる。
     if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos, ponder_candidate))
