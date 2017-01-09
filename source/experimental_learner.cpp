@@ -55,22 +55,41 @@ namespace
   };
   ENABLE_FULL_OPERATORS_ON(WeightKind);
 
-  struct Weight
-  {
+  struct Weight {
     // 勾配の和
-    WeightType sum_gradient;
+    WeightType sum_gradient_raw;
+    WeightType sum_gradient_lower_dimension;
     // 重み
     WeightType w;
     // Adam用変数
     WeightType m;
     WeightType v;
 
-    void AddGradient(double gradient);
+    void Weight::AddRawGradient(double gradient) {
+      sum_gradient_raw += gradient;
+    }
+
+    void Weight::AddLowerDimensionGradient(double gradient) {
+      sum_gradient_lower_dimension += gradient;
+    }
+
     template<typename T>
-    void UpdateWeight(
-      double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight);
-    template<typename T>
-    void Finalize(int num_mini_batches, T& eval_weight);
+    void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
+      // Adam
+      m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient_lower_dimension;
+      v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient_lower_dimension * sum_gradient_lower_dimension;
+      // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
+      WeightType mm = m / (1.0 - adam_beta1_t);
+      WeightType vv = v / (1.0 - adam_beta2_t);
+      WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
+      w -= delta;
+
+      // 重みテーブルに書き戻す
+      eval_weight = static_cast<T>(std::round(w));
+
+      sum_gradient_raw = 0.0;
+      sum_gradient_lower_dimension = 0.0;
+    }
   };
 
   constexpr int kFvScale = 32;
@@ -127,15 +146,6 @@ namespace
       yield Kpp(king_, piece1_, piece0_, weight_kind_);
       yield Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
       yield Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
-    }
-
-    int ToNormalizedIndex() const {
-      return std::min({
-        Kpp(king_, piece0_, piece1_, weight_kind_).ToIndex(),
-      Kpp(king_, piece1_, piece0_, weight_kind_).ToIndex(),
-      Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_).ToIndex(),
-      Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_).ToIndex(),
-      });
     }
 
     static Kpp ForIndex(int index) {
@@ -208,13 +218,6 @@ namespace
       yield Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
     }
 
-    int ToNormalizedIndex() const {
-      return std::min({
-        Kkp(king0_, king1_, piece_, weight_kind_).ToIndex(),
-      Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_).ToIndex(),
-      });
-    }
-
     static Kkp ForIndex(int index) {
       int original_index = index;
       ASSERT_LV3(IsValid(index));
@@ -284,12 +287,6 @@ namespace
       yield Kk(king0_, king1_, weight_kind_);
     }
 
-    int ToNormalizedIndex() const {
-      return std::min({
-        Kk(king0_, king1_, weight_kind_).ToIndex(),
-      });
-    }
-
     static Kk ForIndex(int index) {
       int original_index = index;
       ASSERT_LV3(IsValid(index));
@@ -318,36 +315,6 @@ namespace
     Square king1_;
     WeightKind weight_kind_;
   };
-
-  void Weight::AddGradient(double gradient) {
-    sum_gradient += gradient;
-  }
-
-  template<typename T>
-  void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
-    // Adam
-    m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient;
-    v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient * sum_gradient;
-    // 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
-    WeightType mm = m / (1.0 - adam_beta1_t);
-    WeightType vv = v / (1.0 - adam_beta2_t);
-    WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
-    w -= delta;
-
-    // 重みテーブルに書き戻す
-    eval_weight = static_cast<T>(std::round(w));
-
-    sum_gradient = 0.0;
-  }
-
-  template<typename T>
-  void Weight::Finalize(int num_mini_batches, T& eval_weight)
-  {
-    int64_t value = static_cast<int64_t>(std::round(w));
-    value = std::max<int64_t>(std::numeric_limits<T>::min(), value);
-    value = std::min<int64_t>(std::numeric_limits<T>::max(), value);
-    eval_weight = static_cast<T>(value);
-  }
 
   double sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
@@ -654,8 +621,8 @@ void Learner::Learn(std::istringstream& iss) {
           // 勾配の値を加算する
 
           // KK
-          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_COLOR).ToNormalizedIndex()].AddGradient(delta_color);
-          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_TURN).ToNormalizedIndex()].AddGradient(delta_turn);
+          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_COLOR).ToIndex()].AddRawGradient(delta_color);
+          weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_TURN).ToIndex()].AddRawGradient(delta_turn);
 
           for (int i = 0; i < PIECE_NO_KING; ++i) {
             Eval::BonaPiece k0 = list0[i];
@@ -669,25 +636,25 @@ void Learner::Learn(std::istringstream& iss) {
               // KPP
               Eval::BonaPiece p0b = std::min(k0, l0);
               Eval::BonaPiece p1b = std::max(k0, l0);
-              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
-                .AddGradient(delta_color);
-              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_TURN).ToNormalizedIndex()]
-                .AddGradient(delta_turn);
+              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_COLOR).ToIndex()]
+                .AddRawGradient(delta_color);
+              weights[Kpp(sq_bk, p0b, p1b, WEIGHT_KIND_TURN).ToIndex()]
+                .AddRawGradient(delta_turn);
 
               // KPP
               Eval::BonaPiece p0w = std::min(k1, l1);
               Eval::BonaPiece p1w = std::max(k1, l1);
-              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
-                .AddGradient(-delta_color);
-              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN).ToNormalizedIndex()]
-                .AddGradient(delta_turn);
+              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_COLOR).ToIndex()]
+                .AddRawGradient(-delta_color);
+              weights[Kpp(Inv(sq_wk), p0w, p1w, WEIGHT_KIND_TURN).ToIndex()]
+                .AddRawGradient(delta_turn);
             }
 
             // KKP
-            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR).ToNormalizedIndex()]
-              .AddGradient(delta_color);
-            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN).ToNormalizedIndex()]
-              .AddGradient(delta_turn);
+            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_COLOR).ToIndex()]
+              .AddRawGradient(delta_color);
+            weights[Kkp(sq_bk, sq_wk, k0, WEIGHT_KIND_TURN).ToIndex()]
+              .AddRawGradient(delta_turn);
           }
         };
         Strap(records[record_index], pv_strap_max_depth, f);
@@ -715,6 +682,33 @@ void Learner::Learn(std::istringstream& iss) {
         Strap(records_for_test[record_index], pv_strap_max_depth, f);
       }
 
+      // 低次元へ分配する
+      // 並列化を効かせたいのでdimension_indexで回す
+#pragma omp for schedule(guided)
+      for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+        if (Kpp::IsValid(dimension_index)) {
+          auto& from = weights[dimension_index];
+          for (const auto& to : Kpp::ForIndex(dimension_index).ToLowerDimensions()) {
+            weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
+          }
+        }
+        else if (Kkp::IsValid(dimension_index)) {
+          auto& from = weights[dimension_index];
+          for (const auto& to : Kkp::ForIndex(dimension_index).ToLowerDimensions()) {
+            weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
+          }
+        }
+        else if (Kk::IsValid(dimension_index)) {
+          auto& from = weights[dimension_index];
+          for (const auto& to : Kk::ForIndex(dimension_index).ToLowerDimensions()) {
+            weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
+          }
+        }
+        else {
+          ASSERT_LV3(false);
+        }
+      }
+
       // 重みを更新する
       double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
       double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
@@ -724,42 +718,18 @@ void Learner::Learn(std::istringstream& iss) {
       for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
         if (Kpp::IsValid(dimension_index)) {
           Kpp kpp = Kpp::ForIndex(dimension_index);
-          int normalized_index = kpp.ToNormalizedIndex();
-          if (normalized_index != dimension_index) {
-            continue;
-          }
-          auto& weight = weights[normalized_index];
-          int16_t value = 0;
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
-          for (const auto& lower : kpp.ToLowerDimensions()) {
-            Eval::kpp[lower.king()][lower.piece0()][lower.piece1()][lower.weight_kind()] = value;
-          }
+          weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
         }
         else if (Kkp::IsValid(dimension_index)) {
           Kkp kkp = Kkp::ForIndex(dimension_index);
-          int normalized_index = kkp.ToNormalizedIndex();
-          if (normalized_index != dimension_index) {
-            continue;
-          }
-          auto& weight = weights[normalized_index];
-          int16_t value = 0;
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
-          for (const auto& lower : kkp.ToLowerDimensions()) {
-            Eval::kkp[lower.king0()][lower.king1()][lower.piece()][lower.weight_kind()] = value;
-          }
+          weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
         }
         else if (Kk::IsValid(dimension_index)) {
           Kk kk = Kk::ForIndex(dimension_index);
-          int normalized_index = kk.ToNormalizedIndex();
-          if (normalized_index != dimension_index) {
-            continue;
-          }
-          auto& weight = weights[normalized_index];
-          int16_t value = 0;
-          weight.UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate, value);
-          for (const auto& lower : kk.ToLowerDimensions()) {
-            Eval::kk[lower.king0()][lower.king1()][lower.weight_kind()] = value;
-          }
+          weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
         }
         else {
           ASSERT_LV3(false);
