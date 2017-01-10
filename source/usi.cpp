@@ -762,6 +762,7 @@ void USI::loop(int argc, char* argv[])
     else if (token == "learn_progress") {
       Progress progress;
       progress.Learn();
+      progress.Save();
       break;
     }
     else
