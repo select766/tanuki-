@@ -161,7 +161,7 @@
 // 置換表のprobeに必ず失敗する設定
 // 自己生成棋譜からの学習でqsearch()のPVが欲しいときに
 // 置換表にhitして枝刈りされたときにPVが得られないの悔しいので
- #define USE_FALSE_PROBE_IN_TT
+// #define USE_FALSE_PROBE_IN_TT
 
 // 評価関数パラメーターを共有メモリを用いて他プロセスのものと共有する。
 // 少ないメモリのマシンで思考エンジンを何十個も立ち上げようとしたときにメモリ不足になるので
@@ -248,13 +248,11 @@
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
-// デバッグ絡み
-#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
 // 定跡生成絡み
 #define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-//#define USE_SHARED_MEMORY_IN_EVAL
+#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
@@ -336,7 +334,7 @@
 // 定跡生成絡み
 #define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-//#define USE_SHARED_MEMORY_IN_EVAL
+#define USE_SHARED_MEMORY_IN_EVAL
 // パラメーターの自動調整絡み
 #define USE_GAMEOVER_HANDLER
 //#define LONG_EFFECT_LIBRARY

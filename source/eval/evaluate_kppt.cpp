@@ -14,7 +14,6 @@
 
 #ifdef EVAL_KPPT
 
-#include <direct.h>
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
@@ -246,6 +245,7 @@ namespace Eval
 			kkp_ = &(shared_eval_ptr->kkp_);
 			kpp_ = &(shared_eval_ptr->kpp_);
 
+
 			if (!already_exists)
 			{
 				// 新規作成されてしまった
@@ -308,7 +308,7 @@ Error:;
   std::cout << "\ninfo string save evaluation file failed.\n";
   }
   
-  // KP,KPP,KKPのスケール
+	// KP,KPP,KKPのスケール
 	const int FV_SCALE = 32;
 
 	// 駒割り以外の全計算
@@ -489,6 +489,7 @@ Error:;
 		sum.p[1] += sum1_array;
 
 #elif defined (USE_SSE41)
+
 		sum.m[0] = _mm_set_epi32(0, 0, *reinterpret_cast<const s32*>(&pkppw[list1[0]][0]), *reinterpret_cast<const s32*>(&pkppb[list0[0]][0]));
 		sum.m[0] = _mm_cvtepi16_epi32(sum.m[0]);
 		for (int i = 1; i < PIECE_NO_KING; ++i) {
@@ -575,10 +576,11 @@ Error:;
 			{
 				const auto ppkppw = kpp[Inv(sq_wk)];
 
-#if defined(USE_AVX2)
-                // ΣWKPP = 0
+				// ΣWKPP = 0
 				diff.p[1][0] = 0;
 				diff.p[1][1] = 0;
+
+#if defined(USE_AVX2)
 				
 				__m256i zero = _mm256_setzero_si256();
 				__m256i diffp1 = zero;
@@ -636,11 +638,7 @@ Error:;
 				std::array<int32_t, 2> diffp1_sum;
 				_mm_storel_epi64(reinterpret_cast<__m128i*>(&diffp1_sum), diffp1_128);
 				diff.p[1] += diffp1_sum;
-
 #else
-        // ΣWKPP = 0
-        diff.p[1][0] = 0;
-        diff.p[1][1] = 0;
 
 				for (int i = 0; i < PIECE_NO_KING; ++i)
 				{
@@ -679,7 +677,9 @@ Error:;
 				// 先手玉の移動
 				// さきほどの処理と同様。
 
-        const auto* ppkppb = kpp[sq_bk];
+				const auto* ppkppb = kpp[sq_bk];
+				diff.p[0][0] = 0;
+				diff.p[0][1] = 0;
 
 #if defined(USE_AVX2)
 
@@ -735,10 +735,7 @@ Error:;
 				_mm_storel_epi64(reinterpret_cast<__m128i*>(&diffp0_sum), diffp0_128);
 				diff.p[0] += diffp0_sum;
 #else
-        diff.p[0][0] = 0;
-        diff.p[0][1] = 0;
-
-        for (int i = 0; i < PIECE_NO_KING; ++i)
+				for (int i = 0; i < PIECE_NO_KING; ++i)
 				{
 					const int k0 = list0[i];
 					const auto* pkppb = ppkppb[k0];
