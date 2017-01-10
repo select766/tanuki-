@@ -41,10 +41,14 @@ bool Progress::Load() {
   std::string file_path = (std::string)Options[kProgressFilePath];
   std::ifstream ifs(file_path, std::ios_base::in | std::ios_base::binary);
   if (!ifs) {
+    sync_cout << "info string Failed to open the progress file. file_path=" << file_path <<
+      sync_endl;
     return false;
   }
 
   if (!ifs.read(reinterpret_cast<char*>(weights_), sizeof(weights_))) {
+    sync_cout << "info string Failed to read the progress file. file_path=" << file_path <<
+      sync_endl;
     return false;
   }
 
@@ -55,10 +59,14 @@ bool Progress::Save() {
   std::string file_path = (std::string)Options[kProgressFilePath];
   std::ofstream ofs(file_path, std::ios_base::out | std::ios_base::binary);
   if (!ofs) {
+    sync_cout << "info string Failed to open the progress file. file_path=" << file_path <<
+      sync_endl;
     return false;
   }
 
   if (!ofs.write(reinterpret_cast<char*>(weights_), sizeof(weights_))) {
+    sync_cout << "info string Failed to write the progress file. file_path=" << file_path <<
+      sync_endl;
     return false;
   }
 
@@ -75,7 +83,8 @@ bool Progress::Learn() {
   std::string book_file = (std::string)Options[kProgressBookFile];
   std::ifstream ifs(book_file);
   if (!ifs) {
-    sync_cout << "Failed to read the progress book file." << sync_endl;
+    sync_cout << "info string Failed to read the progress book file." << sync_endl;
+    return false;
   }
 
   std::string line;
