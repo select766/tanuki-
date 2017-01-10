@@ -211,6 +211,7 @@
     <ClInclude Include="evaluate.h" />
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
+    <ClInclude Include="experimental_progress.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book.h" />
@@ -228,6 +229,7 @@
     <ClInclude Include="extra\move_picker_2016Q3.h" />
     <ClInclude Include="learn\learn.h" />
     <ClInclude Include="learn\multi_think.h" />
+    <ClInclude Include="math.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
     <ClInclude Include="search.h" />
@@ -258,6 +260,7 @@
     <ClCompile Include="eval\evaluate_kppt.cpp" />
     <ClCompile Include="eval\evaluate_material.cpp" />
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
+    <ClCompile Include="experimental_progress.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book.cpp" />
     <ClCompile Include="extra\entering_king_win.cpp" />
@@ -278,6 +281,7 @@
     <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
     <ClCompile Include="learn\learner.cpp" />
     <ClCompile Include="learn\multi_think.cpp" />
+    <ClCompile Include="math.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
     <ClCompile Include="shogi.cpp" />
