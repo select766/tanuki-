@@ -136,15 +136,6 @@
     <ClInclude Include="extra\move_picker_2015.h">
       <Filter>リソース ファイル\extra</Filter>
     </ClInclude>
-    <ClInclude Include="kifu_generator.h">
-      <Filter>リソース ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="kifu_writer.h">
-      <Filter>リソース ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="kifu_reader.h">
-      <Filter>リソース ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="eval\kppt_evalsum.h">
       <Filter>リソース ファイル\eval</Filter>
     </ClInclude>
@@ -156,9 +147,6 @@
     </ClInclude>
     <ClInclude Include="engine\help-mate-engine\help-mate-search.h">
       <Filter>リソース ファイル\engine\help-mate-engine</Filter>
-    </ClInclude>
-    <ClInclude Include="experimental_learner.h">
-      <Filter>リソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="learn\multi_think.h">
       <Filter>リソース ファイル\learn</Filter>
@@ -264,15 +252,6 @@
     <ClCompile Include="eval\evaluate_kppt.cpp">
       <Filter>リソース ファイル\eval</Filter>
     </ClCompile>
-    <ClCompile Include="kifu_generator.cpp">
-      <Filter>リソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="kifu_writer.cpp">
-      <Filter>リソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="kifu_reader.cpp">
-      <Filter>リソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="extra\move_picker_2016Q2.cpp">
       <Filter>リソース ファイル\extra</Filter>
     </ClCompile>
@@ -308,9 +287,6 @@
     </ClCompile>
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp">
       <Filter>リソース ファイル\engine\help-mate-engine</Filter>
-    </ClCompile>
-    <ClCompile Include="experimental_learner.cpp">
-      <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="learn\learner.cpp">
       <Filter>リソース ファイル\learn</Filter>

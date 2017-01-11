@@ -1,9 +1,7 @@
 ﻿#include <sstream>
 #include <queue>
 
-#include "experimental_learner.h"
 #include "experimental_progress.h"
-#include "kifu_generator.h"
 #include "misc.h"
 #include "position.h"
 #include "search.h"
@@ -285,8 +283,6 @@ namespace USI
 		o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
-    Learner::InitializeGenerator(o);
-    Learner::InitializeLearner(o);
     Progress::Initialize(o);
     // 各エンジンがOptionを追加したいだろうから、コールバックする。
     USI::extra_option(o);
@@ -731,34 +727,6 @@ void USI::loop(int argc, char* argv[])
     // "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
     // 我々はこれに関知しないので単に無視すれば良い。
     else if (token == "usinewgame") continue;
-    else if (token == "generate_kifu") {
-      Learner::GenerateKifu();
-      break;
-    }
-    else if (token == "learn" || token == "l") {
-      Learner::Learn(is);
-      break;
-    }
-    else if (token == "error_measurement" || token == "e") {
-      Learner::MeasureError();
-      break;
-    }
-    else if (token == "kifu_reader_benchmark") {
-      Learner::BenchmarkKifuReader();
-      break;
-    }
-    else if (token == "measure_filling_factor") {
-      Learner::MeasureFillingFactor();
-      break;
-    }
-    else if (token == "calculate_value_histogram") {
-      Learner::CalculateValueHistogram();
-      break;
-    }
-    else if (token == "calculate_appearance_frequency_histogram") {
-      Learner::CalculateAppearanceFrequencyHistogram();
-      break;
-    }
     else if (token == "learn_progress") {
       Progress progress;
       progress.Learn();

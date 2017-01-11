@@ -220,10 +220,6 @@
     <ClInclude Include="extra\key128.h" />
     <ClInclude Include="extra\macros.h" />
     <ClInclude Include="extra\mate1ply.h" />
-    <ClInclude Include="kifu_generator.h" />
-    <ClInclude Include="kifu_reader.h" />
-    <ClInclude Include="kifu_writer.h" />
-    <ClInclude Include="experimental_learner.h" />
     <ClInclude Include="extra\move_picker_2015.h" />
     <ClInclude Include="extra\move_picker_2016Q2.h" />
     <ClInclude Include="extra\move_picker_2016Q3.h" />
@@ -274,10 +270,6 @@
     <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
-    <ClCompile Include="kifu_generator.cpp" />
-    <ClCompile Include="kifu_reader.cpp" />
-    <ClCompile Include="kifu_writer.cpp" />
-    <ClCompile Include="experimental_learner.cpp" />
     <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
     <ClCompile Include="learn\learner.cpp" />
     <ClCompile Include="learn\multi_think.cpp" />
