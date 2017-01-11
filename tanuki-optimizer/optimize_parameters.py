@@ -185,6 +185,10 @@ START_COUNTER = 0
 CURRENT_COUNTER = 0
 MAX_EVALS = 10000
 START_TIME_SEC = time.time()
+EVAL_DIR = 'eval/2017-01-10-20-31-40'
+ENGINE1 = 'YaneuraOu-2017-early-master.exe'
+ENGINE2 = 'YaneuraOu-2017-early-slave.exe'
+
 
 # pause/resume
 class HyperoptState(object):
@@ -238,140 +242,6 @@ class HyperoptState(object):
        ratio = win / (lose + draw + win)
       print ratio
 
-class MSYSBuilder(object):
-  def __init__(self):
-    pass
-
-  def clean(self):
-    popenargs = [
-      'make',
-      'clean',
-    ]
-    print(popenargs)
-    while True:
-      try:
-        with open('make-clean.txt', 'w') as file:
-          output = subprocess.check_output(popenargs)
-          file.write(output)
-        break
-      except subprocess.CalledProcessError:
-        continue
-
-  def build(self, args):
-    popenargs = [
-      'make',
-      '-j4',
-      'native',
-      'TARGET_PREFIX=tanuki-modified',
-      ]
-    for key, val in zip(build_argument_names, args):
-      popenargs.append('{}={}'.format(key, int(val)))
-
-    print('Executing: make native (MSYS) ...')
-    while True:
-      try:
-        with open('make-native.txt', 'w') as file:
-          output = subprocess.check_output(popenargs)
-          file.write(output)
-        break
-      except subprocess.CalledProcessError:
-        continue
-
-  def kill(self, process_name):
-    subprocess.call(['pkill', process_name])
-
-class MSVCBuilder(object):
-  def __init__(self):
-    self.devenv_path = 'devenv.exe'
-    self.header_path = r'builder_generated.hpp'
-
-  def clean(self):
-    log_path = 'make-clean.txt'
-    popenargs = [
-      self.devenv_path,
-      r'..\tanuki-\tanuki-.sln',
-      '/Clean',
-      'Release|x64',
-      '/Project',
-      r'..\tanuki-\tanuki-\tanuki-.vcxproj',
-      '/Out',
-      log_path,
-      ]
-    print(popenargs)
-    while True:
-      try:
-        if os.path.isfile(log_path):
-          os.unlink(log_path)
-        subprocess.call(popenargs)
-        break
-      except subprocess.CalledProcessError:
-        print('retry')
-        continue
-
-  def update_header(self, args):
-    while True:
-      try:
-        with open(self.header_path, 'w') as file:
-          file.write('#ifndef __BUILDER_GENERATED_HPP__\n')
-          file.write('#define __BUILDER_GENERATED_HPP__\n')
-          file.write('// this file was automatically generated.\n')
-          file.write('// generated at {}\n'.format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
-          for key, val in zip(build_argument_names, args):
-            file.write('#define {} {}\n'.format(key, int(val)))
-          file.write('#endif // __BUILDER_GENERATED_HPP__\n')
-        break
-      except IOError:
-        print('retry')
-        continue
-  
-  def clean_header(self):
-    while True:
-      try:
-        with open(self.header_path, 'w') as file:
-          file.write('// this file was automatically generated.\n')
-          file.write('// generated at {}\n'.format(datetime.datetime.now().strftime('%Y%m%d-%H%M%S')))
-        break
-      except IOError:
-        print('retry')
-        continue
-
-  def move_exe(self):
-    shutil.copyfile(
-        r'..\tanuki-\x64\Release\tanuki-.exe',
-        r'tanuki-modified.exe',
-        )
-
-  def build(self, args):
-    self.update_header(args)
-
-    log_path = 'make-native.txt'
-    popenargs = [
-      self.devenv_path,
-      r'..\tanuki-\tanuki-.sln',
-      '/Build',
-      'Release|x64',
-      '/Project',
-      r'..\tanuki-\tanuki-\tanuki-.vcxproj',
-      '/Out',
-      log_path,
-      ]
-    print('Executing: make native (MSVC) ...')
-    while True:
-      try:
-        if os.path.isfile(log_path):
-          os.unlink(log_path)
-        output = subprocess.call(popenargs)
-        break
-      except subprocess.CalledProcessError:
-        print('retry')
-        continue
-
-    self.move_exe()
-    self.clean_header()
-
-  def kill(self, process_name):
-    subprocess.call(['taskkill', '/T', '/F', '/IM', process_name + '.exe'])
-
 
 class YaneuraouBuilder(object):
   FILENAME = 'param/parameters_slave.h'
@@ -386,8 +256,11 @@ class YaneuraouBuilder(object):
 
   def build(self, args):
     with open(self.FILENAME, 'w') as f:
+      f.write('#ifndef _2017_EARLY_PARAMETERS_\n')
+      f.write('#define _2017_EARLY_PARAMETERS_\n')
       for key, val in zip(build_argument_names, args):
         f.write('PARAM_DEFINE {0} = {1};\n'.format(key, str(int(val))))
+      f.write('#endif\n')
 
   def kill(self, process_name):
     subprocess.call(['taskkill', '/T', '/F', '/IM', process_name + '.exe'])
@@ -413,26 +286,48 @@ def function(args):
   builder.clean()
   builder.build(args)
 
-  popenargs = ['./YaneuraOu-local-game-server.exe',]
-  print(popenargs)
+  args = [
+    'C:\\Python27\\python.exe',
+    '..\script\engine_invoker5.py',
+    # hakubishin-private\exe以下から実行していると仮定する
+    'home:{0}'.format(os.getcwd()),
+    # {home}\exeからの相対パスに変換する
+    'engine1:{0}'.format(os.path.relpath(os.path.abspath(ENGINE1), os.path.join(os.getcwd(), 'exe'))),
+    # {home}\evalからの相対パスに変換する
+    'eval1:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
+    'engine2:{0}'.format(os.path.relpath(os.path.abspath(ENGINE2), os.path.join(os.getcwd(), 'exe'))),
+    'eval2:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
+    'cores:{0}'.format(24),
+    'loop:{0}'.format(24),
+    'cpu:1',
+    'engine_threads:1',
+    'hash1:256',
+    'hash2:256',
+    'time:b10000',
+    ]
+  print(args)
   output = None
   try:
-    with open('yaneuraou-config.txt', 'r') as file:
-      output = subprocess.check_output(popenargs, stdin=file)
+    output = subprocess.check_output(args, stdin=file)
   except subprocess.CalledProcessError:
-    pass
+    sys.exit('Failed to calculate the winning rate...');
   print(output)
-  matched = re.compile('GameResult (\\d+) - (\\d+) - (\\d+)').search(output)
-  lose = float(matched.group(1))
-  draw = float(matched.group(2))
-  win = float(matched.group(3))
+
+  lose = 0
+  draw = 0
+  win = 0
+  for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(output):
+    lose = float(matched.group(1))
+    draw = float(matched.group(2))
+    win = float(matched.group(3))
+
   ratio = 0.0
   if lose + draw + win > 0.1:
    ratio = win / (lose + draw + win)
   print ratio
 
-  builder.kill('YaneuraOu-2016-mid-engine-master')
-  builder.kill('YaneuraOu-2016-mid-engine-slave')
+  builder.kill(ENGINE1)
+  builder.kill(ENGINE2)
 
   global state
   state.record_iteration(
@@ -458,8 +353,6 @@ if __name__=='__main__':
       help=u'open a hyper-parameter search file and dump its log.')
   parser.add_argument('--max-evals', type=int, default=MAX_EVALS,
       help=u'max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
-  parser.add_argument('--builder', type=str, default='Yaneuraou',
-      help=u'select building environment. Yaneuraou, MSYS or MSVC.')
   commandline_args = parser.parse_args()
   MAX_EVALS = commandline_args.max_evals
 
@@ -476,12 +369,7 @@ if __name__=='__main__':
     CURRENT_COUNTER = START_COUNTER
 
   # build environment.
-  if commandline_args.builder == 'MSVC':
-    builder = MSVCBuilder()
-  elif commandline_args.builder == 'MSYS':
-    builder = MSYSBuilder()
-  else:
-    builder = YaneuraouBuilder()
+  builder = YaneuraouBuilder()
 
   # shutil.copyfile('../tanuki-/x64/Release/tanuki-.exe', 'tanuki-.exe')
   best = fmin(function, space, algo=tpe.suggest, max_evals=state.calc_max_evals(MAX_EVALS), trials=state.get_trials())
