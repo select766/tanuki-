@@ -244,7 +244,7 @@ class HyperoptState(object):
 
 
 class YaneuraouBuilder(object):
-  FILENAME = 'param/parameters_slave.h'
+  FILENAME = 'param/2017-early-param-slave.h'
   def __init__(self):
     pass
 
@@ -263,7 +263,7 @@ class YaneuraouBuilder(object):
       f.write('#endif\n')
 
   def kill(self, process_name):
-    subprocess.call(['taskkill', '/T', '/F', '/IM', process_name + '.exe'])
+    subprocess.call(['taskkill', '/T', '/F', '/IM', process_name])
 
 
 def function(args):
@@ -308,7 +308,7 @@ def function(args):
   print(args)
   output = None
   try:
-    output = subprocess.check_output(args, stdin=file)
+    output = subprocess.check_output(args)
   except subprocess.CalledProcessError:
     sys.exit('Failed to calculate the winning rate...');
   print(output)
@@ -317,9 +317,9 @@ def function(args):
   draw = 0
   win = 0
   for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(output):
-    lose = float(matched.group(1))
-    draw = float(matched.group(2))
-    win = float(matched.group(3))
+    lose = float(match.group(1))
+    draw = float(match.group(2))
+    win = float(match.group(3))
 
   ratio = 0.0
   if lose + draw + win > 0.1:
