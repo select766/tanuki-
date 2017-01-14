@@ -311,7 +311,7 @@ def function(args):
     ]
   print(args)
 
-  process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
   stdoutdata, stderrdata = process.communicate()
   if stdoutdata:
     print('-' * 78)
