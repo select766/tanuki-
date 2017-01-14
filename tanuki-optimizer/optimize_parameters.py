@@ -307,8 +307,8 @@ def function(args):
     'loop:{0}'.format(NUM_THREADS),
     'cpu:1',
     'engine_threads:1',
-    'hash1:256',
-    'hash2:256',
+    'hash1:1024',
+    'hash2:1024',
     'time:b{0}'.format(THINKING_TIME_MS),
     'rand_book:1'
     ]
