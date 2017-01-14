@@ -278,6 +278,7 @@ def function(args):
   global NUM_THREADS
   global THINKING_TIME_MS
   print(args)
+  sys.stdout.flush()
 
   if START_COUNTER < CURRENT_COUNTER:
     current_time_sec = time.time()
@@ -285,6 +286,7 @@ def function(args):
     sec_per_one = delta / (CURRENT_COUNTER - START_COUNTER)
     remaining = datetime.timedelta(seconds=sec_per_one*(MAX_EVALS-CURRENT_COUNTER))
     print(CURRENT_COUNTER, '/', MAX_EVALS, str(remaining))
+    sys.stdout.flush()
   CURRENT_COUNTER += 1
 
   builder.clean()
@@ -308,8 +310,10 @@ def function(args):
     'hash1:256',
     'hash2:256',
     'time:b{0}'.format(THINKING_TIME_MS),
+    'rand_book:1'
     ]
   print(args)
+  sys.stdout.flush()
 
   process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
   stdoutdata, stderrdata = process.communicate()
@@ -327,6 +331,7 @@ def function(args):
     print('')
     print(stderrdata)
     print('')
+  sys.stdout.flush()
 
   if process.returncode:
     sys.exit('Failed to execute engine_invoker...')
@@ -342,7 +347,8 @@ def function(args):
   ratio = 0.0
   if lose + draw + win > 0.1:
    ratio = win / (lose + draw + win)
-  print ratio
+  print('ratio={0}'.format(ratio))
+  sys.stdout.flush()
 
   builder.kill(ENGINE1)
   builder.kill(ENGINE2)
