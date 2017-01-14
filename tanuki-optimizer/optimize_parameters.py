@@ -312,9 +312,9 @@ def function(args):
   print(args)
   output = None
   try:
-    output = subprocess.check_output(args)
+    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
   except subprocess.CalledProcessError:
-    sys.exit('Failed to calculate the winning rate...');
+    sys.exit('Failed to call engine_invoker...');
   print(output)
 
   lose = 0
