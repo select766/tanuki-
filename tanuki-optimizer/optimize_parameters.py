@@ -310,17 +310,31 @@ def function(args):
     'time:b{0}'.format(THINKING_TIME_MS),
     ]
   print(args)
-  output = None
-  try:
-    output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError as e:
-    sys.exit(e);
-  print(output)
+
+  process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  stdoutdata, stderrdata = process.communicate()
+  if stdoutdata:
+    print('-' * 78)
+    print('- stdout')
+    print('-' * 78)
+    print('')
+    print(stdoutdata)
+    print('')
+  if stderrdata:
+    print('-' * 78)
+    print('- sterr')
+    print('-' * 78)
+    print('')
+    print(stderrdata)
+    print('')
+
+  if process.returncode:
+    sys.exit('Failed to execute engine_invoker...')
 
   lose = 0
   draw = 0
   win = 0
-  for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(output):
+  for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(stdoutdata):
     lose = float(match.group(1))
     draw = float(match.group(2))
     win = float(match.group(3))
@@ -336,7 +350,7 @@ def function(args):
   global state
   state.record_iteration(
       args=args,
-      output=output,
+      output=stdoutdata,
       lose=lose,
       draw=draw,
       win=win,
