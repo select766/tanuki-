@@ -313,8 +313,8 @@ def function(args):
   output = None
   try:
     output = subprocess.check_output(args, stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError:
-    sys.exit('Failed to call engine_invoker...');
+  except subprocess.CalledProcessError as e:
+    sys.exit(e);
   print(output)
 
   lose = 0
