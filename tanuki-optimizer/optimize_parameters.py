@@ -188,6 +188,8 @@ START_TIME_SEC = time.time()
 EVAL_DIR = 'eval/2017-01-10-20-31-40'
 ENGINE1 = 'YaneuraOu-2017-early-master.exe'
 ENGINE2 = 'YaneuraOu-2017-early-slave.exe'
+NUM_THREADS = 24
+THINKING_TIME_MS = 10000
 
 
 # pause/resume
@@ -273,6 +275,8 @@ def function(args):
 
   global START_COUNTER
   global CURRENT_COUNTER
+  global NUM_THREADS
+  global THINKING_TIME_MS
   print(args)
 
   if START_COUNTER < CURRENT_COUNTER:
@@ -297,13 +301,13 @@ def function(args):
     'eval1:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
     'engine2:{0}'.format(os.path.relpath(os.path.abspath(ENGINE2), os.path.join(os.getcwd(), 'exe'))),
     'eval2:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
-    'cores:{0}'.format(24),
-    'loop:{0}'.format(24),
+    'cores:{0}'.format(NUM_THREADS),
+    'loop:{0}'.format(NUM_THREADS),
     'cpu:1',
     'engine_threads:1',
     'hash1:256',
     'hash2:256',
-    'time:b10000',
+    'time:b{0}'.format(THINKING_TIME_MS),
     ]
   print(args)
   output = None
@@ -353,8 +357,14 @@ if __name__=='__main__':
       help=u'open a hyper-parameter search file and dump its log.')
   parser.add_argument('--max-evals', type=int, default=MAX_EVALS,
       help=u'max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
+  parser.add_argument('--num_threads', type=int, default=NUM_THREADS,
+      help=u'number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
+  parser.add_argument('--thinking_time_ms', type=int, default=THINKING_TIME_MS,
+      help=u'thinking time. (default: use THINKING_TIME_MS={})'.format(THINKING_TIME_MS))
   commandline_args = parser.parse_args()
   MAX_EVALS = commandline_args.max_evals
+  NUM_THREADS = commandline_args.num_threads
+  THINKING_TIME_MS = commandline_args.thinking_time_ms
 
   state = HyperoptState()
   state_store_path = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
@@ -371,7 +381,6 @@ if __name__=='__main__':
   # build environment.
   builder = YaneuraouBuilder()
 
-  # shutil.copyfile('../tanuki-/x64/Release/tanuki-.exe', 'tanuki-.exe')
   best = fmin(function, space, algo=tpe.suggest, max_evals=state.calc_max_evals(MAX_EVALS), trials=state.get_trials())
   print("best estimate parameters", best)
   for key in sorted(best.keys()):
