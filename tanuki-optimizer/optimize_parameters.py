@@ -246,7 +246,7 @@ class HyperoptState(object):
 
 
 class YaneuraouBuilder(object):
-  FILENAME = 'param/2017-early-param-slave.h'
+  FILENAME = 'param/2017-early-param-master.h'
   def __init__(self):
     pass
 
@@ -331,13 +331,13 @@ def function(args):
   if process.returncode:
     sys.exit('Failed to execute engine_invoker...')
 
-  lose = 0
-  draw = 0
   win = 0
+  draw = 0
+  lose = 0
   for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(stdoutdata):
-    lose = float(match.group(1))
+    win = float(match.group(1))
     draw = float(match.group(2))
-    win = float(match.group(3))
+    lose = float(match.group(3))
 
   ratio = 0.0
   if lose + draw + win > 0.1:
