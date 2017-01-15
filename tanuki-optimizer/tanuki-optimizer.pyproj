@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>2944d269-829b-4b9d-ab0e-f90a50204a21</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>optimize_parameters.py</StartupFile>
+    <StartupFile>analyze_optimizer_log.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
@@ -14,7 +14,7 @@
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>--num_threads 7 --thinking_time_ms 100</CommandLineArguments>
+    <CommandLineArguments>param\parameters.csv optimize_parameters.hyperopt_state.20170114_121459.pickle</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -31,6 +31,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="analyze_optimizer_log.py" />
+    <Compile Include="hyperopt_state.py" />
     <Compile Include="optimize_parameters.py" />
     <Compile Include="parameters_generator.py" />
   </ItemGroup>

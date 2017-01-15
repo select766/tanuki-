@@ -18,6 +18,8 @@ import sklearn.gaussian_process
 import matplotlib
 matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
+import pickle
+from hyperopt_state import HyperoptState
 
 def score_from_game_result(game_result):
     u'''calculate score (lower is better, [0.0, 1.0] or None (ignore)) from game_result'''
@@ -87,8 +89,8 @@ class LogAnalyzer(object):
         self.log_path = None
         self.parameters_csv_path = None
 
-        self.parse_file(log_file_path)
         self.parse_parameters_csv(parameters_csv_file_path)
+        self.parse_file(log_file_path)
 
     def parse_file(self, path):
         with open(path, 'rb') as fi:
@@ -96,28 +98,30 @@ class LogAnalyzer(object):
                 self.log_path = path
 
     def parse_file_object(self, fi):
-        pat_separator = re.compile(r'^-+$')
-        pat_parameters = re.compile(r'\([0-9., -]+\)')
-        pat_result = re.compile(r'GameResult (\d+) - (\d+) - (\d+)')
+        print('Loading the pickle file...')
+        state = pickle.load(fi)
+        print('Reading values...')
         log_entries = [] # (parameters, GameResult, score)
-        last_parameters = None
-        see_parameters = False
-        for line in fi.readlines():
-            line = line.rstrip()
-
-            if see_parameters:
-                mo = pat_parameters.match(line)
-                if mo is not None:
-                    last_parameters = eval(line)
-                    see_parameters = False
-
-            mo = pat_result.match(line)
-            if mo is not None:
-                result = map(int, mo.groups())
-                log_entries.append((last_parameters, result, score_from_game_result(result)))
-
-            if pat_separator.match(line):
-                see_parameters = True
+        values = []
+        for name in self.index2name:
+            values.append(state.trials.vals[name])
+            sys.stdout.write('.')
+        print ''
+        print('Generating log entries...')
+        for index, result in enumerate(state.trials.results):
+            if result['status'] != 'ok':
+                continue
+            # lower is better
+            win = state.iteration_logs[index]['win']
+            draw = state.iteration_logs[index]['draw']
+            lose = state.iteration_logs[index]['lose']
+            score = None
+            if win + draw + lose > 0.0:
+              score = (win * 0.0 + draw * 0.5 + lose * 1.0) / (win + draw + lose)
+            parameters = []
+            for row in values:
+                parameters.append(row[index])
+            log_entries.append((tuple(parameters), (lose, draw, win), score))
 
         self.log_entries = log_entries
         return log_entries
@@ -429,7 +433,7 @@ def calc_optimal_parameters_20160315(analyzer, n_iterations_to_use=-1):
 def main():
     # SETUP
     if len(sys.argv) < 3:
-        print('usage: analyze_optimizer_log.py parameters_reordered.csv parameters-xxxx.txt')
+        print('usage: analyze_optimizer_log.py parameters_reordered.csv parameters-xxxx.pickle')
         return
     log_file = sys.argv[2]
     param_file = sys.argv[1]
