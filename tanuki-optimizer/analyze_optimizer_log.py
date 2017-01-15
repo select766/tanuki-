@@ -68,17 +68,13 @@ def create_header_file(file_path, analyzer, x_opt, additional_dict={}):
         for k, v in additional_dict.items():
             fo.write('// {} = {}\n'.format(k, v))
         fo.write('\n')
-        fo.write('#define MY_NAME "tanuki-{}"\n'.format(now.strftime('%Y-%m-%d-%H%M%S')))
-        fo.write('\n')
         for index, (name, (default_value, min_value, max_value), best_value) in enumerate(zip(analyzer.index2name, analyzer.index2bounds, x_opt)):
             rounded_value = int(round(best_value))
             option_string = '{} raw={}, min={}, max={} default={}'.format(
                 stringify_value_in_bounds(rounded_value, default_value, min_value, max_value),
                 best_value, min_value, max_value, default_value)
-            fo.write('#ifndef {}\n'.format(name))
             fo.write('// {}\n'.format(option_string))
-            fo.write('#define {} {}\n'.format(name, rounded_value))
-            fo.write('#endif\n')
+            fo.write('PARAM_DEFINE {} = {};\n'.format(name, rounded_value))
             fo.write('\n')
         fo.write('\n')
         fo.write('#endif // __{}__\n'.format(guard))
