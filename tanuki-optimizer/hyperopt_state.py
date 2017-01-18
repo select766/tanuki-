@@ -1,3 +1,5 @@
+from hyperopt import Trials
+
 # pause/resume
 class HyperoptState(object):
   def __init__(self):
