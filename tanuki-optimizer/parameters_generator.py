@@ -20,7 +20,7 @@ def main():
       if name.endswith('_OPENING'):
         sigma = (float(max_value) - float(min_value)) / 6.0
       else:
-        sigma = 0.0
+        sigma = 1e-8
       print("  hp.qnormal('{0}', {1}, {2}, 1),".format(name, default_value, sigma))
 
 if __name__ == '__main__':
