@@ -240,7 +240,7 @@ def function(args):
   builder.clean()
   builder.build(args)
 
-  commandline_args = [
+  engine_invoker_args = [
     'C:\\Python27\\python.exe',
     '..\script\engine_invoker5.py',
     # hakubishin-private\exe以下から実行していると仮定する
@@ -260,10 +260,10 @@ def function(args):
     'time:b{0}'.format(THINKING_TIME_MS),
     'rand_book:1'
     ]
-  print(commandline_args)
+  print(engine_invoker_args)
   sys.stdout.flush()
 
-  process = subprocess.Popen(commandline_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+  process = subprocess.Popen(engine_invoker_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
   stdoutdata, stderrdata = process.communicate()
   if stdoutdata:
     print('-' * 78)
