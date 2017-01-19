@@ -28,7 +28,6 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int kMaxSwapTrials = 10;
   constexpr int kMaxTrialsToSelectSquares = 100;
-  constexpr int kShowProgressPerPositions = 1000'0000;
 
   constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
   constexpr char* kOptionGeneratorMinSearchDepth = "GeneratorMinSearchDepth";
@@ -43,6 +42,7 @@ namespace
   constexpr char* kOptionGeneratorDoRandomMoveProbability = "GeneratorDoRandomMoveProbability";
   constexpr char* kOptionGeneratorDoRandomMoveAfterBook = "GeneratorDoRandomMoveAfterBook";
   constexpr char* kOptionGeneratorWriteAnotherPosition = "GeneratorWriteAnotherPosition";
+  constexpr char* kOptionGeneratorShowProgressPerPositions = "GeneratorShowProgressPerPositions";
 
   std::vector<std::string> book;
   std::uniform_real_distribution<> probability_distribution;
@@ -176,9 +176,9 @@ namespace
   // return 成功した場合はtrue、そうでない場合はfalse。falseの場合は対局を中止したほうが良い
   SearchAndWriteResult SearchAndWrite(
     const std::uniform_int_distribution<>& search_depth_distribution, int value_threshold,
-    time_t start_time, int64_t num_positions, std::mt19937_64& mt19937_64, Position& pos,
-    Learner::KifuWriter& kifu_writer, std::atomic_int64_t& global_position_index,
-    Move& pv_move) {
+    time_t start_time, int64_t num_positions, int64_t show_progress_per_positions,
+    std::mt19937_64& mt19937_64, Position& pos, Learner::KifuWriter& kifu_writer,
+    std::atomic_int64_t& global_position_index, Move& pv_move) {
     int search_depth = search_depth_distribution(mt19937_64);
     auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
 
@@ -202,7 +202,7 @@ namespace
     // 必要局面数生成したら終了する
     int64_t position_index = global_position_index++;
     if (position_index >= num_positions) {
-        return kSearchAndWriteNumPositionReached;
+      return kSearchAndWriteNumPositionReached;
     }
 
     Learner::Record record = { 0 };
@@ -213,7 +213,7 @@ namespace
       return kSearchAndWriteInvalidState;
     }
 
-    Learner::ShowProgress(start_time, position_index, num_positions, kShowProgressPerPositions);
+    Learner::ShowProgress(start_time, position_index, num_positions, show_progress_per_positions);
     pv_move = pv[0];
     return kSearchAndWriteSucceeded;
   }
@@ -233,6 +233,7 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
   o[kOptionGeneratorDoRandomMoveProbability] << Option("0.1");
   o[kOptionGeneratorDoRandomMoveAfterBook] << Option(true);
   o[kOptionGeneratorWriteAnotherPosition] << Option(true);
+  o[kOptionGeneratorShowProgressPerPositions] << Option("1000000");
 }
 
 void Learner::GenerateKifu()
@@ -280,6 +281,8 @@ void Learner::GenerateKifu()
   int value_threshold = Options[kOptionGeneratorValueThreshold];
   std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
   bool write_another_position = (bool)Options[kOptionGeneratorWriteAnotherPosition];
+  int64_t show_progress_per_positions =
+    ParseOptionOrDie<int64_t>(kOptionGeneratorShowProgressPerPositions);
 
   time_t start_time;
   std::time(&start_time);
@@ -344,7 +347,8 @@ void Learner::GenerateKifu()
 
         Move pv_move = Move::MOVE_NONE;
         auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
-          num_positions, mt19937_64, pos, *kifu_writer, global_position_index, pv_move);
+          num_positions, show_progress_per_positions, mt19937_64, pos, *kifu_writer,
+          global_position_index, pv_move);
         if (result != kSearchAndWriteSucceeded) {
           break;
         }
@@ -382,7 +386,8 @@ void Learner::GenerateKifu()
             if (!pos.is_mated()) {
               Move dummy_move = Move::MOVE_NONE;
               auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
-                num_positions, mt19937_64, pos, *kifu_writer, global_position_index, dummy_move);
+                num_positions, show_progress_per_positions, mt19937_64, pos, *kifu_writer,
+                global_position_index, dummy_move);
               if (result != kSearchAndWriteSucceeded &&
                 result != kSearchAndWriteValueThresholdExceeded) {
                 break;
