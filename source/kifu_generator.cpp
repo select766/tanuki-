@@ -169,6 +169,7 @@ namespace
     kSearchAndWriteSucceeded,
     kSearchAndWriteInvalidState,
     kSearchAndWriteValueThresholdExceeded,
+    kSearchAndWriteNumPositionReached,
   };
 
   // 探索を行い、問題がなければ結果を書き出す
@@ -198,6 +199,12 @@ namespace
       return kSearchAndWriteInvalidState;
     }
 
+    // 必要局面数生成したら終了する
+    int64_t position_index = global_position_index++;
+    if (position_index >= num_positions) {
+        return kSearchAndWriteNumPositionReached;
+    }
+
     Learner::Record record = { 0 };
     pos.sfen_pack(record.packed);
     record.value = value;
@@ -206,7 +213,6 @@ namespace
       return kSearchAndWriteInvalidState;
     }
 
-    int64_t position_index = global_position_index++;
     Learner::ShowProgress(start_time, position_index, num_positions, kShowProgressPerPositions);
     pv_move = pv[0];
     return kSearchAndWriteSucceeded;
@@ -392,5 +398,9 @@ void Learner::GenerateKifu()
         }
       }
     }
+
+    // 必要局面数生成したら全スレッドの探索を停止する
+    // こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
+    Search::Signals.stop = true;
   }
 }
