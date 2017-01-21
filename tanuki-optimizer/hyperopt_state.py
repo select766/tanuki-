@@ -1,9 +1,11 @@
-from hyperopt import Trials
+import hyperopt
+import pickle
+import sys
 
 # pause/resume
 class HyperoptState(object):
   def __init__(self):
-    self.trials = Trials()
+    self.trials = hyperopt.Trials()
     self.iteration_logs = []
 
   def get_trials(self): return self.trials
@@ -12,7 +14,8 @@ class HyperoptState(object):
 
   def record_iteration(self, **kwargs):
     # record any pickle-able object as a dictionary at each iteration.
-    # also, len(self.iteration_logs) is used to keep the accumulated number of iterations.
+    # also, len(self.iteration_logs) is used to keep the accumulated number of
+    # iterations.
     self.iteration_logs.append(kwargs)
 
   def calc_max_evals(self, n_additional_evals): return self.get_n_accumulated_iterations() + n_additional_evals
@@ -29,8 +32,8 @@ class HyperoptState(object):
       with open(file_path, 'wb') as fo:
         pickle.dump(self, fo, protocol=-1)
         print('saved state to: {}'.format(file_path))
-    except:
-      print('failed to save state. continue.')
+    except Exception as e:
+      sys.exit('Failed to save state. exitting... e={}'.format(e))
 
   def dump_log(self):
     for index, entry in enumerate(self.iteration_logs):
