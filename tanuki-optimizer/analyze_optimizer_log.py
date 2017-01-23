@@ -210,7 +210,7 @@ class LogAnalyzer(object):
             # use empirical values
             self.mins = xs.min(axis=0)
             self.maxes = xs.max(axis=0)
-        return (xs - self.mins) / (self.maxes - self.mins)
+        return (xs - self.mins) / (self.maxes - self.mins + 1e-8)
 
     def unnormalize_xs(self, xs_norm):
         return xs_norm * (self.maxes - self.mins) + self.mins
