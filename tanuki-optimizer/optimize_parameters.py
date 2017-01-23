@@ -191,6 +191,7 @@ ENGINE1 = 'YaneuraOu-2017-early-master.exe'
 ENGINE2 = 'YaneuraOu-2017-early-slave.exe'
 NUM_THREADS = 24
 THINKING_TIME_MS = 10000
+NUM_NUMA_NODES = 1
 
 
 class YaneuraouBuilder(object):
@@ -253,7 +254,7 @@ def function(args):
     'eval2:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
     'cores:{0}'.format(NUM_THREADS),
     'loop:{0}'.format(NUM_THREADS),
-    'cpu:1',
+    'cpu:{0}'.format(NUM_NUMA_NODES),
     'engine_threads:1',
     'hash1:1024',
     'hash2:1024',
@@ -329,10 +330,13 @@ if __name__=='__main__':
       help=u'number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
   parser.add_argument('--thinking_time_ms', type=int, default=THINKING_TIME_MS,
       help=u'thinking time. (default: use THINKING_TIME_MS={})'.format(THINKING_TIME_MS))
+  parser.add_argument('--num_numa_nodes', type=int, default=1,
+      help=u'Number of the NUMA nodes. (default: use NUM_NUMA_NODES={})'.format(NUM_NUMA_NODES))
   commandline_args = parser.parse_args()
   MAX_EVALS = commandline_args.max_evals
   NUM_THREADS = commandline_args.num_threads
   THINKING_TIME_MS = commandline_args.thinking_time_ms
+  NUM_NUMA_NODES = commandline_args.num_numa_nodes
 
   state = HyperoptState()
   state_store_path = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
