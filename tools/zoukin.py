@@ -113,7 +113,7 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games)
     'eval2:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
     'cores:{0}'.format(num_threads),
     'loop:{0}'.format(num_games),
-    'cpu:1',
+    'cpu:2',
     'engine_threads:1',
     'hash1:256',
     'hash2:256',
