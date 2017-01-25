@@ -760,6 +760,7 @@ for sfen in book_file:
 		sys.stdout.flush()
 book_file.close()
 print
+sys.stdout.flush()
 
 # 定跡をシャッフルする
 if rand_book:
