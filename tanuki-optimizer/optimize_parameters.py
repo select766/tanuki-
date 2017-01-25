@@ -192,6 +192,7 @@ ENGINE2 = r'YaneuraOu-2017-early-slave.exe'
 NUM_THREADS = 24
 THINKING_TIME_MS = 10000
 NUM_NUMA_NODES = 1
+HASH = 256
 
 
 class YaneuraouBuilder(object):
@@ -224,8 +225,15 @@ def function(args):
 
   global START_COUNTER
   global CURRENT_COUNTER
+  global MAX_EVALS
+  global START_TIME_SEC
+  global EVAL_DIR
+  global ENGINE1
+  global ENGINE2
   global NUM_THREADS
   global THINKING_TIME_MS
+  global NUM_NUMA_NODES
+  global HASH
   print(args)
   sys.stdout.flush()
 
@@ -256,8 +264,8 @@ def function(args):
     'loop:{0}'.format(NUM_THREADS),
     'cpu:{0}'.format(NUM_NUMA_NODES),
     'engine_threads:1',
-    'hash1:1024',
-    'hash2:1024',
+    'hash1:{0}'.format(HASH),
+    'hash2:{0}'.format(HASH),
     'time:b{0}'.format(THINKING_TIME_MS),
     'rand_book:1'
     ]
@@ -330,13 +338,16 @@ if __name__=='__main__':
       help=u'number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
   parser.add_argument('--thinking_time_ms', type=int, default=THINKING_TIME_MS,
       help=u'thinking time. (default: use THINKING_TIME_MS={})'.format(THINKING_TIME_MS))
-  parser.add_argument('--num_numa_nodes', type=int, default=1,
+  parser.add_argument('--num_numa_nodes', type=int, default=NUM_NUMA_NODES,
       help=u'Number of the NUMA nodes. (default: use NUM_NUMA_NODES={})'.format(NUM_NUMA_NODES))
+  parser.add_argument('--hash', type=int, default=HASH,
+      help=u'Transposition table hash size. (default: use HASH={})'.format(HASH))
   commandline_args = parser.parse_args()
   MAX_EVALS = commandline_args.max_evals
   NUM_THREADS = commandline_args.num_threads
   THINKING_TIME_MS = commandline_args.thinking_time_ms
   NUM_NUMA_NODES = commandline_args.num_numa_nodes
+  HASH = commandline_args.hash
 
   state = HyperoptState()
   state_store_path = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
@@ -357,4 +368,3 @@ if __name__=='__main__':
   print("best estimate parameters", best)
   for key in sorted(best.keys()):
     print("{0}={1}".format(key, str(int(best[key]))))
-
