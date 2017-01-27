@@ -14,7 +14,7 @@
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments> param\parameters.csv optimize_parameters.hyperopt_state.20170123_102223.pickle</CommandLineArguments>
+    <CommandLineArguments> param\parameters.csv optimize_parameters.hyperopt_state.20170125_111446.pickle</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
