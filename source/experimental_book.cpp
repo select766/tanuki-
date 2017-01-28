@@ -112,6 +112,14 @@ bool Book::CreateScoredBook() {
   std::string output_book_file = Options[kBookOutputFile];
   int save_per_positions = (int)Options[kBookSavePerPositions];
 
+  sync_cout << "info string num_threads=" << num_threads << sync_endl;
+  sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+  sync_cout << "info string search_depth=" << search_depth << sync_endl;
+  sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
+  sync_cout << "info string show_progress_per_positions=" << show_progress_per_positions << sync_endl;
+  sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+  sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
+
   omp_set_num_threads(num_threads);
 
   MemoryBook input_book;
