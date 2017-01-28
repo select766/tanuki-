@@ -152,7 +152,6 @@ bool Book::CreateScoredBook() {
     }
 
     int thread_index = omp_get_thread_num();
-    sync_cout << "thread_index=" << thread_index << sync_endl;
     Thread& thread = *Threads[thread_index];
     Position& pos = thread.rootPos;
     pos.set(sfen);
@@ -191,7 +190,9 @@ bool Book::CreateScoredBook() {
     if (position_index && position_index % save_per_positions == 0) {
       {
         std::lock_guard<std::mutex> lock(output_book_mutex);
+        sync_cout << "info string Writing the book file..." << sync_endl;
         write_book(output_book_file, output_book, false);
+        sync_cout << "done..." << sync_endl;
       }
     }
   }
