@@ -1,6 +1,8 @@
 #include "experimental_util.h"
 
+#include <algorithm>
 #include <cstdio>
+#include <limits>
 
 void Utility::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
   int64_t show_per) {
@@ -18,7 +20,7 @@ void Utility::ShowProgress(const time_t& start_time, int64_t current_data, int64
   int minute = elapsed_time / 60 % 60;
   int second = elapsed_time % 60;
   double data_per_time = current_data / static_cast<double>(current_time - start_time);
-  time_t expected_time = current_time + (total_data - current_data) / data_per_time;
+  time_t expected_time = std::min<time_t>(current_time + (total_data - current_data) / data_per_time, std::numeric_limits<int>::max());
   struct tm current_tm = *std::localtime(&current_time);
   struct tm expected_tm = *std::localtime(&expected_time);
   std::printf(
