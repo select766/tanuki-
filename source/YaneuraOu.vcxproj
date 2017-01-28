@@ -206,6 +206,8 @@
     <ClInclude Include="evaluate.h" />
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
+    <ClInclude Include="experimental_book.h" />
+    <ClInclude Include="experimental_util.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book.h" />
@@ -250,6 +252,8 @@
     <ClCompile Include="eval\evaluate_kppt.cpp" />
     <ClCompile Include="eval\evaluate_material.cpp" />
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
+    <ClCompile Include="experimental_book.cpp" />
+    <ClCompile Include="experimental_util.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book.cpp" />
     <ClCompile Include="extra\entering_king_win.cpp" />

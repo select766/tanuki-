@@ -169,6 +169,12 @@
     <ClInclude Include="extra\move_picker_2016Q3.h">
       <Filter>リソース ファイル\extra</Filter>
     </ClInclude>
+    <ClInclude Include="experimental_book.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="experimental_util.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -305,6 +311,12 @@
     </ClCompile>
     <ClCompile Include="extra\mate_n_ply.cpp">
       <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
+    <ClCompile Include="experimental_book.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="experimental_util.cpp">
+      <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
