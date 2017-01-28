@@ -160,6 +160,10 @@ bool Book::CreateScoredBook() {
     // å„Ç©ÇÁset_this_thread()ÇçsÇ§ÅB
     pos.set_this_thread(&thread);
 
+    if (pos.is_mated()) {
+      continue;
+    }
+
     Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
 
     int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
