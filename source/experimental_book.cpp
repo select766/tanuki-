@@ -124,7 +124,9 @@ bool Book::CreateScoredBook() {
 
   MemoryBook input_book;
   input_book_file = "book/" + input_book_file;
+  sync_cout << "Reading " << input_book_file << sync_endl;
   read_book(input_book_file, input_book);
+  sync_cout << "done..." << sync_endl;
 
   std::vector<std::string> sfens;
   for (const auto& sfen_and_count : input_book.book_body) {
@@ -132,7 +134,7 @@ bool Book::CreateScoredBook() {
   }
 
   time_t start_time = 0;
-  std::ctime(&start_time);
+  std::time(&start_time);
 
   MemoryBook output_book;
   output_book_file = "book/" + output_book_file;
@@ -150,6 +152,7 @@ bool Book::CreateScoredBook() {
     }
 
     int thread_index = omp_get_thread_num();
+    sync_cout << "thread_index=" << thread_index << sync_endl;
     Thread& thread = *Threads[thread_index];
     Position& pos = thread.rootPos;
     pos.set(sfen);
