@@ -69,7 +69,7 @@ generate_kifu
 
 def Learn(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
           kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path, learning_rate,
-          num_actual_positions):
+          num_actual_positions, mini_batch_size):
   print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {num_threads}
@@ -80,7 +80,7 @@ setoption name LearnerNumPositions value {num_positions_to_learn}
 setoption name LearningRate value {learning_rate}
 setoption name KifuForTestDir value {kif_for_test_folder_path}
 setoption name LearnerNumPositionsForTest value 1000000
-setoption name MiniBatchSize value 1000000
+setoption name MiniBatchSize value {mini_batch_size}
 setoption name ReadBatchSize value {num_actual_positions}
 isready
 usinewgame
@@ -93,7 +93,8 @@ learn output_folder_path_base {output_folder_path_base}
   kif_for_test_folder_path=kif_for_test_folder_path,
   output_folder_path_base=output_folder_path_base,
   learning_rate=learning_rate,
-  num_actual_positions=num_actual_positions).encode('utf-8')
+  num_actual_positions=num_actual_positions,
+  mini_batch_size=mini_batch_size).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
@@ -133,155 +134,137 @@ def main():
   parser.add_argument(
     '--learner_output_folder_path_base',
     action='store',
-    dest='learner_output_folder_path_base',
     required=True,
     help='Folder path baseof the output folders. ex) eval')
   parser.add_argument(
     '--kifu_output_folder_path_base',
     action='store',
-    dest='kifu_output_folder_path_base',
     required=True,
     help='Folder path baseof the output kifu. ex) kifu')
   parser.add_argument(
     '--kifu_for_test_output_folder_path_base',
     action='store',
-    dest='kifu_for_test_output_folder_path_base',
     required=True,
     help='Folder path baseof the output kifu for test. ex) kifu for test')
   parser.add_argument(
     '--initial_eval_folder_path',
     action='store',
-    dest='initial_eval_folder_path',
     required=True,
     help='Folder path of the inintial eval files. ex) eval')
   parser.add_argument(
     '--initial_kifu_folder_path',
     action='store',
-    dest='initial_kifu_folder_path',
     required=True,
     help='Folder path of the inintial kifu files. ex) kifu')
   parser.add_argument(
     '--initial_kifu_for_test_folder_path',
     action='store',
-    dest='initial_kifu_for_test_folder_path',
     required=True,
     help='Folder path of the inintial kifu files for test. ex) kifu_for_test')
   parser.add_argument(
     '--initial_new_eval_folder_path_base',
     action='store',
-    dest='initial_new_eval_folder_path_base',
     required=True,
     help='Folder path base of the inintial new eval files. ex) eval')
   parser.add_argument(
     '--initial_state',
     action='store',
-    dest='initial_state',
     required=True,
     help='Initial state. [' + ', '.join([state.name for state in State]) + ']')
   parser.add_argument(
     '--original_eval_folder_path',
     action='store',
-    dest='original_eval_folder_path',
     required=True,
     help='Folder path of the original eval files. ex) eval/apery_wcsc26')
   parser.add_argument(
     '--generate_kifu_exe_file_path',
     action='store',
-    dest='generate_kifu_exe_file_path',
     required=True,
     help='Exe file name of the kifu generator. ex) YaneuraOu.2016-08-05.learn.exe')
   parser.add_argument(
     '--learner_exe_file_path',
     action='store',
-    dest='learner_exe_file_path',
     required=True,
     help='Exe file name of the learner. ex) YaneuraOu.2016-08-05.generate_kifu.exe')
   parser.add_argument(
     '--local_game_server_exe_file_path',
     action='store',
-    dest='local_game_server_exe_file_path',
     required=True,
     help='Exe file name of the local game server. ex) YaneuraOu-local-game-server.exe')
   parser.add_argument(
     '--vs_original_result_file_path',
     action='store',
-    dest='vs_original_result_file_path',
     required=True,
     help='Result file path for VS original eval. ex) vs_original.2016-08-05.csv')
   parser.add_argument(
     '--vs_base_result_file_path',
     action='store',
-    dest='vs_base_result_file_path',
     required=True,
     help='Result file path for VS base eval. ex) vs_base.2016-08-05.csv')
   parser.add_argument(
     '--num_threads_to_generate_kifu',
     action='store',
     type=int,
-    dest='num_threads_to_generate_kifu',
     required=True,
     help='Number of the threads used for learning. ex) 8')
   parser.add_argument(
     '--num_threads_to_learn',
     action='store',
     type=int,
-    dest='num_threads_to_learn',
     required=True,
     help='Number of the threads used for learning. ex) 8')
   parser.add_argument(
     '--num_threads_to_selfplay',
     action='store',
     type=int,
-    dest='num_threads_to_selfplay',
     required=True,
     help='Number of the threads used for selfplay. ex) 8')
   parser.add_argument(
     '--num_games_to_selfplay',
     action='store',
     type=int,
-    dest='num_games_to_selfplay',
     required=True,
     help='Number of the games to play for selfplay. ex) 100')
   parser.add_argument(
     '--num_positions_to_generator_train',
     action='store',
     type=int,
-    dest='num_positions_to_generator_train',
     required=True,
     help='Number of the games to play for generator. ex) 100')
   parser.add_argument(
     '--num_positions_to_generator_test',
     action='store',
     type=int,
-    dest='num_positions_to_generator_test',
     required=True,
     help='Number of the games to play for generator. ex) 100')
   parser.add_argument(
     '--num_positions_to_learn',
     action='store',
     type=int,
-    dest='num_positions_to_learn',
     required=True,
     help='Number of the positions for learning. ex) 10000')
   parser.add_argument(
     '--num_iterations',
     action='store',
     type=int,
-    dest='num_iterations',
     required=True,
     help='Number of the iterations. ex) 100')
   parser.add_argument(
     '--search_depth',
     action='store',
     type=int,
-    dest='search_depth',
     required=True,
     help='Search depth. ex) 8')
   parser.add_argument(
     '--learning_rate',
     action='store',
     type=float,
-    dest='learning_rate',
+    required=True,
+    help='Learning rate. ex) 2.0')
+  parser.add_argument(
+    '--mini_batch_size',
+    action='store',
+    type=int,
     required=True,
     help='Learning rate. ex) 2.0')
   args = parser.parse_args()
@@ -312,6 +295,7 @@ def main():
   num_iterations = args.num_iterations
   search_depth = args.search_depth
   learning_rate = args.learning_rate
+  mini_batch_size = args.mini_batch_size
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
@@ -344,7 +328,7 @@ def main():
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
       Learn(num_threads_to_learn, old_eval_folder_path, kifu_folder_path, num_positions_to_learn,
             kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path,
-            learning_rate, num_positions_to_generator_train)
+            learning_rate, num_positions_to_generator_train, mini_batch_size)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play_with_original
 
