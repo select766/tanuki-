@@ -69,7 +69,7 @@ generate_kifu
 
 def Learn(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
           kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path, learning_rate,
-          num_actual_positions, mini_batch_size):
+          num_actual_positions, mini_batch_size, fobos_l1_parameter, fobos_l2_parameter):
   print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {num_threads}
@@ -82,6 +82,8 @@ setoption name KifuForTestDir value {kif_for_test_folder_path}
 setoption name LearnerNumPositionsForTest value 1000000
 setoption name MiniBatchSize value {mini_batch_size}
 setoption name ReadBatchSize value {num_actual_positions}
+setoption name FobosL1Parameter value {fobos_l1_parameter}
+setoption name FobosL2Parameter value {fobos_l2_parameter}
 isready
 usinewgame
 learn output_folder_path_base {output_folder_path_base}
@@ -94,7 +96,9 @@ learn output_folder_path_base {output_folder_path_base}
   output_folder_path_base=output_folder_path_base,
   learning_rate=learning_rate,
   num_actual_positions=num_actual_positions,
-  mini_batch_size=mini_batch_size).encode('utf-8')
+  mini_batch_size=mini_batch_size,
+  fobos_l1_parameter=fobos_l1_parameter,
+  fobos_l2_parameter=fobos_l2_parameter).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
@@ -267,6 +271,18 @@ def main():
     type=int,
     required=True,
     help='Learning rate. ex) 2.0')
+  parser.add_argument(
+    '--fobos_l1_parameter',
+    action='store',
+    type=float,
+    required=True,
+    help='Learning rate. ex) 0.0')
+  parser.add_argument(
+    '--fobos_l2_parameter',
+    action='store',
+    type=float,
+    required=True,
+    help='Learning rate. ex) 0.99989464503')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -296,6 +312,8 @@ def main():
   search_depth = args.search_depth
   learning_rate = args.learning_rate
   mini_batch_size = args.mini_batch_size
+  fobos_l1_parameter = args.fobos_l1_parameter
+  fobos_l2_parameter = args.fobos_l2_parameter
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
@@ -328,7 +346,8 @@ def main():
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
       Learn(num_threads_to_learn, old_eval_folder_path, kifu_folder_path, num_positions_to_learn,
             kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path,
-            learning_rate, num_positions_to_generator_train, mini_batch_size)
+            learning_rate, num_positions_to_generator_train, mini_batch_size, fobos_l1_parameter,
+            fobos_l2_parameter)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play_with_original
 
