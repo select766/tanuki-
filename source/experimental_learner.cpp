@@ -74,7 +74,8 @@ namespace
     }
 
     template<typename T>
-    void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate, T& eval_weight) {
+    void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
+      double fobos_l1_parameter, double fobos_l2_parameter, T& eval_weight) {
       // Adam
       m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient_lower_dimension;
       v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient_lower_dimension * sum_gradient_lower_dimension;
@@ -83,6 +84,16 @@ namespace
       WeightType vv = v / (1.0 - adam_beta2_t);
       WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
       w -= delta;
+      if (w > fobos_l1_parameter) {
+        w -= fobos_l1_parameter;
+      }
+      else if (w < fobos_l1_parameter) {
+        w -= fobos_l1_parameter;
+      }
+      else {
+        w = 0.0;
+      }
+      w *= fobos_l2_parameter;
 
       // 重みテーブルに書き戻す
       eval_weight = static_cast<T>(std::round(w));
@@ -108,6 +119,8 @@ namespace
   constexpr char* kOptionValueKifuForTestDir = "KifuForTestDir";
   constexpr char* kOptionValueLearnerNumPositionsForTest = "LearnerNumPositionsForTest";
   constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
+  constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
+  constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 
   class Kpp {
   public:
@@ -405,6 +418,11 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   o[kOptionValueKifuForTestDir] << Option("kifu_for_test");
   o[kOptionValueLearnerNumPositionsForTest] << Option("1000000");
   o[kOptionValueMiniBatchSize] << Option("1000000");
+  o[kOptionValueFobosL1Parameter] << Option("0.0");
+  double fobos_l2_parameter = std::pow(0.9, 1.0 / 1000.0);
+  char buffer[1024];
+  sprintf(buffer, "%.20f", fobos_l2_parameter);
+  o[kOptionValueFobosL2Parameter] << Option(fobos_l2_parameter);
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
@@ -535,6 +553,8 @@ void Learner::Learn(std::istringstream& iss) {
   std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
   int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
   int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
+  double fobos_l1_parameter = Options[kOptionValueFobosL1Parameter].cast<double>();
+  double fobos_l2_parameter = Options[kOptionValueFobosL2Parameter].cast<double>();
 
   sync_cout << "learning_rate=" << learning_rate << sync_endl;
   sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -545,6 +565,8 @@ void Learner::Learn(std::istringstream& iss) {
   sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
   sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
   sync_cout << "mini_batch_size=" << mini_batch_size << sync_endl;
+  sync_cout << "fobos_l1_parameter=" << fobos_l1_parameter << sync_endl;
+  sync_cout << "fobos_l2_parameter=" << fobos_l2_parameter << sync_endl;
 
   auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
   std::vector<Record> records_for_test;
@@ -719,16 +741,19 @@ void Learner::Learn(std::istringstream& iss) {
         if (Kpp::IsValid(dimension_index)) {
           Kpp kpp = Kpp::ForIndex(dimension_index);
           weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            fobos_l1_parameter, fobos_l2_parameter,
             Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
         }
         else if (Kkp::IsValid(dimension_index)) {
           Kkp kkp = Kkp::ForIndex(dimension_index);
           weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            fobos_l1_parameter, fobos_l2_parameter,
             Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
         }
         else if (Kk::IsValid(dimension_index)) {
           Kk kk = Kk::ForIndex(dimension_index);
           weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
+            fobos_l1_parameter, fobos_l2_parameter,
             Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
         }
         else {
