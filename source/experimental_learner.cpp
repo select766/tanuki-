@@ -87,8 +87,8 @@ namespace
       if (w > fobos_l1_parameter) {
         w -= fobos_l1_parameter;
       }
-      else if (w < fobos_l1_parameter) {
-        w -= fobos_l1_parameter;
+      else if (w < -fobos_l1_parameter) {
+        w += fobos_l1_parameter;
       }
       else {
         w = 0.0;
@@ -422,7 +422,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   double fobos_l2_parameter = std::pow(0.9, 1.0 / 1000.0);
   char buffer[1024];
   sprintf(buffer, "%.20f", fobos_l2_parameter);
-  o[kOptionValueFobosL2Parameter] << Option(fobos_l2_parameter);
+  o[kOptionValueFobosL2Parameter] << Option(buffer);
 }
 
 void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
