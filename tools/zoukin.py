@@ -104,7 +104,7 @@ learn output_folder_path_base {output_folder_path_base}
   subprocess.run([learner_exe_file_path], input=input, check=True)
 
 
-def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games):
+def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games, num_numa_nodes):
   print(locals(), flush=True)
   args = [
     'C:\\Python27\\python.exe',
@@ -119,7 +119,7 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games)
     'eval2:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
     'cores:{0}'.format(num_threads),
     'loop:{0}'.format(num_games),
-    'cpu:2',
+    'cpu:{0}'.format(num_numa_nodes),
     'engine_threads:1',
     'hash1:256',
     'hash2:256',
@@ -289,6 +289,12 @@ def main():
     type=float,
     required=True,
     help='Learning rate. ex) 0.99989464503')
+  parser.add_argument(
+    '--num_numa_nodes',
+    action='store',
+    type=int,
+    required=True,
+    help='Number of the NUMA nodes. ex) 2')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -321,6 +327,7 @@ def main():
   mini_batch_size = args.mini_batch_size
   fobos_l1_parameter = args.fobos_l1_parameter
   fobos_l2_parameter = args.fobos_l2_parameter
+  num_numa_nodes = args.num_numa_nodes
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
@@ -360,17 +367,17 @@ def main():
 
     elif state == State.self_play_with_original:
       SelfPlay(original_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay)
+               num_games_to_selfplay, num_numa_nodes)
       state = State.self_play_with_ukamuse
 
     elif state == State.self_play_with_ukamuse:
       SelfPlay(ukamuse_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay)
+               num_games_to_selfplay, num_numa_nodes)
       state = State.self_play_with_base
 
     elif state == State.self_play_with_base:
       SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay)
+               num_games_to_selfplay, num_numa_nodes)
       state = State.generate_kifu
       iteration += 1
       old_eval_folder_path = new_eval_folder_path
