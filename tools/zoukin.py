@@ -114,9 +114,9 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games,
     # {home}\exeからの相対パスに変換する
     'engine1:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
     # {home}\evalからの相対パスに変換する
-    'eval1:{0}'.format(os.path.relpath(os.path.abspath(old_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
+    'eval1:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
     'engine2:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
-    'eval2:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
+    'eval2:{0}'.format(os.path.relpath(os.path.abspath(old_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
     'cores:{0}'.format(num_threads),
     'loop:{0}'.format(num_games),
     'cpu:{0}'.format(num_numa_nodes),
