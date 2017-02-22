@@ -56,8 +56,8 @@
 
 // 実行時に読み込むパラメーターファイルの名前
 #define PARAM_FILE "2017-early-param.h"
-//#define PARAM_FILE "param\\2017-early-param-master.h"
-//#define PARAM_FILE "param\\2017-early-param-slave.h"
+//#define PARAM_FILE "2017-early-param-master.h"
+//#define PARAM_FILE "2017-early-param-slave.h"
 #include "2017-early-param.h"
 
 
