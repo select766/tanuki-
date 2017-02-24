@@ -228,6 +228,7 @@
     <ClInclude Include="math.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
+    <ClInclude Include="progress_report.h" />
     <ClInclude Include="search.h" />
     <ClInclude Include="shogi.h" />
     <ClInclude Include="position.h" />
@@ -276,6 +277,7 @@
     <ClCompile Include="math.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
+    <ClCompile Include="progress_report.cpp" />
     <ClCompile Include="shogi.cpp" />
     <ClCompile Include="position.cpp" />
     <ClCompile Include="thread.cpp" />
