@@ -285,7 +285,6 @@ namespace USI
     o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
-    Learner::InitializeGenerator(o);
     Learner::InitializeLearner(o);
     Learner::KifuReader::Initialize(o);
 
@@ -732,20 +731,8 @@ void USI::loop(int argc, char* argv[])
     // "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
     // 我々はこれに関知しないので単に無視すれば良い。
     else if (token == "usinewgame") continue;
-    else if (token == "generate_kifu") {
-      Learner::GenerateKifu();
-      break;
-    }
     else if (token == "learn" || token == "l") {
       Learner::Learn(is);
-      break;
-    }
-    else if (token == "error_measurement" || token == "e") {
-      Learner::MeasureError();
-      break;
-    }
-    else if (token == "kifu_reader_benchmark") {
-      Learner::BenchmarkKifuReader();
       break;
     }
     else

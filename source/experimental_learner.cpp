@@ -10,6 +10,7 @@
 
 #include "kifu_reader.h"
 #include "position.h"
+#include "progress_report.h"
 #include "search.h"
 #include "thread.h"
 
@@ -110,6 +111,7 @@ namespace
   constexpr int kMaxGamePlay = 256;
   constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
   constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
+  constexpr int64_t kShowProgressAtMostSec = 600; // 10分
 
   constexpr char* kOptionValueLearnerNumPositions = "LearnerNumPositions";
   constexpr char* kOptionValueLearnerPvStrapMaxDepth = "LearnerPvStrapMaxDepth";
@@ -425,38 +427,6 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   o[kOptionValueFobosL2Parameter] << Option(buffer);
 }
 
-void Learner::ShowProgress(const time_t& start_time, int64_t current_data, int64_t total_data,
-  int64_t show_per) {
-  if (!current_data || current_data % show_per) {
-    return;
-  }
-  time_t current_time;
-  std::time(&current_time);
-  if (start_time == current_time) {
-    return;
-  }
-
-  time_t elapsed_time = current_time - start_time;
-  int hour = static_cast<int>(elapsed_time / 3600);
-  int minute = elapsed_time / 60 % 60;
-  int second = elapsed_time % 60;
-  double data_per_time = current_data / static_cast<double>(current_time - start_time);
-  time_t expected_time =
-    static_cast<time_t>(current_time + (total_data - current_data) / data_per_time);
-  struct tm current_tm = *std::localtime(&current_time);
-  struct tm expected_tm = *std::localtime(&expected_time);
-  std::printf(
-    "%lld / %lld\n"
-    "        elapsed time = %02d:%02d:%02d\n"
-    "   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
-    "    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
-    current_data, total_data,
-    hour, minute, second,
-    current_tm.tm_year + 1900, current_tm.tm_mon + 1, current_tm.tm_mday, current_tm.tm_hour, current_tm.tm_min, current_tm.tm_sec,
-    expected_tm.tm_year + 1900, expected_tm.tm_mon + 1, expected_tm.tm_mday, expected_tm.tm_hour, expected_tm.tm_min, expected_tm.tm_sec);
-  std::fflush(stdout);
-}
-
 void Learner::Learn(std::istringstream& iss) {
   sync_cout << "Learner::Learn()" << sync_endl;
 
@@ -586,8 +556,10 @@ void Learner::Learn(std::istringstream& iss) {
   std::fprintf(file_loss, ",train_rmse_value,train_rmse_winning_percentage,train_mean_cross_entropy,test_rmse_value,test_rmse_winning_percentage,test_mean_cross_entropy,norm\n");
   std::fflush(file_loss);
 
+  ProgressReport progress_report(max_positions_for_learning, kShowProgressAtMostSec);
+
   for (int64_t num_processed_positions = 0; num_processed_positions < max_positions_for_learning;) {
-    ShowProgress(start, num_processed_positions, max_positions_for_learning, mini_batch_size * 10);
+    progress_report.Show(num_processed_positions);
 
     int num_records = static_cast<int>(std::min(
       max_positions_for_learning - num_processed_positions, mini_batch_size));
@@ -794,109 +766,4 @@ void Learner::Learn(std::istringstream& iss) {
   }
 
   sync_cout << "Finished..." << sync_endl;
-}
-
-void Learner::MeasureError() {
-  sync_cout << "Learner::MeasureError()" << sync_endl;
-
-  Eval::eval_learn_init();
-
-  omp_set_num_threads((int)Options["Threads"]);
-
-  ASSERT_LV3(
-    Kk::MaxIndex() ==
-    static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
-    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
-
-  std::srand(static_cast<unsigned int>(std::time(nullptr)));
-
-  auto kifu_reader = std::make_unique<KifuReader>((std::string)Options["KifuDir"], false);
-  int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
-  int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();;
-
-  Eval::load_eval();
-
-  Search::LimitsType limits;
-  limits.max_game_ply = kMaxGamePlay;
-  limits.depth = 1;
-  limits.silent = true;
-  Search::Limits = limits;
-
-  // 作成・破棄のコストが高いためループの外に宣言する
-  std::vector<Record> records;
-
-  time_t start;
-  std::time(&start);
-  double sum_squared_error_of_value = 0.0;
-  double sum_norm = 0.0;
-  double sum_squared_error_of_winning_percentage = 0.0;
-  double sum_cross_entropy = 0.0;
-  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForErrorMeasurement;) {
-    ShowProgress(start, num_processed_positions, kMaxPositionsForErrorMeasurement, mini_batch_size);
-
-    int num_records = static_cast<int>(std::min(
-      kMaxPositionsForErrorMeasurement - num_processed_positions, mini_batch_size));
-    if (!kifu_reader->Read(num_records, records)) {
-      break;
-    }
-
-    // ミニバッチ
-#pragma omp parallel for reduction(+:sum_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_squared_error_of_winning_percentage) reduction(+:sum_cross_entropy) schedule(guided)
-    for (int record_index = 0; record_index < num_records; ++record_index) {
-      auto f = [&sum_squared_error_of_value, &sum_squared_error_of_winning_percentage,
-        &sum_cross_entropy, &sum_norm](Value record_value, Value value, Color root_color,
-          Position& pos) {
-        double diff_value = record_value - value;
-        sum_squared_error_of_value += diff_value * diff_value;
-        double p = winning_percentage(record_value);
-        double q = winning_percentage(value);
-        double diff_winning_percentage = p - q;
-        sum_squared_error_of_winning_percentage += diff_winning_percentage * diff_winning_percentage;
-        sum_cross_entropy += (-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
-        sum_norm += abs(value);
-      };
-      Strap(records[record_index], pv_strap_max_depth, f);
-    }
-
-    num_processed_positions += num_records;
-  }
-
-  std::printf(
-    "info string rmse_value=%f rmse_winning_percentage=%f mean_cross_entropy=%f norm=%f\n",
-    std::sqrt(sum_squared_error_of_value / kMaxPositionsForErrorMeasurement),
-    std::sqrt(sum_squared_error_of_winning_percentage / kMaxPositionsForErrorMeasurement),
-    sum_cross_entropy / kMaxPositionsForErrorMeasurement,
-    sum_norm / kMaxPositionsForErrorMeasurement);
-  std::fflush(stdout);
-}
-
-void Learner::BenchmarkKifuReader() {
-  sync_cout << "Learner::BenchmarkKifuReader()" << sync_endl;
-
-  Eval::eval_learn_init();
-
-  omp_set_num_threads((int)Options["Threads"]);
-  int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
-
-  time_t start;
-  std::time(&start);
-
-  sync_cout << "Initializing kifu reader..." << sync_endl;
-  std::unique_ptr<Learner::KifuReader> kifu_reader =
-    std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
-
-  sync_cout << "Reading kifu..." << sync_endl;
-  std::vector<Record> records;
-  for (int64_t num_processed_positions = 0; num_processed_positions < kMaxPositionsForBenchmark;) {
-    ShowProgress(start, num_processed_positions, kMaxPositionsForBenchmark, 100'0000LL);
-
-    int num_records = static_cast<int>(std::min(
-      kMaxPositionsForBenchmark - num_processed_positions, mini_batch_size));
-    if (!kifu_reader->Read(num_records, records)) {
-      break;
-    }
-
-    num_processed_positions += num_records;
-  }
 }
