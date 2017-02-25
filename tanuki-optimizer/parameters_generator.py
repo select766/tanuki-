@@ -21,7 +21,13 @@ def main():
         sigma = (float(max_value) - float(min_value)) / 6.0
       else:
         sigma = 1e-8
-      print("  hp.qnormal('{0}', {1}, {2}, 1),".format(name, default_value, sigma))
+      #print("  hp.qnormal('{0}', {1}, {2}, 1),".format(name, default_value, sigma))
+      #print('  {name},'.format(name=name))
+      print("    f.write('PARAM_DEFINE {name} = {{{name}}};\\n'.format({name}=int(round(scipy.stats.norm.ppf({name}, loc={default_value}, scale={sigma})))))".format(name=name, default_value=default_value, sigma=sigma))
+      #print("  STATE['{name}'].append({name})".format(name=name))
+      #print("  '{name}': [0.0, 1.0],".format(name=name))
+      #print("  print('{name:50s}= {{{name}}}'.format({name}={name}))".format(name=name))
+
 
 if __name__ == '__main__':
     main()

@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>2944d269-829b-4b9d-ab0e-f90a50204a21</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>analyze_optimizer_log.py</StartupFile>
+    <StartupFile>parameters_generator.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
