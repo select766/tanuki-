@@ -747,15 +747,6 @@ void Learner::Learn(std::istringstream& iss) {
 
     num_processed_positions += num_records;
 
-    // 評価関数ファイルの書き出し
-    if (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
-      save_eval(output_folder_path_base, num_processed_positions);
-      while (write_eval_per_positions[write_eval_per_positions_index] <= num_processed_positions) {
-        ++write_eval_per_positions_index;
-        ASSERT_LV3(write_eval_per_positions_index < static_cast<int>(write_eval_per_positions.size()));
-      }
-    }
-
     // 学習率の減衰
     if (num_processed_positions >= next_positionsto_decay_learning_rate) {
       learning_rate *= learning_rate_decay_rate;
@@ -764,6 +755,9 @@ void Learner::Learn(std::istringstream& iss) {
       std::fflush(stdout);
     }
   }
+
+  // 評価関数ファイルの書き出し
+  save_eval(output_folder_path_base, max_positions_for_learning);
 
   sync_cout << "Finished..." << sync_endl;
 }
