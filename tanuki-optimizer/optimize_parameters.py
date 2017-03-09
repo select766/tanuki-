@@ -36,43 +36,40 @@ import argparse
 import cPickle as pickle
 from hyperopt_state import HyperoptState
 
-space = [
-  hp.qnormal('PARAM_FUTILITY_MARGIN_ALPHA_OPENING', 150, 23.3333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_MARGIN_BETA_OPENING', 200, 23.3333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_MARGIN_QUIET_OPENING', 128, 18.3333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_RETURN_DEPTH_OPENING', 7, 1.33333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING', 7, 1.33333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING', 256, 33.3333333333, 1),
-  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING', 200, 50.0, 1),
-  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING', 35, 5.0, 1),
-  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING', 35, 6.66666666667, 1),
-  hp.qnormal('PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING', 823, 166.666666667, 1),
-  hp.qnormal('PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING', 67, 8.33333333333, 1),
-  hp.qnormal('PARAM_NULL_MOVE_MARGIN_OPENING', 35, 8.33333333333, 1),
-  hp.qnormal('PARAM_NULL_MOVE_RETURN_DEPTH_OPENING', 12, 1.83333333333, 1),
-  hp.qnormal('PARAM_PROBCUT_DEPTH_OPENING', 5, 1.16666666667, 1),
-  hp.qnormal('PARAM_PROBCUT_MARGIN_OPENING', 200, 33.3333333333, 1),
-  hp.qnormal('PARAM_SINGULAR_EXTENSION_DEPTH_OPENING', 8, 1.5, 1),
-  hp.qnormal('PARAM_SINGULAR_MARGIN_OPENING', 256, 45.3333333333, 1),
-  hp.qnormal('PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING', 16, 4.0, 1),
-  hp.qnormal('PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING', 16, 4.0, 1),
-  hp.qnormal('PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING', 3, 5.0, 1),
-  hp.qnormal('PARAM_REDUCTION_BY_HISTORY_OPENING', 8000, 1833.33333333, 1),
-  hp.qnormal('PARAM_IID_MARGIN_ALPHA_OPENING', 256, 42.6666666667, 1),
-  hp.qnormal('PARAM_RAZORING_MARGIN1_OPENING', 483, 50.0, 1),
-  hp.qnormal('PARAM_RAZORING_MARGIN2_OPENING', 570, 50.0, 1),
-  hp.qnormal('PARAM_RAZORING_MARGIN3_OPENING', 603, 50.0, 1),
-  hp.qnormal('PARAM_RAZORING_MARGIN4_OPENING', 554, 50.0, 1),
-  hp.qnormal('PARAM_REDUCTION_ALPHA_OPENING', 128, 32.0, 1),
-  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING', 240, 41.6666666667, 1),
-  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING', 290, 41.6666666667, 1),
-  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING', 773, 250.0, 1),
-  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING', 1045, 250.0, 1),
-  hp.qnormal('PARAM_QUIET_SEARCH_COUNT_OPENING', 64, 16.0, 1),
-  ]
+space = [hp.qnormal('PARAM_FUTILITY_MARGIN_ALPHA_OPENING', 150, 5.0, 1),
+  hp.qnormal('PARAM_FUTILITY_MARGIN_BETA_OPENING', 200, 6.66666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_MARGIN_QUIET_OPENING', 128, 4.26666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_RETURN_DEPTH_OPENING', 7, 0.233333333333, 1),
+  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING', 7, 0.233333333333, 1),
+  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING', 256, 8.53333333333, 1),
+  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING', 200, 6.66666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING', 35, 1.16666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING', 35, 1.16666666667, 1),
+  hp.qnormal('PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING', 823, 27.4333333333, 1),
+  hp.qnormal('PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING', 67, 2.23333333333, 1),
+  hp.qnormal('PARAM_NULL_MOVE_MARGIN_OPENING', 35, 1.16666666667, 1),
+  hp.qnormal('PARAM_NULL_MOVE_RETURN_DEPTH_OPENING', 12, 0.4, 1),
+  hp.qnormal('PARAM_PROBCUT_DEPTH_OPENING', 5, 0.166666666667, 1),
+  hp.qnormal('PARAM_PROBCUT_MARGIN_OPENING', 200, 6.66666666667, 1),
+  hp.qnormal('PARAM_SINGULAR_EXTENSION_DEPTH_OPENING', 8, 0.266666666667, 1),
+  hp.qnormal('PARAM_SINGULAR_MARGIN_OPENING', 256, 8.53333333333, 1),
+  hp.qnormal('PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING', 16, 0.533333333333, 1),
+  hp.qnormal('PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING', 16, 0.533333333333, 1),
+  hp.qnormal('PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING', 3, 0.1, 1),
+  hp.qnormal('PARAM_REDUCTION_BY_HISTORY_OPENING', 8000, 266.666666667, 1),
+  hp.qnormal('PARAM_IID_MARGIN_ALPHA_OPENING', 256, 8.53333333333, 1),
+  hp.qnormal('PARAM_RAZORING_MARGIN1_OPENING', 483, 16.1, 1),
+  hp.qnormal('PARAM_RAZORING_MARGIN2_OPENING', 570, 19.0, 1),
+  hp.qnormal('PARAM_RAZORING_MARGIN3_OPENING', 603, 20.1, 1),
+  hp.qnormal('PARAM_RAZORING_MARGIN4_OPENING', 554, 18.4666666667, 1),
+  hp.qnormal('PARAM_REDUCTION_ALPHA_OPENING', 128, 4.26666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING', 240, 8.0, 1),
+  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING', 290, 9.66666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING', 773, 25.7666666667, 1),
+  hp.qnormal('PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING', 1045, 34.8333333333, 1),
+  hp.qnormal('PARAM_QUIET_SEARCH_COUNT_OPENING', 64, 2.13333333333, 1),]
 
-build_argument_names = [
-  'PARAM_FUTILITY_MARGIN_ALPHA_OPENING',
+build_argument_names = ['PARAM_FUTILITY_MARGIN_ALPHA_OPENING',
   'PARAM_FUTILITY_MARGIN_BETA_OPENING',
   'PARAM_FUTILITY_MARGIN_QUIET_OPENING',
   'PARAM_FUTILITY_RETURN_DEPTH_OPENING',
@@ -103,8 +100,7 @@ build_argument_names = [
   'PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING',
   'PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING',
   'PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING',
-  'PARAM_QUIET_SEARCH_COUNT_OPENING',
-  ]
+  'PARAM_QUIET_SEARCH_COUNT_OPENING',]
 
 START_COUNTER = 0
 CURRENT_COUNTER = 0
@@ -205,7 +201,7 @@ def function(args):
     current_time_sec = time.time()
     delta = current_time_sec - START_TIME_SEC
     sec_per_one = delta / (CURRENT_COUNTER - START_COUNTER)
-    remaining = datetime.timedelta(seconds=sec_per_one*(MAX_EVALS-CURRENT_COUNTER))
+    remaining = datetime.timedelta(seconds=sec_per_one * (MAX_EVALS - CURRENT_COUNTER))
     print(CURRENT_COUNTER, '/', MAX_EVALS, str(remaining))
     sys.stdout.flush()
   CURRENT_COUNTER += 1
@@ -213,8 +209,7 @@ def function(args):
   builder.clean()
   builder.build(args)
 
-  engine_invoker_args = [
-    'C:\\Python27\\python.exe',
+  engine_invoker_args = ['C:\\Python27\\python.exe',
     '..\script\engine_invoker5.py',
     # hakubishin-private\exe以下から実行していると仮定する
     'home:{0}'.format(os.getcwd()),
@@ -231,8 +226,7 @@ def function(args):
     'hash1:{0}'.format(HASH),
     'hash2:{0}'.format(HASH),
     'time:b{0}'.format(THINKING_TIME_MS),
-    'rand_book:1'
-    ]
+    'rand_book:1']
   print(engine_invoker_args)
   sys.stdout.flush()
 
@@ -275,20 +269,18 @@ def function(args):
   builder.kill(ENGINE2)
 
   global state
-  state.record_iteration(
-      args=args,
+  state.record_iteration(args=args,
       output=stdoutdata,
       lose=lose,
       draw=draw,
-      win=win,
-      )
+      win=win,)
   if commandline_args.store_interval > 0 and state.get_n_accumulated_iterations() % commandline_args.store_interval == 0:
     state.save(state_store_path)
 
   return -ratio
 
 # arguments
-if __name__=='__main__':
+if __name__ == '__main__':
   parser = argparse.ArgumentParser('optimize_parameters.py')
   parser.add_argument('--store-interval', type=int, default=1,
       help=u'store internal state of hyper-parameter search after every <store_interval> iterations. set 0 to disable storing.')
