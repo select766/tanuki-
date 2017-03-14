@@ -301,6 +301,12 @@ def main():
     type=int,
     required=True,
     help='Number of the divisions to generate train data. ex) 10')
+  parser.add_argument(
+    '--initial_division_to_generator_train',
+    action='store',
+    type=int,
+    default=0,
+    help='Initial division to generate train data. ex) 2')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -335,6 +341,7 @@ def main():
   fobos_l2_parameter = args.fobos_l2_parameter
   num_numa_nodes = args.num_numa_nodes
   num_divisions_to_generator_train = args.num_divisions_to_generator_train
+  initial_division_to_generator_train = args.initial_division_to_generator_train
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
@@ -350,7 +357,7 @@ def main():
 
     if state == State.generate_kifu:
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
-      for division in range(num_divisions_to_generator_train):
+      for division in range(initial_division_to_generator_train, num_divisions_to_generator_train):
           GenerateKifu(old_eval_folder_path, kifu_folder_path, num_threads_to_generate_kifu,
                        num_positions_to_generator_train / num_divisions_to_generator_train,
                        search_depth, 'train.{0}'.format(division), generate_kifu_exe_file_path)
