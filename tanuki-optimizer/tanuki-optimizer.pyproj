@@ -8,13 +8,14 @@
     <StartupFile>parameters_generator.py</StartupFile>
     <SearchPath>
     </SearchPath>
-    <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
+    <WorkingDirectory>D:\data\git\hakubishin-private\exe</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>tanuki-optimizer</Name>
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>param\parameters.csv optimize_parameters.hyperopt_state.20170301_202449.pickle</CommandLineArguments>
+    <CommandLineArguments>
+    </CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterId>{9a7a9026-48c1-4688-9d5d-e5699d47d074}</InterpreterId>
     <InterpreterVersion>2.7</InterpreterVersion>
