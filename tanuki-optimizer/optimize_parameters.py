@@ -115,6 +115,7 @@ NUM_THREADS = 24
 THINKING_TIME_MS = 10000
 NUM_NUMA_NODES = 1
 HASH = 256
+HISTOGRAM_WIDTH = 80
 
 
 class YaneuraouBuilder(object):
@@ -278,6 +279,18 @@ def function(args):
       win=win,)
   if commandline_args.store_interval > 0 and state.get_n_accumulated_iterations() % commandline_args.store_interval == 0:
     state.save(state_store_path)
+
+  # Show the histogram.
+  hist = [0] * (NUM_THREADS + 1)
+  max_win = 0
+  for record in state.iteration_logs:
+    win = int(record['win'])
+    hist[win] += 1
+    max_win = max(max_win, hist[win])
+
+  for win, count in enumerate(hist):
+    print('{0:4d} '.format(win) + '*' * (count * HISTOGRAM_WIDTH / max_win))
+  sys.stdout.flush()
 
   return -ratio
 
