@@ -410,10 +410,6 @@ def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,b
 
 					states[i] = "start"
 					if states[i^1] == "start":
-						global rand_book
-						if rand_book:
-							sfen_no = random.randint(0, len(book_sfens) - 1)
-							print(sfen_no)
 						usinewgame_cmd(i  ,sfen_no)
 						usinewgame_cmd(i^1,sfen_no)
 						sfen_no = (sfen_no + 1) % len(book_sfens)
