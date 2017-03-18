@@ -271,7 +271,9 @@ def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,b
 		log_file = open("script_log"+now.strftime("%Y%m%d%H%M%S")+".txt","w")
 
 	if KifOutput:
-		kif_file = open(now.strftime("%Y%m%d%H%M%S") + opt2.replace(",","_") + ".sfen","w")
+		if not os.path.isdir('log'):
+			os.mkdir('log')
+		kif_file = open('log/' + now.strftime("%Y%m%d%H%M%S") + opt2.replace(",","_") + ".sfen","w")
 
 	def send_cmd(i,s):
 		p = procs[i]
