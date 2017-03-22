@@ -284,41 +284,42 @@ namespace TanukiColiseum
                         TimeMs = int.Parse(args[++i]);
                         break;
                     default:
-                        throw new Exception("Unexpected option: " + args[i]);
+                        Environment.FailFast("Unexpected option: " + args[i]);
+                        break;
                 }
             }
 
             if (engine1FilePath == null)
             {
-                throw new Exception("--engine1 is not specified.");
+                Environment.FailFast("--engine1 is not specified.");
             }
             else if (engine2FilePath == null)
             {
-                throw new Exception("--engine2 is not specified.");
+                Environment.FailFast("--engine2 is not specified.");
             }
             else if (eval1FolderPath == null)
             {
-                throw new Exception("--eval1 is not specified.");
+                Environment.FailFast("--eval1 is not specified.");
             }
             else if (eval2FolderPath == null)
             {
-                throw new Exception("--eval2 is not specified.");
+                Environment.FailFast("--eval2 is not specified.");
             }
             else if (numConcurrentGames == 0)
             {
-                throw new Exception("--num_concurrent_games is not specified.");
+                Environment.FailFast("--num_concurrent_games is not specified.");
             }
             else if (numGames == 0)
             {
-                throw new Exception("--num_games is not specified.");
+                Environment.FailFast("--num_games is not specified.");
             }
             else if (hashMb == 0)
             {
-                throw new Exception("--hash is not specified.");
+                Environment.FailFast("--hash is not specified.");
             }
             else if (TimeMs == 0)
             {
-                throw new Exception("--time is not specified.");
+                Environment.FailFast("--time is not specified.");
             }
 
             // 定跡ファイルの読み込み
