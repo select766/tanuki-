@@ -1,106 +1,106 @@
 #ifndef _2017_EARLY_PARAMETERS_
 #define _2017_EARLY_PARAMETERS_
-// Created at: 2017-03-16 13:53:15
-// Log: optimize_parameters.hyperopt_state.20170315_182342.b100.pickle
+// Created at: 2017-03-22 09:39:59
+// Log: optimize_parameters.hyperopt_state.20170317_194746.b10000.pickle
 // Parameters CSV: param\parameters.opening.csv
 // n_iterations_to_use = 1000
 // minima_method = Data
 
-// |--@---+-----------| raw=118.999999999, min=100, max=240 default=150
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA_OPENING = 119;
+// |------+--@--------| raw=181.999999991, min=100, max=240 default=150
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA_OPENING = 182;
 
-// |-----------@+-----| raw=190.999999995, min=100, max=240 default=200
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA_OPENING = 191;
+// |------------+--@--| raw=228.999999991, min=100, max=240 default=200
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA_OPENING = 229;
 
-// |------------+---@-| raw=153.999999991, min=50, max=160 default=128
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET_OPENING = 154;
+// |------------+-@---| raw=145.999999992, min=50, max=160 default=128
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET_OPENING = 146;
 
-// |----@-------------| raw=6.999999995, min=5, max=13 default=7
-PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH_OPENING = 7;
+// |----+-@-----------| raw=7.9999999925, min=5, max=13 default=7
+PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH_OPENING = 8;
 
-// |----@-------------| raw=6.999999995, min=5, max=13 default=7
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING = 7;
+// |--@-+-------------| raw=5.9999999975, min=5, max=13 default=7
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING = 6;
 
-// |--------@----+----| raw=201.999999999, min=100, max=300 default=256
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING = 202;
+// |---------@---+----| raw=212.999999998, min=100, max=300 default=256
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING = 213;
 
-// |-----------@------| raw=209.999999994, min=0, max=300 default=200
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING = 210;
+// |-----------+@-----| raw=225.999999992, min=0, max=300 default=200
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING = 226;
 
-// |--------+-@-------| raw=37.9999999933, min=20, max=50 default=35
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING = 38;
+// |--------+@--------| raw=35.9999999944, min=20, max=50 default=35
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING = 36;
 
-// |------+---@-------| raw=43.99999999, min=20, max=60 default=35
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING = 44;
+// |------@-----------| raw=35.9999999944, min=20, max=60 default=35
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING = 36;
 
-// |-----+-@----------| raw=942.999999992, min=500, max=1500 default=823
-PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING = 943;
+// |----@+------------| raw=741.999999997, min=500, max=1500 default=823
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING = 742;
 
-// |@----+------------| raw=50.0, min=50, max=100 default=67
-PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING = 50;
+// |-----+---@--------| raw=76.9999999921, min=50, max=100 default=67
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING = 77;
 
-// |-------@+---------| raw=32.9999999961, min=10, max=60 default=35
-PARAM_DEFINE PARAM_NULL_MOVE_MARGIN_OPENING = 33;
+// |--------+@--------| raw=36.9999999939, min=10, max=60 default=35
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN_OPENING = 37;
 
-// |---------@--+-----| raw=9.99999999833, min=4, max=15 default=12
-PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH_OPENING = 10;
+// |------------+--@--| raw=13.9999999917, min=4, max=15 default=12
+PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH_OPENING = 14;
 
-// |----+--@----------| raw=5.9999999925, min=3, max=10 default=5
-PARAM_DEFINE PARAM_PROBCUT_DEPTH_OPENING = 6;
+// |----@-------------| raw=4.999999995, min=3, max=10 default=5
+PARAM_DEFINE PARAM_PROBCUT_DEPTH_OPENING = 5;
 
-// |----@---+---------| raw=153.0, min=100, max=300 default=200
-PARAM_DEFINE PARAM_PROBCUT_MARGIN_OPENING = 153;
+// |------@-+---------| raw=181.999999997, min=100, max=300 default=200
+PARAM_DEFINE PARAM_PROBCUT_MARGIN_OPENING = 182;
 
-// |-------@----------| raw=7.999999995, min=4, max=13 default=8
-PARAM_DEFINE PARAM_SINGULAR_EXTENSION_DEPTH_OPENING = 8;
+// |---@---+----------| raw=6.0, min=4, max=13 default=8
+PARAM_DEFINE PARAM_SINGULAR_EXTENSION_DEPTH_OPENING = 6;
 
-// |-------@+---------| raw=254.999999995, min=128, max=400 default=256
-PARAM_DEFINE PARAM_SINGULAR_MARGIN_OPENING = 255;
-
-// |----@+------------| raw=14.9999999963, min=8, max=32 default=16
-PARAM_DEFINE PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING = 15;
+// |----@---+---------| raw=198.0, min=128, max=400 default=256
+PARAM_DEFINE PARAM_SINGULAR_MARGIN_OPENING = 198;
 
 // |--@--+------------| raw=12.0, min=8, max=32 default=16
-PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING = 12;
+PARAM_DEFINE PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING = 12;
 
-// |@-----------------| raw=2.0, min=2, max=32 default=3
-PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING = 2;
+// |---@-+------------| raw=12.9999999987, min=8, max=32 default=16
+PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING = 13;
 
-// |------@-----------| raw=8430.99999999, min=4000, max=15000 default=8000
-PARAM_DEFINE PARAM_REDUCTION_BY_HISTORY_OPENING = 8431;
+// |@-----------------| raw=2.999999995, min=2, max=32 default=3
+PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING = 3;
 
-// |-----@--+---------| raw=208.999999999, min=128, max=384 default=256
-PARAM_DEFINE PARAM_IID_MARGIN_ALPHA_OPENING = 209;
+// |------@-----------| raw=8070.99999999, min=4000, max=15000 default=8000
+PARAM_DEFINE PARAM_REDUCTION_BY_HISTORY_OPENING = 8071;
 
-// |----+----@--------| raw=561.999999992, min=400, max=700 default=483
-PARAM_DEFINE PARAM_RAZORING_MARGIN1_OPENING = 562;
+// |------@-+---------| raw=223.999999997, min=128, max=384 default=256
+PARAM_DEFINE PARAM_IID_MARGIN_ALPHA_OPENING = 224;
 
-// |----@----+--------| raw=478.999999998, min=400, max=700 default=570
-PARAM_DEFINE PARAM_RAZORING_MARGIN2_OPENING = 479;
+// |---@+-------------| raw=469.999999997, min=400, max=700 default=483
+PARAM_DEFINE PARAM_RAZORING_MARGIN1_OPENING = 470;
 
-// |---------@-+------| raw=572.999999995, min=400, max=700 default=603
-PARAM_DEFINE PARAM_RAZORING_MARGIN3_OPENING = 573;
+// |---------+------@-| raw=688.99999999, min=400, max=700 default=570
+PARAM_DEFINE PARAM_RAZORING_MARGIN2_OPENING = 689;
 
-// |---@----+---------| raw=465.999999998, min=400, max=700 default=554
-PARAM_DEFINE PARAM_RAZORING_MARGIN4_OPENING = 466;
+// |-----------+--@---| raw=662.999999991, min=400, max=700 default=603
+PARAM_DEFINE PARAM_RAZORING_MARGIN3_OPENING = 663;
 
-// |-----+-@----------| raw=144.999999992, min=64, max=256 default=128
-PARAM_DEFINE PARAM_REDUCTION_ALPHA_OPENING = 145;
+// |----@---+---------| raw=481.999999998, min=400, max=700 default=554
+PARAM_DEFINE PARAM_RAZORING_MARGIN4_OPENING = 482;
 
-// |------+@----------| raw=261.999999993, min=150, max=400 default=240
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING = 262;
+// |-----+@-----------| raw=138.999999993, min=64, max=256 default=128
+PARAM_DEFINE PARAM_REDUCTION_ALPHA_OPENING = 139;
 
-// |---------+-@------| raw=311.999999993, min=150, max=400 default=290
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING = 312;
+// |------+-@---------| raw=271.999999992, min=150, max=400 default=240
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING = 272;
 
-// |---@--------------| raw=787.999999995, min=500, max=2000 default=773
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING = 788;
+// |---------+@-------| raw=304.999999994, min=150, max=400 default=290
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING = 305;
 
-// |------+@----------| raw=1203.99999999, min=500, max=2000 default=1045
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING = 1204;
+// |--@+--------------| raw=763.999999995, min=500, max=2000 default=773
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING = 764;
 
-// |----@+------------| raw=58.9999999966, min=32, max=128 default=64
-PARAM_DEFINE PARAM_QUIET_SEARCH_COUNT_OPENING = 59;
+// |------@-----------| raw=1076.99999999, min=500, max=2000 default=1045
+PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING = 1077;
+
+// |--@--+------------| raw=48.0, min=32, max=128 default=64
+PARAM_DEFINE PARAM_QUIET_SEARCH_COUNT_OPENING = 48;
 
 PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA_ENDING = 150;
 PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA_ENDING = 200;
