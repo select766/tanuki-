@@ -241,6 +241,9 @@ namespace TanukiColiseum
         public int[] Engine12Win { get; } = { 0, 0 };
         public int Draw = 0;
         public int[] BlackWhiteWin { get; } = { 0, 0 };
+        private DateTime LastOutput = DateTime.Now;
+        private const double OutputResultsPerMin = 1.0;
+        private int TimeMs = 0;
 
         public void Run(string[] args)
         {
@@ -251,7 +254,6 @@ namespace TanukiColiseum
             int numConcurrentGames = 0;
             int numGames = 0;
             int hashMb = 0;
-            int timeMs = 0;
 
             for (int i = 0; i < args.Length; ++i)
             {
@@ -279,7 +281,7 @@ namespace TanukiColiseum
                         hashMb = int.Parse(args[++i]);
                         break;
                     case "--time":
-                        timeMs = int.Parse(args[++i]);
+                        TimeMs = int.Parse(args[++i]);
                         break;
                     default:
                         throw new Exception("Unexpected option: " + args[i]);
@@ -314,13 +316,16 @@ namespace TanukiColiseum
             {
                 throw new Exception("--hash is not specified.");
             }
-            else if (timeMs == 0)
+            else if (TimeMs == 0)
             {
                 throw new Exception("--time is not specified.");
             }
 
             // 定跡ファイルの読み込み
             string[] book = File.ReadAllLines(BookFilePath);
+
+            Console.WriteLine("Initializing engines...");
+            Console.Out.Flush();
 
             for (int gameIndex = 0; gameIndex < numConcurrentGames; ++gameIndex)
             {
@@ -356,8 +361,12 @@ namespace TanukiColiseum
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手
-                Games.Add(new Game(gameIndex & 1, timeMs, engine1, engine2));
+                Games.Add(new Game(gameIndex & 1, TimeMs, engine1, engine2));
             }
+
+            Console.WriteLine("Initialized engines...");
+            Console.WriteLine("Started games...");
+            Console.Out.Flush();
 
             // numConcurrentGames局同時に対局できるようにする
             GameSemaphoreSlim = new SemaphoreSlim(numConcurrentGames, numConcurrentGames);
@@ -385,14 +394,34 @@ namespace TanukiColiseum
                 }
             }
 
-            Console.WriteLine("win={0} draw={1} lose={2} black={3} white={4}", Engine12Win[0], Draw, Engine12Win[1], BlackWhiteWin[0], BlackWhiteWin[1]);
+            OutputResult();
         }
 
         public void OnGameFinished()
         {
-            Console.WriteLine("win={0} draw={1} lose={2} black={3} white={4}", Engine12Win[0], Draw, Engine12Win[1], BlackWhiteWin[0], BlackWhiteWin[1]);
+            if (LastOutput.AddMinutes(OutputResultsPerMin) < DateTime.Now)
+            {
+                OutputResult();
+                LastOutput = DateTime.Now;
+            }
             GameSemaphoreSlim.Release();
             FinishSemaphoreSlim.Release();
+        }
+
+        private void OutputResult()
+        {
+            // T1,b10000,433 - 54 - 503(46.26% R-26.03) win black : white = 52.42% : 47.58%
+            double winRate = Engine12Win[0] / (double)(Engine12Win[0] + Engine12Win[1]);
+            double rating = 0.0;
+            if (1e-8 < winRate && winRate < 1.0 - 1e-8)
+            {
+                rating = -400.0 * Math.Log10((1.0 - winRate) / winRate);
+            }
+            double black = BlackWhiteWin[0] / (double)(BlackWhiteWin[0] + BlackWhiteWin[1]);
+            double white = BlackWhiteWin[1] / (double)(BlackWhiteWin[0] + BlackWhiteWin[1]);
+            Console.WriteLine("T1,b{0},{1} - {2} - {3}({4:0.00%} R{5:0.00}) win black: white = {6:0.00%} : {7:0.00%}",
+                TimeMs, Engine12Win[0], Draw, Engine12Win[1], winRate, rating, black, white);
+            Console.Out.Flush();
         }
 
         static void Main(string[] args)
