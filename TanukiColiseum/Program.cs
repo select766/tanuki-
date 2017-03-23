@@ -395,6 +395,8 @@ namespace TanukiColiseum
                 }
             }
 
+            Console.WriteLine("engine1={0} eval1={1}", engine1FilePath, eval1FolderPath);
+            Console.WriteLine("engine2={0} eval2={1}", engine2FilePath, eval2FolderPath);
             OutputResult();
         }
 
