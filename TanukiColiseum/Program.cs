@@ -340,10 +340,10 @@ namespace TanukiColiseum
                 options1.Add("setoption name NetworkDelay value 0");
                 options1.Add("setoption name NetworkDelay2 value 0");
                 options1.Add("setoption name EvalShare value true");
-                Debug.WriteLine("Starting the engine process " + (gameIndex * 2));
+                Console.WriteLine("Starting the engine process " + (gameIndex * 2));
+                Console.Out.Flush();
                 var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0);
                 engine1.StartAsync().Wait();
-                Debug.WriteLine("Started the engine process " + (gameIndex * 2));
 
                 // エンジン2初期化
                 var options2 = new List<string>();
@@ -355,10 +355,10 @@ namespace TanukiColiseum
                 options2.Add("setoption name NetworkDelay value 0");
                 options2.Add("setoption name NetworkDelay2 value 0");
                 options2.Add("setoption name EvalShare value true");
-                Debug.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
-                var engine2 = new Engine(engine1FilePath, options1, this, gameIndex * 2 + 1, gameIndex, 1);
+                Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
+                Console.Out.Flush();
+                var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1);
                 engine2.StartAsync().Wait();
-                Debug.WriteLine("Started the engine process " + (gameIndex * 2 + 1));
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手

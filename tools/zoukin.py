@@ -108,8 +108,8 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games,
   print(locals(), flush=True)
   args = [
     'TanukiColiseum.exe',
-    '--engine1', 'YaneuraOu-2017-early-master.exe',
-    '--engine2', 'YaneuraOu-2017-early-slave.exe',
+    '--engine1', 'YaneuraOu-2017-early.exe',
+    '--engine2', 'YaneuraOu-2017-early.exe',
     '--eval1', new_eval_folder_path,
     '--eval2', old_eval_folder_path,
     '--num_concurrent_games', str(num_threads),
