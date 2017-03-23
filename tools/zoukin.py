@@ -107,24 +107,15 @@ learn output_folder_path_base {output_folder_path_base}
 def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games, num_numa_nodes):
   print(locals(), flush=True)
   args = [
-    'C:\\Python27\\python.exe',
-    '..\script\engine_invoker5.py',
-    # hakubishin-private\exe以下から実行していると仮定する
-    'home:{0}'.format(os.getcwd()),
-    # {home}\exeからの相対パスに変換する
-    'engine1:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
-    # {home}\evalからの相対パスに変換する
-    'eval1:{0}'.format(os.path.relpath(os.path.abspath(new_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
-    'engine2:{0}'.format(os.path.relpath(os.path.abspath('YaneuraOu-2017-early.exe'), os.path.join(os.getcwd(), 'exe'))),
-    'eval2:{0}'.format(os.path.relpath(os.path.abspath(old_eval_folder_path), os.path.join(os.getcwd(), 'eval'))),
-    'cores:{0}'.format(num_threads),
-    'loop:{0}'.format(num_games),
-    'cpu:{0}'.format(num_numa_nodes),
-    'engine_threads:1',
-    'hash1:256',
-    'hash2:256',
-    'time:b1000',
-    ]
+    'TanukiColiseum.exe',
+    '--engine1', 'YaneuraOu-2017-early-master.exe',
+    '--engine2', 'YaneuraOu-2017-early-slave.exe',
+    '--eval1', new_eval_folder_path,
+    '--eval2', old_eval_folder_path,
+    '--num_concurrent_games', str(num_threads),
+    '--num_games', str(num_games),
+    '--hash', '256',
+    '--time', '1000']
   print(args, flush=True)
   if subprocess.run(args).returncode:
     sys.exit('Failed to calculate the winning rate...');
