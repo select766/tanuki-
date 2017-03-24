@@ -212,24 +212,17 @@ def function(args):
   builder.clean()
   builder.build(args)
 
-  engine_invoker_args = ['C:\\Python27\\python.exe',
-    '..\script\engine_invoker5.py',
-    # hakubishin-private\exe以下から実行していると仮定する
-    'home:{0}'.format(os.getcwd()),
-    # {home}\exeからの相対パスに変換する
-    'engine1:{0}'.format(os.path.relpath(os.path.abspath(ENGINE1), os.path.join(os.getcwd(), 'exe'))),
-    # {home}\evalからの相対パスに変換する
-    'eval1:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
-    'engine2:{0}'.format(os.path.relpath(os.path.abspath(ENGINE2), os.path.join(os.getcwd(), 'exe'))),
-    'eval2:{0}'.format(os.path.relpath(os.path.abspath(EVAL_DIR), os.path.join(os.getcwd(), 'eval'))),
-    'cores:{0}'.format(NUM_THREADS),
-    'loop:{0}'.format(NUM_THREADS),
-    'cpu:{0}'.format(NUM_NUMA_NODES),
-    'engine_threads:1',
-    'hash1:{0}'.format(HASH),
-    'hash2:{0}'.format(HASH),
-    'time:b{0}'.format(THINKING_TIME_MS),
-    'rand_book:1']
+  engine_invoker_args = [
+    'TanukiColiseum.exe',
+    '--engine1', ENGINE1,
+    '--engine2', ENGINE2,
+    '--eval1', EVAL_DIR,
+    '--eval2', EVAL_DIR,
+    '--num_concurrent_games', str(NUM_THREADS),
+    '--num_games', str(NUM_THREADS),
+    '--hash', HASH,
+    '--time', THINKING_TIME_MS]
+
   print(engine_invoker_args)
   sys.stdout.flush()
 
