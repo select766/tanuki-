@@ -220,8 +220,8 @@ def function(args):
     '--eval2', EVAL_DIR,
     '--num_concurrent_games', str(NUM_THREADS),
     '--num_games', str(NUM_THREADS),
-    '--hash', HASH,
-    '--time', THINKING_TIME_MS]
+    '--hash', str(HASH),
+    '--time', str(THINKING_TIME_MS)]
 
   print(engine_invoker_args)
   sys.stdout.flush()
