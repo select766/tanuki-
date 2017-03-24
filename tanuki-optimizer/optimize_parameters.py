@@ -221,7 +221,8 @@ def function(args):
     '--num_concurrent_games', str(NUM_THREADS),
     '--num_games', str(NUM_THREADS),
     '--hash', str(HASH),
-    '--time', str(THINKING_TIME_MS)]
+    '--time', str(THINKING_TIME_MS),
+    '--num_numa_nodes', str(NUM_NUMA_NODES)]
 
   print(engine_invoker_args)
   sys.stdout.flush()

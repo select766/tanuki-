@@ -29,7 +29,7 @@ namespace TanukiColiseum
         private int GameIndex;
         private int EngineIndex;
 
-        public Engine(string fileName, List<string> options, Program program, int processIndex, int gameIndex, int engineIndex)
+        public Engine(string fileName, List<string> options, Program program, int processIndex, int gameIndex, int engineIndex, int numNumaNodes)
         {
             this.Process.StartInfo.FileName = fileName;
             this.Process.StartInfo.UseShellExecute = false;
@@ -38,6 +38,8 @@ namespace TanukiColiseum
             this.Process.StartInfo.RedirectStandardError = true;
             this.Process.OutputDataReceived += HandleStdout;
             this.Process.ErrorDataReceived += HandleStderr;
+            //TODO(nodchip): NUMAノードを考慮する
+            this.Process.ProcessorAffinity = new IntPtr(1 << engineIndex);
             this.Program = program;
             this.Options = options;
             this.ProcessIndex = processIndex;
@@ -244,6 +246,7 @@ namespace TanukiColiseum
         private DateTime LastOutput = DateTime.Now;
         private const double OutputResultsPerMin = 1.0;
         private int TimeMs = 0;
+        private int NumNumaNodes = 1;
 
         public void Run(string[] args)
         {
@@ -282,6 +285,9 @@ namespace TanukiColiseum
                         break;
                     case "--time":
                         TimeMs = int.Parse(args[++i]);
+                        break;
+                    case "--num_numa_nodes":
+                        NumNumaNodes = int.Parse(args[++i]);
                         break;
                     default:
                         Environment.FailFast("Unexpected option: " + args[i]);
@@ -342,7 +348,7 @@ namespace TanukiColiseum
                 options1.Add("setoption name EvalShare value true");
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
-                var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0);
+                var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0, NumNumaNodes);
                 engine1.StartAsync().Wait();
 
                 // エンジン2初期化
@@ -357,7 +363,7 @@ namespace TanukiColiseum
                 options2.Add("setoption name EvalShare value true");
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
-                var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1);
+                var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1, NumNumaNodes);
                 engine2.StartAsync().Wait();
 
                 // ゲーム初期化

@@ -115,7 +115,8 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games,
     '--num_concurrent_games', str(num_threads),
     '--num_games', str(num_games),
     '--hash', '256',
-    '--time', '1000']
+    '--time', '1000',
+    '--num_numa_nodes', str(num_numa_nodes)]
   print(args, flush=True)
   if subprocess.run(args).returncode:
     sys.exit('Failed to calculate the winning rate...');
