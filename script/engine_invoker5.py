@@ -227,7 +227,7 @@ def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,b
 	moves = [0]*threads
 
 	# 今回の対局での先手番のplayer(0 or 1)
-	turns = [0]*threads
+	turns = [0,1]*int((threads+1)/2)
 
 	# process handle
 	procs = [0]*threads*2
