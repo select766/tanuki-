@@ -31,15 +31,15 @@ namespace TanukiColiseum
 
         public Engine(string fileName, List<string> options, Program program, int processIndex, int gameIndex, int engineIndex, int numNumaNodes)
         {
-            this.Process.StartInfo.FileName = fileName;
+            this.Process.StartInfo.FileName = "cmd.exe";
+            int numaNode = gameIndex % numNumaNodes;
+            this.Process.StartInfo.Arguments = string.Format("/c start /B /WAIT /NODE {0} {1}", numaNode, fileName);
             this.Process.StartInfo.UseShellExecute = false;
             this.Process.StartInfo.RedirectStandardInput = true;
             this.Process.StartInfo.RedirectStandardOutput = true;
             this.Process.StartInfo.RedirectStandardError = true;
             this.Process.OutputDataReceived += HandleStdout;
             this.Process.ErrorDataReceived += HandleStderr;
-            //TODO(nodchip): NUMAノードを考慮する
-            this.Process.ProcessorAffinity = new IntPtr(1 << engineIndex);
             this.Program = program;
             this.Options = options;
             this.ProcessIndex = processIndex;
