@@ -264,7 +264,7 @@ def function(args):
 
   ratio = 0.0
   if lose + draw + win > 0.1:
-   ratio = win / (lose + draw + win)
+   ratio = (win * 1.0 + draw * 0.5 + lose * 0.0) / (lose + draw + win)
   print('ratio={0}'.format(ratio))
   sys.stdout.flush()
 
