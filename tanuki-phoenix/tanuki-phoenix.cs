@@ -87,6 +87,17 @@ namespace tanuki_phoenix
         System.Threading.SemaphoreSlim m_process_stdout_semaphore = new System.Threading.SemaphoreSlim(0, 1);
         System.Threading.SemaphoreSlim m_process_stdin_semaphore = new System.Threading.SemaphoreSlim(0, 1);
 
+        public void Log(string msg)
+        {
+            string timestr = DateTime.Now.ToLocalTime().ToString();
+            m_log_writer.WriteLine(String.Format("{0}: {1}", timestr, msg));
+        }
+
+        public void Log(string format, params object[] objects)
+        {
+            Log(String.Format(format, objects));
+        }
+
         public void Dispose()
         {
             m_log_writer?.Close();
@@ -106,7 +117,7 @@ namespace tanuki_phoenix
             }
 
             m_log_writer = new System.IO.StreamWriter(System.IO.File.Open(log_file_name, System.IO.FileMode.Append, System.IO.FileAccess.Write));
-            m_log_writer.WriteLine("log init");
+            Log("log init");
 
             DoTask();
         }
@@ -116,7 +127,7 @@ namespace tanuki_phoenix
         void SendToUpstream(string line)
         {
             Console.WriteLine(line);
-            m_log_writer.WriteLine(String.Format("U< {0}", line));
+            Log("U< {0}", line);
         }
 
         // 上流からもらう
@@ -128,7 +139,7 @@ namespace tanuki_phoenix
                 string line = await stdin_reader.ReadLineAsync();
                 line = line.TrimEnd();
                 Debug.WriteLine(String.Format("U> {0}", line));
-                m_log_writer.WriteLine(String.Format("U> {0}", line));
+                Log("U> {0}", line);
                 return line;
             }
         }
@@ -143,7 +154,7 @@ namespace tanuki_phoenix
         async Task SendToDownstreamAsyncNoLock(string line)
         {
             Debug.WriteLine(String.Format(">D {0}", line));
-            m_log_writer.WriteLine(String.Format(">D {0}", line));
+            Log(">D {0}", line);
             await m_active_process.StandardInput.WriteLineAsync(line);
         }
 
@@ -164,7 +175,7 @@ namespace tanuki_phoenix
                     }
                     line = line.TrimEnd();
                     Debug.WriteLine(String.Format("<D {0}", line));
-                    m_log_writer.WriteLine(String.Format("<D {0}", line));
+                    Log("<D {0}", line);
                     return line;
                 }
                 catch
@@ -189,7 +200,7 @@ namespace tanuki_phoenix
                 }
                 line = line.TrimEnd();
                 Debug.WriteLine(String.Format("<D {0}", line));
-                m_log_writer.WriteLine(String.Format("<D {0}", line));
+                Log("<D {0}", line);
                 return line;
             }
         }
@@ -333,7 +344,7 @@ namespace tanuki_phoenix
 
             Console.WriteLine("info string tanuki-phoenix: launching a process. {0}/{1}", m_n_retried, settings.retry_count);
             Debug.WriteLine(String.Format("launching #{0}/{1}-th process", m_n_retried, settings.retry_count));
-            m_log_writer.WriteLine(String.Format("LAUNCH"));
+            Log("LAUNCH");
 
             m_active_process = p;
 
