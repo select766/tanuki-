@@ -65,6 +65,7 @@ namespace tanuki_phoenix
             USI_USIOK,
             READY_READYOK,
             USINEWGAME,
+            NO_POSITION_GO, // bestmoveにより古いposition/goが無効化された状態
             POSITION,
             GO,
         }
@@ -124,14 +125,11 @@ namespace tanuki_phoenix
             using (var stdin = Console.OpenStandardInput())
             using (var stdin_reader = new System.IO.StreamReader(stdin))
             {
-                while (true)
-                {
-                    string line = await stdin_reader.ReadLineAsync();
-                    line = line.TrimEnd();
-                    Debug.WriteLine(String.Format("U> {0}", line));
-                    m_log_writer.WriteLine(String.Format("U> {0}", line));
-                    return line;
-                }
+                string line = await stdin_reader.ReadLineAsync();
+                line = line.TrimEnd();
+                Debug.WriteLine(String.Format("U> {0}", line));
+                m_log_writer.WriteLine(String.Format("U> {0}", line));
+                return line;
             }
         }
 
@@ -197,20 +195,6 @@ namespace tanuki_phoenix
         }
 
         // 特定の文字列を待つ
-        async Task WaitExpectedAsync(string expect_line)
-        {
-            while (true)
-            {
-                Debug.WriteLine(String.Format("W) waiting downstream for [{0}] {1}", expect_line, m_active_process.HasExited));
-                string line = await RecvFromDownstreamAsync();
-                if (line == expect_line)
-                {
-                    Debug.WriteLine(String.Format("W) match"));
-                    return;
-                }
-                Debug.WriteLine(String.Format("W) not match"));
-            }
-        }
         async Task WaitExpectedAsyncNoLock(string expect_line)
         {
             while (true)
@@ -243,7 +227,7 @@ namespace tanuki_phoenix
                     // 初期化シーケンスの完了をマーク
                     if (line == "usiok") m_initial_sequence_done = EUSISequence.USI_USIOK;
                     if (line == "readyok") m_initial_sequence_done = EUSISequence.READY_READYOK;
-                    if (line.StartsWith("bestmove")) m_initial_sequence_done = EUSISequence.READY_READYOK; // POSITION, GOを巻き戻す
+                    if (line.StartsWith("bestmove")) m_initial_sequence_done = EUSISequence.NO_POSITION_GO; // POSITION, GOを巻き戻す
                     
                     // プログラム名を書き換え
                     Match match = name_pattern.Match(line);
@@ -285,14 +269,16 @@ namespace tanuki_phoenix
                         Debug.WriteLine("adding setoption.");
                         m_usi_set_options.Add(line);
                     }
+
+                    // 下流に渡す
+                    await SendToDownstreamAsync(line);
+
+                    // quitは下流に伝達してからこのプロセスを終了
                     if (line == "quit")
                     {
                         Debug.WriteLine("quit..");
                         break;
                     }
-
-                    // 下流に渡す
-                    await SendToDownstreamAsync(line);
                 }
 
                 Debug.WriteLine("upstream_to_downstream_task terminating.");
@@ -304,7 +290,7 @@ namespace tanuki_phoenix
                 while (m_n_retried < settings.retry_count)
                 {
                     await CreateProcessAndInitialize();
-                    await Task.Run(() => m_active_process.WaitForExit());
+                    m_active_process.WaitForExit();
                     await Task.Delay((int)settings.retry_sleep_ms);
                 }
             });
@@ -383,12 +369,11 @@ namespace tanuki_phoenix
             }
 
             // 使用可能プロセスが増え、他のタスクで定常の読み書きを行う
-            Debug.WriteLine("process init OK. release the process...");
+            m_n_retried += 1;
             m_process_semaphore.Release();
             m_process_stdout_semaphore.Release();
             m_process_stdin_semaphore.Release();
             Debug.WriteLine("process init OK. release the process...OK");
-            m_n_retried += 1;
         }
 
     }
