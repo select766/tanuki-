@@ -11,18 +11,22 @@ using System.Text.RegularExpressions;
 namespace tanuki_phoenix
 {
     [DataContract]
-    public struct Settings
+    public class Settings
     {
         [DataMember]
-        public string working_directory;
+        public string working_directory = "";
         [DataMember]
-        public string exe_path;
+        public string exe_path = "";
         [DataMember]
-        public List<string> arguments;
+        public List<string> arguments = new List<string>();
         [DataMember]
-        public double retry_sleep_ms;
+        public double retry_sleep_ms = 200;
         [DataMember]
-        public int retry_count;
+        public int retry_count = 9999;
+        // position/go関係はタイミングを間違えるとillegal moveにつながる。resend_goをfalseにすれば
+        // position/goの再送を行わず、1指し手分の思考時間は無駄にすることで安全側に倒すことができる。
+        [DataMember]
+        public bool resend_go = false;
     }
 
     class Program : IDisposable
@@ -369,11 +373,11 @@ namespace tanuki_phoenix
                 {
                     await SendToDownstreamAsyncNoLock("usinewgame");
                 }
-                if (m_initial_sequence_done >= EUSISequence.POSITION)
+                if (settings.resend_go && m_initial_sequence_done >= EUSISequence.POSITION)
                 {
                     await SendToDownstreamAsyncNoLock(m_last_position);
                 }
-                if (m_initial_sequence_done >= EUSISequence.GO)
+                if (settings.resend_go && m_initial_sequence_done >= EUSISequence.GO)
                 {
                     await SendToDownstreamAsyncNoLock(m_last_go);
                 }
