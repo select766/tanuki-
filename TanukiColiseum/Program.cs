@@ -29,10 +29,9 @@ namespace TanukiColiseum
         private int GameIndex;
         private int EngineIndex;
 
-        public Engine(string fileName, List<string> options, Program program, int processIndex, int gameIndex, int engineIndex, int numNumaNodes)
+        public Engine(string fileName, List<string> options, Program program, int processIndex, int gameIndex, int engineIndex, int numaNode)
         {
             this.Process.StartInfo.FileName = "cmd.exe";
-            int numaNode = gameIndex % numNumaNodes;
             this.Process.StartInfo.Arguments = string.Format("/c start /B /WAIT /NODE {0} {1}", numaNode, fileName);
             this.Process.StartInfo.UseShellExecute = false;
             this.Process.StartInfo.RedirectStandardInput = true;
@@ -336,6 +335,8 @@ namespace TanukiColiseum
 
             for (int gameIndex = 0; gameIndex < numConcurrentGames; ++gameIndex)
             {
+                int numaNode = gameIndex * NumNumaNodes / numConcurrentGames;
+
                 // エンジン1初期化
                 var options1 = new List<string>();
                 options1.Add("setoption name Threads value 1");
@@ -348,7 +349,7 @@ namespace TanukiColiseum
                 options1.Add("setoption name EvalShare value true");
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
-                var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0, NumNumaNodes);
+                var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0, numaNode);
                 engine1.StartAsync().Wait();
 
                 // エンジン2初期化
@@ -363,7 +364,7 @@ namespace TanukiColiseum
                 options2.Add("setoption name EvalShare value true");
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
-                var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1, NumNumaNodes);
+                var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1, numaNode);
                 engine2.StartAsync().Wait();
 
                 // ゲーム初期化
