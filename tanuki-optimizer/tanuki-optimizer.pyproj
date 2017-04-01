@@ -5,16 +5,16 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>2944d269-829b-4b9d-ab0e-f90a50204a21</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>analyze_optimizer_log.py</StartupFile>
+    <StartupFile>optimize_parameters.py</StartupFile>
     <SearchPath>
     </SearchPath>
-    <WorkingDirectory>D:\data\git\hakubishin-private\exe</WorkingDirectory>
+    <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>tanuki-optimizer</Name>
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>param\parameters.opening.csv optimize_parameters.hyperopt_state.20170324_105241.b10000.pickle</CommandLineArguments>
+    <CommandLineArguments>--num_threads 4 --thinking_time_ms 100 --hash 100</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterId>{9a7a9026-48c1-4688-9d5d-e5699d47d074}</InterpreterId>
     <InterpreterVersion>2.7</InterpreterVersion>
