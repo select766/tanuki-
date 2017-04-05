@@ -165,7 +165,7 @@ namespace TanukiColiseum
 
     class Game
     {
-        private const int NumBookMoves = 24;
+        private int NumBookMoves;
         public List<string> Moves { get; } = new List<string>();
         public int Turn { get; private set; }
         public int InitialTurn { get; private set; }
@@ -174,11 +174,12 @@ namespace TanukiColiseum
         private int TimeMs;
         private Random Random = new Random();
 
-        public Game(int initialTurn, int timeMs, Engine engine1, Engine engine2)
+        public Game(int initialTurn, int timeMs, Engine engine1, Engine engine2, int numBookMoves)
         {
             this.TimeMs = timeMs;
             this.Engines.Add(engine1);
             this.Engines.Add(engine2);
+            this.NumBookMoves = numBookMoves;
         }
 
         public void OnNewGame(string sfen)
@@ -256,6 +257,11 @@ namespace TanukiColiseum
             int numConcurrentGames = 0;
             int numGames = 0;
             int hashMb = 0;
+            int numBookMoves1 = 0;
+            int numBookMoves2 = 0;
+            string bookFileName1 = "no_book";
+            string bookFileName2 = "no_book";
+            int numBookMoves = 0;
 
             for (int i = 0; i < args.Length; ++i)
             {
@@ -287,6 +293,21 @@ namespace TanukiColiseum
                         break;
                     case "--num_numa_nodes":
                         NumNumaNodes = int.Parse(args[++i]);
+                        break;
+                    case "--num_book_moves1":
+                        numBookMoves1 = int.Parse(args[++i]);
+                        break;
+                    case "--num_book_moves2":
+                        numBookMoves2 = int.Parse(args[++i]);
+                        break;
+                    case "--book_file_name1":
+                        bookFileName1 = args[++i];
+                        break;
+                    case "--book_file_name2":
+                        bookFileName2 = args[++i];
+                        break;
+                    case "--num_book_moves":
+                        numBookMoves = int.Parse(args[++i]);
                         break;
                     default:
                         Environment.FailFast("Unexpected option: " + args[i]);
@@ -347,6 +368,8 @@ namespace TanukiColiseum
                 options1.Add("setoption name NetworkDelay value 0");
                 options1.Add("setoption name NetworkDelay2 value 0");
                 options1.Add("setoption name EvalShare value true");
+                options1.Add("setoption name BookMoves value " + numBookMoves1);
+                options1.Add("setoption name BookFile value " + bookFileName1);
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
                 var engine1 = new Engine(engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0, numaNode);
@@ -362,6 +385,8 @@ namespace TanukiColiseum
                 options2.Add("setoption name NetworkDelay value 0");
                 options2.Add("setoption name NetworkDelay2 value 0");
                 options2.Add("setoption name EvalShare value true");
+                options2.Add("setoption name BookMoves value " + numBookMoves2);
+                options2.Add("setoption name BookFile value " + bookFileName2);
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
                 var engine2 = new Engine(engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1, numaNode);
@@ -369,7 +394,7 @@ namespace TanukiColiseum
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手
-                Games.Add(new Game(gameIndex & 1, TimeMs, engine1, engine2));
+                Games.Add(new Game(gameIndex & 1, TimeMs, engine1, engine2, numBookMoves));
             }
 
             Console.WriteLine("Initialized engines...");
