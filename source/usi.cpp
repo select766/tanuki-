@@ -72,6 +72,10 @@ int max_game_ply = 100000;
 
 namespace USI
 {
+  // 最後に受け取ったpositionコマンド文字列
+  // tanuki-proxyでどの局面に対しての指し手が出力されたか管理するために使う
+  std::string last_position_cmd;
+
   // 入玉ルール
 #ifdef USE_ENTERING_KING_WIN
   EnteringKingRule ekr = EKR_27_POINT;
@@ -649,7 +653,10 @@ void USI::loop(int argc, char* argv[])
     else if (token == "go") go_cmd(pos, is);
 
     // (思考などに使うための)開始局面(root)を設定する
-    else if (token == "position") position_cmd(pos, is);
+    else if (token == "position") {
+      last_position_cmd = cmd;
+      position_cmd(pos, is);
+    }
 
     // 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
     else if (token == "usi")

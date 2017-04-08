@@ -15,7 +15,7 @@
 
 // パラメーターを自動調整するのか
 // 自動調整が終われば、ファイルを固定してincludeしたほうが良い。
-#define USE_AUTO_TUNE_PARAMETERS
+//#define USE_AUTO_TUNE_PARAMETERS
 
 // 探索パラメーターにstep分のランダム値を加えて対戦させるとき用。
 // 試合が終わったときに勝敗と、そのときに用いたパラメーター一覧をファイルに出力する。
@@ -257,7 +257,7 @@ namespace YaneuraOu2017Early
   int FutilityMoveCounts[2][32];
 #else
   // 16のはずだが。
-  int FutilityMoveCounts[2][PARAM_PRUNING_BY_MOVE_COUNT_DEPTH];
+  int FutilityMoveCounts[2][32];
 #endif
 
   // 探索深さを減らすためのReductionテーブル
@@ -1567,7 +1567,7 @@ namespace YaneuraOu2017Early
 #if defined (USE_AUTO_TUNE_PARAMETERS) || defined(USE_RANDOM_PARAMETERS)
       128
 #else
-      PARAM_QUIET_SEARCH_COUNT
+      128
 #endif
     ];
     int quietCount = 0;
