@@ -341,8 +341,7 @@ namespace tanuki_proxy
                     int depthIndex = command.IndexOf("depth");
                     int pvIndex = command.IndexOf("pv");
 
-                    // Fail-low/Fail-highした探索結果は保持しない
-                    if (depthIndex == -1 || pvIndex == -1 || command.Contains("lowerbound") || command.Contains("upperbound"))
+                    if (depthIndex == -1 || pvIndex == -1)
                     {
                         return;
                     }
@@ -358,7 +357,8 @@ namespace tanuki_proxy
 
                     Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
 
-                    if (depth < tempDepth)
+                    // Fail-low/Fail-highした探索結果は表示しない
+                    if (!command.Contains("lowerbound") && !command.Contains("upperbound") && depth < tempDepth)
                     {
                         // voteの表示
                         Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
