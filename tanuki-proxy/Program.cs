@@ -21,12 +21,18 @@ namespace tanuki_proxy
             Thinking,
         }
 
+        public class EngineBestmove
+        {
+            public string move { get; set; }
+            public string ponder { get; set; }
+            public int score { get; set; }
+        }
+
         public static object upstreamLockObject = new object();
         public static UpstreamState upstreamState = UpstreamState.Stopped;
         public static int depth = 0;
         public const string bestmoveNone = "None";
-        public static string[] bestmoveBestMoves = null;
-        public static string[] bestmovePonders = null;
+        public static EngineBestmove[] engineBestmoves = null;
         public static string upstreamPosition = "";
         public static int numberOfReadyoks = 0;
         public static System.Random random = new System.Random();
@@ -272,15 +278,7 @@ namespace tanuki_proxy
 
             private int getNumberOfRunningEngines()
             {
-                int numberOfRunningEngines = 0;
-                foreach (var engine in engines)
-                {
-                    if (!engine.process.HasExited)
-                    {
-                        ++numberOfRunningEngines;
-                    }
-                }
-                return numberOfRunningEngines;
+                return engines.Count(engine => !engine.process.HasExited);
             }
 
             private void HandleReadyok(List<string> command)
@@ -288,7 +286,7 @@ namespace tanuki_proxy
                 // goコマンドが受理されたのでpvの受信を開始する
                 lock (upstreamLockObject)
                 {
-                    if (getNumberOfRunningEngines() == ++numberOfReadyoks)
+                    if (getNumberOfRunningEngines() == Interlocked.Increment(ref numberOfReadyoks))
                     {
                         Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
                         WriteLineAndFlush(Console.Out, Join(command));
@@ -347,12 +345,18 @@ namespace tanuki_proxy
                     }
 
                     int tempDepth = int.Parse(command[depthIndex + 1]);
+                    int cpIndex = command.IndexOf("cp");
 
                     Debug.Assert(pvIndex + 1 < command.Count);
-                    bestmoveBestMoves[id] = command[pvIndex + 1];
+                    engineBestmoves[id].move = command[pvIndex + 1];
                     if (pvIndex + 2 < command.Count)
                     {
-                        bestmovePonders[id] = command[pvIndex + 2];
+                        engineBestmoves[id].ponder = command[pvIndex + 2];
+                    }
+                    if (cpIndex != -1)
+                    {
+                        int score = int.Parse(command[cpIndex + 1]);
+                        engineBestmoves[id].score = score;
                     }
 
                     Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
@@ -362,17 +366,18 @@ namespace tanuki_proxy
                     {
                         // voteの表示
                         Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        for (int i = 0; i < bestmoveBestMoves.Length; ++i)
+                        foreach (var engineBestmove in engineBestmoves)
                         {
-                            if (bestmoveBestMoves[i] == null)
+                            if (engineBestmove.move == null)
                             {
                                 continue;
                             }
-                            if (!bestmoveToCount.ContainsKey(bestmoveBestMoves[i]))
+
+                            if (!bestmoveToCount.ContainsKey(engineBestmove.move))
                             {
-                                bestmoveToCount.Add(bestmoveBestMoves[i], 0);
+                                bestmoveToCount.Add(engineBestmove.move, 0);
                             }
-                            ++bestmoveToCount[bestmoveBestMoves[i]];
+                            ++bestmoveToCount[engineBestmove.move];
                         }
                         List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
                         bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
@@ -394,20 +399,27 @@ namespace tanuki_proxy
                 }
             }
 
+            public class CountAndScore
+            {
+                public int Count { get; set; } = 0;
+                public int Score { get; set; } = int.MinValue;
+            }
+
             private void HandleBestmove(List<string> command)
             {
                 if (command[1] == "resign" || command[1] == "win")
                 {
-                    for (int i = 0; i < bestmoveBestMoves.Length; ++i)
+                    foreach (var engineBestmove in engineBestmoves)
                     {
-                        bestmoveBestMoves[i] = command[1];
-                        bestmovePonders[i] = null;
+                        engineBestmove.move = command[1];
+                        engineBestmove.ponder = null;
                     }
+
                     if (command.Count == 4 && command[2] == "ponder")
                     {
-                        for (int i = 0; i < bestmoveBestMoves.Length; ++i)
+                        foreach (var engineBestmove in engineBestmoves)
                         {
-                            bestmovePonders[i] = command[3];
+                            engineBestmove.move = command[3];
                         }
                     }
                 }
@@ -432,57 +444,64 @@ namespace tanuki_proxy
                         }
                     }
 
-                    if (bestmoveBestMoves == null)
+                    // TODO(nodchip): この条件が必要かどうか考える
+                    if (engineBestmoves == null)
                     {
                         return;
                     }
 
-                    if (bestmovePonders == null)
+                    var bestmoveToCount = new Dictionary<string, CountAndScore>();
+                    foreach (var engineBestmove in engineBestmoves)
                     {
-                        return;
-                    }
-
-                    Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                    for (int i = 0; i < bestmoveBestMoves.Length; ++i)
-                    {
-                        if (bestmoveBestMoves[i] == null)
+                        if (engineBestmove.move == null)
                         {
                             continue;
                         }
-                        if (!bestmoveToCount.ContainsKey(bestmoveBestMoves[i]))
+
+                        if (!bestmoveToCount.ContainsKey(engineBestmove.move))
                         {
-                            bestmoveToCount.Add(bestmoveBestMoves[i], 0);
+                            bestmoveToCount.Add(engineBestmove.move, new CountAndScore());
                         }
-                        ++bestmoveToCount[bestmoveBestMoves[i]];
+                        ++bestmoveToCount[engineBestmove.move].Count;
+                        bestmoveToCount[engineBestmove.move].Score = Math.Max(bestmoveToCount[engineBestmove.move].Score, engineBestmove.score);
                     }
 
+                    // 楽観合議制
+                    // 最も投票の多かった指し手を選ぶ
+                    // 投票数が同じ場合は最もスコアが高かった指し手を選ぶ
                     int bestCount = -1;
+                    int bestScore = int.MinValue;
                     string bestmove = "resign";
                     foreach (var p in bestmoveToCount)
                     {
-                        if (p.Value > bestCount)
+                        if (p.Value.Count > bestCount || (p.Value.Count == bestCount && p.Value.Score > bestScore))
                         {
-                            bestCount = p.Value;
                             bestmove = p.Key;
+                            bestCount = p.Value.Count;
+                            bestScore = p.Value.Score;
                         }
                     }
 
+                    // Ponderを決定する
+                    // 最もスコアが高かった指し手のPonderを選択する
+                    // スコアが等しいものが複数ある場合はランダムに1つを選ぶ
                     int ponderCount = 0;
                     string ponder = null;
-                    for (int i = 0; i < bestmoveBestMoves.Length; ++i)
+                    foreach (var engineBestmove in engineBestmoves)
                     {
-                        if (bestmoveBestMoves[i] != bestmove)
+                        if (engineBestmove.move != bestmove || engineBestmove.ponder == null || engineBestmove.score != bestScore)
                         {
                             continue;
                         }
-                        if (bestmovePonders[i] == null)
+                        else if (engineBestmove.ponder == null)
                         {
                             continue;
                         }
+
                         ++ponderCount;
                         if (random.Next(ponderCount) == 0)
                         {
-                            ponder = bestmovePonders[i];
+                            ponder = engineBestmove.ponder;
                         }
                     }
 
@@ -501,8 +520,7 @@ namespace tanuki_proxy
 
                     TransitUpstreamState(UpstreamState.Stopped);
                     depth = 0;
-                    bestmoveBestMoves = null;
-                    bestmovePonders = null;
+                    engineBestmoves = null;
                     WriteToEachEngine("stop");
                 }
             }
@@ -523,7 +541,7 @@ namespace tanuki_proxy
             //writeSampleSetting();
             ProxySetting setting = loadSetting();
             Debug.Listeners.Add(new TextWriterTraceListener(Console.Error));
-            string logFileFormat = setting.logDirectory + "\\" + DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + string.Format("_pid={0}", GetProcessId()) + ".txt";
+            string logFileFormat = Path.Combine(setting.logDirectory, string.Format("tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
             Debug.Listeners.Add(new TextWriterTraceListener(new StreamWriter(logFileFormat, false, Encoding.UTF8)));
 
 
@@ -550,8 +568,11 @@ namespace tanuki_proxy
                         // 思考開始の合図です。エンジンはこれを受信すると思考を開始します。
                         lock (upstreamLockObject)
                         {
-                            bestmoveBestMoves = new string[engines.Count];
-                            bestmovePonders = new string[engines.Count];
+                            engineBestmoves = new EngineBestmove[engines.Count];
+                            for (int i = 0; i < engines.Count; ++i)
+                            {
+                                engineBestmoves[i] = new EngineBestmove();
+                            }
                             depth = 0;
                             TransitUpstreamState(UpstreamState.Thinking);
                             Console.WriteLine("info string " + upstreamPosition);

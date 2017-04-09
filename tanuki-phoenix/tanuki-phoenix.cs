@@ -32,7 +32,15 @@ namespace tanuki_phoenix
     class Program : IDisposable
     {
         static string settings_file_name = "tanuki-phoenix.json";
-        static string log_file_name = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tanuki-phoenix.log");
+        static string log_file_name = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, string.Format("tanuki-phoenix.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
+
+        static int GetProcessId()
+        {
+            using (Process process = Process.GetCurrentProcess())
+            {
+                return process.Id;
+            }
+        }
 
         static Settings GetSettings()
         {
@@ -106,7 +114,7 @@ namespace tanuki_phoenix
         {
             m_log_writer?.Close();
         }
-        
+
         void Start()
         {
             if (!System.IO.Directory.Exists(settings.working_directory))
@@ -238,12 +246,12 @@ namespace tanuki_phoenix
                 while (true)
                 {
                     string line = await RecvFromDownstreamAsync();
-                    
+
                     // 初期化シーケンスの完了をマーク
                     if (line == "usiok") m_initial_sequence_done = EUSISequence.USI_USIOK;
                     if (line == "readyok") m_initial_sequence_done = EUSISequence.READY_READYOK;
                     if (line.StartsWith("bestmove")) m_initial_sequence_done = EUSISequence.NO_POSITION_GO; // POSITION, GOを巻き戻す
-                    
+
                     // プログラム名を書き換え
                     Match match = name_pattern.Match(line);
                     if (match.Success)
@@ -332,7 +340,7 @@ namespace tanuki_phoenix
             info.RedirectStandardError = false;
             info.ErrorDialog = false;
             info.UseShellExecute = false;
-            
+
             Process p = Process.Start(info);
 
             p.EnableRaisingEvents = true;
