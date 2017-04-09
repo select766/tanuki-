@@ -32,15 +32,8 @@ namespace tanuki_phoenix
     class Program : IDisposable
     {
         static string settings_file_name = "tanuki-phoenix.json";
-        static string log_file_name = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, string.Format("tanuki-phoenix.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
-
-        static int GetProcessId()
-        {
-            using (Process process = Process.GetCurrentProcess())
-            {
-                return process.Id;
-            }
-        }
+        static string log_file_name = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, 
+            String.Format("tanuki-phoenix-{0}-{1}.log", DateTime.Now.ToLocalTime().ToString("yyyyMMdd_HHmmss"), System.Diagnostics.Process.GetCurrentProcess().Id));
 
         static Settings GetSettings()
         {
@@ -84,6 +77,8 @@ namespace tanuki_phoenix
         EUSISequence m_initial_sequence_done = EUSISequence.NONE;
         string m_last_position = null;
         string m_last_go = null;
+        bool m_terminate = false;
+        object m_state_lock = new object();
 
         // プロセス再起動回数
         int m_n_retried = 0;
@@ -102,7 +97,12 @@ namespace tanuki_phoenix
         public void Log(string msg)
         {
             string timestr = DateTime.Now.ToLocalTime().ToString();
-            m_log_writer.WriteLine(String.Format("{0}: {1}", timestr, msg));
+            lock (m_log_writer)
+            {
+                string line = String.Format("{0}: {1}", timestr, msg);
+                m_log_writer.WriteLine(line);
+                Debug.WriteLine(line);
+            }
         }
 
         public void Log(string format, params object[] objects)
@@ -138,47 +138,45 @@ namespace tanuki_phoenix
         // 上流に送る
         void SendToUpstream(string line)
         {
+            Log("U< {0} (sending)", line);
             Console.WriteLine(line);
-            Log("U< {0}", line);
+            Log("U< {0} (sent)", line);
         }
 
         // 上流からもらう
-        async Task<string> RecvFromUpstreamAsync()
+        string RecvFromUpstream(System.IO.StreamReader stdin_reader)
         {
-            using (var stdin = Console.OpenStandardInput())
-            using (var stdin_reader = new System.IO.StreamReader(stdin))
-            {
-                string line = await stdin_reader.ReadLineAsync();
-                line = line.TrimEnd();
-                Debug.WriteLine(String.Format("U> {0}", line));
-                Log("U> {0}", line);
-                return line;
-            }
+            Log("U> (waiting)");
+            string line = stdin_reader.ReadLine();
+            line = line.TrimEnd();
+            Log("U> {0}", line);
+            return line;
         }
 
         // 下流に送る
-        async Task SendToDownstreamAsync(string line)
+        void SendToDownstream(string line)
         {
-            await m_process_stdin_semaphore.WaitAsync();
-            await SendToDownstreamAsyncNoLock(line);
+            m_process_stdin_semaphore.Wait();
+            SendToDownstreamNoLock(line);
             m_process_stdin_semaphore.Release();
         }
-        async Task SendToDownstreamAsyncNoLock(string line)
+        void SendToDownstreamNoLock(string line)
         {
-            Debug.WriteLine(String.Format(">D {0}", line));
-            Log(">D {0}", line);
-            await m_active_process.StandardInput.WriteLineAsync(line);
+            Log(">D {0} (sending)", line);
+            m_active_process.StandardInput.WriteLine(line);
+            m_active_process.StandardInput.Flush();
+            Log(">D {0} (sent)", line);
         }
 
         // 下流からもらう
-        async Task<string> RecvFromDownstreamAsync()
+        string RecvFromDownstream()
         {
             while (true)
             {
-                await m_process_stdout_semaphore.WaitAsync();
+                m_process_stdout_semaphore.Wait();
                 try
                 {
-                    string line = await m_active_process.StandardOutput.ReadLineAsync();
+                    string line = m_active_process.StandardOutput.ReadLine();
                     if (line == null)
                     {
                         // プロセスが死んだ場合
@@ -186,7 +184,6 @@ namespace tanuki_phoenix
                         continue;
                     }
                     line = line.TrimEnd();
-                    Debug.WriteLine(String.Format("<D {0}", line));
                     Log("<D {0}", line);
                     return line;
                 }
@@ -200,36 +197,35 @@ namespace tanuki_phoenix
                 }
             }
         }
-        async Task<string> RecvFromDownstreamAsyncNoLock()
+        string RecvFromDownstreamNoLock()
         {
             while (true)
             {
-                string line = await m_active_process.StandardOutput.ReadLineAsync();
+                string line = m_active_process.StandardOutput.ReadLine();
                 if (line == null)
                 {
                     Debug.WriteLine("ERROR NULL read line");
                     continue;
                 }
                 line = line.TrimEnd();
-                Debug.WriteLine(String.Format("<D {0}", line));
                 Log("<D {0}", line);
                 return line;
             }
         }
 
         // 特定の文字列を待つ
-        async Task WaitExpectedAsyncNoLock(string expect_line)
+        void WaitExpectedNoLock(string expect_line)
         {
             while (true)
             {
-                Debug.WriteLine(String.Format("W) waiting downstream for [{0}] {1}", expect_line, m_active_process.HasExited));
-                string line = await RecvFromDownstreamAsyncNoLock();
+                Log(String.Format("W) waiting downstream for [{0}] {1}", expect_line, m_active_process.HasExited));
+                string line = RecvFromDownstreamNoLock();
                 if (line == expect_line)
                 {
-                    Debug.WriteLine(String.Format("W) match"));
+                    Log(String.Format("W) match"));
                     return;
                 }
-                Debug.WriteLine(String.Format("W) not match"));
+                Log(String.Format("W) not match"));
             }
         }
 
@@ -239,98 +235,116 @@ namespace tanuki_phoenix
             m_n_retried = 0;
 
             // 下流から受け取って上流に渡す
-            Task downstream_to_upstream_task = Task.Run(async () =>
+            System.Threading.Thread downstream_to_upstream_task = new System.Threading.Thread(new System.Threading.ThreadStart(() => 
             {
                 var name_pattern = new Regex("^id name (.*?)$");
-                Debug.WriteLine("downstream_to_upstream_task started.");
-                while (true)
+                Log("D2U) downstream_to_upstream_task started.");
+                try
                 {
-                    string line = await RecvFromDownstreamAsync();
-
-                    // 初期化シーケンスの完了をマーク
-                    if (line == "usiok") m_initial_sequence_done = EUSISequence.USI_USIOK;
-                    if (line == "readyok") m_initial_sequence_done = EUSISequence.READY_READYOK;
-                    if (line.StartsWith("bestmove")) m_initial_sequence_done = EUSISequence.NO_POSITION_GO; // POSITION, GOを巻き戻す
-
-                    // プログラム名を書き換え
-                    Match match = name_pattern.Match(line);
-                    if (match.Success)
+                    while (true)
                     {
-                        line = String.Format("id name {0}-phoenix", match.Groups[1].ToString());
-                    }
+                        string line = RecvFromDownstream();
 
-                    // 上流に渡す
-                    SendToUpstream(line);
+                        // 初期化シーケンスの完了をマーク
+                        lock (m_state_lock)
+                        {
+                            if (line == "usiok") m_initial_sequence_done = EUSISequence.USI_USIOK;
+                            if (line == "readyok") m_initial_sequence_done = EUSISequence.READY_READYOK;
+                            if (line.StartsWith("bestmove")) m_initial_sequence_done = EUSISequence.NO_POSITION_GO; // POSITION, GOを巻き戻す
+                        }
+
+                        // プログラム名を書き換え
+                        Match match = name_pattern.Match(line);
+                        if (match.Success)
+                        {
+                            line = String.Format("id name {0}-phoenix", match.Groups[1].ToString());
+                        }
+
+                        // 上流に渡す
+                        SendToUpstream(line);
+                    }
                 }
-            });
+                catch (System.Threading.ThreadAbortException e)
+                {
+                    Log("D2U) downstream_to_upstream_task terminating: {0}", e.Message);
+                }
+            }));
+            downstream_to_upstream_task.Start();
 
             // 上流から受け取って下流に渡す
-            Task upstream_to_downstream_task = Task.Run(async () =>
+            System.Threading.Thread upstream_to_downstream_task = new System.Threading.Thread(new System.Threading.ThreadStart(() => 
             {
-                Debug.WriteLine("upstream_to_downstream_task started.");
+                Log("U2D) upstream_to_downstream_task started.");
+                using (var stdin = Console.OpenStandardInput())
+                using (var stdin_reader = new System.IO.StreamReader(stdin))
                 while (true)
                 {
                     // 上流から読み込む
-                    string line = await RecvFromUpstreamAsync();
+                    string line = RecvFromUpstream(stdin_reader);
 
-                    // 初期化シーケンスの完了をマーク
-                    if (line == "usinewgame") m_initial_sequence_done = EUSISequence.USINEWGAME;
-                    // 状態の保存
-                    if (line.StartsWith("position"))
+                    lock (m_state_lock)
                     {
-                        m_last_position = line;
-                        m_initial_sequence_done = EUSISequence.POSITION;
-                    }
-                    if (line.StartsWith("go"))
-                    {
-                        m_last_go = line;
-                        m_initial_sequence_done = EUSISequence.GO;
-                    }
-                    // setoptionの保存
-                    if (line.StartsWith("usi setoption"))
-                    {
-                        Debug.WriteLine("adding setoption.");
-                        m_usi_set_options.Add(line);
+                        // 初期化シーケンスの完了をマーク
+                        if (line == "usinewgame") m_initial_sequence_done = EUSISequence.USINEWGAME;
+                        // 状態の保存
+                        if (line.StartsWith("position"))
+                        {
+                            m_last_position = line;
+                            m_initial_sequence_done = EUSISequence.POSITION;
+                        }
+                        if (line.StartsWith("go"))
+                        {
+                            m_last_go = line;
+                            m_initial_sequence_done = EUSISequence.GO;
+                        }
+                        if (line.StartsWith("stop") || line.StartsWith("gameover"))
+                        {
+                            m_initial_sequence_done = EUSISequence.NO_POSITION_GO;
+                        }
+                        // setoptionの保存
+                        if (line.StartsWith("usi setoption"))
+                        {
+                            Log("adding setoption.");
+                            m_usi_set_options.Add(line);
+                        }
                     }
 
                     // 下流に渡す
-                    await SendToDownstreamAsync(line);
+                    SendToDownstream(line);
 
                     // quitは下流に伝達してからこのプロセスを終了
                     if (line == "quit")
                     {
-                        Debug.WriteLine("quit..");
+                        Log("quit..");
+                        lock (m_state_lock)
+                            m_terminate = true;
                         break;
                     }
                 }
 
-                Debug.WriteLine("upstream_to_downstream_task terminating.");
-            });
+                Log("U2D) upstream_to_downstream_task terminating.");
+            }));
+            upstream_to_downstream_task.Start();
 
             // プロセスを回す
-            Task process_runner = Task.Run(async () =>
+            while (true)
             {
-                while (m_n_retried < settings.retry_count)
+                CreateProcessAndInitialize();
+                m_active_process.WaitForExit();
+                lock (m_state_lock)
                 {
-                    await CreateProcessAndInitialize();
-                    m_active_process.WaitForExit();
-                    await Task.Delay((int)settings.retry_sleep_ms);
+                    if (m_terminate || m_n_retried >= settings.retry_count)
+                        break;
                 }
-            });
-
-            try
-            {
-                upstream_to_downstream_task.Wait();
+                System.Threading.Thread.Sleep((int)settings.retry_sleep_ms);
             }
-            catch (AggregateException e)
-            {
-                Debug.WriteLine(String.Format("task terminated: {0}", e.Message));
-            }
-            Debug.WriteLine("M) finished");
+            Log("M  ) finished");
+            downstream_to_upstream_task.Abort();
+            Log("M  ) terminate");
         }
 
-        // 子プロセスを開始
-        async Task CreateProcessAndInitialize()
+        // 子プロセスを開始(main thread)
+        void CreateProcessAndInitialize()
         {
             ProcessStartInfo info = new ProcessStartInfo(settings.exe_path, String.Join(" ", settings.arguments));
             info.CreateNoWindow = true;
@@ -340,8 +354,9 @@ namespace tanuki_phoenix
             info.RedirectStandardError = false;
             info.ErrorDialog = false;
             info.UseShellExecute = false;
-
-            Process p = Process.Start(info);
+            
+            Process p = new Process();
+            p.StartInfo = info;
 
             p.EnableRaisingEvents = true;
             p.Exited += new EventHandler((object o, EventArgs e) =>
@@ -355,39 +370,41 @@ namespace tanuki_phoenix
             });
 
             Console.WriteLine("info string tanuki-phoenix: launching a process. {0}/{1}", m_n_retried, settings.retry_count);
-            Debug.WriteLine(String.Format("launching #{0}/{1}-th process", m_n_retried, settings.retry_count));
-            Log("LAUNCH");
+            Log(String.Format("M  ) launching #{0}/{1}-th process", m_n_retried, settings.retry_count));
 
             m_active_process = p;
+            m_active_process.Start();
+            Log("M  ) launched.");
 
             // 他のタスクが読み書きできるようになる前に初期化シーケンスを行う
+            lock (m_state_lock)
             {
-                Debug.WriteLine(String.Format("init sequence.."));
+                Log(String.Format("M  ) init sequence.."));
                 if (m_initial_sequence_done >= EUSISequence.USI_USIOK)
                 {
-                    await SendToDownstreamAsyncNoLock("usi");
-                    await WaitExpectedAsyncNoLock("usiok");
+                    SendToDownstreamNoLock("usi");
+                    WaitExpectedNoLock("usiok");
                 }
                 if (m_initial_sequence_done >= EUSISequence.READY_READYOK)
                 {
                     foreach (string cmd in m_usi_set_options)
                     {
-                        await SendToDownstreamAsyncNoLock(cmd);
+                        SendToDownstreamNoLock(cmd);
                     }
-                    await SendToDownstreamAsyncNoLock("isready");
-                    await WaitExpectedAsyncNoLock("readyok");
+                    SendToDownstreamNoLock("isready");
+                    WaitExpectedNoLock("readyok");
                 }
                 if (m_initial_sequence_done >= EUSISequence.USINEWGAME)
                 {
-                    await SendToDownstreamAsyncNoLock("usinewgame");
+                    SendToDownstreamNoLock("usinewgame");
                 }
                 if (settings.resend_go && m_initial_sequence_done >= EUSISequence.POSITION)
                 {
-                    await SendToDownstreamAsyncNoLock(m_last_position);
+                    SendToDownstreamNoLock(m_last_position);
                 }
                 if (settings.resend_go && m_initial_sequence_done >= EUSISequence.GO)
                 {
-                    await SendToDownstreamAsyncNoLock(m_last_go);
+                    SendToDownstreamNoLock(m_last_go);
                 }
             }
 
@@ -396,7 +413,7 @@ namespace tanuki_phoenix
             m_process_semaphore.Release();
             m_process_stdout_semaphore.Release();
             m_process_stdin_semaphore.Release();
-            Debug.WriteLine("process init OK. release the process...OK");
+            Log("M  ) process init OK. release the process...OK");
         }
 
     }
