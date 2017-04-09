@@ -65,6 +65,10 @@ using namespace std;
 using namespace Search;
 using namespace Eval;
 
+namespace {
+  static constexpr char* OPTION_VERBOSE = "Verbose";
+}
+
 // 定跡ファイル名
 string book_name;
 
@@ -77,6 +81,8 @@ static fstream result_log;
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
 {
+  o[OPTION_VERBOSE] << Option(false);
+
   // 
   //   定跡設定
   //
@@ -2563,6 +2569,7 @@ void Thread::search()
   int lastInfoTime = 0;
   // PVの出力間隔[ms]
   int pv_interval = Options["PvInterval"];
+  bool verbose = Options[OPTION_VERBOSE];
 
   // もし自分がメインスレッドであるならmainThreadにそのポインタを入れる。
   // 自分がスレーブのときはnullptrになる。
@@ -2667,13 +2674,13 @@ void Thread::search()
           break;
 
         // main threadでfail high/lowが起きたなら読み筋をGUIに出力する。
-        // ただし出力を散らかさないように思考開始から3秒経ってないときは抑制する。
+        // Verboseオプションが有効の場合、または思考開始から3秒経っている場合に出力する。
         if (mainThread && !Limits.silent
           && multiPV == 1
           && (bestValue <= alpha || beta <= bestValue)
-          && Time.elapsed() > 3000
+          && ((Time.elapsed() > 3000
           // 将棋所のコンソールが詰まるのを予防するために出力を少し抑制する。
-          && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())
+          && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())) || verbose)
           )
         {
           lastInfoTime = Time.elapsed();
@@ -2728,6 +2735,8 @@ void Thread::search()
         // 停止するときにもPVを出力すべき。(少なくともnode数などは出力されるべき)
         // (そうしないと正確な探索node数がわからなくなってしまう)
         if (Signals.stop ||
+          // Verboseオプションが有効になっている場合は出力する
+          verbose ||
           // MultiPVのときは最後の候補手を求めた直後とする。
           // ただし、時間が3秒以上経過してからは、MultiPVのそれぞれの指し手ごと。
           ((PVIdx + 1 == multiPV || Time.elapsed() > 3000)
