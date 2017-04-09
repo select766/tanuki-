@@ -36,6 +36,9 @@ namespace tanuki_proxy
         public static string upstreamPosition = "";
         public static int numberOfReadyoks = 0;
         public static System.Random random = new System.Random();
+        private static object lastShowPvLockObject = new object();
+        private static DateTime lastShowPv = DateTime.Now;
+        private static double showPvSupressionMs = 200.0;
 
         [DataContract]
         public struct Option
@@ -185,12 +188,6 @@ namespace tanuki_proxy
                 // コマンドをBlockingCollectionに入れる。
                 // 入れられたコマンドは別のスレッドで処理される。
                 commandQueue.Add(input);
-            }
-
-            private static void WriteLineAndFlush(TextWriter textWriter, string format, params object[] arg)
-            {
-                textWriter.WriteLine(format, arg);
-                textWriter.Flush();
             }
 
             private static string Join(IEnumerable<string> command)
@@ -362,39 +359,46 @@ namespace tanuki_proxy
                     Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
 
                     // Fail-low/Fail-highした探索結果は表示しない
-                    if (!command.Contains("lowerbound") && !command.Contains("upperbound") && depth < tempDepth)
+                    lock (lastShowPvLockObject)
                     {
-                        // voteの表示
-                        Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        foreach (var engineBestmove in engineBestmoves)
+                        if (lastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now &&
+                            !command.Contains("lowerbound") &&
+                            !command.Contains("upperbound") &&
+                            depth < tempDepth)
                         {
-                            if (engineBestmove.move == null)
+                            // voteの表示
+                            Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
+                            foreach (var engineBestmove in engineBestmoves)
                             {
-                                continue;
-                            }
+                                if (engineBestmove.move == null)
+                                {
+                                    continue;
+                                }
 
-                            if (!bestmoveToCount.ContainsKey(engineBestmove.move))
+                                if (!bestmoveToCount.ContainsKey(engineBestmove.move))
+                                {
+                                    bestmoveToCount.Add(engineBestmove.move, 0);
+                                }
+                                ++bestmoveToCount[engineBestmove.move];
+                            }
+                            List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
+                            bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+
+                            string vote = "info string";
+                            foreach (var p in bestmoveAndCount)
                             {
-                                bestmoveToCount.Add(engineBestmove.move, 0);
+                                vote += " ";
+                                vote += p.Key;
+                                vote += "=";
+                                vote += p.Value;
                             }
-                            ++bestmoveToCount[engineBestmove.move];
-                        }
-                        List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
-                        bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+                            WriteLineAndFlush(Console.Out, vote);
 
-                        string vote = "info string";
-                        foreach (var p in bestmoveAndCount)
-                        {
-                            vote += " ";
-                            vote += p.Key;
-                            vote += "=";
-                            vote += p.Value;
+                            // info pvの表示
+                            WriteLineAndFlush(Console.Out, Join(command));
+                            depth = tempDepth;
+                            lastShowPv = DateTime.Now;
                         }
-                        WriteLineAndFlush(Console.Out, vote);
-
-                        // info pvの表示
-                        WriteLineAndFlush(Console.Out, Join(command));
-                        depth = tempDepth;
                     }
                 }
             }
@@ -575,8 +579,8 @@ namespace tanuki_proxy
                             }
                             depth = 0;
                             TransitUpstreamState(UpstreamState.Thinking);
-                            Console.WriteLine("info string " + upstreamPosition);
-                            Console.Out.Flush();
+                            WriteLineAndFlush(Console.Out, "info string " + upstreamPosition);
+                            lastShowPv = DateTime.Now;
                         }
                     }
                     else if (command[0] == "isready")
@@ -720,6 +724,11 @@ namespace tanuki_proxy
                 }
             }
             return null;
+        }
+        private static void WriteLineAndFlush(TextWriter textWriter, string format, params object[] arg)
+        {
+            textWriter.WriteLine(format, arg);
+            textWriter.Flush();
         }
     }
 }
