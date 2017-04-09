@@ -280,6 +280,10 @@ namespace tanuki_phoenix
                         m_last_go = line;
                         m_initial_sequence_done = EUSISequence.GO;
                     }
+                    if (line.StartsWith("stop") || line.StartsWith("gameover"))
+                    {
+                        m_initial_sequence_done = EUSISequence.NO_POSITION_GO;
+                    }
                     // setoptionの保存
                     if (line.StartsWith("usi setoption"))
                     {
@@ -335,7 +339,8 @@ namespace tanuki_phoenix
             info.ErrorDialog = false;
             info.UseShellExecute = false;
             
-            Process p = Process.Start(info);
+            Process p = new Process();
+            p.StartInfo = info;
 
             p.EnableRaisingEvents = true;
             p.Exited += new EventHandler((object o, EventArgs e) =>
@@ -350,9 +355,11 @@ namespace tanuki_phoenix
 
             Console.WriteLine("info string tanuki-phoenix: launching a process. {0}/{1}", m_n_retried, settings.retry_count);
             Debug.WriteLine(String.Format("launching #{0}/{1}-th process", m_n_retried, settings.retry_count));
-            Log("LAUNCH");
 
             m_active_process = p;
+            Log("LAUNCH..");
+            m_active_process.Start();
+            Log("LAUNCHED");
 
             // 他のタスクが読み書きできるようになる前に初期化シーケンスを行う
             {
