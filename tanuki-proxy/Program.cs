@@ -144,21 +144,22 @@ namespace tanuki_proxy
                         continue;
                     }
 
-                    string[] split = Split(input);
-                    if (split.Length == 0)
+                    var command = Split(input);
+                    if (command.Count == 0)
                     {
                         continue;
                     }
 
                     // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
-                    if (HandleSetoption(input))
+                    if (command.Contains("setoption"))
                     {
-                        continue;
+                        HandleSetoption(command);
                     }
-
-                    Debug.WriteLine("     >> engine={0} command={1}", name, Concat(split));
-                    process.StandardInput.WriteLine(input);
-                    process.StandardInput.Flush();
+                    else
+                    {
+                        Debug.WriteLine("  P> engine={0} command={1}", name, Join(command));
+                        WriteLineAndFlush(process.StandardInput, Join(command));
+                    }
                 }
             }
 
@@ -180,37 +181,40 @@ namespace tanuki_proxy
                 commandQueue.Add(input);
             }
 
+            private static void WriteLineAndFlush(TextWriter textWriter, string format, params object[] arg)
+            {
+                textWriter.WriteLine(format, arg);
+                textWriter.Flush();
+            }
+
+            private static string Join(IEnumerable<string> command)
+            {
+                return string.Join(" ", command);
+            }
+
             /// <summary>
             /// setoptionコマンドを処理する
             /// </summary>
             /// <param name="input">UIまたは上流proxyからのコマンド文字列</param>
             /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
-            private bool HandleSetoption(string input)
+            private void HandleSetoption(List<string> command)
             {
-                string[] split = Split(input);
-                if (split[0] != "setoption")
-                {
-                    return false;
-                }
-
                 // エンジンに対して値を設定する時に送ります。
-                Debug.Assert(split.Length == 5);
-                Debug.Assert(split[1] == "name");
-                Debug.Assert(split[3] == "value");
+                Debug.Assert(command.Count == 5);
+                Debug.Assert(command[1] == "name");
+                Debug.Assert(command[3] == "value");
 
                 // オプションをオーバーライドする
                 foreach (var optionOverride in optionOverrides)
                 {
-                    if (split[2] == optionOverride.name)
+                    if (command[2] == optionOverride.name)
                     {
-                        split[4] = optionOverride.value;
+                        command[4] = optionOverride.value;
                     }
                 }
 
-                Debug.WriteLine("     >> engine={0} command={1}", name, Concat(split));
-                process.StandardInput.WriteLine(Concat(split));
-                process.StandardInput.Flush();
-                return true;
+                Debug.WriteLine("  P> engine={0} command={1}", name, Join(command));
+                WriteLineAndFlush(process.StandardInput, Join(command));
             }
 
             /// <summary>
@@ -225,33 +229,31 @@ namespace tanuki_proxy
                     return;
                 }
 
-                Debug.WriteLine("     << engine={0} command={1}", name, e.Data);
+                Debug.WriteLine("  <D engine={0} command={1}", name, e.Data);
 
-                string[] split = Split(e.Data);
+                var command = Split(e.Data);
 
-                if (HandleReadyok(e.Data))
+                if (command.Contains("readyok"))
                 {
-                    return;
+                    HandleReadyok(command);
                 }
-
-                if (HandlePosition(e.Data))
+                else if (command.Contains("position"))
                 {
-                    return;
+                    HandlePosition(command);
                 }
-
-                if (HandlePv(e.Data))
+                else if (command.Contains("pv"))
                 {
-                    return;
+                    HandlePv(command);
                 }
-
-                if (HandleBestmove(e.Data))
+                else if (command.Contains("bestmove"))
                 {
-                    return;
+                    HandleBestmove(command);
                 }
-
-                Debug.WriteLine("  <<    engine={0} command={1}", name, e.Data);
-                Console.WriteLine(e.Data);
-                Console.Out.Flush();
+                else
+                {
+                    Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
+                    WriteLineAndFlush(Console.Out, Join(command));
+                }
             }
 
             /// <summary>
@@ -265,7 +267,7 @@ namespace tanuki_proxy
                 {
                     return;
                 }
-                Debug.WriteLine("!!!!! engine={0} command={1}", name, e.Data);
+                Debug.WriteLine("  <d engine={0} command={1}", name, e.Data);
             }
 
             private int getNumberOfRunningEngines()
@@ -281,70 +283,49 @@ namespace tanuki_proxy
                 return numberOfRunningEngines;
             }
 
-            private bool HandleReadyok(string output)
+            private void HandleReadyok(List<string> command)
             {
-                string[] split = Split(output);
-                if (!Contains(split, "readyok"))
-                {
-                    return false;
-                }
-
                 // goコマンドが受理されたのでpvの受信を開始する
                 lock (upstreamLockObject)
                 {
                     if (getNumberOfRunningEngines() == ++numberOfReadyoks)
                     {
-                        Debug.WriteLine("  <<    engine={0} command={1}", name, output);
-                        Console.WriteLine(output);
+                        Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
+                        WriteLineAndFlush(Console.Out, Join(command));
                     }
                 }
-
-                return true;
             }
 
             /// <summary>
             /// info string startedを受信し、goコマンドが受理されたときの処理を行う
             /// </summary>
-            /// <param name="output">思考エンジンの出力文字列</param>
+            /// <param name="command">思考エンジンの出力文字列</param>
             /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
-            private bool HandlePosition(string output)
+            private void HandlePosition(List<string> command)
             {
-                string[] split = Split(output);
-                if (!Contains(split, "position"))
-                {
-                    return false;
-                }
-
                 // goコマンドが受理されたのでpvの受信を開始する
                 lock (downstreamLockObject)
                 {
-                    downstreamPosition = output.Substring(output.IndexOf("position"));
+                    int index = command.IndexOf("position");
+                    downstreamPosition = Join(command.Skip(index));
                     Debug.WriteLine("downstreamPosition=" + downstreamPosition);
                 }
-
-                return true;
             }
 
             /// <summary>
             /// pvを含むinfoコマンドを処理する
             /// </summary>
-            /// <param name="output">思考エンジンの出力文字列</param>
+            /// <param name="command">思考エンジンの出力文字列</param>
             /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
-            private bool HandlePv(string output)
+            private void HandlePv(List<string> command)
             {
-                string[] split = Split(output);
-                if (!Contains(split, "pv"))
-                {
-                    return false;
-                }
-
                 lock (upstreamLockObject)
                 {
                     // 上流停止中はpvを含む行を処理しない
                     if (upstreamState == UpstreamState.Stopped)
                     {
                         //Debug.WriteLine("     ## process={0} upstreamState == UpstreamState.Stopped", process);
-                        return true;
+                        return;
                     }
 
                     lock (downstreamLockObject)
@@ -353,30 +334,29 @@ namespace tanuki_proxy
                         if (upstreamPosition != downstreamPosition)
                         {
                             Debug.WriteLine("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
-                            return true;
+                            return;
                         }
                     }
 
-                    int depthIndex = Array.FindIndex(split, x => x == "depth");
-                    int pvIndex = Array.FindIndex(split, x => x == "pv");
+                    int depthIndex = command.IndexOf("depth");
+                    int pvIndex = command.IndexOf("pv");
 
                     // Fail-low/Fail-highした探索結果は保持しない
-                    if (depthIndex == -1 || pvIndex == -1 || Contains(split, "lowerbound") || Contains(split, "upperbound"))
+                    if (depthIndex == -1 || pvIndex == -1 || command.Contains("lowerbound") || command.Contains("upperbound"))
                     {
-                        return true;
+                        return;
                     }
 
-                    int tempDepth = int.Parse(split[depthIndex + 1]);
+                    int tempDepth = int.Parse(command[depthIndex + 1]);
 
-
-                    Debug.Assert(pvIndex + 1 < split.Length);
-                    bestmoveBestMoves[id] = split[pvIndex + 1];
-                    if (pvIndex + 2 < split.Length)
+                    Debug.Assert(pvIndex + 1 < command.Count);
+                    bestmoveBestMoves[id] = command[pvIndex + 1];
+                    if (pvIndex + 2 < command.Count)
                     {
-                        bestmovePonders[id] = split[pvIndex + 2];
+                        bestmovePonders[id] = command[pvIndex + 2];
                     }
 
-                    Debug.WriteLine("  <<    engine={0} command={1}", name, output);
+                    Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
 
                     if (depth < tempDepth)
                     {
@@ -395,8 +375,8 @@ namespace tanuki_proxy
                             ++bestmoveToCount[bestmoveBestMoves[i]];
                         }
                         List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
-                        bestmoveAndCount.Sort((KeyValuePair<string, int>  lh, KeyValuePair<string, int>  rh) => { return -(lh.Value - rh.Value); });
-                           
+                        bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+
                         string vote = "info string";
                         foreach (var p in bestmoveAndCount)
                         {
@@ -405,40 +385,29 @@ namespace tanuki_proxy
                             vote += "=";
                             vote += p.Value;
                         }
-                        Console.WriteLine(vote);
-                        Console.Out.Flush();
+                        WriteLineAndFlush(Console.Out, vote);
 
                         // info pvの表示
-                        Console.WriteLine(output);
-                        Console.Out.Flush();
-                        //WriteToEachEngine("broadcast " + output);
+                        WriteLineAndFlush(Console.Out, Join(command));
                         depth = tempDepth;
                     }
                 }
-
-                return true;
             }
 
-            private bool HandleBestmove(string output)
+            private void HandleBestmove(List<string> command)
             {
-                string[] split = Split(output);
-                if (!Contains(split, "bestmove"))
-                {
-                    return false;
-                }
-
-                if (split[1] == "resign" || split[1] == "win")
+                if (command[1] == "resign" || command[1] == "win")
                 {
                     for (int i = 0; i < bestmoveBestMoves.Length; ++i)
                     {
-                        bestmoveBestMoves[i] = split[1];
+                        bestmoveBestMoves[i] = command[1];
                         bestmovePonders[i] = null;
                     }
-                    if (split.Length == 4 && split[2] == "ponder")
+                    if (command.Count == 4 && command[2] == "ponder")
                     {
                         for (int i = 0; i < bestmoveBestMoves.Length; ++i)
                         {
-                            bestmovePonders[i] = split[3];
+                            bestmovePonders[i] = command[3];
                         }
                     }
                 }
@@ -450,7 +419,7 @@ namespace tanuki_proxy
                     if (upstreamState == UpstreamState.Stopped)
                     {
                         //Debug.WriteLine("     ## process={0} upstreamState == UpstreamState.Stopped", process);
-                        return true;
+                        return;
                     }
 
                     lock (downstreamLockObject)
@@ -458,19 +427,19 @@ namespace tanuki_proxy
                         // 思考中の局面が違う場合は処理しない
                         if (upstreamPosition != downstreamPosition)
                         {
-                            Debug.WriteLine("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
-                            return true;
+                            Debug.WriteLine("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                            return;
                         }
                     }
 
                     if (bestmoveBestMoves == null)
                     {
-                        return true;
+                        return;
                     }
 
                     if (bestmovePonders == null)
                     {
-                        return true;
+                        return;
                     }
 
                     Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
@@ -501,12 +470,12 @@ namespace tanuki_proxy
                     int ponderCount = 0;
                     string ponder = null;
                     for (int i = 0; i < bestmoveBestMoves.Length; ++i)
+                    {
+                        if (bestmoveBestMoves[i] != bestmove)
                         {
-                            if (bestmoveBestMoves[i] != bestmove)
-                            {
-                                continue;
-                            }
-                            if(bestmovePonders[i] == null)
+                            continue;
+                        }
+                        if (bestmovePonders[i] == null)
                         {
                             continue;
                         }
@@ -517,18 +486,18 @@ namespace tanuki_proxy
                         }
                     }
 
-                    string command = null;
+                    string outputCommand = null;
                     if (!string.IsNullOrEmpty(ponder))
                     {
-                        command = string.Format("bestmove {0} ponder {1}", bestmove, ponder);
+                        outputCommand = string.Format("bestmove {0} ponder {1}", bestmove, ponder);
                     }
                     else
                     {
-                        command = string.Format("bestmove {0}", bestmove);
+                        outputCommand = string.Format("bestmove {0}", bestmove);
                     }
 
-                    Debug.WriteLine("  <<    engine={0} command={1}", name, command);
-                    Console.WriteLine(command);
+                    Debug.WriteLine("  <<    engine={0} command={1}", name, outputCommand);
+                    WriteLineAndFlush(Console.Out, outputCommand);
 
                     TransitUpstreamState(UpstreamState.Stopped);
                     depth = 0;
@@ -536,26 +505,10 @@ namespace tanuki_proxy
                     bestmovePonders = null;
                     WriteToEachEngine("stop");
                 }
-
-                return true;
             }
         }
 
         static List<Engine> engines = new List<Engine>();
-
-        static string Concat(string[] split)
-        {
-            string result = "";
-            foreach (var word in split)
-            {
-                if (result.Length != 0)
-                {
-                    result += " ";
-                }
-                result += word;
-            }
-            return result;
-        }
 
         static int GetProcessId()
         {
@@ -573,7 +526,7 @@ namespace tanuki_proxy
             string logFileFormat = setting.logDirectory + "\\" + DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + string.Format("_pid={0}", GetProcessId()) + ".txt";
             Debug.Listeners.Add(new TextWriterTraceListener(new StreamWriter(logFileFormat, false, Encoding.UTF8)));
 
-            
+
             for (int id = 0; id < setting.engines.Length; ++id)
             {
                 engines.Add(new Engine(setting.engines[id], id));
@@ -590,9 +543,9 @@ namespace tanuki_proxy
                 string input;
                 while ((input = Console.ReadLine()) != null)
                 {
-                    string[] split = Split(input);
+                    var command = Split(input);
 
-                    if (split[0] == "go")
+                    if (command[0] == "go")
                     {
                         // 思考開始の合図です。エンジンはこれを受信すると思考を開始します。
                         lock (upstreamLockObject)
@@ -605,14 +558,14 @@ namespace tanuki_proxy
                             Console.Out.Flush();
                         }
                     }
-                    else if (split[0] == "isready")
+                    else if (command[0] == "isready")
                     {
                         lock (upstreamLockObject)
                         {
                             numberOfReadyoks = 0;
                         }
                     }
-                    else if (split[0] == "position")
+                    else if (command[0] == "position")
                     {
                         lock (upstreamLockObject)
                         {
@@ -655,14 +608,9 @@ namespace tanuki_proxy
             }
         }
 
-        static string[] Split(string s)
+        static List<string> Split(string s)
         {
-            return new Regex("\\s+").Split(s);
-        }
-
-        static bool Contains(string[] strings, string s)
-        {
-            return Array.FindIndex(strings, x => x == s) != -1;
+            return new List<string>(new Regex("\\s+").Split(s));
         }
 
         static void TransitUpstreamState(UpstreamState newUpstreamState)
