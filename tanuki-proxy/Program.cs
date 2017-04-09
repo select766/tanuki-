@@ -547,7 +547,7 @@ namespace tanuki_proxy
             Debug.Listeners.Add(new TextWriterTraceListener(Console.Error));
             string logFileFormat = Path.Combine(setting.logDirectory, string.Format("tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
             Debug.Listeners.Add(new TextWriterTraceListener(new StreamWriter(logFileFormat, false, Encoding.UTF8)));
-
+            Debug.AutoFlush = true;
 
             for (int id = 0; id < setting.engines.Length; ++id)
             {
