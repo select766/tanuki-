@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TanukiColiseum", "TanukiCol
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "tanuki-proxy", "tanuki-proxy\tanuki-proxy.csproj", "{7953A2CB-956C-4AC4-9280-2D726FB632A4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "tanuki-phoenix", "tanuki-phoenix\tanuki-phoenix.csproj", "{9C8A4B51-BD93-4584-80DD-9E410B1DF503}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{7953A2CB-956C-4AC4-9280-2D726FB632A4}.Release|x64.Build.0 = Release|Any CPU
 		{7953A2CB-956C-4AC4-9280-2D726FB632A4}.Release|x86.ActiveCfg = Release|Any CPU
 		{7953A2CB-956C-4AC4-9280-2D726FB632A4}.Release|x86.Build.0 = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|x64.Build.0 = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Debug|x86.Build.0 = Debug|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|x64.ActiveCfg = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|x64.Build.0 = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|x86.ActiveCfg = Release|Any CPU
+		{9C8A4B51-BD93-4584-80DD-9E410B1DF503}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
