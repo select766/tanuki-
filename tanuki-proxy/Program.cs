@@ -407,23 +407,6 @@ namespace tanuki_proxy
 
             private void HandleBestmove(List<string> command)
             {
-                if (command[1] == "resign" || command[1] == "win")
-                {
-                    foreach (var engineBestmove in engineBestmoves)
-                    {
-                        engineBestmove.move = command[1];
-                        engineBestmove.ponder = null;
-                    }
-
-                    if (command.Count == 4 && command[2] == "ponder")
-                    {
-                        foreach (var engineBestmove in engineBestmoves)
-                        {
-                            engineBestmove.move = command[3];
-                        }
-                    }
-                }
-
                 // 手番かつ他の思考エンジンがbestmoveを返していない時のみ
                 // bestmoveを返すようにする
                 lock (upstreamLockObject)
@@ -448,6 +431,23 @@ namespace tanuki_proxy
                     if (engineBestmoves == null)
                     {
                         return;
+                    }
+
+                    if (command[1] == "resign" || command[1] == "win")
+                    {
+                        foreach (var engineBestmove in engineBestmoves)
+                        {
+                            engineBestmove.move = command[1];
+                            engineBestmove.ponder = null;
+                        }
+
+                        if (command.Count == 4 && command[2] == "ponder")
+                        {
+                            foreach (var engineBestmove in engineBestmoves)
+                            {
+                                engineBestmove.move = command[3];
+                            }
+                        }
                     }
 
                     var bestmoveToCount = new Dictionary<string, CountAndScore>();
