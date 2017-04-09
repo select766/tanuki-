@@ -130,22 +130,20 @@ namespace tanuki_phoenix
         // 上流に送る
         void SendToUpstream(string line)
         {
+            Log("U< {0} (sending)", line);
             Console.WriteLine(line);
-            Log("U< {0}", line);
+            Log("U< {0} (sent)", line);
         }
 
         // 上流からもらう
-        async Task<string> RecvFromUpstreamAsync()
+        async Task<string> RecvFromUpstreamAsync(System.IO.StreamReader stdin_reader)
         {
-            using (var stdin = Console.OpenStandardInput())
-            using (var stdin_reader = new System.IO.StreamReader(stdin))
-            {
-                string line = await stdin_reader.ReadLineAsync();
-                line = line.TrimEnd();
-                Debug.WriteLine(String.Format("U> {0}", line));
-                Log("U> {0}", line);
-                return line;
-            }
+            Log("U> (waiting)");
+            string line = await stdin_reader.ReadLineAsync();
+            line = line.TrimEnd();
+            Debug.WriteLine(String.Format("U> {0}", line));
+            Log("U> {0}", line);
+            return line;
         }
 
         // 下流に送る
@@ -158,8 +156,10 @@ namespace tanuki_phoenix
         async Task SendToDownstreamAsyncNoLock(string line)
         {
             Debug.WriteLine(String.Format(">D {0}", line));
-            Log(">D {0}", line);
+            Log(">D {0} (sending)", line);
             await m_active_process.StandardInput.WriteLineAsync(line);
+            await m_active_process.StandardInput.FlushAsync();
+            Log(">D {0} (sent)", line);
         }
 
         // 下流からもらう
@@ -260,10 +260,12 @@ namespace tanuki_phoenix
             Task upstream_to_downstream_task = Task.Run(async () =>
             {
                 Debug.WriteLine("upstream_to_downstream_task started.");
+                using (var stdin = Console.OpenStandardInput())
+                using (var stdin_reader = new System.IO.StreamReader(stdin))
                 while (true)
                 {
                     // 上流から読み込む
-                    string line = await RecvFromUpstreamAsync();
+                    string line = await RecvFromUpstreamAsync(stdin_reader);
 
                     // 初期化シーケンスの完了をマーク
                     if (line == "usinewgame") m_initial_sequence_done = EUSISequence.USINEWGAME;
