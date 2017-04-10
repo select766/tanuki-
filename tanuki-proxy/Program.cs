@@ -1,15 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Text.RegularExpressions;
+using System.Threading;
+using static tanuki_proxy.Logging;
 
 namespace tanuki_proxy
 {
@@ -166,7 +165,7 @@ namespace tanuki_proxy
                     }
                     else
                     {
-                        Debug.WriteLine("  P> engine={0} command={1}", name, Join(command));
+                        Log("  P> engine={0} command={1}", name, Join(command));
                         WriteLineAndFlush(process.StandardInput, Join(command));
                     }
                 }
@@ -216,7 +215,7 @@ namespace tanuki_proxy
                     }
                 }
 
-                Debug.WriteLine("  P> engine={0} command={1}", name, Join(command));
+                Log("  P> engine={0} command={1}", name, Join(command));
                 WriteLineAndFlush(process.StandardInput, Join(command));
             }
 
@@ -232,7 +231,7 @@ namespace tanuki_proxy
                     return;
                 }
 
-                Debug.WriteLine("  <D engine={0} command={1}", name, e.Data);
+                Log("  <D engine={0} command={1}", name, e.Data);
 
                 var command = Split(e.Data);
 
@@ -254,7 +253,7 @@ namespace tanuki_proxy
                 }
                 else
                 {
-                    Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
+                    Log("<P   engine={0} command={1}", name, Join(command));
                     WriteLineAndFlush(Console.Out, Join(command));
                 }
             }
@@ -270,7 +269,7 @@ namespace tanuki_proxy
                 {
                     return;
                 }
-                Debug.WriteLine("  <d engine={0} command={1}", name, e.Data);
+                Log("  <d engine={0} command={1}", name, e.Data);
             }
 
             private int getNumberOfRunningEngines()
@@ -285,7 +284,7 @@ namespace tanuki_proxy
                 {
                     if (getNumberOfRunningEngines() == Interlocked.Increment(ref numberOfReadyoks))
                     {
-                        Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
+                        Log("<P   engine={0} command={1}", name, Join(command));
                         WriteLineAndFlush(Console.Out, Join(command));
                     }
                 }
@@ -303,7 +302,7 @@ namespace tanuki_proxy
                 {
                     int index = command.IndexOf("position");
                     downstreamPosition = Join(command.Skip(index));
-                    Debug.WriteLine("downstreamPosition=" + downstreamPosition);
+                    Log("downstreamPosition=" + downstreamPosition);
                 }
             }
 
@@ -319,7 +318,7 @@ namespace tanuki_proxy
                     // 上流停止中はpvを含む行を処理しない
                     if (upstreamState == UpstreamState.Stopped)
                     {
-                        //Debug.WriteLine("     ## process={0} upstreamState == UpstreamState.Stopped", process);
+                        //Log("     ## process={0} upstreamState == UpstreamState.Stopped", process);
                         return;
                     }
 
@@ -328,7 +327,7 @@ namespace tanuki_proxy
                         // 思考中の局面が違う場合は処理しない
                         if (upstreamPosition != downstreamPosition)
                         {
-                            Debug.WriteLine("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                            Log("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                             return;
                         }
                     }
@@ -356,7 +355,7 @@ namespace tanuki_proxy
                         engineBestmoves[id].score = score;
                     }
 
-                    Debug.WriteLine("<P   engine={0} command={1}", name, Join(command));
+                    Log("<P   engine={0} command={1}", name, Join(command));
 
                     // Fail-low/Fail-highした探索結果は表示しない
                     lock (lastShowPvLockObject)
@@ -417,7 +416,7 @@ namespace tanuki_proxy
                 {
                     if (upstreamState == UpstreamState.Stopped)
                     {
-                        //Debug.WriteLine("     ## process={0} upstreamState == UpstreamState.Stopped", process);
+                        //Log("     ## process={0} upstreamState == UpstreamState.Stopped", process);
                         return;
                     }
 
@@ -426,7 +425,7 @@ namespace tanuki_proxy
                         // 思考中の局面が違う場合は処理しない
                         if (upstreamPosition != downstreamPosition)
                         {
-                            Debug.WriteLine("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                            Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                             return;
                         }
                     }
@@ -519,7 +518,7 @@ namespace tanuki_proxy
                         outputCommand = string.Format("bestmove {0}", bestmove);
                     }
 
-                    Debug.WriteLine("  <<    engine={0} command={1}", name, outputCommand);
+                    Log("  <<    engine={0} command={1}", name, outputCommand);
                     WriteLineAndFlush(Console.Out, outputCommand);
 
                     TransitUpstreamState(UpstreamState.Stopped);
@@ -544,10 +543,8 @@ namespace tanuki_proxy
         {
             //writeSampleSetting();
             ProxySetting setting = loadSetting();
-            Debug.Listeners.Add(new TextWriterTraceListener(Console.Error));
             string logFileFormat = Path.Combine(setting.logDirectory, string.Format("tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
-            Debug.Listeners.Add(new TextWriterTraceListener(new StreamWriter(logFileFormat, false, Encoding.UTF8)));
-            Debug.AutoFlush = true;
+            Logging.Open(logFileFormat);
 
             for (int id = 0; id < setting.engines.Length; ++id)
             {
@@ -595,7 +592,7 @@ namespace tanuki_proxy
                         lock (upstreamLockObject)
                         {
                             upstreamPosition = input;
-                            Debug.WriteLine("upstreamPosition=" + upstreamPosition);
+                            Log("upstreamPosition=" + upstreamPosition);
                         }
                     }
 
@@ -609,7 +606,7 @@ namespace tanuki_proxy
             }
             finally
             {
-                Debug.Flush();//すべての出力をファイルに書き込むのに必要
+                Logging.Close();
                 foreach (var engine in engines)
                 {
                     engine.Close();
@@ -640,7 +637,7 @@ namespace tanuki_proxy
 
         static void TransitUpstreamState(UpstreamState newUpstreamState)
         {
-            Debug.WriteLine("  || upstream {0} > {1}", upstreamState, newUpstreamState);
+            Log("  || upstream {0} > {1}", upstreamState, newUpstreamState);
             upstreamState = newUpstreamState;
         }
 
