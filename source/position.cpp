@@ -1401,10 +1401,18 @@ RepetitionState Position::is_repetition(const int repPly) const
 
   if (i <= e)
   {
+    // stp->previous等がnullptrになる場合があるのでチェックする
+    if (st == nullptr || st->previous == nullptr|| st->previous->previous == nullptr) {
+      return REPETITION_NONE;
+    }
     auto stp = st->previous->previous;
     auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
 
     do {
+      // stp->previous等がnullptrになる場合があるのでチェックする
+      if (stp == nullptr || stp->previous == nullptr || stp->previous->previous == nullptr) {
+        return REPETITION_NONE;
+      }
       stp = stp->previous->previous;
 
       // 同じboard hash keyの局面であるか？
