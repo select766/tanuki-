@@ -4,6 +4,7 @@
 #include <omp.h>
 #include <sstream>
 #include <vector>
+#include <ctime>
 
 #include "math.h"
 #include "misc.h"
@@ -11,16 +12,20 @@
 #include "search.h"
 #include "shogi.h"
 
+#ifndef _MAX_PATH
+#   define _MAX_PATH   260
+#endif
+
 using USI::Option;
 
 namespace {
-  constexpr char* kProgressBookFile = "ProgressBookFile";
-  constexpr char* kProgressFilePath = "ProgressFilePath";
-  constexpr char* kProgressLearningRate = "ProgressLearningRate";
-  constexpr char* kProgressNumGamesForTesting = "ProgressNumGamesForTesting";
-  constexpr char* kProgressNumGamesForTraining = "ProgressNumGamesForTraining";
-  constexpr char* kProgressNumIterations = "ProgressNumIterations";
-  constexpr char* kThreads = "Threads";
+  const constexpr char* kProgressBookFile = "ProgressBookFile";
+  const constexpr char* kProgressFilePath = "ProgressFilePath";
+  const constexpr char* kProgressLearningRate = "ProgressLearningRate";
+  const constexpr char* kProgressNumGamesForTesting = "ProgressNumGamesForTesting";
+  const constexpr char* kProgressNumGamesForTraining = "ProgressNumGamesForTraining";
+  const constexpr char* kProgressNumIterations = "ProgressNumIterations";
+  const constexpr char* kThreads = "Threads";
 
   constexpr double kAdamBeta1 = 0.9;
   constexpr double kAdamBeta2 = 0.999;
@@ -165,7 +170,7 @@ bool Progress::Learn() {
       pos.set_hirate();
       int num_moves = static_cast<int>(game.size());
       //sync_cout << "num_moves: " << num_moves << sync_endl;
-      StateInfo state_infos[300] = { 0 };
+      StateInfo state_infos[300] = {{ 0 }};
       for (int move_index = 0; move_index < num_moves; ++move_index) {
         pos.do_move(game[move_index], state_infos[move_index]);
 
@@ -207,7 +212,7 @@ bool Progress::Learn() {
       Position pos;
       pos.set_hirate();
       int num_moves = static_cast<int>(game.size());
-      StateInfo state_infos[300] = { 0 };
+      StateInfo state_infos[300] = {{ 0 }};
       for (int move_index = 0; move_index < num_moves; ++move_index) {
         pos.do_move(game[move_index], state_infos[move_index]);
 

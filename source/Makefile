@@ -76,7 +76,10 @@ SOURCES  = shogi.cpp                                                           \
 	engine/must-capture-shogi-engine/must-capture-shogi.cpp                    \
 	learn/learner.cpp                                                          \
 	learn/multi_think.cpp                                                      \
-	learn/evaluate_kppt_learn.cpp   
+	learn/evaluate_kppt_learn.cpp                                              \
+	experimental_progress.cpp                                                  \
+	progress_report.cpp                                                        \
+	math.cpp
 																               
 #ifeq ($(YANEURAOU_EDITION),YANEURAOU_2016_LATE_ENGINE)				               
 #	SOURCES += engine/2016-late-engine/2016-late-search.cpp                    \

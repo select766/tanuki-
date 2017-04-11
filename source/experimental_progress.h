@@ -18,7 +18,7 @@ public:
   double Estimate(const Position& pos);
 
 private:
-  double weights_[SQ_NB][Eval::fe_end] = { 0 };
+  double weights_[SQ_NB][Eval::fe_end] = {{ 0 }};
 };
 
 #endif
