@@ -67,14 +67,17 @@ namespace tanuki_proxy
             public string workingDirectory { get; set; }
             [DataMember]
             public Option[] optionOverrides { get; set; }
+            [DataMember]
+            public bool timeKeeper { get; set; } = false;
 
-            public EngineOption(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides)
+            public EngineOption(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, bool timeKeeper)
             {
                 this.engineName = engineName;
                 this.fileName = fileName;
                 this.arguments = arguments;
                 this.workingDirectory = workingDirectory;
                 this.optionOverrides = optionOverrides;
+                this.timeKeeper = timeKeeper;
             }
 
             public EngineOption()
@@ -94,16 +97,17 @@ namespace tanuki_proxy
 
         class Engine
         {
-            private Process process = new Process();
-            private Option[] optionOverrides;
+            private readonly Process process = new Process();
+            private readonly Option[] optionOverrides;
             private string downstreamPosition = "";
-            private object downstreamLockObject = new object();
-            private BlockingCollection<string> commandQueue = new BlockingCollection<string>();
+            private readonly object downstreamLockObject = new object();
+            private readonly BlockingCollection<string> commandQueue = new BlockingCollection<string>();
             private Thread thread;
             public string name { get; }
-            private int id;
+            private readonly int id;
+            private readonly bool timeKeeper;
 
-            public Engine(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id)
+            public Engine(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool timeKeeper)
             {
                 this.name = engineName;
                 this.process.StartInfo.FileName = fileName;
@@ -117,9 +121,10 @@ namespace tanuki_proxy
                 this.process.ErrorDataReceived += HandleStderr;
                 this.optionOverrides = optionOverrides;
                 this.id = id;
+                this.timeKeeper = timeKeeper;
             }
 
-            public Engine(EngineOption opt, int id) : this(opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id)
+            public Engine(EngineOption opt, int id) : this(opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.timeKeeper)
             {
             }
 
@@ -163,9 +168,17 @@ namespace tanuki_proxy
                     {
                         HandleSetoption(command);
                     }
+                    else if (command.Contains("go"))
+                    {
+                        HandleGo(command);
+                    }
+                    else if (command.Contains("ponderhit"))
+                    {
+                        HandlePonderhit(command);
+                    }
                     else
                     {
-                        Log("  P> engine={0} command={1}", name, Join(command));
+                        Log("  P> [{0}] {1}", id, Join(command));
                         WriteLineAndFlush(process.StandardInput, Join(command));
                     }
                 }
@@ -197,8 +210,7 @@ namespace tanuki_proxy
             /// <summary>
             /// setoptionコマンドを処理する
             /// </summary>
-            /// <param name="input">UIまたは上流proxyからのコマンド文字列</param>
-            /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
+            /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
             private void HandleSetoption(List<string> command)
             {
                 // エンジンに対して値を設定する時に送ります。
@@ -215,8 +227,41 @@ namespace tanuki_proxy
                     }
                 }
 
-                Log("  P> engine={0} command={1}", name, Join(command));
+                Log("  P> [{0}] {1}", id, Join(command));
                 WriteLineAndFlush(process.StandardInput, Join(command));
+            }
+
+            /// <summary>
+            /// goコマンドを処理する
+            /// </summary>
+            /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
+            private void HandleGo(List<string> command)
+            {
+                if (timeKeeper)
+                {
+                    Log("  P> [{0}] {1}", id, Join(command));
+                    WriteLineAndFlush(process.StandardInput, Join(command));
+                }
+                else
+                {
+                    string output = "go infinite";
+                    Log("  P> [{0}] {1}", id, output);
+                    WriteLineAndFlush(process.StandardInput, output);
+                }
+            }
+
+            /// <summary>
+            /// ponderhitコマンドを処理する
+            /// </summary>
+            /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
+            private void HandlePonderhit(List<string> command)
+            {
+                if (timeKeeper)
+                {
+                    Log("  P> [{0}] {1}", id, Join(command));
+                    WriteLineAndFlush(process.StandardInput, Join(command));
+                }
+                // タイムキーパー以外にはそのまま思考を続けさせる
             }
 
             /// <summary>
@@ -231,7 +276,7 @@ namespace tanuki_proxy
                     return;
                 }
 
-                Log("  <D engine={0} command={1}", name, e.Data);
+                Log("  <D [{0}] {1}", id, e.Data);
 
                 var command = Split(e.Data);
 
@@ -253,7 +298,7 @@ namespace tanuki_proxy
                 }
                 else
                 {
-                    Log("<P   engine={0} command={1}", name, Join(command));
+                    Log("<P   [{0}] {1}", id, Join(command));
                     WriteLineAndFlush(Console.Out, Join(command));
                 }
             }
@@ -269,7 +314,7 @@ namespace tanuki_proxy
                 {
                     return;
                 }
-                Log("  <d engine={0} command={1}", name, e.Data);
+                Log("  <D [{0}] {1}", id, e.Data);
             }
 
             private int getNumberOfRunningEngines()
@@ -284,7 +329,7 @@ namespace tanuki_proxy
                 {
                     if (getNumberOfRunningEngines() == Interlocked.Increment(ref numberOfReadyoks))
                     {
-                        Log("<P   engine={0} command={1}", name, Join(command));
+                        Log("<P   [{0}] {1}", id, Join(command));
                         WriteLineAndFlush(Console.Out, Join(command));
                     }
                 }
@@ -294,7 +339,6 @@ namespace tanuki_proxy
             /// info string startedを受信し、goコマンドが受理されたときの処理を行う
             /// </summary>
             /// <param name="command">思考エンジンの出力文字列</param>
-            /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
             private void HandlePosition(List<string> command)
             {
                 // goコマンドが受理されたのでpvの受信を開始する
@@ -302,7 +346,7 @@ namespace tanuki_proxy
                 {
                     int index = command.IndexOf("position");
                     downstreamPosition = Join(command.Skip(index));
-                    Log("downstreamPosition=" + downstreamPosition);
+                    Log("     downstreamPosition=" + downstreamPosition);
                 }
             }
 
@@ -310,7 +354,6 @@ namespace tanuki_proxy
             /// pvを含むinfoコマンドを処理する
             /// </summary>
             /// <param name="command">思考エンジンの出力文字列</param>
-            /// <returns>コマンドをこの関数で処理した場合はtrue、そうでない場合はfalse</returns>
             private void HandlePv(List<string> command)
             {
                 lock (upstreamLockObject)
@@ -355,7 +398,7 @@ namespace tanuki_proxy
                         engineBestmoves[id].score = score;
                     }
 
-                    Log("<P   engine={0} command={1}", name, Join(command));
+                    Log("<P   [{0}] {1}", id, Join(command));
 
                     // Fail-low/Fail-highした探索結果は表示しない
                     lock (lastShowPvLockObject)
@@ -469,7 +512,7 @@ namespace tanuki_proxy
                         bestmoveToCount[engineBestmove.move].Score = Math.Max(bestmoveToCount[engineBestmove.move].Score, engineBestmove.score);
                     }
 
-                    // 楽観合議制
+                    // 楽観合議制っぽいなにか…。
                     // 最も投票の多かった指し手を選ぶ
                     // 投票数が同じ場合は最もスコアが高かった指し手を選ぶ
                     int bestCount = -1;
@@ -518,7 +561,7 @@ namespace tanuki_proxy
                         outputCommand = string.Format("bestmove {0}", bestmove);
                     }
 
-                    Log("  <<    engine={0} command={1}", name, outputCommand);
+                    Log("<P   [{0}] {1}", id, outputCommand);
                     WriteLineAndFlush(Console.Out, outputCommand);
 
                     TransitUpstreamState(UpstreamState.Stopped);
@@ -592,7 +635,7 @@ namespace tanuki_proxy
                         lock (upstreamLockObject)
                         {
                             upstreamPosition = input;
-                            Log("upstreamPosition=" + upstreamPosition);
+                            Log("     upstreamPosition=" + upstreamPosition);
                         }
                     }
 
@@ -637,7 +680,7 @@ namespace tanuki_proxy
 
         static void TransitUpstreamState(UpstreamState newUpstreamState)
         {
-            Log("  || upstream {0} > {1}", upstreamState, newUpstreamState);
+            Log("     {0} > {1}", upstreamState, newUpstreamState);
             upstreamState = newUpstreamState;
         }
 
@@ -659,7 +702,7 @@ namespace tanuki_proxy
                     new Option("Max_Random_Score_Diff", "0"),
                     new Option("Max_Random_Score_Diff_Ply", "0"),
                     new Option("Threads", "1"),
-                }),
+                },true),
             new EngineOption(
                 "nighthawk",
                 "ssh",
@@ -672,7 +715,7 @@ namespace tanuki_proxy
                     new Option("Max_Random_Score_Diff", "0"),
                     new Option("Max_Random_Score_Diff_Ply", "0"),
                     new Option("Threads", "4"),
-                }),
+                },false),
             new EngineOption(
                 "doutanuki",
                 "C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
@@ -685,7 +728,7 @@ namespace tanuki_proxy
                     new Option("Max_Random_Score_Diff", "0"),
                     new Option("Max_Random_Score_Diff_Ply", "0"),
                     new Option("Threads", "1"),
-                })
+                },false)
             };
 
             DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(ProxySetting));
