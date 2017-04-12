@@ -197,6 +197,9 @@
       <HeapReserveSize>
       </HeapReserveSize>
     </Link>
+    <PostBuildEvent>
+      <Command>COPY /Y $(TargetPath) $(SolutionDir)exe\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bitboard.h" />
