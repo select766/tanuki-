@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
 
 namespace tanuki_proxy
 {
@@ -12,18 +12,47 @@ namespace tanuki_proxy
     {
         private static object LockObject = new object();
         private static TextWriter TextWriter;
-        private static Timer Timer;
+        private static System.Timers.Timer FlushTimer;
+        private static BlockingCollection<string> Queue;
         public static void Open(string filePath)
         {
             lock (LockObject)
             {
                 TextWriter = new StreamWriter(filePath, false, Encoding.UTF8);
-                Timer = new Timer(new TimerCallback(Callback));
-                Timer.Change(1000, 1000);
+                Queue = new BlockingCollection<string>();
+                FlushTimer = new System.Timers.Timer(1000);
+                FlushTimer.Elapsed += FlushTimerCallback;
+                FlushTimer.Start();
+
+                Task.Run(() =>
+                {
+                    while (!Queue.IsCompleted)
+                    {
+                        string line = null;
+                        try
+                        {
+                            line = Queue.Take();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            continue;
+                        }
+
+                        if (string.IsNullOrEmpty(line))
+                        {
+                            continue;
+                        }
+
+                        lock (LockObject)
+                        {
+                            TextWriter.WriteLine(line);
+                        }
+                    }
+                });
             }
         }
 
-        private static void Callback(object args)
+        private static void FlushTimerCallback(object sender, ElapsedEventArgs e)
         {
             lock (LockObject)
             {
@@ -35,43 +64,36 @@ namespace tanuki_proxy
         {
             lock (LockObject)
             {
-                Timer.Change(Timeout.Infinite, Timeout.Infinite);
-                Timer = null;
+                FlushTimer.Stop();
+                FlushTimer = null;
+
                 TextWriter.Close();
                 TextWriter = null;
+
+                var queue = Queue;
+                Queue = null;
+                queue.CompleteAdding();
             }
         }
 
         public static void Log(string format, object arg0)
         {
-            lock (LockObject)
-            {
-                TextWriter?.WriteLine(format, arg0);
-            }
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0));
         }
 
         public static void Log(string format, object arg0, object arg1)
         {
-            lock (LockObject)
-            {
-                TextWriter?.WriteLine(format, arg0, arg1);
-            }
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0, arg1));
         }
 
         public static void Log(string format, object arg0, object arg1, object arg2)
         {
-            lock (LockObject)
-            {
-                TextWriter?.WriteLine(format, arg0, arg1, arg2);
-            }
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0, arg1, arg2));
         }
 
         public static void Log(string format, params object[] arg)
         {
-            lock (LockObject)
-            {
-                TextWriter?.WriteLine(format, arg);
-            }
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg));
         }
     }
 }
