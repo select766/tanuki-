@@ -384,6 +384,12 @@ namespace tanuki_proxy
                         }
                     }
 
+                    // 定跡の列挙の場合は処理しない
+                    if (Join(command).Contains("%)"))
+                    {
+                        return;
+                    }
+
                     int depthIndex = command.IndexOf("depth");
                     int pvIndex = command.IndexOf("pv");
 
@@ -427,7 +433,8 @@ namespace tanuki_proxy
                     // Fail-low/Fail-highした探索結果は表示しない
                     lock (lastShowPvLockObject)
                     {
-                        if (lastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now &&
+                        // 深さ3未満のPVを出力するのは将棋所にmateの値を認識させるため
+                        if ((tempDepth < 3 || lastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now) &&
                             !command.Contains("lowerbound") &&
                             !command.Contains("upperbound") &&
                             depth < tempDepth)

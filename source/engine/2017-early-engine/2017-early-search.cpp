@@ -2163,8 +2163,8 @@ namespace YaneuraOu2017Early
     ASSERT_LV3(abs(bestValue) <= mate_in(ss->ply));
 
     return bestValue;
-    }
   }
+}
 
 using namespace YaneuraOu2017Early;
 
@@ -2478,7 +2478,7 @@ if (count != param_names.size())
 
     }
 #endif
-  }
+}
 
 // 起動時に呼び出される。時間のかからない探索関係の初期化処理はここに書くこと。
 void Search::init() {}
@@ -3001,6 +3001,22 @@ void MainThread::think()
               if (rootMoves[0].pv.size() <= 1)
                 rootMoves[0].pv.push_back(MOVE_NONE);
               rootMoves[0].pv[1] = move.nextMove; // これが合法手でなかったら将棋所が弾くと思う。
+            }
+
+            bool verbose = Options[OPTION_VERBOSE];
+            if (verbose) {
+              // 選択した定跡のpvを出力する
+              // tanuki-proxyで必要
+              if (move.nextMove == MOVE_NONE) {
+                sync_cout << "info pv " << move.bestMove
+                  << " score cp " << move.value << " depth " << move.depth
+                  << sync_endl;
+              }
+              else {
+                sync_cout << "info pv " << move.bestMove << " " << move.nextMove
+                  << " score cp " << move.value << " depth " << move.depth
+                  << sync_endl;
+              }
             }
             goto ID_END;
           }
