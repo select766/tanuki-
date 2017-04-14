@@ -46,6 +46,7 @@ namespace tanuki_proxy
         private const int moveHorizon = 80;
         private const int maxPly = 127;
         private static volatile bool running = true;
+        private const int mateScore = 32000;
 
         [DataContract]
         public struct Option
@@ -392,7 +393,6 @@ namespace tanuki_proxy
                     }
 
                     int tempDepth = int.Parse(command[depthIndex + 1]);
-                    int cpIndex = command.IndexOf("cp");
 
                     Debug.Assert(pvIndex + 1 < command.Count);
                     engineBestmoves[id].move = command[pvIndex + 1];
@@ -400,10 +400,26 @@ namespace tanuki_proxy
                     {
                         engineBestmoves[id].ponder = command[pvIndex + 2];
                     }
+
+                    int cpIndex = command.IndexOf("cp");
                     if (cpIndex != -1)
                     {
                         int score = int.Parse(command[cpIndex + 1]);
                         engineBestmoves[id].score = score;
+                    }
+
+                    int mateIndex = command.IndexOf("mate");
+                    if (mateIndex != -1)
+                    {
+                        int mate = int.Parse(command[mateIndex + 1]);
+                        if (mate > 0)
+                        {
+                            engineBestmoves[id].score = mateScore - mate;
+                        }
+                        else
+                        {
+                            engineBestmoves[id].score = -mateScore - mate;
+                        }
                     }
 
                     Log("<P   [{0}] {1}", id, Join(command));
