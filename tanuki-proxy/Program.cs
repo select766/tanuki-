@@ -608,7 +608,7 @@ namespace tanuki_proxy
             {
                 lock (upstreamLockObject)
                 {
-                    Log("     limit={0}", decideMoveLimit.ToString("o"));
+                    //Log("     limit={0}", decideMoveLimit.ToString("o"));
                     if (decideMoveLimit < DateTime.Now)
                     {
                         DecideMove();

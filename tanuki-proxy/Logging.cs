@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using static System.String;
 
 namespace tanuki_proxy
 {
@@ -78,22 +79,22 @@ namespace tanuki_proxy
 
         public static void Log(string format, object arg0)
         {
-            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0));
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + Format(" ({0,2}) ", Thread.CurrentThread.ManagedThreadId) + format, arg0));
         }
 
         public static void Log(string format, object arg0, object arg1)
         {
-            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0, arg1));
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + Format(" ({0,2}) ", Thread.CurrentThread.ManagedThreadId) + format, arg0, arg1));
         }
 
         public static void Log(string format, object arg0, object arg1, object arg2)
         {
-            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg0, arg1, arg2));
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + Format(" ({0,2}) ", Thread.CurrentThread.ManagedThreadId) + format, arg0, arg1, arg2));
         }
 
         public static void Log(string format, params object[] arg)
         {
-            Queue?.Add(string.Format(DateTime.Now.ToString("o") + " (" + Thread.CurrentThread.ManagedThreadId.ToString() + ") " + format, arg));
+            Queue?.Add(string.Format(DateTime.Now.ToString("o") + Format(" ({0,2}) ", Thread.CurrentThread.ManagedThreadId) + format, arg));
         }
     }
 }
