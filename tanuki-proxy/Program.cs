@@ -16,9 +16,9 @@ using static System.String;
 
 namespace tanuki_proxy
 {
-    public class Program
+    public class Program : IDisposable
     {
-        public enum UpstreamState
+        public enum UpstreamStateEnum
         {
             Stopped,
             Thinking,
@@ -32,26 +32,44 @@ namespace tanuki_proxy
             public List<string> command { get; set; }
         }
 
-        public static object upstreamLockObject = new object();
-        public static UpstreamState upstreamState = UpstreamState.Stopped;
-        public static int depth = 0;
-        public const string bestmoveNone = "None";
-        public static EngineBestmove[] engineBestmoves = null;
-        public static string upstreamPosition = "";
-        public static int numberOfReadyoks = 0;
-        public static System.Random random = new System.Random();
-        private static object lastShowPvLockObject = new object();
-        private static DateTime lastShowPv = DateTime.Now;
-        private static double showPvSupressionMs = 200.0;
-        private static DateTime decideMoveLimit = DateTime.MaxValue;
+        public class CountAndScore
+        {
+            public int Count { get; set; } = 0;
+            public int Score { get; set; } = int.MinValue;
+        }
+
+        private const string bestmoveNone = "None";
         private const int decideMoveSleepMs = 10;
         private const int moveHorizon = 80;
         private const int maxPly = 127;
-        private static volatile bool running = true;
         private const int mateScore = 32000;
 
+        private bool disposed = false;
+        public object UpstreamLockObject { get; } = new object();
+        private UpstreamStateEnum upstreamState = UpstreamStateEnum.Stopped;
+        public UpstreamStateEnum UpstreamState
+        {
+            get { return upstreamState; }
+            set
+            {
+                Log("     {0} > {1}", upstreamState, value);
+                upstreamState = value;
+            }
+        }
+        public int Depth { get; set; } = 0;
+        public EngineBestmove[] EngineBestmoves { get; set; }
+        public string UpstreamPosition { get; set; }
+        public int numberOfReadyoks = 0;
+        private readonly System.Random random = new System.Random();
+        public object LastShowPvLockObject { get; set; } = new object();
+        public DateTime LastShowPv { get; set; } = DateTime.Now;
+        private DateTime decideMoveLimit = DateTime.MaxValue;
+        private volatile bool running = true;
+        private readonly List<Engine> engines = new List<Engine>();
+        private Thread decideMoveTask;
+
         [DataContract]
-        public struct Option
+        public class Option
         {
             [DataMember]
             public string name;
@@ -106,8 +124,11 @@ namespace tanuki_proxy
             public string logDirectory { get; set; }
         }
 
-        class Engine
+        public class Engine : IDisposable
         {
+            private const double showPvSupressionMs = 200.0;
+            bool disposed = false;
+            private readonly Program program;
             private readonly Process process = new Process();
             private readonly Option[] optionOverrides;
             private string downstreamPosition = "";
@@ -117,9 +138,11 @@ namespace tanuki_proxy
             public string name { get; }
             private readonly int id;
             private readonly bool timeKeeper;
+            public bool ProcessHasExited { get { return process.HasExited; } }
 
-            public Engine(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool timeKeeper)
+            public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool timeKeeper)
             {
+                this.program = program;
                 this.name = engineName;
                 this.process.StartInfo.FileName = fileName;
                 this.process.StartInfo.Arguments = arguments;
@@ -135,11 +158,11 @@ namespace tanuki_proxy
                 this.timeKeeper = timeKeeper;
             }
 
-            public Engine(EngineOption opt, int id) : this(opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.timeKeeper)
+            public Engine(Program program, EngineOption opt, int id) : this(program, opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.timeKeeper)
             {
             }
 
-            public void RunAsync()
+            public void Start()
             {
                 thread = new Thread(ThreadRun);
                 thread.Start();
@@ -195,11 +218,25 @@ namespace tanuki_proxy
                 }
             }
 
-            public void Close()
+            public void Dispose()
             {
+                Dispose(true);
+                GC.SuppressFinalize(this);
+            }
+
+            protected virtual void Dispose(bool disposing)
+            {
+                if (disposed)
+                {
+                    return;
+                }
+
                 commandQueue.CompleteAdding();
                 thread.Join();
-                process.Close();
+                commandQueue.Dispose();
+                process.Dispose();
+
+                disposed = true;
             }
 
             /// <summary>
@@ -323,17 +360,12 @@ namespace tanuki_proxy
                 Log("  <D [{0}] {1}", id, e.Data);
             }
 
-            private int getNumberOfRunningEngines()
-            {
-                return engines.Count(engine => !engine.process.HasExited);
-            }
-
             private void HandleReadyok(List<string> command)
             {
                 // goコマンドが受理されたのでpvの受信を開始する
-                lock (upstreamLockObject)
+                lock (program.UpstreamLockObject)
                 {
-                    if (getNumberOfRunningEngines() == Interlocked.Increment(ref numberOfReadyoks))
+                    if (program.NumberOfRunningEngines == Interlocked.Increment(ref program.numberOfReadyoks))
                     {
                         Log("<P   [{0}] {1}", id, Join(command));
                         WriteLineAndFlush(Console.Out, Join(command));
@@ -362,19 +394,19 @@ namespace tanuki_proxy
             /// <param name="command">思考エンジンの出力文字列</param>
             private void HandlePv(List<string> command)
             {
-                lock (upstreamLockObject)
+                lock (program.UpstreamLockObject)
                 {
                     // 上流停止中はpvを含む行を処理しない
-                    if (upstreamState == UpstreamState.Stopped)
+                    if (program.UpstreamState == UpstreamStateEnum.Stopped)
                     {
-                        //Log("     ## process={0} upstreamState == UpstreamState.Stopped", process);
+                        //Log("     ## process={0} upstreamState == UpstreamStateEnum.Stopped", process);
                         return;
                     }
 
                     lock (downstreamLockObject)
                     {
                         // 思考中の局面が違う場合は処理しない
-                        if (upstreamPosition != downstreamPosition)
+                        if (program.UpstreamPosition != downstreamPosition)
                         {
                             Log("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                             return;
@@ -398,17 +430,17 @@ namespace tanuki_proxy
                     int tempDepth = int.Parse(command[depthIndex + 1]);
 
                     Debug.Assert(pvIndex + 1 < command.Count);
-                    engineBestmoves[id].move = command[pvIndex + 1];
+                    program.EngineBestmoves[id].move = command[pvIndex + 1];
                     if (pvIndex + 2 < command.Count)
                     {
-                        engineBestmoves[id].ponder = command[pvIndex + 2];
+                        program.EngineBestmoves[id].ponder = command[pvIndex + 2];
                     }
 
                     int cpIndex = command.IndexOf("cp");
                     if (cpIndex != -1)
                     {
                         int score = int.Parse(command[cpIndex + 1]);
-                        engineBestmoves[id].score = score;
+                        program.EngineBestmoves[id].score = score;
                     }
 
                     int mateIndex = command.IndexOf("mate");
@@ -417,30 +449,30 @@ namespace tanuki_proxy
                         int mate = int.Parse(command[mateIndex + 1]);
                         if (mate > 0)
                         {
-                            engineBestmoves[id].score = mateScore - mate;
+                            program.EngineBestmoves[id].score = mateScore - mate;
                         }
                         else
                         {
-                            engineBestmoves[id].score = -mateScore - mate;
+                            program.EngineBestmoves[id].score = -mateScore - mate;
                         }
                     }
 
-                    engineBestmoves[id].command = command;
+                    program.EngineBestmoves[id].command = command;
 
                     Log("<P   [{0}] {1}", id, Join(command));
 
                     // Fail-low/Fail-highした探索結果は表示しない
-                    lock (lastShowPvLockObject)
+                    lock (program.LastShowPvLockObject)
                     {
                         // 深さ3未満のPVを出力するのは将棋所にmateの値を認識させるため
-                        if ((tempDepth < 3 || lastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now) &&
+                        if ((tempDepth < 3 || program.LastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now) &&
                             !command.Contains("lowerbound") &&
                             !command.Contains("upperbound") &&
-                            depth < tempDepth)
+                            program.Depth < tempDepth)
                         {
                             // voteの表示
                             Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                            foreach (var engineBestmove in engineBestmoves)
+                            foreach (var engineBestmove in program.EngineBestmoves)
                             {
                                 if (engineBestmove.move == null)
                                 {
@@ -468,8 +500,8 @@ namespace tanuki_proxy
 
                             // info pvの表示
                             WriteLineAndFlush(Console.Out, Join(command));
-                            depth = tempDepth;
-                            lastShowPv = DateTime.Now;
+                            program.Depth = tempDepth;
+                            program.LastShowPv = DateTime.Now;
                         }
                     }
                 }
@@ -479,18 +511,18 @@ namespace tanuki_proxy
             {
                 // 手番かつ他の思考エンジンがbestmoveを返していない時のみ
                 // bestmoveを返すようにする
-                lock (upstreamLockObject)
+                lock (program.UpstreamLockObject)
                 {
-                    if (upstreamState == UpstreamState.Stopped)
+                    if (program.UpstreamState == UpstreamStateEnum.Stopped)
                     {
-                        //Log("     ## process={0} upstreamState == UpstreamState.Stopped", process);
+                        //Log("     ## process={0} upstreamState == UpstreamStateEnum.Stopped", process);
                         return;
                     }
 
                     lock (downstreamLockObject)
                     {
                         // 思考中の局面が違う場合は処理しない
-                        if (upstreamPosition != downstreamPosition)
+                        if (program.UpstreamPosition != downstreamPosition)
                         {
                             Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                             return;
@@ -498,14 +530,14 @@ namespace tanuki_proxy
                     }
 
                     // TODO(nodchip): この条件が必要かどうか考える
-                    if (engineBestmoves == null)
+                    if (program.EngineBestmoves == null)
                     {
                         return;
                     }
 
                     if (command[1] == "resign" || command[1] == "win")
                     {
-                        foreach (var engineBestmove in engineBestmoves)
+                        foreach (var engineBestmove in program.EngineBestmoves)
                         {
                             engineBestmove.move = command[1];
                             engineBestmove.ponder = null;
@@ -513,34 +545,59 @@ namespace tanuki_proxy
 
                         if (command.Count == 4 && command[2] == "ponder")
                         {
-                            foreach (var engineBestmove in engineBestmoves)
+                            foreach (var engineBestmove in program.EngineBestmoves)
                             {
                                 engineBestmove.move = command[3];
                             }
                         }
                     }
 
-                    DecideMove();
+                    program.DecideMove();
                 }
             }
         }
 
-        public class CountAndScore
+        public void Dispose()
         {
-            public int Count { get; set; } = 0;
-            public int Score { get; set; } = int.MinValue;
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            running = false;
+            decideMoveTask.Join();
+            Logging.Close();
+            foreach (var engine in engines)
+            {
+                engine.Dispose();
+            }
+
+            disposed = true;
+        }
+        public int NumberOfRunningEngines
+        {
+            get
+            {
+                return engines.Count(engine => !engine.ProcessHasExited);
+            }
         }
 
         /// <summary>
         /// 指し手を決め、bestmoveを出力する
         /// </summary>
-        static void DecideMove()
+        private void DecideMove()
         {
-            lock (upstreamLockObject)
+            lock (UpstreamLockObject)
             {
                 // 詰み・優等局面となる指し手は最優先で指す
-                var maxScoreBestMove = engineBestmoves[0];
-                foreach (var engineBestmove in engineBestmoves)
+                var maxScoreBestMove = EngineBestmoves[0];
+                foreach (var engineBestmove in EngineBestmoves)
                 {
                     if (maxScoreBestMove.score < engineBestmove.score)
                     {
@@ -558,7 +615,7 @@ namespace tanuki_proxy
                     // 楽観合議制っぽいなにか…。
                     // 各指し手の投票数を数える
                     var bestmoveToCount = new Dictionary<string, CountAndScore>();
-                    foreach (var engineBestmove in engineBestmoves)
+                    foreach (var engineBestmove in EngineBestmoves)
                     {
                         if (engineBestmove.move == null)
                         {
@@ -591,7 +648,7 @@ namespace tanuki_proxy
                     // 最もスコアが高かった指し手をbestmoveとして選択する
                     // スコアが等しいものが複数ある場合はランダムに1つを選ぶ
                     // Ponderが存在するものを優先する
-                    var bestmovesWithPonder = engineBestmoves
+                    var bestmovesWithPonder = EngineBestmoves
                         .Where(x => x.move == bestBestmove && x.score == bestScore && !IsNullOrEmpty(x.ponder))
                         .ToList();
                     if (bestmovesWithPonder.Count > 0)
@@ -600,7 +657,7 @@ namespace tanuki_proxy
                     }
                     else
                     {
-                        var bestmoves = engineBestmoves
+                        var bestmoves = EngineBestmoves
                             .Where(x => x.move == bestBestmove && x.score == bestScore)
                             .ToList();
                         bestmove = bestmoves[random.Next(bestmoves.Count)];
@@ -620,17 +677,15 @@ namespace tanuki_proxy
                 Log("<P   {0}", outputCommand);
                 WriteLineAndFlush(Console.Out, outputCommand);
 
-                TransitUpstreamState(UpstreamState.Stopped);
-                depth = 0;
-                engineBestmoves = null;
+                UpstreamState = UpstreamStateEnum.Stopped;
+                Depth = 0;
+                EngineBestmoves = null;
                 decideMoveLimit = DateTime.MaxValue;
                 WriteToEachEngine("stop");
             }
         }
 
-        static List<Engine> engines = new List<Engine>();
-
-        static int GetProcessId()
+        private int GetProcessId()
         {
             using (Process process = Process.GetCurrentProcess())
             {
@@ -638,11 +693,11 @@ namespace tanuki_proxy
             }
         }
 
-        private static void CheckDecideMoveLimit()
+        private void CheckDecideMoveLimit()
         {
             while (running)
             {
-                lock (upstreamLockObject)
+                lock (UpstreamLockObject)
                 {
                     //Log("     limit={0}", decideMoveLimit.ToString("o"));
                     if (decideMoveLimit < DateTime.Now)
@@ -654,150 +709,149 @@ namespace tanuki_proxy
             }
         }
 
-        static void Main(string[] args)
+        public void Run()
         {
             //writeSampleSetting();
             ProxySetting setting = loadSetting();
-            string logFileFormat = Path.Combine(setting.logDirectory, string.Format("tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"), GetProcessId()));
+            string logFileFormat = Path.Combine(setting.logDirectory, string.Format(
+                "tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"),
+                GetProcessId()));
             Logging.Open(logFileFormat);
 
             for (int id = 0; id < setting.engines.Length; ++id)
             {
-                engines.Add(new Engine(setting.engines[id], id));
+                engines.Add(new Engine(this, setting.engines[id], id));
             }
 
-            var decideMoveTask = new Thread(CheckDecideMoveLimit);
+            decideMoveTask = new Thread(CheckDecideMoveLimit);
             decideMoveTask.Start();
 
             // 子プロセスの標準入出力 (System.Diagnostics.Process) - Programming/.NET Framework/標準入出力 - 総武ソフトウェア推進所 http://smdn.jp/programming/netfx/standard_streams/1_process/
-            try
+            foreach (var engine in engines)
             {
-                foreach (var engine in engines)
+                engine.Start();
+            }
+
+            int networkDelay = 120;
+            int networkDelay2 = 1120;
+            int minimumThinkingTime = 2000;
+            int maxGamePly = int.MaxValue;
+            int time = 0;
+            int byoyomi = 0;
+            int inc = 0;
+
+            string input;
+            while ((input = Console.ReadLine()) != null)
+            {
+                Log("U>       {0}", input);
+                var command = Split(input);
+
+                if (command[0] == "go")
                 {
-                    engine.RunAsync();
-                }
-
-                int networkDelay = 120;
-                int networkDelay2 = 1120;
-                int minimumThinkingTime = 2000;
-                int maxGamePly = int.MaxValue;
-                int time = 0;
-                int byoyomi = 0;
-                int inc = 0;
-
-                string input;
-                while ((input = Console.ReadLine()) != null)
-                {
-                    Log("U>       {0}", input);
-                    var command = Split(input);
-
-                    if (command[0] == "go")
+                    lock (UpstreamLockObject)
                     {
-                        lock (upstreamLockObject)
-                        {
-                            // 思考開始の合図です。エンジンはこれを受信すると思考を開始します。
-                            int btime = ParseCommandParameter(command, "btime");
-                            int wtime = ParseCommandParameter(command, "wtime");
-                            time = IsBlack() ? btime : wtime;
-                            byoyomi = ParseCommandParameter(command, "byoyomi");
-                            int binc = ParseCommandParameter(command, "binc");
-                            int winc = ParseCommandParameter(command, "winc");
-                            inc = IsBlack() ? binc : winc;
+                        // 思考開始の合図です。エンジンはこれを受信すると思考を開始します。
+                        int btime = ParseCommandParameter(command, "btime");
+                        int wtime = ParseCommandParameter(command, "wtime");
+                        time = IsBlack() ? btime : wtime;
+                        byoyomi = ParseCommandParameter(command, "byoyomi");
+                        int binc = ParseCommandParameter(command, "binc");
+                        int winc = ParseCommandParameter(command, "winc");
+                        inc = IsBlack() ? binc : winc;
 
-                            if (!command.Contains("ponder"))
-                            {
-                                int maximumTime = CalculateMaximumTime(networkDelay, networkDelay2,
-                                    minimumThinkingTime, maxGamePly, time, byoyomi, inc, Ply());
-                                decideMoveLimit = DateTime.Now.AddMilliseconds(maximumTime);
-                            }
-
-                            engineBestmoves = new EngineBestmove[engines.Count];
-                            for (int i = 0; i < engines.Count; ++i)
-                            {
-                                engineBestmoves[i] = new EngineBestmove();
-                            }
-                            depth = 0;
-                            TransitUpstreamState(UpstreamState.Thinking);
-                            WriteLineAndFlush(Console.Out, "info string " + upstreamPosition);
-                            lastShowPv = DateTime.Now;
-                        }
-                    }
-                    else if (command[0] == "isready")
-                    {
-                        lock (upstreamLockObject)
-                        {
-                            numberOfReadyoks = 0;
-                        }
-                    }
-                    else if (command[0] == "position")
-                    {
-                        lock (upstreamLockObject)
-                        {
-                            upstreamPosition = input;
-                            Log("     upstreamPosition=" + upstreamPosition);
-                        }
-                    }
-                    else if (command[0] == "ponderhit")
-                    {
-                        lock (upstreamLockObject)
+                        if (!command.Contains("ponder"))
                         {
                             int maximumTime = CalculateMaximumTime(networkDelay, networkDelay2,
                                 minimumThinkingTime, maxGamePly, time, byoyomi, inc, Ply());
                             decideMoveLimit = DateTime.Now.AddMilliseconds(maximumTime);
                         }
-                    }
-                    else if (command[0] == "stop")
-                    {
-                        lock (upstreamLockObject)
+
+                        EngineBestmoves = new EngineBestmove[engines.Count];
+                        for (int i = 0; i < engines.Count; ++i)
                         {
-                            // stopが来た時に指し手を返さないと次のgoがもらえない
-                            DecideMove();
+                            EngineBestmoves[i] = new EngineBestmove();
+                        }
+                        Depth = 0;
+                        UpstreamState = UpstreamStateEnum.Thinking;
+                        WriteLineAndFlush(Console.Out, "info string " + UpstreamPosition);
+                        LastShowPv = DateTime.Now;
+                    }
+                }
+                else if (command[0] == "isready")
+                {
+                    lock (UpstreamLockObject)
+                    {
+                        numberOfReadyoks = 0;
+                    }
+                }
+                else if (command[0] == "position")
+                {
+                    lock (UpstreamLockObject)
+                    {
+                        UpstreamPosition = input;
+                        Log("     upstreamPosition=" + UpstreamPosition);
+                    }
+                }
+                else if (command[0] == "ponderhit")
+                {
+                    lock (UpstreamLockObject)
+                    {
+                        int maximumTime = CalculateMaximumTime(networkDelay, networkDelay2,
+                            minimumThinkingTime, maxGamePly, time, byoyomi, inc, Ply());
+                        decideMoveLimit = DateTime.Now.AddMilliseconds(maximumTime);
+                    }
+                }
+                else if (command[0] == "stop")
+                {
+                    lock (UpstreamLockObject)
+                    {
+                        // stopが来た時に指し手を返さないと次のgoがもらえない
+                        DecideMove();
+                    }
+                }
+                else if (command[0] == "setoption")
+                {
+                    lock (UpstreamLockObject)
+                    {
+                        // setoption name nodestime value 0
+                        switch (command[2])
+                        {
+                            case "NetworkDelay":
+                                networkDelay = int.Parse(command[4]);
+                                break;
+                            case "NetworkDelay2":
+                                networkDelay2 = int.Parse(command[4]);
+                                break;
+                            case "MinimumThinkingTime":
+                                minimumThinkingTime = int.Parse(command[4]);
+                                break;
+                            case "MaxMovesToDraw":
+                                maxGamePly = int.Parse(command[4]);
+                                if (maxGamePly == 0)
+                                {
+                                    maxGamePly = int.MaxValue;
+                                }
+                                break;
                         }
                     }
-                    else if (command[0] == "setoption")
-                    {
-                        lock (upstreamLockObject)
-                        {
-                            // setoption name nodestime value 0
-                            switch (command[2])
-                            {
-                                case "NetworkDelay":
-                                    networkDelay = int.Parse(command[4]);
-                                    break;
-                                case "NetworkDelay2":
-                                    networkDelay2 = int.Parse(command[4]);
-                                    break;
-                                case "MinimumThinkingTime":
-                                    minimumThinkingTime = int.Parse(command[4]);
-                                    break;
-                                case "MaxMovesToDraw":
-                                    maxGamePly = int.Parse(command[4]);
-                                    if (maxGamePly == 0)
-                                    {
-                                        maxGamePly = int.MaxValue;
-                                    }
-                                    break;
-                            }
-                        }
-                    }
+                }
 
-                    WriteToEachEngine(input);
+                WriteToEachEngine(input);
 
-                    if (input == "quit")
-                    {
-                        break;
-                    }
+                if (input == "quit")
+                {
+                    break;
                 }
             }
-            finally
+
+
+        }
+
+        static void Main(string[] args)
+        {
+            using (var program = new Program())
             {
-                running = false;
-                decideMoveTask.Join();
-                Logging.Close();
-                foreach (var engine in engines)
-                {
-                    engine.Close();
-                }
+                program.Run();
             }
         }
 
@@ -913,7 +967,7 @@ namespace tanuki_proxy
         /// エンジンに対して出力する
         /// </summary>
         /// <param name="input">親ソフトウェアからの入力。USIプロトコルサーバーまたは親tanuki-proxy</param>
-        private static void WriteToEachEngine(string input)
+        private void WriteToEachEngine(string input)
         {
             foreach (var engine in engines)
             {
@@ -925,9 +979,9 @@ namespace tanuki_proxy
             }
         }
 
-        private static bool IsBlack()
+        private bool IsBlack()
         {
-            lock (upstreamLockObject)
+            lock (UpstreamLockObject)
             {
                 return Ply() % 2 == 1;
             }
@@ -937,11 +991,11 @@ namespace tanuki_proxy
         /// (将棋の)開始局面からの手数を返す。平手の開始局面なら1が返る。(0ではない)
         /// </summary>
         /// <returns>開始局面からの手数</returns>
-        private static int Ply()
+        private int Ply()
         {
-            lock (upstreamLockObject)
+            lock (UpstreamLockObject)
             {
-                var position = Split(upstreamPosition);
+                var position = Split(UpstreamPosition);
                 int index = position.IndexOf("moves");
                 if (index == -1)
                 {
@@ -951,18 +1005,12 @@ namespace tanuki_proxy
             }
         }
 
-        static List<string> Split(string s)
+        private static List<string> Split(string s)
         {
             return new List<string>(new Regex("\\s+").Split(s));
         }
 
-        static void TransitUpstreamState(UpstreamState newUpstreamState)
-        {
-            Log("     {0} > {1}", upstreamState, newUpstreamState);
-            upstreamState = newUpstreamState;
-        }
-
-        static void writeSampleSetting()
+        private static void writeSampleSetting()
         {
             ProxySetting setting = new ProxySetting();
             setting.logDirectory = "C:\\home\\develop\\tanuki-";
