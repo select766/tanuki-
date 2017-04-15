@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using static System.Math;
 using static tanuki_proxy.Logging;
+using static System.String;
 
 namespace tanuki_proxy
 {
@@ -28,6 +29,7 @@ namespace tanuki_proxy
             public string move { get; set; }
             public string ponder { get; set; }
             public int score { get; set; }
+            public List<string> command { get; set; }
         }
 
         public static object upstreamLockObject = new object();
@@ -209,11 +211,6 @@ namespace tanuki_proxy
                 // コマンドをBlockingCollectionに入れる。
                 // 入れられたコマンドは別のスレッドで処理される。
                 commandQueue.Add(input);
-            }
-
-            private static string Join(IEnumerable<string> command)
-            {
-                return string.Join(" ", command);
             }
 
             /// <summary>
@@ -428,6 +425,8 @@ namespace tanuki_proxy
                         }
                     }
 
+                    engineBestmoves[id].command = command;
+
                     Log("<P   [{0}] {1}", id, Join(command));
 
                     // Fail-low/Fail-highした探索結果は表示しない
@@ -539,71 +538,85 @@ namespace tanuki_proxy
         {
             lock (upstreamLockObject)
             {
-                var bestmoveToCount = new Dictionary<string, CountAndScore>();
+                // 詰み・優等局面となる指し手は最優先で指す
+                var maxScoreBestMove = engineBestmoves[0];
                 foreach (var engineBestmove in engineBestmoves)
                 {
-                    if (engineBestmove.move == null)
+                    if (maxScoreBestMove.score < engineBestmove.score)
                     {
-                        continue;
-                    }
-
-                    if (!bestmoveToCount.ContainsKey(engineBestmove.move))
-                    {
-                        bestmoveToCount.Add(engineBestmove.move, new CountAndScore());
-                    }
-                    ++bestmoveToCount[engineBestmove.move].Count;
-                    bestmoveToCount[engineBestmove.move].Score = Math.Max(bestmoveToCount[engineBestmove.move].Score, engineBestmove.score);
-                }
-
-                // 楽観合議制っぽいなにか…。
-                // 最も投票の多かった指し手を選ぶ
-                // 投票数が同じ場合は最もスコアが高かった指し手を選ぶ
-                int bestCount = -1;
-                int bestScore = int.MinValue;
-                string bestmove = "resign";
-                foreach (var p in bestmoveToCount)
-                {
-                    if (p.Value.Count > bestCount || (p.Value.Count == bestCount && p.Value.Score > bestScore))
-                    {
-                        bestmove = p.Key;
-                        bestCount = p.Value.Count;
-                        bestScore = p.Value.Score;
+                        maxScoreBestMove = engineBestmove;
                     }
                 }
 
-                // Ponderを決定する
-                // 最もスコアが高かった指し手のPonderを選択する
-                // スコアが等しいものが複数ある場合はランダムに1つを選ぶ
-                int ponderCount = 0;
-                string ponder = null;
-                foreach (var engineBestmove in engineBestmoves)
+                EngineBestmove bestmove = null;
+                if (maxScoreBestMove.score > 30000)
                 {
-                    if (engineBestmove.move != bestmove || engineBestmove.ponder == null || engineBestmove.score != bestScore)
-                    {
-                        continue;
-                    }
-                    else if (engineBestmove.ponder == null)
-                    {
-                        continue;
-                    }
-
-                    ++ponderCount;
-                    if (random.Next(ponderCount) == 0)
-                    {
-                        ponder = engineBestmove.ponder;
-                    }
-                }
-
-                string outputCommand = null;
-                if (!string.IsNullOrEmpty(ponder))
-                {
-                    outputCommand = string.Format("bestmove {0} ponder {1}", bestmove, ponder);
+                    bestmove = maxScoreBestMove;
                 }
                 else
                 {
-                    outputCommand = string.Format("bestmove {0}", bestmove);
+                    // 楽観合議制っぽいなにか…。
+                    // 各指し手の投票数を数える
+                    var bestmoveToCount = new Dictionary<string, CountAndScore>();
+                    foreach (var engineBestmove in engineBestmoves)
+                    {
+                        if (engineBestmove.move == null)
+                        {
+                            continue;
+                        }
+
+                        if (!bestmoveToCount.ContainsKey(engineBestmove.move))
+                        {
+                            bestmoveToCount.Add(engineBestmove.move, new CountAndScore());
+                        }
+                        ++bestmoveToCount[engineBestmove.move].Count;
+                        bestmoveToCount[engineBestmove.move].Score = Math.Max(bestmoveToCount[engineBestmove.move].Score, engineBestmove.score);
+                    }
+
+                    // 最も得票数の高い指し手を選ぶ
+                    // 得票数が同じ場合は最も評価値の高い手を選ぶ
+                    int bestCount = -1;
+                    int bestScore = int.MinValue;
+                    string bestBestmove = "resign";
+                    foreach (var p in bestmoveToCount)
+                    {
+                        if (p.Value.Count > bestCount || (p.Value.Count == bestCount && p.Value.Score > bestScore))
+                        {
+                            bestBestmove = p.Key;
+                            bestCount = p.Value.Count;
+                            bestScore = p.Value.Score;
+                        }
+                    }
+
+                    // 最もスコアが高かった指し手をbestmoveとして選択する
+                    // スコアが等しいものが複数ある場合はランダムに1つを選ぶ
+                    // Ponderが存在するものを優先する
+                    var bestmovesWithPonder = engineBestmoves
+                        .Where(x => x.move == bestBestmove && x.score == bestScore && !IsNullOrEmpty(x.ponder))
+                        .ToList();
+                    if (bestmovesWithPonder.Count > 0)
+                    {
+                        bestmove = bestmovesWithPonder[random.Next(bestmovesWithPonder.Count)];
+                    }
+                    else
+                    {
+                        var bestmoves = engineBestmoves
+                            .Where(x => x.move == bestBestmove && x.score == bestScore)
+                            .ToList();
+                        bestmove = bestmoves[random.Next(bestmoves.Count)];
+                    }
                 }
 
+                // PVを出力する
+                Log("<P   {0}", Join(bestmove.command));
+                WriteLineAndFlush(Console.Out, Join(bestmove.command));
+
+                // bestmoveを出力する
+                string outputCommand = "bestmove " + bestmove.move;
+                if (IsNullOrEmpty(bestmove.ponder))
+                {
+                    outputCommand += " ponder " + bestmove.ponder;
+                }
                 Log("<P   {0}", outputCommand);
                 WriteLineAndFlush(Console.Out, outputCommand);
 
@@ -1030,10 +1043,16 @@ namespace tanuki_proxy
             }
             return null;
         }
+
         private static void WriteLineAndFlush(TextWriter textWriter, string format, params object[] arg)
         {
             textWriter.WriteLine(format, arg);
             textWriter.Flush();
+        }
+
+        private static string Join(IEnumerable<string> command)
+        {
+            return string.Join(" ", command);
         }
     }
 }
