@@ -346,6 +346,13 @@ namespace tanuki_proxy
                     }
                 }
 
+                int npsIndex = command.IndexOf("nps");
+                if (npsIndex != -1)
+                {
+                    int nps = int.Parse(command[npsIndex + 1]);
+                    program.EngineBestmoves[id].nps = nps;
+                }
+
                 program.EngineBestmoves[id].command = command;
 
                 Log("<P   [{0}] {1}", id, Join(command));
@@ -385,10 +392,19 @@ namespace tanuki_proxy
                             vote += "=";
                             vote += p.Value;
                         }
+                        Log("<P   {0}", vote);
                         WriteLineAndFlush(Console.Out, vote);
 
                         // info pvの表示
-                        WriteLineAndFlush(Console.Out, Join(command));
+                        int sumNps = program.EngineBestmoves.Sum(x => x.nps);
+                        var commandWithNps = new List<string>(command);
+                        int sumNpsIndex = commandWithNps.IndexOf("nps");
+                        if (sumNpsIndex != -1)
+                        {
+                            commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
+                        }
+                        Log("<P   {0}", Join(commandWithNps));
+                        WriteLineAndFlush(Console.Out, Join(commandWithNps));
                         program.Depth = tempDepth;
                         program.LastShowPv = DateTime.Now;
                     }

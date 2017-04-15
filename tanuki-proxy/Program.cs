@@ -26,6 +26,7 @@ namespace tanuki_proxy
             public string ponder { get; set; }
             public int score { get; set; }
             public List<string> command { get; set; }
+            public int nps { get; set; }
         }
 
         public class CountAndScore
@@ -172,12 +173,20 @@ namespace tanuki_proxy
                 }
 
                 // PVを出力する
-                Log("<P   {0}", Join(bestmove.command));
-                WriteLineAndFlush(Console.Out, Join(bestmove.command));
+                // npsは再計算する
+                int sumNps = EngineBestmoves.Sum(x => x.nps);
+                var commandWithNps = new List<string>(bestmove.command);
+                int sumNpsIndex = commandWithNps.IndexOf("nps");
+                if (sumNpsIndex != -1)
+                {
+                    commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
+                }
+                Log("<P   {0}", Join(commandWithNps));
+                WriteLineAndFlush(Console.Out, Join(commandWithNps));
 
                 // bestmoveを出力する
                 string outputCommand = "bestmove " + bestmove.move;
-                if (IsNullOrEmpty(bestmove.ponder))
+                if (!IsNullOrEmpty(bestmove.ponder))
                 {
                     outputCommand += " ponder " + bestmove.ponder;
                 }
