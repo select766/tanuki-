@@ -310,10 +310,21 @@ namespace tanuki_proxy
 
                 int depthIndex = command.IndexOf("depth");
                 int pvIndex = command.IndexOf("pv");
+                int mateIndex = command.IndexOf("mate");
 
                 if (depthIndex == -1 || pvIndex == -1)
                 {
                     return;
+                }
+
+                // 詰まされた場合
+                if (depthIndex != -1 && command[depthIndex + 1] == "0" && mateIndex != -1 && command[mateIndex + 1] == "0")
+                {
+                    foreach (var engineBestmove in program.EngineBestmoves)
+                    {
+                        engineBestmove.move = "resign";
+                        engineBestmove.ponder = null;
+                    }
                 }
 
                 int tempDepth = int.Parse(command[depthIndex + 1]);
@@ -332,7 +343,6 @@ namespace tanuki_proxy
                     program.EngineBestmoves[id].score = score;
                 }
 
-                int mateIndex = command.IndexOf("mate");
                 if (mateIndex != -1)
                 {
                     int mate = int.Parse(command[mateIndex + 1]);
