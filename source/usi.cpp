@@ -380,6 +380,8 @@ void is_ready()
 // isreadyコマンド処理部
 void is_ready_cmd(Position& pos)
 {
+  Threads.main()->wait_for_search_finished();
+
   // 対局ごとに"isready","usinewgame"の両方が来るはずだが、
   // "isready"は起動後に1度だけしか来ないGUI実装がありうるかも知れない。
   // 将棋では、"isready"が毎回来るようなので、"usinewgame"のほうは無視して、
