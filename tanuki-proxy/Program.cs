@@ -35,7 +35,6 @@ namespace tanuki_proxy
             public int Score { get; set; } = int.MinValue;
         }
 
-        private const string bestmoveNone = "None";
         private const int decideMoveSleepMs = 10;
         private const int moveHorizon = 80;
         private const int maxPly = 127;
@@ -103,15 +102,23 @@ namespace tanuki_proxy
         {
             lock (UpstreamLockObject)
             {
-                // 投了・宣言勝ち
-                if (EngineBestmoves.Any(x => x.move == "resign"))
+                if (EngineBestmoves.All(x => x.move == null))
                 {
+                    // いずれのスレーブもpvを返していない状態で
+                    // 上流からstopが渡ってきたか、maximumTime経過した
+                    Log("<P   {0}", "bestmove resign");
+                    WriteLineAndFlush(Console.Out, "bestmove resign");
+                }
+                else if (EngineBestmoves.Any(x => x.move == "resign"))
+                {
+                    // 投了
                     Log("<P   {0}", "bestmove resign");
                     WriteLineAndFlush(Console.Out, "bestmove resign");
 
                 }
                 else if (EngineBestmoves.Any(x => x.move == "win"))
                 {
+                    //宣言勝ち
                     Log("<P   {0}", "bestmove win");
                     WriteLineAndFlush(Console.Out, "bestmove win");
                 }

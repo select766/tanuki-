@@ -317,17 +317,17 @@ namespace tanuki_proxy
                     return;
                 }
 
-                // 詰まされた場合
-                if (depthIndex != -1 && command[depthIndex + 1] == "0" && mateIndex != -1 && command[mateIndex + 1] == "0")
-                {
-                    foreach (var engineBestmove in program.EngineBestmoves)
-                    {
-                        engineBestmove.move = "resign";
-                        engineBestmove.ponder = null;
-                    }
-                }
+                program.EngineBestmoves[id].command = command;
 
                 int tempDepth = int.Parse(command[depthIndex + 1]);
+
+                // 詰まされた場合
+                if (tempDepth == 0)
+                {
+                    program.EngineBestmoves[id].move = "resign";
+                    program.EngineBestmoves[id].ponder = null;
+                    return;
+                }
 
                 Debug.Assert(pvIndex + 1 < command.Count);
                 program.EngineBestmoves[id].move = command[pvIndex + 1];
@@ -362,10 +362,6 @@ namespace tanuki_proxy
                     int nps = int.Parse(command[npsIndex + 1]);
                     program.EngineBestmoves[id].nps = nps;
                 }
-
-                program.EngineBestmoves[id].command = command;
-
-                Log("<P   [{0}] {1}", id, Join(command));
 
                 // Fail-low/Fail-highした探索結果は表示しない
                 lock (program.LastShowPvLockObject)
