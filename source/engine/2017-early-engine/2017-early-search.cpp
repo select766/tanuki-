@@ -2541,10 +2541,8 @@ void Thread::search()
   // ---------------------
 
   // (ss-5)と(ss+2)にアクセスしたいので余分に確保しておく。
-  Stack stack[MAX_PLY + 7], *ss = stack + 4;
-
-  // 先頭8つを初期化しておけば十分。そのあとはsearch()の先頭でss+1,ss+2を適宜初期化していく。
-  memset(ss - 4, 0, 7 * sizeof(Stack));
+  Stack stack[MAX_PLY * 2 + 7], *ss = stack + 4;
+  memset(stack, 0, sizeof(stack));
 
   // aspiration searchの窓の範囲(alpha,beta)
   // apritation searchで窓を動かす大きさdelta
