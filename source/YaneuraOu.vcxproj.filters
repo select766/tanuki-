@@ -184,6 +184,9 @@
     <ClInclude Include="progress_report.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="extra\move_picker_2017Q2.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -327,6 +330,9 @@
     <ClCompile Include="progress_report.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="extra\move_picker_2017Q2.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
@@ -346,6 +352,9 @@
     </Text>
     <Text Include="..\script\readme.txt">
       <Filter>script</Filter>
+    </Text>
+    <Text Include="開発メモ2017.txt">
+      <Filter>doc</Filter>
     </Text>
   </ItemGroup>
   <ItemGroup>
