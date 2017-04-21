@@ -2513,8 +2513,9 @@ void Thread::search()
   // ---------------------
 
   // (ss-5)と(ss+2)にアクセスしたいので余分に確保しておく。
-  Stack stack[MAX_PLY * 2 + 7], *ss = stack + 4;
-  memset(stack, 0, sizeof(stack));
+  std::vector<Stack> stack(1 << 16);
+  memset(&stack[0], 0, sizeof(Stack) * stack.size());
+  Stack *ss = &stack[0] + (1 << 15);
 
   // counterMovesをnullptrに初期化するのではなくNO_PIECEのときの値を番兵として用いる。
   for (int i = 4; i > 0; i--)

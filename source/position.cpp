@@ -1395,7 +1395,7 @@ RepetitionState Position::is_repetition(const int repPly) const
 {
   // スレーブとして実行した時に落ちることが多く、
   // デバッグが難しいので千日手判定を無効化する
-	return REPETITION_NONE;
+	//return REPETITION_NONE;
 	// 4手かけないと千日手にはならないから、4手前から調べていく。
   const int Start = 4;
   int i = Start;
