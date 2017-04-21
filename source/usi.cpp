@@ -400,6 +400,11 @@ void is_ready_cmd(Position& pos)
 // "position"コマンド処理部
 void position_cmd(Position& pos, istringstream& is)
 {
+  Search::Signals.stop = true;
+  // 思考を終えて寝てるかも知れないのでresume==trueにして呼び出してやる
+  Threads.main()->start_searching(true);
+  Threads.main()->wait_for_search_finished();
+
   Move m;
   string token, sfen;
 
