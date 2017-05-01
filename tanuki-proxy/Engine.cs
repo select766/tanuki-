@@ -345,14 +345,25 @@ namespace tanuki_proxy
 
                 if (mateIndex != -1)
                 {
-                    int mate = int.Parse(command[mateIndex + 1]);
-                    if (mate > 0)
+                    if (command[mateIndex + 1] == "+")
                     {
-                        program.EngineBestmoves[id].score = mateScore - mate;
+                        program.EngineBestmoves[id].score = 31500;
+                    }
+                    else if (command[mateIndex + 1] == "-")
+                    {
+                        program.EngineBestmoves[id].score = -31500;
                     }
                     else
                     {
-                        program.EngineBestmoves[id].score = -mateScore - mate;
+                        int mate = int.Parse(command[mateIndex + 1]);
+                        if (mate > 0)
+                        {
+                            program.EngineBestmoves[id].score = mateScore - mate;
+                        }
+                        else
+                        {
+                            program.EngineBestmoves[id].score = -mateScore - mate;
+                        }
                     }
                 }
 
@@ -420,6 +431,12 @@ namespace tanuki_proxy
 
         private void HandleBestmove(List<string> command)
         {
+            // タイムキーパー以外はbestmoveを無視する
+            if (!timeKeeper)
+            {
+                return;
+            }
+
             // 手番かつ他の思考エンジンがbestmoveを返していない時のみ
             // bestmoveを返すようにする
             lock (program.UpstreamLockObject)
