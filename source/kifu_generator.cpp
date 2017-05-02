@@ -263,7 +263,6 @@ void Learner::GenerateKifu()
         record.win_color = win;
       }
 
-      int num_records_to_write = 0;
       for (const auto& record : records) {
         if (std::abs(record.value) > value_threshold) {
           break;
@@ -272,10 +271,8 @@ void Learner::GenerateKifu()
           sync_cout << "info string Failed to write a record." << sync_endl;
           std::exit(1);
         }
-        ++num_records_to_write;
+        Learner::ShowProgress(start_time, ++global_position_index, num_positions, show_progress_per_positions);
       }
-      global_position_index += num_records_to_write;
-      Learner::ShowProgress(start_time, global_position_index, num_positions, show_progress_per_positions);
     }
 
     // 必要局面数生成したら全スレッドの探索を停止する
