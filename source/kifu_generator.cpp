@@ -86,72 +86,6 @@ namespace
     return value;
   }
 
-  // 王が移動する指し手からランダムに1手選んで指す
-  bool DoRandomKingMove(Position& pos, std::mt19937_64& mt, StateInfo* state) {
-    MoveList<LEGAL> list(pos);
-    ExtMove* it2 = (ExtMove*)list.begin();
-    for (ExtMove* it = (ExtMove*)list.begin(); it != list.end(); ++it)
-      if (type_of(pos.moved_piece_after(it->move)) == KING)
-        *it2++ = *it;
-
-    auto size = it2 - list.begin();
-    if (size == 0) {
-      return false;
-    }
-
-    // ランダムにひとつ選ぶ
-    pos.do_move(list.at(std::uniform_int_distribution<>(0, static_cast<int>(size) - 1)(mt)),
-      state[pos.game_ply()]);
-    // 差分計算のためevaluate()を呼び出す
-    Eval::evaluate(pos);
-    return true;
-  }
-
-  // 2駒をランダムに入れ替える
-  // https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-  bool SwapTwoPieces(Position& pos, std::mt19937_64& mt) {
-    for (int retry = 0; retry < 10; ++retry) {
-      // 手番側の駒を2駒入れ替える。
-
-      // 与えられたBitboardからランダムに1駒を選び、そのSquareを返す。
-      auto get_one = [&mt](Bitboard pieces) {
-        // 駒の数
-        int num = pieces.pop_count();
-
-        // 何番目かの駒
-        int n = std::uniform_int_distribution<>(1, num)(mt);
-        Square sq = SQ_NB;
-        for (int i = 0; i < n; ++i) {
-          sq = pieces.pop();
-        }
-        return sq;
-      };
-
-      // この升の2駒を入れ替える。
-      auto pieces = pos.pieces(pos.side_to_move());
-
-      auto sq1 = get_one(pieces);
-      // sq1を除くbitboard
-      auto sq2 = get_one(pieces ^ sq1);
-
-      // sq2は王しかいない場合、SQ_NBになるから、これを調べておく
-      // この指し手に成功したら、それはdo_moveの代わりであるから今回、do_move()は行わない。
-
-      if (sq2 != SQ_NB && pos.do_move_by_swapping_pieces(sq1, sq2)) {
-        // 差分計算のためevaluate()を呼び出す
-        Eval::evaluate(pos);
-        // 検証用のassert
-        if (!is_ok(pos)) {
-          sync_cout << pos << sq1 << sq2 << sync_endl;
-        }
-
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   // 合法手の中からランダムに1手指す
   //https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
   bool DoRandomMove(Position& pos, std::mt19937_64& mt, StateInfo* state, Move& move) {
@@ -162,60 +96,6 @@ namespace
     // 差分計算のためevaluate()を呼び出す
     Eval::evaluate(pos);
     return true;
-  }
-
-  enum SearchAndWriteResult {
-    kSearchAndWriteUnknown,
-    kSearchAndWriteSucceeded,
-    kSearchAndWriteInvalidState,
-    kSearchAndWriteValueThresholdExceeded,
-    kSearchAndWriteNumPositionReached,
-  };
-
-  // 探索を行い、問題がなければ結果を書き出す
-  // return 成功した場合はtrue、そうでない場合はfalse。falseの場合は対局を中止したほうが良い
-  SearchAndWriteResult SearchAndWrite(
-    const std::uniform_int_distribution<>& search_depth_distribution, int value_threshold,
-    time_t start_time, int64_t num_positions, int64_t show_progress_per_positions,
-    std::mt19937_64& mt19937_64, Position& pos, Learner::KifuWriter& kifu_writer,
-    std::atomic_int64_t& global_position_index, Move& pv_move) {
-    int search_depth = search_depth_distribution(mt19937_64);
-    auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
-
-    // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-    Value value = valueAndPv.first;
-    const std::vector<Move>& pv = valueAndPv.second;
-    if (pv.empty()) {
-      return kSearchAndWriteInvalidState;
-    }
-
-    // 評価値の絶対値の上限を超えている場合は書き出さないようにする
-    if (std::abs(value) > value_threshold) {
-      return kSearchAndWriteValueThresholdExceeded;
-    }
-
-    // 局面が不正な場合があるので再度チェックする
-    if (!pos.pos_is_ok()) {
-      return kSearchAndWriteInvalidState;
-    }
-
-    // 必要局面数生成したら終了する
-    int64_t position_index = global_position_index++;
-    if (position_index >= num_positions) {
-      return kSearchAndWriteNumPositionReached;
-    }
-
-    Learner::Record record = { 0 };
-    pos.sfen_pack(record.packed);
-    record.value = value;
-
-    if (!kifu_writer.Write(record)) {
-      return kSearchAndWriteInvalidState;
-    }
-
-    Learner::ShowProgress(start_time, position_index, num_positions, show_progress_per_positions);
-    pv_move = pv[0];
-    return kSearchAndWriteSucceeded;
   }
 }
 
@@ -342,66 +222,60 @@ void Learner::GenerateKifu()
         Eval::evaluate(pos);
       }
 
+      std::vector<Learner::Record> records;
       while (pos.game_ply() < kMaxGamePlay && !pos.is_mated()) {
         pos.set_this_thread(&thread);
 
         Move pv_move = Move::MOVE_NONE;
-        auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
-          num_positions, show_progress_per_positions, mt19937_64, pos, *kifu_writer,
-          global_position_index, pv_move);
-        if (result != kSearchAndWriteSucceeded) {
+        int search_depth = search_depth_distribution(mt19937_64);
+        auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
+
+        // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
+        Value value = valueAndPv.first;
+        const std::vector<Move>& pv = valueAndPv.second;
+        if (pv.empty()) {
           break;
         }
 
-        // 指定した確率に従って特別な指し手を指す
-        double r = probability_distribution(mt19937_64);
-        bool special_move_is_done = false;
-        if (r < do_random_king_move_probability) {
-          if (!pos.in_check()) {
-            special_move_is_done = DoRandomKingMove(pos, mt19937_64, state);
-          }
-        }
-        else if (r < do_random_king_move_probability + swap_two_pieces_probability) {
-          if (!pos.in_check() && pos.pieces(pos.side_to_move()).pop_count() >= 6) {
-            special_move_is_done = SwapTwoPieces(pos, mt19937_64);
-          }
-        }
-        else if (r < do_random_king_move_probability + swap_two_pieces_probability +
-          do_random_move_probability) {
-          if (!pos.in_check()) {
-            Move dummy_move = Move::MOVE_NONE;
-            special_move_is_done = DoRandomMove(pos, mt19937_64, state, dummy_move);
-          }
+        // 局面が不正な場合があるので再度チェックする
+        if (!pos.pos_is_ok()) {
+          break;
         }
 
-        // 特別な指し手が指されなかった場合は探索による指し手を指す
-        if (!special_move_is_done) {
-          if (write_another_position) {
-            // ランダムに選んだ指し手を学習データに加える
-            Move move = Move::MOVE_NONE;
-            DoRandomMove(pos, mt19937_64, state, move);
-            // 差分計算のためevaluate()を呼び出す
-            Eval::evaluate(pos);
+        Learner::Record record = { 0 };
+        pos.sfen_pack(record.packed);
+        record.value = value;
+        records.push_back(record);
 
-            if (!pos.is_mated()) {
-              Move dummy_move = Move::MOVE_NONE;
-              auto result = SearchAndWrite(search_depth_distribution, value_threshold, start_time,
-                num_positions, show_progress_per_positions, mt19937_64, pos, *kifu_writer,
-                global_position_index, dummy_move);
-              if (result != kSearchAndWriteSucceeded &&
-                result != kSearchAndWriteValueThresholdExceeded) {
-                break;
-              }
-            }
-
-            pos.undo_move(move);
-          }
-
-          pos.do_move(pv_move, state[pos.game_ply()]);
-          // 差分計算のためevaluate()を呼び出す
-          Eval::evaluate(pos);
-        }
+        pv_move = pv[0];
+        pos.do_move(pv_move, state[pos.game_ply()]);
+        // 差分計算のためevaluate()を呼び出す
+        Eval::evaluate(pos);
       }
+
+      if (!pos.is_mated()) {
+        continue;
+      }
+
+      Color win;
+      win = ~pos.side_to_move();
+      for (auto& record : records) {
+        record.win_color = win;
+      }
+
+      int num_records_to_write = 0;
+      for (const auto& record : records) {
+        if (std::abs(record.value) > value_threshold) {
+          break;
+        }
+        if (!kifu_writer->Write(record)) {
+          sync_cout << "info string Failed to write a record." << sync_endl;
+          std::exit(1);
+        }
+        ++num_records_to_write;
+      }
+      global_position_index += num_records_to_write;
+      Learner::ShowProgress(start_time, global_position_index, num_positions, show_progress_per_positions);
     }
 
     // 必要局面数生成したら全スレッドの探索を停止する
