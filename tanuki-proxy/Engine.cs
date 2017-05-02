@@ -331,7 +331,7 @@ namespace tanuki_proxy
 
                 Debug.Assert(pvIndex + 1 < command.Count);
                 program.EngineBestmoves[id].move = command[pvIndex + 1];
-                if (pvIndex + 2 < command.Count)
+                if (pvIndex + 2 < command.Count && command[pvIndex + 2] != "score")
                 {
                     program.EngineBestmoves[id].ponder = command[pvIndex + 2];
                 }
