@@ -11,8 +11,9 @@ namespace Learner
   struct Record {
     PackedSfen packed;
     int16_t value;
+    int16_t win_color;
   };
-  static_assert(sizeof(Record) == 34, "Size of Record is not 34");
+  static_assert(sizeof(Record) == 36, "Size of Record is not 36");
 
   void InitializeLearner(USI::OptionsMap& o);
   void Learn(std::istringstream& iss);

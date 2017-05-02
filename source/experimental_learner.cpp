@@ -367,7 +367,7 @@ namespace
 
   // 浅い探索付きの*Strapを行う
   void Strap(const Learner::Record& record, int pv_strap_max_depth,
-    std::function<void(Value record_value, Value value, Color root_color, Position& pos)> f) {
+    std::function<void(Value record_value, Color win_color, Value value, Color root_color, Position& pos)> f) {
     int thread_index = omp_get_thread_num();
     Thread& thread = *Threads[thread_index];
     Position& pos = thread.rootPos;
@@ -402,7 +402,7 @@ namespace
       value = -value;
     }
 
-    f(static_cast<Value>(record.value), value, root_color, pos);
+    f(static_cast<Value>(record.value), static_cast<Color>(record.win_color), value, root_color, pos);
 
     // 局面を浅い探索のroot局面にもどす
     for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
@@ -586,11 +586,12 @@ void Learner::Learn(std::istringstream& iss) {
       for (int record_index = 0; record_index < num_records; ++record_index) {
         auto f = [&weights, &sum_train_squared_error_of_value, &sum_norm,
           &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy](
-            Value record_value, Value value, Color root_color, Position& pos) {
+            Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          WeightType delta = q - p;
+          double r = (root_color == win_color) ? 1.0 : -1.0;
+          WeightType delta = (q - p) + (q - r);
 
           double diff_value = record_value - value;
           sum_train_squared_error_of_value += diff_value * diff_value;
@@ -659,11 +660,12 @@ void Learner::Learn(std::istringstream& iss) {
       for (int record_index = 0; record_index < num_records; ++record_index) {
         auto f = [&weights, &sum_test_squared_error_of_value,
           &sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy](
-            Value record_value, Value value, Color root_color, Position& pos) {
+            Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          WeightType delta = q - p;
+          double r = (root_color == win_color) ? 1.0 : -1.0;
+          WeightType delta = (q - p) + (q - r);
 
           double diff_value = record_value - value;
           sum_test_squared_error_of_value += diff_value * diff_value;
