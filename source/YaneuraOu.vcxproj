@@ -41,15 +41,15 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -117,8 +117,6 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <MinimalRebuild>false</MinimalRebuild>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
@@ -173,21 +171,25 @@
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
+      <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
       <SDLCheck>
       </SDLCheck>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <OpenMPSupport>true</OpenMPSupport>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+      <OmitFramePointers>true</OmitFramePointers>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <HeapCommitSize>
@@ -215,7 +217,6 @@
     <ClInclude Include="evaluate.h" />
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
-    <ClInclude Include="experimental_progress.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\apery_book.h" />
     <ClInclude Include="extra\bitop.h" />
@@ -229,13 +230,10 @@
     <ClInclude Include="extra\move_picker_2016Q2.h" />
     <ClInclude Include="extra\move_picker_2016Q3.h" />
     <ClInclude Include="extra\move_picker_2017Q2.h" />
-    <ClInclude Include="extra\mt64bit.h" />
     <ClInclude Include="learn\learn.h" />
     <ClInclude Include="learn\multi_think.h" />
-    <ClInclude Include="math.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
-    <ClInclude Include="progress_report.h" />
     <ClInclude Include="search.h" />
     <ClInclude Include="shogi.h" />
     <ClInclude Include="position.h" />
@@ -264,7 +262,6 @@
     <ClCompile Include="eval\evaluate_kppt.cpp" />
     <ClCompile Include="eval\evaluate_material.cpp" />
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
-    <ClCompile Include="experimental_progress.cpp" />
     <ClCompile Include="extra\apery_book.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book.cpp" />
@@ -283,10 +280,8 @@
     <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
     <ClCompile Include="learn\learner.cpp" />
     <ClCompile Include="learn\multi_think.cpp" />
-    <ClCompile Include="math.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
-    <ClCompile Include="progress_report.cpp" />
     <ClCompile Include="shogi.cpp" />
     <ClCompile Include="position.cpp" />
     <ClCompile Include="thread.cpp" />
@@ -298,9 +293,9 @@
     <Text Include="..\docs\やねうら大定跡.txt" />
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
+    <Text Include="..\docs\開発メモ2017.txt" />
     <Text Include="..\exe\eval\readme.txt" />
     <Text Include="..\script\readme.txt" />
-    <Text Include="開発メモ2017.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\exe\book\standard_book.db" />

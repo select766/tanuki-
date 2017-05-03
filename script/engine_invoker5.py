@@ -228,7 +228,7 @@ def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,b
 	moves = [0]*threads
 
 	# 今回の対局での先手番のplayer(0 or 1)
-	turns = [0,1]*int((threads+1)/2)
+	turns = [0]*threads
 
 	# process handle
 	procs = [0]*threads*2
@@ -272,9 +272,7 @@ def vs_match(engines_full,options,threads,loop,cpu,book_sfens,fileLogging,opt2,b
 		log_file = open("script_log"+now.strftime("%Y%m%d%H%M%S")+".txt","w")
 
 	if KifOutput:
-		if not os.path.isdir('log'):
-			os.mkdir('log')
-		kif_file = open('log/' + now.strftime("%Y%m%d%H%M%S") + opt2.replace(",","_") + ".sfen","w")
+		kif_file = open(now.strftime("%Y%m%d%H%M%S") + opt2.replace(",","_") + ".sfen","w")
 
 	def send_cmd(i,s):
 		p = procs[i]
@@ -722,7 +720,6 @@ for sfen in book_file:
 		sys.stdout.flush()
 book_file.close()
 print
-sys.stdout.flush()
 
 # 定跡をシャッフルする
 if rand_book:
