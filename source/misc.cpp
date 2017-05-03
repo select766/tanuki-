@@ -216,6 +216,7 @@ namespace WinProcGroup {
 
 #else
 
+
 	/// get_group() retrieves logical processor information using Windows specific
 	/// API and returns the best group id for the thread with index idx. Original
 	/// code from Texel by Peter Österlund.

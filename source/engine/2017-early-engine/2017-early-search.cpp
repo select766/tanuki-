@@ -45,7 +45,6 @@
 #include "../../extra/book.h"
 #include "../../move_picker.h"
 #include "../../learn/learn.h"
-#include "../../experimental_progress.h"
 
 // ハイパーパラメーターを自動調整するときはstatic変数にしておいて変更できるようにする。
 #if defined (USE_AUTO_TUNE_PARAMETERS) || defined(USE_RANDOM_PARAMETERS)
@@ -56,8 +55,6 @@
 
 // 実行時に読み込むパラメーターファイルの名前
 #define PARAM_FILE "2017-early-param.h"
-//#define PARAM_FILE "2017-early-param-master.h"
-//#define PARAM_FILE "2017-early-param-slave.h"
 #include "2017-early-param.h"
 
 
@@ -179,51 +176,6 @@ void USI::extra_option(USI::OptionsMap & o)
 
 namespace YaneuraOu2017Early
 {
-  // 探索パラメーター
-  static int PARAM_FUTILITY_MARGIN_ALPHA;
-  static int PARAM_FUTILITY_MARGIN_BETA;
-  static int PARAM_FUTILITY_MARGIN_QUIET;
-  static int PARAM_FUTILITY_RETURN_DEPTH;
-
-  static int PARAM_FUTILITY_AT_PARENT_NODE_DEPTH;
-  static int PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1;
-  static int PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2;
-  static int PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1;
-  static int PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2;
-
-  static int PARAM_NULL_MOVE_DYNAMIC_ALPHA;
-  static int PARAM_NULL_MOVE_DYNAMIC_BETA;
-  static int PARAM_NULL_MOVE_MARGIN;
-  static int PARAM_NULL_MOVE_RETURN_DEPTH;
-
-  static int PARAM_PROBCUT_DEPTH;
-  static int PARAM_PROBCUT_MARGIN;
-
-  static int PARAM_SINGULAR_EXTENSION_DEPTH;
-  static int PARAM_SINGULAR_MARGIN;
-  static int PARAM_SINGULAR_SEARCH_DEPTH_ALPHA;
-
-  static int PARAM_PRUNING_BY_MOVE_COUNT_DEPTH;
-  static int PARAM_PRUNING_BY_HISTORY_DEPTH;
-  static int PARAM_REDUCTION_BY_HISTORY;
-  static int PARAM_IID_MARGIN_ALPHA;
-  static int PARAM_RAZORING_MARGIN1;
-  static int PARAM_RAZORING_MARGIN2;
-  static int PARAM_RAZORING_MARGIN3;
-  static int PARAM_RAZORING_MARGIN4;
-
-  static int PARAM_REDUCTION_ALPHA;
-
-  static int PARAM_FUTILITY_MOVE_COUNT_ALPHA0;
-  static int PARAM_FUTILITY_MOVE_COUNT_ALPHA1;
-  static int PARAM_FUTILITY_MOVE_COUNT_BETA0;
-  static int PARAM_FUTILITY_MOVE_COUNT_BETA1;
-
-  static int PARAM_QUIET_SEARCH_COUNT;
-
-  static int PARAM_QSEARCH_MATE1;
-  static int PARAM_SEARCH_MATE1;
-  static int PARAM_WEAK_MATE_PLY;
 
   // 外部から調整される探索パラメーター
   int param1 = 0;
@@ -265,7 +217,7 @@ namespace YaneuraOu2017Early
   int FutilityMoveCounts[2][32];
 #else
   // 16のはずだが。
-  int FutilityMoveCounts[2][32];
+  int FutilityMoveCounts[2][PARAM_PRUNING_BY_MOVE_COUNT_DEPTH];
 #endif
 
   // 探索深さを減らすためのReductionテーブル
@@ -280,115 +232,6 @@ namespace YaneuraOu2017Early
   // 悪化していく局面なので深く読んでも仕方ないからreduction量を心もち増やす。
   template <bool PvNode> Depth reduction(bool improving, Depth depth, int move_count) {
     return Reductions[PvNode][improving][std::min(depth / ONE_PLY, 63)][std::min(move_count, 63)] * ONE_PLY;
-  }
-
-  // ------------------------------------------
-  //  進行度を用いた探索パラメーターの自動調整
-  // ------------------------------------------
-
-  Progress progress;
-
-  void adjust_parameters_with_progress(Position& pos) {
-    // 進行度を推定する
-    double p = progress.Estimate(pos);
-    sync_cout << "info string estimated progress=" << p << sync_endl;
-
-    // 進行度に応じて探索パラメーターを調整する
-    PARAM_FUTILITY_MARGIN_ALPHA = p < 0.5 ? PARAM_FUTILITY_MARGIN_ALPHA_OPENING : PARAM_FUTILITY_MARGIN_ALPHA_ENDING;
-    PARAM_FUTILITY_MARGIN_BETA = p < 0.5 ? PARAM_FUTILITY_MARGIN_BETA_OPENING : PARAM_FUTILITY_MARGIN_BETA_ENDING;
-    PARAM_FUTILITY_MARGIN_QUIET = p < 0.5 ? PARAM_FUTILITY_MARGIN_QUIET_OPENING : PARAM_FUTILITY_MARGIN_QUIET_ENDING;
-    PARAM_FUTILITY_RETURN_DEPTH = p < 0.5 ? PARAM_FUTILITY_RETURN_DEPTH_OPENING : PARAM_FUTILITY_RETURN_DEPTH_ENDING;
-
-    PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = p < 0.5 ? PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING : PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_ENDING;
-    PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = p < 0.5 ? PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING : PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_ENDING;
-    PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2 = p < 0.5 ? PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING : PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_ENDING;
-    PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = p < 0.5 ? PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING : PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_ENDING;
-    PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = p < 0.5 ? PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING : PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_ENDING;
-
-    PARAM_NULL_MOVE_DYNAMIC_ALPHA = p < 0.5 ? PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING : PARAM_NULL_MOVE_DYNAMIC_ALPHA_ENDING;
-    PARAM_NULL_MOVE_DYNAMIC_BETA = p < 0.5 ? PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING : PARAM_NULL_MOVE_DYNAMIC_BETA_ENDING;
-    PARAM_NULL_MOVE_MARGIN = p < 0.5 ? PARAM_NULL_MOVE_MARGIN_OPENING : PARAM_NULL_MOVE_MARGIN_ENDING;
-    PARAM_NULL_MOVE_RETURN_DEPTH = p < 0.5 ? PARAM_NULL_MOVE_RETURN_DEPTH_OPENING : PARAM_NULL_MOVE_RETURN_DEPTH_ENDING;
-
-    PARAM_PROBCUT_DEPTH = p < 0.5 ? PARAM_PROBCUT_DEPTH_OPENING : PARAM_PROBCUT_DEPTH_ENDING;
-    PARAM_PROBCUT_MARGIN = p < 0.5 ? PARAM_PROBCUT_MARGIN_OPENING : PARAM_PROBCUT_MARGIN_ENDING;
-
-    PARAM_SINGULAR_EXTENSION_DEPTH = p < 0.5 ? PARAM_SINGULAR_EXTENSION_DEPTH_OPENING : PARAM_SINGULAR_EXTENSION_DEPTH_ENDING;
-    PARAM_SINGULAR_MARGIN = p < 0.5 ? PARAM_SINGULAR_MARGIN_OPENING : PARAM_SINGULAR_MARGIN_ENDING;
-    PARAM_SINGULAR_SEARCH_DEPTH_ALPHA = p < 0.5 ? PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING : PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_ENDING;
-
-    PARAM_PRUNING_BY_MOVE_COUNT_DEPTH = p < 0.5 ? PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING : PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_ENDING;
-    PARAM_PRUNING_BY_HISTORY_DEPTH = p < 0.5 ? PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING : PARAM_PRUNING_BY_HISTORY_DEPTH_ENDING;
-    PARAM_REDUCTION_BY_HISTORY = p < 0.5 ? PARAM_REDUCTION_BY_HISTORY_OPENING : PARAM_REDUCTION_BY_HISTORY_ENDING;
-    PARAM_IID_MARGIN_ALPHA = p < 0.5 ? PARAM_IID_MARGIN_ALPHA_OPENING : PARAM_IID_MARGIN_ALPHA_ENDING;
-    PARAM_RAZORING_MARGIN1 = p < 0.5 ? PARAM_RAZORING_MARGIN1_OPENING : PARAM_RAZORING_MARGIN1_ENDING;
-    PARAM_RAZORING_MARGIN2 = p < 0.5 ? PARAM_RAZORING_MARGIN2_OPENING : PARAM_RAZORING_MARGIN2_ENDING;
-    PARAM_RAZORING_MARGIN3 = p < 0.5 ? PARAM_RAZORING_MARGIN3_OPENING : PARAM_RAZORING_MARGIN3_ENDING;
-    PARAM_RAZORING_MARGIN4 = p < 0.5 ? PARAM_RAZORING_MARGIN4_OPENING : PARAM_RAZORING_MARGIN4_ENDING;
-
-    PARAM_REDUCTION_ALPHA = p < 0.5 ? PARAM_REDUCTION_ALPHA_OPENING : PARAM_REDUCTION_ALPHA_ENDING;
-
-    PARAM_FUTILITY_MOVE_COUNT_ALPHA0 = p < 0.5 ? PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING : PARAM_FUTILITY_MOVE_COUNT_ALPHA0_ENDING;
-    PARAM_FUTILITY_MOVE_COUNT_ALPHA1 = p < 0.5 ? PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING : PARAM_FUTILITY_MOVE_COUNT_ALPHA1_ENDING;
-    PARAM_FUTILITY_MOVE_COUNT_BETA0 = p < 0.5 ? PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING : PARAM_FUTILITY_MOVE_COUNT_BETA0_ENDING;
-    PARAM_FUTILITY_MOVE_COUNT_BETA1 = p < 0.5 ? PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING : PARAM_FUTILITY_MOVE_COUNT_BETA1_ENDING;
-
-    PARAM_QUIET_SEARCH_COUNT = p < 0.5 ? PARAM_QUIET_SEARCH_COUNT_OPENING : PARAM_QUIET_SEARCH_COUNT_ENDING;
-
-    PARAM_QSEARCH_MATE1 = p < 0.5 ? PARAM_QSEARCH_MATE1_OPENING : PARAM_QSEARCH_MATE1_ENDING;
-    PARAM_SEARCH_MATE1 = p < 0.5 ? PARAM_SEARCH_MATE1_OPENING : PARAM_SEARCH_MATE1_ENDING;
-    PARAM_WEAK_MATE_PLY = p < 0.5 ? PARAM_WEAK_MATE_PLY_OPENING : PARAM_WEAK_MATE_PLY_ENDING;
-
-    // -----------------------
-    //   テーブルの初期化
-    // -----------------------
-
-    // LMRで使うreduction tableの初期化
-
-    // この初期化処理、起動時に1度でも良いのだが、探索パラメーターの調整を行なうときは、
-    // init_param()のあとに行なうべきなので、ここで初期化することにする。
-
-    // pvとnon pvのときのreduction定数
-    // 0.05とか変更するだけで勝率えらく変わる
-
-    // K[][2] = { nonPV時 }、{ PV時 }
-
-    // パラメーターの自動調整のため、前の値として0以外が入っているかも知れないのでゼロ初期化する。
-    memset(&Reductions, 0, sizeof(Reductions));
-
-    for (int imp = 0; imp <= 1; ++imp)
-      for (int d = 1; d < 64; ++d)
-        for (int mc = 1; mc < 64; ++mc)
-        {
-          // 基本的なアイデアとしては、log(depth) × log(moveCount)に比例した分だけreductionさせるというもの。
-          double r = log(d) * log(mc) * PARAM_REDUCTION_ALPHA / 256;
-
-          Reductions[NonPV][imp][d][mc] = int(round(r)) * ONE_PLY;
-          Reductions[PV][imp][d][mc] = std::max(Reductions[NonPV][imp][d][mc] - 1, 0);
-
-          // nonPVでimproving(評価値が2手前から上がっている)でないときはreductionの量を増やす。
-          // →　これ、ほとんど効果がないようだ…。あとで調整すべき。
-          if (!imp && Reductions[NonPV][imp][d][mc] >= 2)
-            Reductions[NonPV][imp][d][mc] ++;
-        }
-
-    // Futilityで用いるテーブルの初期化
-
-    // 残り探索depthが少なくて、王手がかかっていなくて、王手にもならないような指し手を
-    // 枝刈りしてしまうためのmoveCountベースのfutilityで用いるテーブル。
-    // FutilityMoveCounts[improving][残りdepth/ONE_PLY]
-    for (int d = 0; d < PARAM_PRUNING_BY_MOVE_COUNT_DEPTH; ++d)
-    {
-      FutilityMoveCounts[0][d] = int(PARAM_FUTILITY_MOVE_COUNT_ALPHA0 / 100.0 + PARAM_FUTILITY_MOVE_COUNT_BETA0 / 1000.0 * pow(d, 1.78));
-      FutilityMoveCounts[1][d] = int(PARAM_FUTILITY_MOVE_COUNT_ALPHA1 / 100.0 + PARAM_FUTILITY_MOVE_COUNT_BETA1 / 1000.0 * pow(d, 2.00));
-    }
-
-    // razor marginの初期化
-
-    razor_margin[0] = PARAM_RAZORING_MARGIN1;
-    razor_margin[1] = PARAM_RAZORING_MARGIN2;
-    razor_margin[2] = PARAM_RAZORING_MARGIN3;
-    razor_margin[3] = PARAM_RAZORING_MARGIN4;
   }
 
   // depthに基づく、historyとstatsのupdate bonus
@@ -572,7 +415,7 @@ namespace YaneuraOu2017Early
     Value oldAlpha;        // 関数が呼び出されたときのalpha値
     Value futilityBase;    // futility pruningの基準となる値
 
-                           // hash key関係
+    // hash key関係
     TTEntry* tte;          // 置換表にhitしたときの置換表のエントリーへのポインタ
     Key posKey;            // この局面のhash key
     bool ttHit;            // 置換表にhitしたかのフラグ
@@ -580,12 +423,12 @@ namespace YaneuraOu2017Early
     Value ttValue;         // 置換表に登録されていたスコア
     Depth ttDepth;         // このnodeに関して置換表に登録するときの残り探索深さ
 
-                           // 王手関係
+    // 王手関係
     bool givesCheck;       // MovePickerから取り出した指し手で王手になるか
 
-                           // -----------------------
-                           //     nodeの初期化
-                           // -----------------------
+    // -----------------------
+    //     nodeの初期化
+    // -----------------------
 
     if (PvNode)
     {
@@ -727,7 +570,7 @@ namespace YaneuraOu2017Early
             (ss - 1)->currentMove != MOVE_NULL ? evaluate(pos)
             : -(ss - 1)->staticEval + 2 * Tempo;
 #else
-          // 長い持ち時間では、ここ、きちんと評価したほうが良いかも。
+        // 長い持ち時間では、ここ、きちんと評価したほうが良いかも。
           ss->staticEval = bestValue = evaluate(pos);
 #endif
         }
@@ -1357,9 +1200,9 @@ namespace YaneuraOu2017Early
       // 残り探索深さがONE_PLY以下で、alphaを確実に下回りそうなら、ここで静止探索を呼び出してしまう。
       if (depth <= ONE_PLY
         //	&& eval + razor_margin[3] <= alpha
-        // →　ここ、razoringとしてはrazor_margin[ZERO_DEPTH]を参照すべき。
-        // しかしそれは前提条件として満たしているので結局、ここでは単にqsearch()を
-        // 呼び出して良いように思う。
+          // →　ここ、razoringとしてはrazor_margin[ZERO_DEPTH]を参照すべき。
+          // しかしそれは前提条件として満たしているので結局、ここでは単にqsearch()を
+          // 呼び出して良いように思う。
         )
         return qsearch<NonPV, false>(pos, ss, alpha, alpha + 1);
 
@@ -1548,7 +1391,7 @@ namespace YaneuraOu2017Early
 #if defined (USE_AUTO_TUNE_PARAMETERS) || defined(USE_RANDOM_PARAMETERS)
       128
 #else
-      128
+      PARAM_QUIET_SEARCH_COUNT
 #endif
     ];
     int quietCount = 0;
@@ -1753,7 +1596,7 @@ namespace YaneuraOu2017Early
         // T1,r300,2501 - 73 - 2426(50.76% R5.29)
         // T1,b1000,2428 - 97 - 2465(49.62% R-2.63)
         // 1秒のほうではやや勝ち越し。計測できない程度の差だが良しとする。
-        //				&& pos.non_pawn_material(pos.side_to_move())
+  //				&& pos.non_pawn_material(pos.side_to_move())
         && bestValue > VALUE_MATED_IN_MAX_PLY)
       {
 
@@ -1918,12 +1761,12 @@ namespace YaneuraOu2017Early
             - PARAM_REDUCTION_BY_HISTORY; // 修正項
 
 
-                                          // historyの値に応じて指し手のreduction量を増減する。
+      // historyの値に応じて指し手のreduction量を増減する。
 #if 0
 
-                                          // これ、やったほうがいいかどうかは微妙。1秒、3秒においてはやると弱くなるようだが…。
-                                          // T1,b1000,2135 - 84 - 2071(50.76% R5.29)
-                                          // T1,b3000,640 - 34 - 576(52.63% R18.3)
+          // これ、やったほうがいいかどうかは微妙。1秒、3秒においてはやると弱くなるようだが…。
+          // T1,b1000,2135 - 84 - 2071(50.76% R5.29)
+          // T1,b3000,640 - 34 - 576(52.63% R18.3)
 
           if (ss->history > 0 && (ss - 1)->history < 0)
             r -= ONE_PLY;
@@ -2169,85 +2012,34 @@ void init_param()
 #if defined (USE_AUTO_TUNE_PARAMETERS) || defined(USE_RANDOM_PARAMETERS) || defined(ENABLE_OUTPUT_GAME_RESULT)
   {
     vector<string> param_names = {
-      "PARAM_FUTILITY_MARGIN_ALPHA_OPENING",
-      "PARAM_FUTILITY_MARGIN_ALPHA_ENDING",
-      "PARAM_FUTILITY_MARGIN_BETA_OPENING",
-      "PARAM_FUTILITY_MARGIN_BETA_ENDING",
-      "PARAM_FUTILITY_MARGIN_QUIET_OPENING",
-      "PARAM_FUTILITY_MARGIN_QUIET_ENDING",
-      "PARAM_FUTILITY_RETURN_DEPTH_OPENING",
-      "PARAM_FUTILITY_RETURN_DEPTH_ENDING",
+      "PARAM_FUTILITY_MARGIN_ALPHA" , "PARAM_FUTILITY_MARGIN_BETA" ,
+      "PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
 
-      "PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_ENDING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_ENDING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_ENDING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_ENDING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING",
-      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_ENDING",
+      "PARAM_FUTILITY_AT_PARENT_NODE_DEPTH",
+      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1",
+      "PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2",
+      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1" ,
+      "PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2" ,
 
-      "PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING",
-      "PARAM_NULL_MOVE_DYNAMIC_ALPHA_ENDING",
-      "PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING",
-      "PARAM_NULL_MOVE_DYNAMIC_BETA_ENDING",
-      "PARAM_NULL_MOVE_MARGIN_OPENING",
-      "PARAM_NULL_MOVE_MARGIN_ENDING",
-      "PARAM_NULL_MOVE_RETURN_DEPTH_OPENING",
-      "PARAM_NULL_MOVE_RETURN_DEPTH_ENDING",
+      "PARAM_NULL_MOVE_DYNAMIC_ALPHA","PARAM_NULL_MOVE_DYNAMIC_BETA",
+      "PARAM_NULL_MOVE_MARGIN","PARAM_NULL_MOVE_RETURN_DEPTH",
 
-      "PARAM_PROBCUT_DEPTH_OPENING",
-      "PARAM_PROBCUT_DEPTH_ENDING",
-      "PARAM_PROBCUT_MARGIN_OPENING",
-      "PARAM_PROBCUT_MARGIN_ENDING",
+      "PARAM_PROBCUT_DEPTH","PARAM_PROBCUT_MARGIN",
 
-      "PARAM_SINGULAR_EXTENSION_DEPTH_OPENING",
-      "PARAM_SINGULAR_EXTENSION_DEPTH_ENDING",
-      "PARAM_SINGULAR_MARGIN_OPENING",
-      "PARAM_SINGULAR_MARGIN_ENDING",
-      "PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING",
-      "PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_ENDING",
+      "PARAM_SINGULAR_EXTENSION_DEPTH","PARAM_SINGULAR_MARGIN","PARAM_SINGULAR_SEARCH_DEPTH_ALPHA",
 
-      "PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING",
-      "PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_ENDING",
-      "PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING",
-      "PARAM_PRUNING_BY_HISTORY_DEPTH_ENDING",
-      "PARAM_REDUCTION_BY_HISTORY_OPENING",
-      "PARAM_REDUCTION_BY_HISTORY_ENDING",
-      "PARAM_IID_MARGIN_ALPHA_OPENING",
-      "PARAM_IID_MARGIN_ALPHA_ENDING",
-      "PARAM_RAZORING_MARGIN1_OPENING",
-      "PARAM_RAZORING_MARGIN1_ENDING",
-      "PARAM_RAZORING_MARGIN2_OPENING",
-      "PARAM_RAZORING_MARGIN2_ENDING",
-      "PARAM_RAZORING_MARGIN3_OPENING",
-      "PARAM_RAZORING_MARGIN3_ENDING",
-      "PARAM_RAZORING_MARGIN4_OPENING",
-      "PARAM_RAZORING_MARGIN4_ENDING",
+      "PARAM_PRUNING_BY_MOVE_COUNT_DEPTH","PARAM_PRUNING_BY_HISTORY_DEPTH","PARAM_REDUCTION_BY_HISTORY",
+      "PARAM_IID_MARGIN_ALPHA",
+      "PARAM_RAZORING_MARGIN1","PARAM_RAZORING_MARGIN2","PARAM_RAZORING_MARGIN3","PARAM_RAZORING_MARGIN4",
 
-      "PARAM_REDUCTION_ALPHA_OPENING",
-      "PARAM_REDUCTION_ALPHA_ENDING",
+      "PARAM_REDUCTION_ALPHA",
 
-      "PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING",
-      "PARAM_FUTILITY_MOVE_COUNT_ALPHA0_ENDING",
-      "PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING",
-      "PARAM_FUTILITY_MOVE_COUNT_ALPHA1_ENDING",
-      "PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING",
-      "PARAM_FUTILITY_MOVE_COUNT_BETA0_ENDING",
-      "PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING",
-      "PARAM_FUTILITY_MOVE_COUNT_BETA1_ENDING",
+      "PARAM_FUTILITY_MOVE_COUNT_ALPHA0","PARAM_FUTILITY_MOVE_COUNT_ALPHA1",
+      "PARAM_FUTILITY_MOVE_COUNT_BETA0","PARAM_FUTILITY_MOVE_COUNT_BETA1",
 
-      "PARAM_QUIET_SEARCH_COUNT_OPENING",
-      "PARAM_QUIET_SEARCH_COUNT_ENDING",
+      "PARAM_QUIET_SEARCH_COUNT",
 
-      "PARAM_QSEARCH_MATE1_OPENING",
-      "PARAM_QSEARCH_MATE1_ENDING",
-      "PARAM_SEARCH_MATE1_OPENING",
-      "PARAM_SEARCH_MATE1_ENDING",
-      "PARAM_WEAK_MATE_PLY_OPENING",
-      "PARAM_WEAK_MATE_PLY_ENDING",
+      "PARAM_QSEARCH_MATE1","PARAM_SEARCH_MATE1","PARAM_WEAK_MATE_PLY"
 
     };
 
@@ -2256,85 +2048,34 @@ void init_param()
 #else
     vector<int*> param_vars = {
 #endif
-      &PARAM_FUTILITY_MARGIN_ALPHA_OPENING,
-      &PARAM_FUTILITY_MARGIN_ALPHA_ENDING,
-      &PARAM_FUTILITY_MARGIN_BETA_OPENING,
-      &PARAM_FUTILITY_MARGIN_BETA_ENDING,
-      &PARAM_FUTILITY_MARGIN_QUIET_OPENING,
-      &PARAM_FUTILITY_MARGIN_QUIET_ENDING,
-      &PARAM_FUTILITY_RETURN_DEPTH_OPENING,
-      &PARAM_FUTILITY_RETURN_DEPTH_ENDING,
+      &PARAM_FUTILITY_MARGIN_ALPHA , &PARAM_FUTILITY_MARGIN_BETA,
+      &PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
 
-      &PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_ENDING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_ENDING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_ENDING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_ENDING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING,
-      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_ENDING,
+      &PARAM_FUTILITY_AT_PARENT_NODE_DEPTH,
+      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1,
+      &PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2,
+      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1,
+      &PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2,
 
-      &PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING,
-      &PARAM_NULL_MOVE_DYNAMIC_ALPHA_ENDING,
-      &PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING,
-      &PARAM_NULL_MOVE_DYNAMIC_BETA_ENDING,
-      &PARAM_NULL_MOVE_MARGIN_OPENING,
-      &PARAM_NULL_MOVE_MARGIN_ENDING,
-      &PARAM_NULL_MOVE_RETURN_DEPTH_OPENING,
-      &PARAM_NULL_MOVE_RETURN_DEPTH_ENDING,
+      &PARAM_NULL_MOVE_DYNAMIC_ALPHA, &PARAM_NULL_MOVE_DYNAMIC_BETA,
+      &PARAM_NULL_MOVE_MARGIN,&PARAM_NULL_MOVE_RETURN_DEPTH,
 
-      &PARAM_PROBCUT_DEPTH_OPENING,
-      &PARAM_PROBCUT_DEPTH_ENDING,
-      &PARAM_PROBCUT_MARGIN_OPENING,
-      &PARAM_PROBCUT_MARGIN_ENDING,
+      &PARAM_PROBCUT_DEPTH, &PARAM_PROBCUT_MARGIN,
 
-      &PARAM_SINGULAR_EXTENSION_DEPTH_OPENING,
-      &PARAM_SINGULAR_EXTENSION_DEPTH_ENDING,
-      &PARAM_SINGULAR_MARGIN_OPENING,
-      &PARAM_SINGULAR_MARGIN_ENDING,
-      &PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING,
-      &PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_ENDING,
+      &PARAM_SINGULAR_EXTENSION_DEPTH, &PARAM_SINGULAR_MARGIN,&PARAM_SINGULAR_SEARCH_DEPTH_ALPHA,
 
-      &PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING,
-      &PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_ENDING,
-      &PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING,
-      &PARAM_PRUNING_BY_HISTORY_DEPTH_ENDING,
-      &PARAM_REDUCTION_BY_HISTORY_OPENING,
-      &PARAM_REDUCTION_BY_HISTORY_ENDING,
-      &PARAM_IID_MARGIN_ALPHA_OPENING,
-      &PARAM_IID_MARGIN_ALPHA_ENDING,
-      &PARAM_RAZORING_MARGIN1_OPENING,
-      &PARAM_RAZORING_MARGIN1_ENDING,
-      &PARAM_RAZORING_MARGIN2_OPENING,
-      &PARAM_RAZORING_MARGIN2_ENDING,
-      &PARAM_RAZORING_MARGIN3_OPENING,
-      &PARAM_RAZORING_MARGIN3_ENDING,
-      &PARAM_RAZORING_MARGIN4_OPENING,
-      &PARAM_RAZORING_MARGIN4_ENDING,
+      &PARAM_PRUNING_BY_MOVE_COUNT_DEPTH, &PARAM_PRUNING_BY_HISTORY_DEPTH,&PARAM_REDUCTION_BY_HISTORY,
+      &PARAM_IID_MARGIN_ALPHA,
+      &PARAM_RAZORING_MARGIN1,&PARAM_RAZORING_MARGIN2,&PARAM_RAZORING_MARGIN3,&PARAM_RAZORING_MARGIN4,
 
-      &PARAM_REDUCTION_ALPHA_OPENING,
-      &PARAM_REDUCTION_ALPHA_ENDING,
+      &PARAM_REDUCTION_ALPHA,
 
-      &PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING,
-      &PARAM_FUTILITY_MOVE_COUNT_ALPHA0_ENDING,
-      &PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING,
-      &PARAM_FUTILITY_MOVE_COUNT_ALPHA1_ENDING,
-      &PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING,
-      &PARAM_FUTILITY_MOVE_COUNT_BETA0_ENDING,
-      &PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING,
-      &PARAM_FUTILITY_MOVE_COUNT_BETA1_ENDING,
+      &PARAM_FUTILITY_MOVE_COUNT_ALPHA0,&PARAM_FUTILITY_MOVE_COUNT_ALPHA1,
+      &PARAM_FUTILITY_MOVE_COUNT_BETA0,&PARAM_FUTILITY_MOVE_COUNT_BETA1,
 
-      &PARAM_QUIET_SEARCH_COUNT_OPENING,
-      &PARAM_QUIET_SEARCH_COUNT_ENDING,
+      &PARAM_QUIET_SEARCH_COUNT,
 
-      &PARAM_QSEARCH_MATE1_OPENING,
-      &PARAM_QSEARCH_MATE1_ENDING,
-      &PARAM_SEARCH_MATE1_OPENING,
-      &PARAM_SEARCH_MATE1_ENDING,
-      &PARAM_WEAK_MATE_PLY_OPENING,
-      &PARAM_WEAK_MATE_PLY_ENDING,
+      &PARAM_QSEARCH_MATE1,&PARAM_SEARCH_MATE1,&PARAM_WEAK_MATE_PLY,
 
     };
 
@@ -2422,30 +2163,30 @@ void init_param()
             {
               cout << "Error : param is out of range -> " << line << endl;
             }
-            else {
-              *param_vars[i] = a[rand.rand(a.size())];
-            }
+ else {
+*param_vars[i] = a[rand.rand(a.size())];
+}
 #endif
 
-            //            cout << param_names[i] << " = " << *param_vars[i] << endl;
-            goto NEXT;
-          }
-        cout << "Error : param not found! in parameters.h -> " << line << endl;
+ //            cout << param_names[i] << " = " << *param_vars[i] << endl;
+ goto NEXT;
+}
+cout << "Error : param not found! in parameters.h -> " << line << endl;
 
-      NEXT:;
-      }
-      last_line = line; // 1つ前の行を記憶しておく。
-    }
-    fs.close();
+NEXT:;
+}
+last_line = line; // 1つ前の行を記憶しておく。
+}
+fs.close();
 
-    // 読み込んだパラメーターの数が合致しないといけない。
-    // 見つかっていなかったパラメーターを表示させる。
-    if (count != param_names.size())
-    {
-      for (int i = 0; i < founds.size(); ++i)
-        if (!founds[i])
-          cout << "Error : param not found in " << PARAM_FILE << " -> " << param_names[i] << endl;
-    }
+// 読み込んだパラメーターの数が合致しないといけない。
+// 見つかっていなかったパラメーターを表示させる。
+if (count != param_names.size())
+{
+  for (int i = 0; i < founds.size(); ++i)
+    if (!founds[i])
+      cout << "Error : param not found in " << PARAM_FILE << " -> " << param_names[i] << endl;
+}
 
 #if defined (USE_RANDOM_PARAMETERS) || defined(ENABLE_OUTPUT_GAME_RESULT)
     {
@@ -2491,10 +2232,56 @@ void Search::clear()
 
   init_param();
 
-  // 進行度学習ファイルのロード
-  if (!YaneuraOu2017Early::progress.Load()) {
-    std::exit(1);
+  // -----------------------
+  //   テーブルの初期化
+  // -----------------------
+
+  // LMRで使うreduction tableの初期化
+
+  // この初期化処理、起動時に1度でも良いのだが、探索パラメーターの調整を行なうときは、
+  // init_param()のあとに行なうべきなので、ここで初期化することにする。
+
+  // pvとnon pvのときのreduction定数
+  // 0.05とか変更するだけで勝率えらく変わる
+
+  // K[][2] = { nonPV時 }、{ PV時 }
+
+  // パラメーターの自動調整のため、前の値として0以外が入っているかも知れないのでゼロ初期化する。
+  memset(&Reductions, 0, sizeof(Reductions));
+
+  for (int imp = 0; imp <= 1; ++imp)
+    for (int d = 1; d < 64; ++d)
+      for (int mc = 1; mc < 64; ++mc)
+      {
+        // 基本的なアイデアとしては、log(depth) × log(moveCount)に比例した分だけreductionさせるというもの。
+        double r = log(d) * log(mc) * PARAM_REDUCTION_ALPHA / 256;
+
+        Reductions[NonPV][imp][d][mc] = int(round(r)) * ONE_PLY;
+        Reductions[PV][imp][d][mc] = std::max(Reductions[NonPV][imp][d][mc] - ONE_PLY, 0);
+
+        // nonPVでimproving(評価値が2手前から上がっている)でないときはreductionの量を増やす。
+        // →　これ、ほとんど効果がないようだ…。あとで調整すべき。
+        if (!imp && Reductions[NonPV][imp][d][mc] >= 2 * ONE_PLY)
+          Reductions[NonPV][imp][d][mc] ++;
+      }
+
+  // Futilityで用いるテーブルの初期化
+
+  // 残り探索depthが少なくて、王手がかかっていなくて、王手にもならないような指し手を
+  // 枝刈りしてしまうためのmoveCountベースのfutilityで用いるテーブル。
+  // FutilityMoveCounts[improving][残りdepth/ONE_PLY]
+  for (int d = 0; d < PARAM_PRUNING_BY_MOVE_COUNT_DEPTH; ++d)
+  {
+    FutilityMoveCounts[0][d] = int(PARAM_FUTILITY_MOVE_COUNT_ALPHA0 / 100.0 + PARAM_FUTILITY_MOVE_COUNT_BETA0 / 1000.0 * pow(d, 1.78));
+    FutilityMoveCounts[1][d] = int(PARAM_FUTILITY_MOVE_COUNT_ALPHA1 / 100.0 + PARAM_FUTILITY_MOVE_COUNT_BETA1 / 1000.0 * pow(d, 2.00));
   }
+
+  // razor marginの初期化
+
+  razor_margin[0] = PARAM_RAZORING_MARGIN1; // 未使用
+  razor_margin[1] = PARAM_RAZORING_MARGIN2;
+  razor_margin[2] = PARAM_RAZORING_MARGIN3;
+  razor_margin[3] = PARAM_RAZORING_MARGIN4;
 
   // -----------------------
   //   定跡の読み込み
@@ -2683,10 +2470,10 @@ void Thread::search()
           && multiPV == 1
           && (bestValue <= alpha || beta <= bestValue)
           && ((Time.elapsed() > 3000
-          // silent modeなら出力を抑制する。
-          && !Limits.silent
-          // 将棋所のコンソールが詰まるのを予防するために出力を少し抑制する。
-          && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())) || verbose)
+            // silent modeなら出力を抑制する。
+            && !Limits.silent
+            // 将棋所のコンソールが詰まるのを予防するために出力を少し抑制する。
+            && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())) || verbose)
           )
         {
           // 最後に出力した時刻を記録しておく。
@@ -2803,7 +2590,7 @@ void Thread::search()
         // 1つしか合法手がない(one reply)であるだとか、利用できる時間を使いきっているだとか、
         // easyMoveに合致しただとか…。
         const int F[] = { mainThread->failedLow,
-          bestValue - mainThread->previousScore };
+                  bestValue - mainThread->previousScore };
 
         int improvingFactor = std::max(229, std::min(715, 357 + 119 * F[0] - 6 * F[1]));
         double unstablePvFactor = 1 + mainThread->bestMoveChanges;
@@ -3018,14 +2805,10 @@ void MainThread::think()
               // 選択した定跡のpvを出力する
               // tanuki-proxyで必要
               if (move.nextMove == MOVE_NONE) {
-                sync_cout << "info pv " << move.bestMove
-                  << " score cp " << move.value << " depth " << move.depth
-                  << sync_endl;
+                sync_cout << "info depth " << move.depth << " score cp " << move.value << " pv " << move.bestMove << sync_endl;
               }
               else {
-                sync_cout << "info pv " << move.bestMove << " " << move.nextMove
-                  << " score cp " << move.value << " depth " << move.depth
-                  << sync_endl;
+                sync_cout << "info depth " << move.depth << " score cp " << move.value << " pv " << move.bestMove << " " << move.nextMove << sync_endl;
               }
             }
             goto ID_END;
@@ -3080,9 +2863,6 @@ void MainThread::think()
     // --- 今回の思考時間の設定。
 
     Time.init(Limits, us, rootPos.game_ply());
-
-    // 探索パラメーターを調整する
-    adjust_parameters_with_progress(pos);
 
     // ---------------------
     // 各スレッドがsearch()を実行する
@@ -3253,7 +3033,7 @@ namespace Learner
       th->counterMoves.clear();
       th->fromTo.clear();
       //	th->counterMoveHistory.clear();
-      // →　このクリア、時間がかかりすぎるのでまあいいや。
+        // →　このクリア、時間がかかりすぎるのでまあいいや。
 #endif
       th->resetCalls = true;
 

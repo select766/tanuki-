@@ -19,7 +19,7 @@ namespace Book
     uint64_t num;  // 何らかの棋譜集において、この指し手が採択された回数。
     float prob;    // ↑のnumをパーセンテージで表現したもの。(read_bookしたときには反映される。ファイルには書き出していない。)
 
-    BookPos(Move best, Move next, int v, int d,uint64_t n) : bestMove(best), nextMove(next), value(v), depth(d),num(n) {}
+    BookPos(Move best, Move next, int v, int d, uint64_t n) : bestMove(best), nextMove(next), value(v), depth(d), num(n) {}
     bool operator == (const BookPos& rhs) const { return bestMove == rhs.bestMove; }
     bool operator < (const BookPos& rhs) const { return num > rhs.num; } // std::sortで降順ソートされて欲しいのでこう定義する。
   };
@@ -56,13 +56,11 @@ namespace Book
   // 同じファイルを二度目は読み込み動作をskipする。
   // on_the_flyが指定されているとメモリに丸読みしない。
   // 定跡作成時などはこれをtrueにしてはいけない。(メモリに読み込まれないため)
-  extern int read_book(const std::string& filename, MemoryBook& book,bool on_the_fly = false);
-
-  extern int read_apery_book(const std::string& filename, MemoryBook& book);
+  extern int read_book(const std::string& filename, MemoryBook& book, bool on_the_fly = false);
 
   // 定跡ファイルの書き出し
   // sort = 書き出すときにsfen文字列で並び替えるのか。(書き出しにかかる時間増)
-  extern int write_book(const std::string& filename, const MemoryBook& book,bool sort = false);
+  extern int write_book(const std::string& filename, const MemoryBook& book, bool sort = false);
 
   // bookにBookPosを一つ追加。(その局面ですでに同じbestMoveの指し手が登録されている場合は上書き動作)
   extern void insert_book_pos(MemoryBook& book, const std::string sfen, const BookPos& bp);

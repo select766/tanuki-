@@ -639,10 +639,8 @@ private:
 	// c側の手駒ptの(最後の1枚の)PieceNoを返す
 	PieceNo piece_no_of(Color c, Piece pt) const { return evalList.piece_no_of(bona_piece_of(c, pt)); }
 
-public:
-  // 盤上のpcの駒のPieceNoを返す
-  PieceNo piece_no_of(Piece pc, Square sq) const { return evalList.piece_no_of((Eval::BonaPiece)(Eval::kpp_board_index[pc].fb + sq)); }
-protected:
+	// 盤上のpcの駒のPieceNoを返す
+	PieceNo piece_no_of(Piece pc, Square sq) const { return evalList.piece_no_of((Eval::BonaPiece)(Eval::kpp_board_index[pc].fb + sq)); }
 #else
 	// 駒番号を使わないとき用のダミー
 	PieceNo piece_no_of(Color c, Piece pt) const { return PIECE_NO_ZERO; }
