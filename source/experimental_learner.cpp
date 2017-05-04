@@ -590,12 +590,12 @@ void Learner::Learn(std::istringstream& iss) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          double r = (root_color == win_color) ? 0.0 : 1.0;
-          WeightType delta = (q - p) + (q - r);
+          double r = (root_color == win_color) ? 1.0 : 0.0;
+          WeightType delta = (q - p) + 0.1 * (q - r);
 
           double diff_value = record_value - value;
           sum_train_squared_error_of_value += diff_value * diff_value;
-          double diff_winning_percentage = p - q;
+          double diff_winning_percentage = delta;
           sum_train_squared_error_of_winning_percentage +=
             diff_winning_percentage * diff_winning_percentage;
           sum_train_cross_entropy +=
@@ -664,12 +664,12 @@ void Learner::Learn(std::istringstream& iss) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          double r = (root_color == win_color) ? 0.0 : 1.0;
-          WeightType delta = (q - p) + (q - r);
+          double r = (root_color == win_color) ? 1.0 : 0.0;
+          WeightType delta = (q - p) + 0.1 * (q - r);
 
           double diff_value = record_value - value;
           sum_test_squared_error_of_value += diff_value * diff_value;
-          double diff_winning_percentage = p - q;
+          double diff_winning_percentage = delta;
           sum_test_squared_error_of_winning_percentage +=
             diff_winning_percentage * diff_winning_percentage;
           sum_test_cross_entropy +=
