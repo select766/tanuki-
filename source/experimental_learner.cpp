@@ -590,7 +590,7 @@ void Learner::Learn(std::istringstream& iss) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          double r = (root_color == win_color) ? 1.0 : 0.0;
+          double r = (root_color == win_color) ? 0.0 : 1.0;
           WeightType delta = (q - p) + (q - r);
 
           double diff_value = record_value - value;
@@ -664,7 +664,7 @@ void Learner::Learn(std::istringstream& iss) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
-          double r = (root_color == win_color) ? 1.0 : 0.0;
+          double r = (root_color == win_color) ? 0.0 : 1.0;
           WeightType delta = (q - p) + (q - r);
 
           double diff_value = record_value - value;
