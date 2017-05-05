@@ -123,6 +123,7 @@ namespace
   constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
   constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
   constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
+  constexpr char* kOptionValueElmoCoefficient = "ElmoCoefficient";
 
   class Kpp {
   public:
@@ -425,6 +426,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
   char buffer[1024];
   sprintf(buffer, "%.20f", fobos_l2_parameter);
   o[kOptionValueFobosL2Parameter] << Option(buffer);
+  o[kOptionValueElmoCoefficient] << Option("1.0");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -525,6 +527,7 @@ void Learner::Learn(std::istringstream& iss) {
   int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
   double fobos_l1_parameter = Options[kOptionValueFobosL1Parameter].cast<double>();
   double fobos_l2_parameter = Options[kOptionValueFobosL2Parameter].cast<double>();
+  double elmo_coefficient = Options[kOptionValueElmoCoefficient].cast<double>();
 
   sync_cout << "learning_rate=" << learning_rate << sync_endl;
   sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -537,6 +540,7 @@ void Learner::Learn(std::istringstream& iss) {
   sync_cout << "mini_batch_size=" << mini_batch_size << sync_endl;
   sync_cout << "fobos_l1_parameter=" << fobos_l1_parameter << sync_endl;
   sync_cout << "fobos_l2_parameter=" << fobos_l2_parameter << sync_endl;
+  sync_cout << "elmo_coefficient=" << elmo_coefficient << sync_endl;
 
   auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
   std::vector<Record> records_for_test;
@@ -584,14 +588,14 @@ void Learner::Learn(std::istringstream& iss) {
       // num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(guided) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        auto f = [&weights, &sum_train_squared_error_of_value, &sum_norm,
+        auto f = [elmo_coefficient, &weights, &sum_train_squared_error_of_value, &sum_norm,
           &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy](
             Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
           double r = (root_color == win_color) ? 1.0 : 0.0;
-          WeightType delta = (q - p) + 0.1 * (q - r);
+          WeightType delta = (q - p) + elmo_coefficient * (q - r);
 
           double diff_value = record_value - value;
           sum_train_squared_error_of_value += diff_value * diff_value;
@@ -658,14 +662,14 @@ void Learner::Learn(std::istringstream& iss) {
       // 損失関数を計算する
 #pragma omp for schedule(guided) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy)
       for (int record_index = 0; record_index < num_records; ++record_index) {
-        auto f = [&weights, &sum_test_squared_error_of_value,
+        auto f = [elmo_coefficient, &weights, &sum_test_squared_error_of_value,
           &sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy](
             Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
           // 評価値から推定した勝率の分布の交差エントロピー
           double p = winning_percentage(record_value);
           double q = winning_percentage(value);
           double r = (root_color == win_color) ? 1.0 : 0.0;
-          WeightType delta = (q - p) + 0.1 * (q - r);
+          WeightType delta = (q - p) + elmo_coefficient * (q - r);
 
           double diff_value = record_value - value;
           sum_test_squared_error_of_value += diff_value * diff_value;
