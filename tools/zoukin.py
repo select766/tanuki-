@@ -17,7 +17,7 @@ class State(enum.Enum):
   generate_kifu_for_test = 2
   learn = 3
   self_play_with_original = 4
-  self_play_with_ukamuse = 5
+  self_play_with_tanuki_wcsc27 = 5
   self_play_with_base = 6
 
 
@@ -174,10 +174,10 @@ def main():
     required=True,
     help='Folder path of the original eval files. ex) eval/apery_wcsc26')
   parser.add_argument(
-    '--ukamuse_eval_folder_path',
+    '--tanuki_wcsc27_eval_folder_path',
     action='store',
     required=True,
-    help='Folder path of the Ukamuse eval files. ex) eval/apery_sdt4')
+    help='Folder path of the tanuki-wcsc27 eval files. ex) eval/apery_sdt4')
   parser.add_argument(
     '--generate_kifu_exe_file_path',
     action='store',
@@ -312,7 +312,7 @@ def main():
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
   original_eval_folder_path = args.original_eval_folder_path
-  ukamuse_eval_folder_path = args.ukamuse_eval_folder_path
+  tanuki_wcsc27_eval_folder_path = args.tanuki_wcsc27_eval_folder_path
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
   local_game_server_exe_file_path = args.local_game_server_exe_file_path
@@ -375,10 +375,10 @@ def main():
     elif state == State.self_play_with_original:
       SelfPlay(original_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
                num_games_to_selfplay, num_numa_nodes)
-      state = State.self_play_with_ukamuse
+      state = State.self_play_with_tanuki_wcsc27
 
-    elif state == State.self_play_with_ukamuse:
-      SelfPlay(ukamuse_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
+    elif state == State.self_play_with_tanuki_wcsc27:
+      SelfPlay(tanuki_wcsc27_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
                num_games_to_selfplay, num_numa_nodes)
       state = State.self_play_with_base
 
