@@ -264,9 +264,6 @@ void Learner::GenerateKifu()
       }
 
       for (const auto& record : records) {
-        if (std::abs(record.value) > value_threshold) {
-          break;
-        }
         if (!kifu_writer->Write(record)) {
           sync_cout << "info string Failed to write a record." << sync_endl;
           std::exit(1);
