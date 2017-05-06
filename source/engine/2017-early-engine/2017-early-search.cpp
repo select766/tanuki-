@@ -63,7 +63,7 @@ using namespace Search;
 using namespace Eval;
 
 namespace {
-  static constexpr char* OPTION_VERBOSE = "Verbose";
+  static const constexpr char* OPTION_SLAVE = "Slave";
 }
 
 // 定跡ファイル名
@@ -78,7 +78,7 @@ static fstream result_log;
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
 {
-  o[OPTION_VERBOSE] << Option(false);
+  o[OPTION_SLAVE] << Option(false);
 
   // 
   //   定跡設定
@@ -2368,7 +2368,7 @@ void Thread::search()
   // (この関数を直接呼び出すときには注意が必要)
   completedDepth = DEPTH_ZERO;
 
-  bool verbose = Options[OPTION_VERBOSE];
+  bool slave = Options[OPTION_SLAVE];
   // メインスレッド用の初期化処理
   if (mainThread)
   {
@@ -2478,7 +2478,7 @@ void Thread::search()
             // silent modeなら出力を抑制する。
             && !Limits.silent
             // 将棋所のコンソールが詰まるのを予防するために出力を少し抑制する。
-            && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())) || verbose)
+            && (rootDepth < 3 || lastInfoTime + pv_interval < Time.elapsed())) || slave)
           )
         {
           // 最後に出力した時刻を記録しておく。
@@ -2535,7 +2535,7 @@ void Thread::search()
         // (そうしないと正確な探索node数がわからなくなってしまう)
         if (Signals.stop ||
           // Verboseオプションが有効になっている場合は出力する
-          verbose ||
+          slave ||
           // MultiPVのときは最後の候補手を求めた直後とする。
           // ただし、時間が3秒以上経過してからは、MultiPVのそれぞれの指し手ごと。
           ((PVIdx + 1 == multiPV || Time.elapsed() > 3000)
@@ -2805,8 +2805,8 @@ void MainThread::think()
               rootMoves[0].pv[1] = move.nextMove; // これが合法手でなかったら将棋所が弾くと思う。
             }
 
-            bool verbose = Options[OPTION_VERBOSE];
-            if (verbose) {
+            bool slave = Options[OPTION_SLAVE];
+            if (slave) {
               // 選択した定跡のpvを出力する
               // tanuki-proxyで必要
               if (move.nextMove == MOVE_NONE) {
