@@ -214,7 +214,7 @@ void prefetch2(void* addr) {
 
 namespace WinProcGroup {
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 
 	void bindThisThread(size_t) {}
 

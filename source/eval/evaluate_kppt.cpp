@@ -41,7 +41,7 @@ namespace Eval
 	// 通常の評価関数テーブル。
 
 	ALIGNED(32) ValueKk kk[SQ_NB][SQ_NB];
-	ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end + KPP_PADDING_0][fe_end + KPP_PADDING_1];
+	ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end][fe_end];
 	ALIGNED(32) ValueKkp kkp[SQ_NB][SQ_NB][fe_end];
 
 #endif
@@ -62,19 +62,7 @@ namespace Eval
 
 			// KPP
 			std::ifstream ifsKPP(path_combine((string)Options["EvalDir"], KPP_BIN), std::ios::binary);
-      if (ifsKPP) {
-        //ifsKPP.read(reinterpret_cast<char*>(kpp), sizeof(kpp));
-        std::vector<ValueKpp> temp(static_cast<int>(SQ_NB) * static_cast<int>(fe_end) * static_cast<int>(fe_end));
-        ifsKPP.read(reinterpret_cast<char*>(&temp[0]), sizeof(temp[0]) * temp.size());
-        int index = 0;
-        for (int k = 0; k < SQ_NB; ++k) {
-          for (int p0 = 0; p0 < fe_end; ++p0) {
-            for (int p1 = 0; p1 < fe_end; ++p1) {
-              kpp[k][p0][p1] = temp[index++];
-            }
-          }
-        }
-      }
+			if (ifsKPP) ifsKPP.read(reinterpret_cast<char*>(kpp), sizeof(kpp));
 			else goto Error;
 
 #if 0
@@ -669,8 +657,7 @@ namespace Eval
 				// 先手玉の移動
 				// さきほどの処理と同様。
 
-        const auto* ppkppb = kpp[sq_bk];
-
+				const auto* ppkppb = kpp[sq_bk];
 				diff.p[0][0] = 0;
 				diff.p[0][1] = 0;
 

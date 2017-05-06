@@ -171,16 +171,6 @@ void Timer::init(Search::LimitsType& limits, Color us, int ply)
 	optimumTime = std::min(optimumTime, remain_time);
 	maximumTime = std::min(round_up(maximumTime), remain_time);
 
-  int minimumMin = minimumTime / 1000 / 60;
-  int minimumSec = minimumTime / 1000 % 60;
-  int optimumMin = optimumTime / 1000 / 60;
-  int optimumSec = optimumTime / 1000 % 60;
-  int maximumMin = maximumTime / 1000 / 60;
-  int maximumSec = maximumTime / 1000 % 60;
-  char buffer[1024];
-  sprintf(buffer, "info string minimum=%d:%02d optimum=%d:%02d maximum=%d:%02d",
-    minimumMin, minimumSec, optimumMin, optimumSec, maximumMin, maximumSec);
-  sync_cout << buffer << sync_endl;
 }
 
 #endif

@@ -176,6 +176,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -185,7 +186,6 @@
       <StructMemberAlignment>Default</StructMemberAlignment>
       <OmitFramePointers>true</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -200,6 +200,9 @@
       <HeapReserveSize>
       </HeapReserveSize>
     </Link>
+    <PostBuildEvent>
+      <Command>COPY /Y $(TargetPath) $(SolutionDir)exe\</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bitboard.h" />
@@ -215,6 +218,7 @@
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
     <ClInclude Include="extra\all.h" />
+    <ClInclude Include="extra\apery_book.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book.h" />
     <ClInclude Include="extra\config.h" />
@@ -258,6 +262,7 @@
     <ClCompile Include="eval\evaluate_kppt.cpp" />
     <ClCompile Include="eval\evaluate_material.cpp" />
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
+    <ClCompile Include="extra\apery_book.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book.cpp" />
     <ClCompile Include="extra\entering_king_win.cpp" />

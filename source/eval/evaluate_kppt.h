@@ -70,20 +70,13 @@ namespace Eval
 
 #else
 
-#ifndef KPP_PADDING_0
-#define KPP_PADDING_0 0
-#endif
-#ifndef KPP_PADDING_1
-#define KPP_PADDING_1 0
-#endif
-  
-  // 通常の評価関数テーブル
+	// 通常の評価関数テーブル
 
 	// KK
 	extern ALIGNED(32) ValueKk kk[SQ_NB][SQ_NB];
 
 	// KPP
-	extern ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end + KPP_PADDING_0][fe_end + KPP_PADDING_1];
+	extern ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end][fe_end];
 
 	// KKP
 	extern ALIGNED(32) ValueKkp kkp[SQ_NB][SQ_NB][fe_end];

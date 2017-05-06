@@ -252,13 +252,13 @@
 #define ONE_PLY_EQ_1
 #define ENABLE_TEST_CMD
 // 定跡生成絡み
-//#define ENABLE_MAKEBOOK_CMD
+#define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-//#define USE_SHARED_MEMORY_IN_EVAL
+#define USE_SHARED_MEMORY_IN_EVAL
 #endif
 
 #ifdef YANEURAOU_2016_LATE_ENGINE
-#define ENGINE_NAME "tanuki-sdt4"
+#define ENGINE_NAME "YaneuraOu 2016 Late"
 #define EVAL_KPPT
 //#define USE_EVAL_HASH
 #define USE_SEE
@@ -331,14 +331,14 @@
 
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
-//#define USE_SFEN_PACKER
-//#define EVAL_LEARN
+#define USE_SFEN_PACKER
+#define EVAL_LEARN
 // 定跡生成絡み
-//#define ENABLE_MAKEBOOK_CMD
+#define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-//#define USE_SHARED_MEMORY_IN_EVAL
+#define USE_SHARED_MEMORY_IN_EVAL
 // パラメーターの自動調整絡み
-//#define USE_GAMEOVER_HANDLER
+#define USE_GAMEOVER_HANDLER
 //#define LONG_EFFECT_LIBRARY
 #endif
 

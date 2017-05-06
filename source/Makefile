@@ -16,20 +16,20 @@ YANEURAOU_EDITION = YANEURAOU_2017_EARLY_ENGINE
 
 COMPILER = g++
 #COMPILER = mpicxx
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64 -DKPP_PADDING0=$(KPP_PADDING0) -DKPP_PADDING1=$(KPP_PADDING1)
+CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64
 # ltoオプションを指定すると実行同時にSegmentation Faultで落ちるときがあるので、そのときは、コメントアウトしてください。
 # CFLAGS   += -flto
-CFLAGS   += -march=native
+# CFLAGS   += -march=native
 LDFLAGS  = -lpthread #-lboost_mpi -lboost_serialization
 LIBS     =
 INCLUDE  = #-I../include
 
 ifeq ($(OS),Windows_NT)
   LDFLAGS += -static
-  TARGET = tanuki-sdt4.exe
+  TARGET = tanuki-wcsc27.exe
 else
   CFLAGS += -D_LINUX
-  TARGET = tanuki-sdt4
+  TARGET = tanuki-wcsc27
 endif
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
@@ -77,7 +77,8 @@ SOURCES  = shogi.cpp                                                           \
 	engine/must-capture-shogi-engine/must-capture-shogi.cpp                    \
 	learn/learner.cpp                                                          \
 	learn/multi_think.cpp                                                      \
-	learn/evaluate_kppt_learn.cpp   
+	learn/evaluate_kppt_learn.cpp \
+	extra/apery_book.cpp
 																               
 #ifeq ($(YANEURAOU_EDITION),YANEURAOU_2016_LATE_ENGINE)				               
 #	SOURCES += engine/2016-late-engine/2016-late-search.cpp                    \

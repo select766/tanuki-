@@ -3,35 +3,13 @@
 
 #include "../../extra/all.h"
 
-#include <mutex>
-#include <fstream>
 #include <windows.h>
 
-namespace
-{
-  std::string generate_datetime_string()
-  {
-    time_t t = time(NULL);
-    struct tm tm;
-    char str[64];
-    localtime_s(&tm, &t);
-    strftime(str, sizeof(str), "%Y-%m-%d-%H-%M-%S", &tm);
-    return str;
-  }
-
-  std::string generate_log_file_name()
-  {
-    return "log/yaneuraou-process-log-" + generate_datetime_string() + ".txt";
-  }
-}
-
 // 子プロセスとの通信ログをデバッグのために表示するオプション
-#define OUTPUT_PROCESS_LOG
-std::mutex PROCESS_LOG_MUTEX;
-std::ofstream PROCESS_LOG_STREAM(generate_log_file_name().c_str());
+//#define OUTPUT_PROCESS_LOG
 
 // 1行ずつ結果を出力するモード
-//#define ONE_LINE_OUTPUT_MODE
+#define ONE_LINE_OUTPUT_MODE
 
 // 勝敗の出力のときについでに対局棋譜を出力する機能
 //#define OUTPUT_KIF_LOG
@@ -443,7 +421,7 @@ protected:
 
   engine-config1.txt : 1つ目の思考エンジン
   engine-config2.txt : 2つ目の思考エンジン
-
+  
     1行目にengineの実行ファイル名
     2行目に思考時のコマンド
     3行目以降にsetoption等、初期化時に思考エンジンに送りたいコマンドを書く。
@@ -576,11 +554,11 @@ void MainThread::think() {
   sync_cout << "local game server start : " << engine_name[0] << " vs " << engine_name[1] << sync_endl;
 
   // マルチスレッド対応
-  for (auto th : Threads.slaves) th->start_searching();
+  for (auto th : Threads.slaves) th->start_searching(); 
   Thread::search();
   for (auto th : Threads.slaves) th->wait_for_search_finished();
 
-  sync_cout << endl << "local game server end : [" << engine_name[0] << "(" << usi_engine_name[0] << ")] vs [" << engine_name[1] << "(" << usi_engine_name[1] << ")]" << sync_endl;
+  sync_cout << endl << "local game server end : [" << engine_name[0] << "] vs [" << engine_name[1] << "]" << sync_endl;
   sync_cout << "GameResult " << win << " - " << draw << " - " << lose << sync_endl;
 
 #ifdef ONE_LINE_OUTPUT_MODE
