@@ -152,6 +152,9 @@ struct StateInfo {
 //       盤面
 // --------------------
 
+// packされたsfen
+struct PackedSfen { u8 data[32]; };
+
 // 盤面
 struct Position
 {
@@ -217,14 +220,14 @@ struct Position
 	// 保持しているデータに矛盾がないかテストする。
 	bool pos_is_ok() const;
 
-	// 探索したノード数(≒do_move()が呼び出された回数)を設定/取得する
-	void set_nodes_searched(uint64_t n) { nodes = n; }
-	int64_t nodes_searched() const { return nodes; }
+	// 探索したノード数(≒do_move()が呼び出された回数)を取得する
+	uint64_t nodes_searched() const { return nodes; }
 
 	// 現局面に対して
 	// この指し手によって移動させる駒を返す。(移動前の駒)
 	// 後手の駒打ちは後手の駒が返る。
-	Piece moved_piece_before(Move m) const {
+	Piece moved_piece_before(Move m) const
+	{
 		return is_drop(m)
 			? (move_dropped_piece(m) + (sideToMove == WHITE ? PIECE_WHITE : NO_PIECE))
 			: piece_on(move_from(m));
@@ -342,11 +345,11 @@ struct Position
 	// このバッファはこのdo_move()の呼び出し元の責任において確保されている必要がある。
 	// givesCheck = mの指し手によって王手になるかどうか。
 	// この呼出までにst.checkInfo.update(pos)が呼び出されている必要がある。
-	void do_move(Move m, StateInfo& st, bool givesCheck);
+	void do_move(Move m, StateInfo& newSt, bool givesCheck);
 
 	// do_move()の4パラメーター版のほうを呼び出すにはgivesCheckも渡さないといけないが、
 	// mで王手になるかどうかがわからないときはこちらの関数を用いる。
-	void do_move(Move m, StateInfo& st) { do_move(m, st, gives_check(m)); }
+	void do_move(Move m, StateInfo& newSt) { do_move(m, newSt, gives_check(m)); }
 
 	// 指し手で盤面を1手戻す
 	void undo_move(Move m);
@@ -425,12 +428,12 @@ struct Position
 	const Eval::EvalList* eval_list() const { return &evalList; }
 #endif
 
-#if defined (USE_SEE) || defined (USE_SIMPLE_SEE)
-	// 指し手mの(Static Exchange Evaluation : 静的取り合い評価)の値を返す。
-	Value see(Move m) const;
+#if defined (USE_SEE)
+	// 指し手mのsee(Static Exchange Evaluation : 静的取り合い評価)において
+	// v(しきい値)以上になるかどうかを返す。
+	// see_geのgeはgreater or equal(「以上」の意味)の略。
+	bool see_ge(Move m, Value v) const;
 
-	// SEEの符号だけが欲しい場合はこちらのほうがsee()より速い。
-	Value see_sign(Move m) const;
 #endif
 
 	// --- Accessing hash keys
@@ -549,15 +552,15 @@ struct Position
 #ifdef USE_SFEN_PACKER
   // packされたsfenを得る。引数に指定したバッファに返す。
   // gamePlyはpackに含めない。
-	void sfen_pack(u8 data[32]);
+	void sfen_pack(PackedSfen& sfen);
 
 	// packされたsfenを解凍する。sfen文字列が返る。
 	// gamePly = 0となる。
-	static std::string sfen_unpack(u8 data[32]);
+	static std::string sfen_unpack(const PackedSfen& sfen);
 
 	// ↑sfenを経由すると遅いので直接packされたsfenをセットする関数を作った。
 	// pos.set(sfen_unpack(data)); と等価。
-	void set_from_packed_sfen(u8 data[32]);
+	void set_from_packed_sfen(const PackedSfen& sfen);
 
 	// 盤面と手駒、手番を与えて、そのsfenを返す。
 	static std::string sfen_from_rawdata(Piece board[81], Hand hands[2], Color turn, int gamePly);
@@ -664,7 +667,7 @@ private:
 	Thread* thisThread;
 
 	// 探索ノード数 ≒do_move()の呼び出し回数。
-	int64_t nodes;
+	uint64_t nodes;
 
 	// 現局面に対応するStateInfoのポインタ。
 	// do_move()で次の局面に進むときは次の局面のStateInfoへの参照をdo_move()の引数として渡される。

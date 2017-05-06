@@ -1,4 +1,29 @@
-﻿#include <fstream>
+﻿
+// Windows環境下でのプロセッサグループの割当関係
+#ifdef _WIN32
+#if _WIN32_WINNT < 0x0601
+#undef  _WIN32_WINNT
+#define _WIN32_WINNT 0x0601 // Force to include needed API prototypes
+#endif
+#include <windows.h>
+// The needed Windows API for processor groups could be missed from old Windows
+// versions, so instead of calling them directly (forcing the linker to resolve
+// the calls at compile time), try to load them at runtime. To do this we need
+// first to define the corresponding function pointers.
+extern "C" {
+	typedef bool(*fun1_t)(LOGICAL_PROCESSOR_RELATIONSHIP,
+		PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, PDWORD);
+	typedef bool(*fun2_t)(USHORT, PGROUP_AFFINITY);
+	typedef bool(*fun3_t)(HANDLE, CONST GROUP_AFFINITY*, PGROUP_AFFINITY);
+}
+
+// このheaderのなかでmin,maxを定義してあって、C++のstd::min,maxと衝突して困る。
+#undef max
+#undef min
+
+#endif
+
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -158,21 +183,177 @@ void prefetch(void*) {}
 
 void prefetch(void* addr) {
 
-// SSEの命令なのでSSE2が使える状況でのみ使用する。
+	// SSEの命令なのでSSE2が使える状況でのみ使用する。
 #ifdef USE_SSE2
 
 #  if defined(__INTEL_COMPILER)
-  // 最適化でprefetch命令を削除するのを回避するhack。MSVCとgccは問題ない。
-  __asm__("");
+	// 最適化でprefetch命令を削除するのを回避するhack。MSVCとgccは問題ない。
+	__asm__("");
 #  endif
 
+	// 1 cache lineのprefetch
+	// 64bytesの系もあるかも知れないが、Stockfishではcache line = 32bytesだと仮定してある。
+	// ちなみにRyzenでは32bytesらしい。
+
 #  if defined(__INTEL_COMPILER) || defined(_MSC_VER)
-  _mm_prefetch((char*)addr, _MM_HINT_T0);
+	_mm_prefetch((char*)addr, _MM_HINT_T0);
 #  else
-  __builtin_prefetch(addr);
+	__builtin_prefetch(addr);
 #  endif
 
 #endif
 }
 
 #endif
+
+void prefetch2(void* addr) {
+	prefetch(addr);
+	prefetch((uint8_t*)addr + 64);
+}
+
+
+namespace WinProcGroup {
+
+#ifndef _WIN32
+
+	void bindThisThread(size_t) {}
+
+#else
+
+
+	/// get_group() retrieves logical processor information using Windows specific
+	/// API and returns the best group id for the thread with index idx. Original
+	/// code from Texel by Peter Österlund.
+
+	int get_group(size_t idx) {
+
+		int threads = 0;
+		int nodes = 0;
+		int cores = 0;
+		DWORD returnLength = 0;
+		DWORD byteOffset = 0;
+
+		// Early exit if the needed API is not available at runtime
+		HMODULE k32 = GetModuleHandle(L"Kernel32.dll");
+		auto fun1 = (fun1_t)GetProcAddress(k32, "GetLogicalProcessorInformationEx");
+		if (!fun1)
+			return -1;
+
+		// First call to get returnLength. We expect it to fail due to null buffer
+		if (fun1(RelationAll, nullptr, &returnLength))
+			return -1;
+
+		// Once we know returnLength, allocate the buffer
+		SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *buffer, *ptr;
+		ptr = buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)malloc(returnLength);
+
+		// Second call, now we expect to succeed
+		if (!fun1(RelationAll, buffer, &returnLength))
+		{
+			free(buffer);
+			return -1;
+		}
+
+		while (ptr->Size > 0 && byteOffset + ptr->Size <= returnLength)
+		{
+			if (ptr->Relationship == RelationNumaNode)
+				nodes++;
+
+			else if (ptr->Relationship == RelationProcessorCore)
+			{
+				cores++;
+				threads += (ptr->Processor.Flags == LTP_PC_SMT) ? 2 : 1;
+			}
+
+			byteOffset += ptr->Size;
+			ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);
+	}
+
+		free(buffer);
+
+		std::vector<int> groups;
+
+		// Run as many threads as possible on the same node until core limit is
+		// reached, then move on filling the next node.
+		for (int n = 0; n < nodes; n++)
+			for (int i = 0; i < cores / nodes; i++)
+				groups.push_back(n);
+
+		// In case a core has more than one logical processor (we assume 2) and we
+		// have still threads to allocate, then spread them evenly across available
+		// nodes.
+		for (int t = 0; t < threads - cores; t++)
+			groups.push_back(t % nodes);
+
+		// If we still have more threads than the total number of logical processors
+		// then return -1 and let the OS to decide what to do.
+		return idx < groups.size() ? groups[idx] : -1;
+	}
+
+	// たぬきさんのXeon Phi用のコード。
+	// Dual Xeonでもう一つのコアが100%使えないようなのであとで修正する。
+#if 0
+	// スレッドID idxに対し、当該スレッドを実行すべきプロセッサーグループの番号を返す。
+	// Windowsではプロセッサーは以下のように扱われる。
+	// - システムは1つ以上のプロセッサーグループからなる
+	// - 1つのプロセッサーグループは1つ以上のNUMAノードからなる
+	// - 1つのNUMAノードは1つ以上の論理プロセッサーからなる
+	// - 1つのプロセッサーグループには最大で64個までの論理プロセッサーを含めることができる。
+	// https://technet.microsoft.com/ja-jp/windowsserver/ee661585.aspx
+	// 
+	// Intel Xeon Phi Knights Landings上でWindows Server 2016を動かした場合、
+	// 64論理プロセッサー毎にプロセッサーグループに分割される。
+	// 例えばIntel Xeon Phi Processor 7250の場合、
+	// 論理272コアは64+64+64+64+16の5つのプロセッサーグループに分割される。
+	// Stockfishのget_group()は全てのプロセッサーグループに同じ数の論理プロセッサが含まれることを仮定している。
+	// このため上記の構成ではCPUを使い切ることが出来ない。
+	// 以下の実装では先頭のプロセッサーグループから貪欲にスレッドを割り当てている。
+	// これによりIntel Xeon Phi Processor 7250においても100%CPUを使い切ることができる。
+	int get_group(size_t idx) {
+		WORD activeProcessorGroupCount = ::GetActiveProcessorGroupCount();
+		for (WORD processorGroupNumber = 0; processorGroupNumber < activeProcessorGroupCount; ++processorGroupNumber) {
+			DWORD activeProcessorCount = ::GetActiveProcessorCount(processorGroupNumber);
+			if (idx < activeProcessorCount) {
+				return processorGroupNumber;
+			}
+			idx -= activeProcessorCount;
+		}
+
+		return -1;
+	}
+#endif
+
+	/// bindThisThread() set the group affinity of the current thread
+
+	void bindThisThread(size_t idx) {
+
+		// If OS already scheduled us on a different group than 0 then don't overwrite
+		// the choice, eventually we are one of many one-threaded processes running on
+		// some Windows NUMA hardware, for instance in fishtest. To make it simple,
+		// just check if running threads are below a threshold, in this case all this
+		// NUMA machinery is not needed.
+		if (Threads.size() < 8)
+			return;
+
+		// Use only local variables to be thread-safe
+		int group = get_group(idx);
+
+		if (group == -1)
+			return;
+
+		// Early exit if the needed API are not available at runtime
+		HMODULE k32 = GetModuleHandle(L"Kernel32.dll");
+		auto fun2 = (fun2_t)GetProcAddress(k32, "GetNumaNodeProcessorMaskEx");
+		auto fun3 = (fun3_t)GetProcAddress(k32, "SetThreadGroupAffinity");
+
+		if (!fun2 || !fun3)
+			return;
+
+		GROUP_AFFINITY affinity;
+		if (fun2(group, &affinity))
+			fun3(GetCurrentThread(), &affinity, nullptr);
+	}
+
+#endif
+
+} // namespace WinProcGroup

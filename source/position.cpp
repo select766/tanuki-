@@ -14,7 +14,7 @@ std::string SFEN_HIRATE = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGK
 namespace Zobrist {
   HASH_KEY zero; // ゼロ(==0)
   HASH_KEY side; // 手番(==1)
-  HASH_KEY psq[SQ_NB][PIECE_NB]; // 駒pcが盤上sqに配置されているときのZobrist Key
+  HASH_KEY psq[SQ_NB_PLUS1][PIECE_NB]; // 駒pcが盤上sqに配置されているときのZobrist Key
   HASH_KEY hand[COLOR_NB][PIECE_HAND_NB]; // c側の手駒prが一枚増えるごとにこれを加算するZobristKey
   HASH_KEY depth[MAX_PLY]; // 深さも考慮に入れたHASH KEYを作りたいときに用いる(実験用)
 }
@@ -84,13 +84,18 @@ void Position::init() {
 
 	// 64bit hash keyは256bit hash keyの下位64bitという解釈をすることで、256bitと64bitのときとでhash keyの下位64bitは合致するようにしておく。
 	// これは定跡DBなどで使うときにこの性質が欲しいからである。
+	// またpc==NO_PIECEのときは0であることを保証したいのでSET_HASHしない。
+	// psqは、C++の規約上、事前にゼロであることは保証される。
 	for (auto pc : Piece())
 		for (auto sq : SQ)
-			SET_HASH(Zobrist::psq[sq][pc], rng.rand<Key>() & ~1ULL, rng.rand<Key>(), rng.rand<Key>(), rng.rand<Key>());
+			if (pc)
+				SET_HASH(Zobrist::psq[sq][pc], rng.rand<Key>() & ~1ULL, rng.rand<Key>(), rng.rand<Key>(), rng.rand<Key>());
 
+	// またpr==NO_PIECEのときは0であることを保証したいのでSET_HASHしない。
 	for (auto c : COLOR)
 		for (Piece pr = PIECE_ZERO; pr < PIECE_HAND_NB; ++pr)
-			SET_HASH(Zobrist::hand[c][pr], rng.rand<Key>() & ~1ULL, rng.rand<Key>(), rng.rand<Key>(), rng.rand<Key>());
+			if (pr)
+				SET_HASH(Zobrist::hand[c][pr], rng.rand<Key>() & ~1ULL, rng.rand<Key>(), rng.rand<Key>(), rng.rand<Key>());
 
 	for (int i = 0; i < MAX_PLY; ++i)
 		SET_HASH(Zobrist::depth[i], rng.rand<Key>() & ~1ULL, rng.rand<Key>(), rng.rand<Key>(), rng.rand<Key>());
@@ -506,26 +511,32 @@ Bitboard Position::attackers_to(Color c, Square sq, const Bitboard& occ) const
 
 }
 
-// 
+// see_ge()から呼び出すので、この関数、結構な頻度で呼び出されるのだが、
+// 両方の駒を見る必要があって、あまり速いとは言えない。ByteBoardを用いるべきなのか…。
 Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const
 {
-	// sの地点に敵駒ptをおいて、その利きに自駒のptがあればsに利いているということだ。
+	// sqの地点に敵駒ptをおいて、その利きに自駒のptがあればsqに利いているということだ。
 	return
 		  (pawnEffect(BLACK, sq) & pieces(WHITE, PAWN))
 		| (pawnEffect(WHITE, sq) & pieces(BLACK, PAWN))
-		| (lanceEffect(BLACK, sq, occ) & pieces(WHITE, LANCE))
-		| (lanceEffect(WHITE, sq, occ) & pieces(BLACK, LANCE))
+		//| (lanceEffect(BLACK, sq, occ) & pieces(WHITE, LANCE))
+		//| (lanceEffect(WHITE, sq, occ) & pieces(BLACK, LANCE))
 		| (knightEffect(BLACK, sq) & pieces(WHITE, KNIGHT))
 		| (knightEffect(WHITE, sq) & pieces(BLACK, KNIGHT))
 		| (silverEffect(BLACK, sq) & (pieces(WHITE, SILVER) | pieces(WHITE, HDK)))
 		| (silverEffect(WHITE, sq) & (pieces(BLACK, SILVER) | pieces(BLACK, HDK)))
-		| (goldEffect(BLACK, sq) & (pieces(WHITE, GOLD) | pieces(WHITE, HDK)))
-		| (goldEffect(WHITE, sq) & (pieces(BLACK, GOLD) | pieces(BLACK, HDK)))
+		| (goldEffect(BLACK, sq) & (pieces(WHITE, GOLD ) | pieces(WHITE, HDK)))
+		| (goldEffect(WHITE, sq) & (pieces(BLACK, GOLD ) | pieces(BLACK, HDK)))
 		| (bishopEffect(sq, occ) & (pieces(BLACK,BISHOP) | pieces(WHITE,BISHOP)))
-		| (rookEffect(sq, occ) & (pieces(BLACK,ROOK) | pieces(BLACK,ROOK)));
+		| (rookEffect(sq, occ) & (
+			   pieces(BLACK , ROOK)
+			|  pieces(WHITE , ROOK)
+			| (pieces(BLACK , LANCE) & lanceStepEffect(WHITE , sq))
+			| (pieces(WHITE , LANCE) & lanceStepEffect(BLACK , sq))
+			// 香も、StepEffectでマスクしたあと飛車の利きを使ったほうが香の利きを求めなくて済んで速い。
+			));
 	//    | (kingEffect(sq) & pieces(c, HDK));
 	// →　HDKは、銀と金のところに含めることによって、参照するテーブルを一個減らして高速化しようというAperyのアイデア。
-
 }
 
 // 打ち歩詰め判定に使う。王に打ち歩された歩の升をpawn_sqとして、c側(王側)のpawn_sqへ利いている駒を列挙する。香が利いていないことは自明。
@@ -992,6 +1003,19 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 		ASSERT_LV2(PAWN <= pr && pr < PIECE_HAND_NB);
 
 		Piece pc = make_piece(Us, pr);
+
+		// Zobrist keyの更新
+		h -= Zobrist::hand[Us][pr];
+		k += Zobrist::psq[to][pc];
+
+		// なるべく早い段階でのTTに対するprefetch
+		// 駒打ちのときはこの時点でTT entryのアドレスが確定できる
+		const Key key = k + h;
+		prefetch(TT.first_entry(key));
+#if defined(USE_EVAL_HASH)
+		Eval::prefetch_evalhash(key);
+#endif
+
 		PieceNo piece_no = piece_no_of(Us, pr);
 		ASSERT_LV3(is_ok(piece_no));
 
@@ -1024,10 +1048,6 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 		// 駒打ちは捕獲した駒がない。
 		st->capturedPiece = NO_PIECE;
-
-		// Zobrist keyの更新
-		h -= Zobrist::hand[Us][pr];
-		k += Zobrist::psq[to][pc];
 
 #ifndef EVAL_NO_USE
 		materialDiff = 0;
@@ -1150,6 +1170,13 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 		// fromにあったmoved_pcがtoにmoved_after_pcとして移動した。
 		k -= Zobrist::psq[from][moved_pc];
 		k += Zobrist::psq[to][moved_after_pc];
+
+		// 駒打ちでないときはprefetchはこの時点まで延期される。
+		const Key key = k + h;
+		prefetch(TT.first_entry(key));
+#if defined(USE_EVAL_HASH)
+		Eval::prefetch_evalhash(key);
+#endif
 
 		// 王手している駒のbitboardを更新する。
 		if (givesCheck)
@@ -1323,12 +1350,12 @@ void Position::undo_move_impl(Move m)
 }
 
 // do_move()を先後分けたdo_move_impl<>()を呼び出す。
-void Position::do_move(Move m, StateInfo& st, bool givesCheck)
+void Position::do_move(Move m, StateInfo& newSt, bool givesCheck)
 {
   if (sideToMove == BLACK)
-    do_move_impl<BLACK>(m, st, givesCheck);
+    do_move_impl<BLACK>(m, newSt, givesCheck);
   else
-    do_move_impl<WHITE>(m, st, givesCheck);
+    do_move_impl<WHITE>(m, newSt, givesCheck);
 }
 
 // undo_move()を先後分けたdo_move_impl<>()を呼び出す。
@@ -1356,8 +1383,13 @@ void Position::do_null_move(StateInfo& newSt) {
   // このタイミングでアドレスが確定するのでprefetchしたほうが良い。(かも)
   // →　将棋では評価関数の計算時のメモリ帯域がボトルネックになって、ここでprefetchしても
   // 　prefetchのスケジューラーが処理しきれない可能性が…。
+  // CPUによっては有効なので一応やっておく。
 
-  // prefetch(TT.first_entry(st->key()));
+  const Key key = st->key();
+  prefetch(TT.first_entry(key));
+
+  // これは、さっきアクセスしたところのはずなので意味がない。
+  //  Eval::prefetch_evalhash(key);
 
   st->pliesFromNull = 0;
 
@@ -1381,54 +1413,55 @@ void Position::undo_null_move() {
 // 連続王手の千日手等で引き分けかどうかを返す(repPlyまで遡る)
 RepetitionState Position::is_repetition(const int repPly) const
 {
-  // 4手かけないと千日手にはならないから、4手前から調べていく。
-  const int Start = 4;
-  int i = Start;
+	// 4手かけないと千日手にはならないから、4手前から調べていく。
+	const int Start = 4;
+	int i = Start;
 
-  // 遡り可能な手数。
-  // 最大でもrepPly手までしか遡らないことにする。
-  const int e = min(repPly,st->pliesFromNull);
-  
-  // pliesFromNullが未初期化になっていないかのチェックのためのassert
-  ASSERT_LV3(st->pliesFromNull >= 0);
+	// 遡り可能な手数。
+	// 最大でもrepPly手までしか遡らないことにする。
+	const int e = min(repPly, st->pliesFromNull);
 
-  if (i <= e)
-  {
-    auto stp = st->previous->previous;
-    auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
+	// pliesFromNullが未初期化になっていないかのチェックのためのassert
+	ASSERT_LV3(st->pliesFromNull >= 0);
 
-    do {
-      stp = stp->previous->previous;
+	if (i <= e)
+	{
+		auto stp = st->previous->previous;
+		auto key = st->board_key(); // 盤上の駒のみのhash(手駒を除く)
 
-      // 同じboard hash keyの局面であるか？
-      if (stp->board_key() == key)
-      {
-        // 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
-        if (stp->hand == st->hand)
-        {
-          // 自分が王手をしている連続王手の千日手なのか？
-          if (i <= st->continuousCheck[sideToMove])
-            return REPETITION_LOSE;
+		do {
+			stp = stp->previous->previous;
 
-          // 相手が王手をしている連続王手の千日手なのか？
-          if (i <= st->continuousCheck[~sideToMove])
-            return REPETITION_WIN;
+			// 同じboard hash keyの局面であるか？
+			if (stp->board_key() == key)
+			{
+				// 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
+				if (stp->hand == st->hand)
+				{
+					// 自分が王手をしている連続王手の千日手なのか？
+					if (i <= st->continuousCheck[sideToMove])
+						return REPETITION_LOSE;
 
-          return REPETITION_DRAW;
-        } else {
-          // 優等局面か劣等局面であるか。(手番が相手番になっている場合はいま考えない)
-          if (hand_is_equal_or_superior(st->hand, stp->hand))
-            return REPETITION_SUPERIOR;
-          if (hand_is_equal_or_superior(stp->hand, st->hand))
-            return REPETITION_INFERIOR;
-        }
-      }
-      i += 2;
-    } while (i <= e);
-  }
+					// 相手が王手をしている連続王手の千日手なのか？
+					if (i <= st->continuousCheck[~sideToMove])
+						return REPETITION_WIN;
 
-  // 同じhash keyの局面が見つからなかったので…。
-  return REPETITION_NONE;
+					return REPETITION_DRAW;
+				}
+				else {
+					// 優等局面か劣等局面であるか。(手番が相手番になっている場合はいま考えない)
+					if (hand_is_equal_or_superior(st->hand, stp->hand))
+						return REPETITION_SUPERIOR;
+					if (hand_is_equal_or_superior(stp->hand, st->hand))
+						return REPETITION_INFERIOR;
+				}
+			}
+			i += 2;
+		} while (i <= e);
+	}
+
+	// 同じhash keyの局面が見つからなかったので…。
+	return REPETITION_NONE;
 }
 
 // ----------------------------------

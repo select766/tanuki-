@@ -79,14 +79,22 @@ struct Stats {
 
     ASSERT_LV4(is_ok(to));
 
-    // abs(v) <= 324に制限する。
+#if 1
+	// abs(v) <= 324に制限する。
+	// → returnするのが良いかどうかはわからない。
+	// depthの2乗ボーナスだとしたら、depth >= 18以上でないと関係がない部分であり、
+	// なかなか表面化してこない。
+	// 長い持ち時間では変わるはずなのだが、この違いを検証するのは大変。
 
-    //v = max((Value)-324, v);
-    //v = min((Value)+324, v);
+	if (abs(int(v)) >= 324)
+		return;
 
-    // ToDo : ↑と↓と、どちらが良いのか..
-    if (abs(int(v)) >= 324)
-      return ;
+#else
+
+	// 値が過剰だと言うなら足切りするのはどうか。
+	v = (Value)max(int(v) , -324);
+	v = (Value)min(int(v) , +324);
+#endif
 
     table[to][pc] -= table[to][pc] * abs(int(v)) / (CM ? 936 : 324);
     table[to][pc] += int(v) * 32;
@@ -165,7 +173,7 @@ private:
 	// 置換表の指し手
 	Move ttMove;
 
-	// killer move 2個 + counter move 1個 + ttMove(QUIETS時) = 3個
+	// killer move 2個 + counter move 1個 + ttMove(QUIETS時) = 4個
 	// これはオーダリングしないからExtMoveである必要はない。
 	ExtMove killers[4];
 
@@ -180,6 +188,19 @@ private:
 
 	// 指し手生成バッファ
 	ExtMove moves[MAX_MOVES];
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+	// 合法な駒を捕獲する指し手が1手でもあるのか
+	bool mustCapture;
+
+	// ↑のフラグを更新する
+	void checkMustCapture();
+
+	// 本来のnext_move()を以下の関数に移動させて、
+	// next_move()はmustCaptureのチェックを行なう関数と差し替える。
+	Move next_move2();
+#endif
+
 };
 #endif // USE_MOVE_PICKER_2016Q3
 

@@ -21,13 +21,14 @@
 //#define LEARN_YANEURAOU_2016_LATE
 //#define EVAL_SAVE_ONLY_ONCE
 
+
 // =====================
 // 教師局面生成時の設定
 // =====================
 
-// 教師局面生成時に千日手・優等・劣等局面の判定をなくすなら、LEARN_GENSFENをdefineすること。
-//#define LEARN_GENSFEN
-
+// 教師局面の生成時にPVの初手も保存するならこれをdefineすること。
+// 2016年9月までに公開したした教師データを用いる場合、これをdefineしてはならない。
+// #define GENSFEN_SAVE_FIRST_MOVE
 
 
 // ----------------------
@@ -43,34 +44,16 @@
 //#define USE_SGD_UPDATE
 
 
-// 2) YANE_SGDによるupdate
-//  これはSGDを改良したもの。
-
-//#define USE_YANE_SGD_UPDATE
-
-
-// 3) AdaGradによるupdate
+// 2) AdaGradによるupdate
 //  これは普通のAdaGrad
 
 //#define USE_ADA_GRAD_UPDATE
 
 
-// 4) YaneGradによるupdate
-//  これはAdaGradを改良したもの。
-
-//#define USE_YANE_GRAD_UPDATE
-
-
-// 5) Adamによるupdate
+// 3) Adamによるupdate
 //  これは普通のAdam 評価関数ファイルの16倍ぐらいWeight用のメモリが必要。
 
 //#define USE_ADAM_UPDATE
-
-
-// 6) やねんざメソッドによるupdate
-// これは、勾配の符号だけを見てweightを調整する。ただし出現回数があまりにも低い特徴に関しては無視する。
-
-// #define USE_YANENZA_UPDATE
 
 
 
@@ -89,13 +72,25 @@
 // ある程度大きいほうが良いが、この数×34byte×3倍ぐらいのメモリを消費する。10M局面なら340MB*3程度消費する。
 // THREAD_BUFFER_SIZE(=10000)の倍数にすること。
 
-#define LEARN_READ_SFEN_SIZE (1000 * 1000 * 5)
+#define LEARN_SFEN_READ_SIZE (1000 * 1000 * 10)
 
-// KPPの評価値、ミラーを考慮するか(ミラーの位置にある評価値を同じ値にする)
+// 学習時の評価関数の保存間隔。この局面数だけ学習させるごとに保存。
+#define LEARN_EVAL_SAVE_INTERVAL (80000000ULL)
+
+
+// KKP,KPPの評価値、ミラーを考慮するか(ミラーの位置にある評価値を同じ値にする)
+// #define USE_KKP_MIRROR_WRITE
 // #define USE_KPP_MIRROR_WRITE
 
 // KKPの評価値、フリップを考慮するか(盤面を180度回転させた位置にある評価値を同じ値にする)
 // #define USE_KKP_FLIP_WRITE
+
+// 毎回wを更新する。ただし評価関数パラメーターに反映させるのは、
+// mini-batch回数に1回。
+// #define LEARN_UPDATE_EVERYTIME
+
+// 評価関数ファイルを出力するときに指数移動平均(EMA)を用いた平均化を行なう。
+// #define LEARN_USE_EMA
 
 // ----------------------
 //    目的関数の選択
@@ -174,10 +169,6 @@
 // 学習に関するデバッグ設定
 // ----------------------
 
-// kkpの一番大きな値を表示させることで学習が進んでいるかのチェックに用いる。
-// これを使うとOpen MPと相性が悪くて、update_weights()が非常に遅くなる。
-//#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
-
 // 学習時にsfenファイルを1万局面読み込むごとに'.'を出力する。
 //#define DISPLAY_STATS_IN_THREAD_READ_SFENS
 
@@ -215,10 +206,10 @@ typedef float LearnFloatType;
 // 用いる定跡は、Options["BookFile"]が反映される。
 
 // 2駒の入れ替えを5手に1回ぐらいの確率で行なう。
-// #define USE_SWAPPING_PIECES
+//#define USE_SWAPPING_PIECES
 
 // ときどき合法手のなかからランダムに1手選ぶ。(Apery方式)
-#define USE_RANDOM_LEGAL_MOVE
+//#define USE_RANDOM_LEGAL_MOVE
 
 
 // タイムスタンプの出力をこの回数に一回に抑制する。
@@ -238,31 +229,64 @@ typedef float LearnFloatType;
 #define USE_QSEARCH_FOR_SHALLOW_VALUE
 #undef EVAL_FILE_NAME_CHANGE_INTERVAL
 #define EVAL_FILE_NAME_CHANGE_INTERVAL 1000000000
+#define USE_RANDOM_LEGAL_MOVE
 #endif
 
 #ifdef LEARN_YANEURAOU_2016_LATE
-//#define USE_SGD_UPDATE
-//#define USE_YANE_SGD_UPDATE
-//#define USE_YANE_GRAD_UPDATE
-//#define USE_ADAM_UPDATE
+
+// SGDによる標準的なupdate
+#if 0
+#define USE_SGD_UPDATE
+#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+#endif
+
+// AdaGradによるリアルタイムupdate
+#if 1
 #define USE_ADA_GRAD_UPDATE
-//#define USE_YANENZA_UPDATE
+#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+#define LEARN_UPDATE_EVERYTIME
+#endif
+
+// Adamによるupdate
+#if 0
+#define USE_ADAM_UPDATE
+#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+#define LEARN_UPDATE_EVERYTIME
+#endif
+
+#if 0
+
+//#define USE_SGD_UPDATE
+//#define USE_ADAM_UPDATE
+//#define USE_ADA_GRAD_UPDATE
 
 //#define LOSS_FUNCTION_IS_WINNING_PERCENTAGE
-#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
+//#define LOSS_FUNCTION_IS_CROSS_ENTOROPY
 //define LOSS_FUNCTION_IS_CROSS_ENTOROPY_FOR_VALUE
 
+#endif
+
 #undef LEARN_MINI_BATCH_SIZE
-#define LEARN_MINI_BATCH_SIZE (1000 * 100)
+#define LEARN_MINI_BATCH_SIZE (1000 * 1000 * 1)
 #define USE_QSEARCH_FOR_SHALLOW_VALUE
+//#define USE_EVALUATE_FOR_SHALLOW_VALUE
 #define DISABLE_TT_PROBE
 #undef EVAL_FILE_NAME_CHANGE_INTERVAL
-#define EVAL_FILE_NAME_CHANGE_INTERVAL 1000000000
+#define EVAL_FILE_NAME_CHANGE_INTERVAL (250000000ULL)
 
 #undef LEARN_RMSE_OUTPUT_INTERVAL
-#define LEARN_RMSE_OUTPUT_INTERVAL 50
-//#define LEARN_RMSE_OUTPUT_INTERVAL 1
-//#define DISPLAY_STATS_IN_UPDATE_WEIGHTS
+#define LEARN_RMSE_OUTPUT_INTERVAL 10
+
+// 2.5億に1回ぐらいのペースでいいんじゃね？
+#undef LEARN_EVAL_SAVE_INTERVAL
+#define LEARN_EVAL_SAVE_INTERVAL (250000000ULL)
+
+#define USE_KPP_MIRROR_WRITE
+#define USE_KKP_FLIP_WRITE
+#define USE_KKP_MIRROR_WRITE
+#define LEARN_USE_EMA
+
+//#define USE_RANDOM_LEGAL_MOVE
 
 #endif
 
@@ -277,12 +301,8 @@ typedef float LearnFloatType;
 #define LEARN_UPDATE "YaneSGD"
 #elif defined(USE_ADA_GRAD_UPDATE)
 #define LEARN_UPDATE "AdaGrad"
-#elif defined(USE_YANE_GRAD_UPDATE)
-#define LEARN_UPDATE "YaneGrad"
 #elif defined(USE_ADAM_UPDATE)
 #define LEARN_UPDATE "Adam"
-#elif defined(USE_YANENZA_UPDATE)
-#define LEARN_UPDATE "Yanenza"
 #endif
 
 #if defined(LOSS_FUNCTION_IS_WINNING_PERCENTAGE)
@@ -292,5 +312,34 @@ typedef float LearnFloatType;
 #elif defined(LOSS_FUNCTION_IS_CROSS_ENTOROPY_FOR_VALUE)
 #define LOSS_FUNCTION "CROSS_ENTOROPY_FOR_VALUE"
 #endif
+
+// rmseの観測用
+#if 0
+#undef LEARN_RMSE_OUTPUT_INTERVAL
+#define LEARN_RMSE_OUTPUT_INTERVAL 1
+#define LEARN_SFEN_NO_SHUFFLE
+#undef LEARN_SFEN_READ_SIZE
+#define LEARN_SFEN_READ_SIZE 100000 
+#endif
+
+
+// ----------------------
+// Learnerで用いるstructの定義
+// ----------------------
+#include "../position.h"
+
+namespace Learner
+{
+	// PackedSfenと評価値が一体化した構造体
+	struct PackedSfenValue
+	{
+		PackedSfen sfen;
+		s16 score; // PV leafでの評価値
+
+#ifdef	GENSFEN_SAVE_FIRST_MOVE
+		u16 move; // PVの初手
+#endif
+	};
+}
 
 #endif // ifndef _LEARN_H_

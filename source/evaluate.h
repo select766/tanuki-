@@ -36,6 +36,11 @@ namespace Eval {
   // あるいは差分計算が不可能なときに呼び出される。
   Value compute_eval(const Position& pos);
 
+#if defined(EVAL_KPPT) && defined(USE_EVAL_HASH)
+  // prefetchする関数
+  void prefetch_evalhash(const Key key);
+#endif
+
   // 評価関数パラメーターのチェックサムを返す。
 #if defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST)
   s32 calc_check_sum();
@@ -51,7 +56,8 @@ namespace Eval {
   void eval_learn_init();
 
   // 学習のときの勾配配列の初期化
-  void init_grad();
+  // 学習率を引数に渡しておく。0.0fなら、defaultの値を採用する。
+  void init_grad(float eta);
 
   // 現在の局面で出現している特徴すべてに対して、勾配の差分値を勾配配列に加算する。
   void add_grad(Position& pos , Color rootColor , double delt_grad);
@@ -73,7 +79,7 @@ namespace Eval {
 
 #else
 
-#if defined (EVAL_PP) || defined(EVAL_KPP)
+#if defined (EVAL_MATERIAL) || defined (EVAL_PP) || defined(EVAL_KPP)
   // Bona6の駒割りを初期値に。それぞれの駒の価値。
   enum {
     PawnValue = 86,
@@ -129,11 +135,10 @@ namespace Eval {
 
   // BonanzaのようにKPPを求めるときに、39の地点の歩のように、
   // 升×駒種に対して一意な番号が必要となる。これをBonaPiece型と呼ぶことにする。
-#ifndef EVAL_KPPT_FAST
+#if defined(USE_FAST_KPPT)
   enum BonaPiece: int32_t
 #else
-  // KPPT_FASTでは、高速化のためにVPGATHERDDを用いる関係で4バイトのほうが好都合。
-  enum BonaPiece : int32_t
+  enum BonaPiece : int16_t
 #endif
   {
     // f = friend(≒先手)の意味。e = enemy(≒後手)の意味
@@ -142,7 +147,7 @@ namespace Eval {
 
     // --- 手駒
 
-#if defined (EVAL_PP) || defined(EVAL_KPP)
+#if defined (EVAL_MATERIAL) || defined (EVAL_PP) || defined(EVAL_KPP)
 
     f_hand_pawn = BONA_PIECE_ZERO + 1,
     e_hand_pawn = f_hand_pawn + 18,
@@ -293,8 +298,13 @@ namespace Eval {
     }
 
     // 駒リスト。駒番号(PieceNo)いくつの駒がどこにあるのか(BonaPiece)を示す。FV38などで用いる。
-    alignas(32) BonaPiece pieceListFb[PIECE_NO_NB];
-    alignas(32) BonaPiece pieceListFw[PIECE_NO_NB];
+#if defined(USE_FAST_KPPT)
+	alignas(32) BonaPiece pieceListFb[PIECE_NO_NB];
+	alignas(32) BonaPiece pieceListFw[PIECE_NO_NB];
+#else
+	BonaPiece pieceListFb[PIECE_NO_NB];
+	BonaPiece pieceListFw[PIECE_NO_NB];
+#endif
 
     // あるBonaPieceに対して、その駒番号(PieceNo)を保持している配列
     PieceNo piece_no_list[fe_end2];

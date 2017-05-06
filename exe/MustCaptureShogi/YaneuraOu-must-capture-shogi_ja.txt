@@ -1,5 +1,5 @@
 Threads スレッド数
-Hash 置換表サイズ[mb]
+Hash 置換表サイズ[MB]
 Ponder Ponder(相手番でも考慮)
 WriteDebugLog デバッグログ出力
 NarrowBook 出現確率の低い定跡を採用しない
@@ -26,10 +26,7 @@ TryRule トライルール
 BookFile 定跡ファイル
 # このコンボボックスの値
 no_book 定跡なし
-standard_book.db 標準定跡
-yaneura_book1.db やねうら大定跡
-yaneura_book2.db やねうら超定跡
-yaneura_book3.db やねうら裏定跡
+must-capture-shogi.db 取る一手将棋定跡
 user_book1.db ユーザー定跡1
 user_book2.db ユーザー定跡2
 user_book3.db ユーザー定跡3
@@ -54,3 +51,4 @@ PvInterval PVの出力の抑制時間[ms]
 
 nodestime nodes as time
 EngineNuma EngineNuma
+ResignValue 投了スコア

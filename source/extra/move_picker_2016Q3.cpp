@@ -110,6 +110,26 @@ Move pick_best(ExtMove* begin, ExtMove* end)
 }
 } // end of namespace
 
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+void MovePicker::checkMustCapture()
+{
+	// このnodeで合法なcaptureの指し手が1手でもあれば、必ずcaptureしなければならない。
+	bool inCheck = pos.in_check();
+	endMoves = inCheck ? generateMoves<EVASIONS>(pos, moves) : generateMoves<CAPTURES>(pos,moves);
+	for (auto it = moves; it != endMoves; ++it)
+	{
+		// 合法な指し手が一つ見つかったので以降、captureしか返してはならない。
+		// capturesで生成した指し手はcapturesに決まっているのだが、このチェックのコストは
+		// 知れてるので構わない。
+		if (pos.capture(it->move) && pos.legal(it->move))
+		{
+			mustCapture = true;
+			return;
+		}
+	}
+	mustCapture = false;
+}
+#endif
 
 // 指し手オーダリング器
 
@@ -119,6 +139,10 @@ MovePicker::MovePicker(const Position& p, Move ttm, Depth d, Search::Stack*s)
 {
 	// 通常探索から呼び出されているので残り深さはゼロより大きい。
 	ASSERT_LV3(d > DEPTH_ZERO);
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+	checkMustCapture();
+#endif
 
 	Square prevSq = to_sq((ss - 1)->currentMove);
 	Piece prevPc = pos.moved_piece_after((ss - 1)->currentMove);
@@ -144,6 +168,10 @@ MovePicker::MovePicker(const Position& p, Move ttm, Depth d, Search::Stack*s)
 MovePicker::MovePicker(const Position& p, Move ttm, Depth d, Square recapSq)
 	: pos(p)
 {
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+	checkMustCapture();
+#endif
 
 	// 静止探索から呼び出されているので残り深さはゼロ以下。
 	ASSERT_LV3(d <= DEPTH_ZERO);
@@ -178,6 +206,10 @@ MovePicker::MovePicker(const Position& p, Move ttm, Value th)
 
 	ASSERT_LV3(!pos.in_check());
 
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+	checkMustCapture();
+#endif
+
 	stage = PROBCUT;
 
 	// ProbCutにおいて、SEEが与えられたthresholdの値より大きな指し手のみ生成する。
@@ -185,7 +217,7 @@ MovePicker::MovePicker(const Position& p, Move ttm, Value th)
 	ttMove = ttm
 		&& pos.pseudo_legal_s<false>(ttm)
 		&& pos.capture(ttm)
-		&& pos.see(ttm) > threshold ? ttm : MOVE_NONE;
+		&& pos.see_ge(ttm, threshold + 1) ? ttm : MOVE_NONE;
 
 	// 置換表の指し手がないなら、次のstageから開始する。
 	stage += (ttMove == MOVE_NONE);
@@ -253,55 +285,54 @@ void MovePicker::score<EVASIONS>()
 	const HistoryStats& history = pos.this_thread()->history;
 	const FromToStats& fromTo = pos.this_thread()->fromTo;
 	Color c = pos.side_to_move();
-	Value see;
 
 	for (auto& m : *this)
 
-#if defined (USE_SEE)
-		
-		// see()が負の指し手ならマイナスの値を突っ込んで後回しにする
-		// 王手を防ぐためだけのただで取られてしまう駒打ちとかがここに含まれるであろうから。
-		// evasion自体は指し手の数が少ないのでここでsee()を呼び出すコストは無視できる。
-		// ただで取られる指し手を後回しに出来るメリットのほうが大きい。(と思う)
+		// 駒を取る指し手ならseeがプラスだったということなのでプラスの符号になるようにStats::Maxを足す。
+		// あとは取る駒の価値を足して、動かす駒の番号を引いておく(小さな価値の駒で王手を回避したほうが
+		// 価値が高いので(例えば合駒に安い駒を使う的な…)
 
-		if ((see = pos.see_sign(m)) < VALUE_ZERO)
-			m.value = see - HistoryStats::Max; // At the bottom
+		//  成るなら、その成りの価値を加算したほうが見積もりとしては正しい気がするが、
+		// 　それは取り返されないことが前提にあるから、そうでもない。
+		//		T1,r300,2491 - 78 - 2421(50.71% R4.95)
+		//		T1,b1000,2483 - 103 - 2404(50.81% R5.62)
+		//      T1,b3000,2459 - 148 - 2383(50.78% R5.45)
+		//   →　やはり、改造前のほうが良い。[2016/10/06]
 
+		if (pos.capture(m))
+			// 捕獲する指し手に関しては簡易SEE + MVV/LVA
+			m.value = (Value)Eval::CapturePieceValue[pos.piece_on(to_sq(m))]
+			- Value(LVA(type_of(pos.moved_piece_before(m)))) + HistoryStats::Max;
 		else
-			// ↓のifがぶら下がっている。
-
-#endif
-
-			// 駒を取る指し手ならseeがプラスだったということなのでプラスの符号になるようにStats::Maxを足す。
-			// あとは取る駒の価値を足して、動かす駒の番号を引いておく(小さな価値の駒で王手を回避したほうが
-			// 価値が高いので(例えば合駒に安い駒を使う的な…)
-			// LVAするときに王が10000だから、これが大きすぎる可能性がなくはないが…。
-			if (pos.capture_or_promotion(m))
-			{
-
-				// このLVA、やらないとめっちゃ弱くなるようだ。
-				// 	r300 , 2091 - 56 - 1633(56.15% R42.95) [2016/08/19]
-				// 	b1000, 1414 - 45 - 1111(56.0% R41.89) [2016/08/19]
-
-				m.value = (Value)Eval::CapturePieceValue[pos.piece_on(move_to(m))]
-					- Value(LVA(type_of(pos.moved_piece_before(m))))
-					+ HistoryStats::Max;
-
-				// 成るなら、その成りの価値を加算
-				if (is_promote(m))
-					m.value += (Eval::ProDiffPieceValue[raw_type_of(pos.moved_piece_after(m))]);
-
-			} else {
-
-				m.value = history[move_to(m)][pos.moved_piece_after(m)] + fromTo.get(c, m);
-
-			}
+			// 捕獲しない指し手に関してはhistoryの値の順番
+			m.value = history[to_sq(m)][pos.moved_piece_after(m)] + fromTo.get(c, m);
 }
 
 // 呼び出されるごとに新しいpseudo legalな指し手をひとつ返す。
 // 指し手が尽きればMOVE_NONEが返る。
 // 置換表の指し手(ttMove)を返したあとは、それを取り除いた指し手を返す。
 Move MovePicker::next_move() {
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+	// MustCaptureShogiの場合は、mustCaptureフラグを見ながら指し手を返す必要がある。
+	Move move;
+	while (true)
+	{
+		move = next_move2();
+
+		// 終端まで行った
+		if (move == MOVE_NONE)
+			return move;
+
+		// 1.mustCaputreモードではない
+		// 2.mustCaptureだけどmoveが捕獲する指し手
+		// のいずれか
+		if (!mustCapture || pos.capture(move))
+			return move;
+	}
+}
+Move MovePicker::next_move2() {
+#endif
 
 	Move move;
 
@@ -331,8 +362,8 @@ Move MovePicker::next_move() {
 			if (move != ttMove)
 			{
 				// ここでSSEの符号がマイナスならbad captureのほうに回す。
-				// ToDo: moveは駒打ちではないからsee()の内部での駒打ち判定不要なのだが。
-				if (pos.see_sign(move) >= VALUE_ZERO)
+				// ToDo: moveは駒打ちではないからsee()の内部での駒打ちは判定不要なのだが。
+				if (pos.see_ge(move, VALUE_ZERO))
 					return move;
 
 				// 損をするCAPTUREの指し手は、後回しにする。
@@ -417,11 +448,7 @@ Move MovePicker::next_move() {
 	case EVASIONS_INIT:
 		cur = moves;
 		endMoves = generateMoves<EVASIONS>(pos, cur);
-		// 生成された指し手が2手以上あるならオーダリングする。
-		// ただし、そのうちの1つはttMove(があるなら)と一致するはずだから、
-		// これを引いて2手以上あればという条件にする。
-		if (endMoves - cur - (ttMove != MOVE_NONE) > 1)
-			score<EVASIONS>();
+		score<EVASIONS>();
 		++stage;
 
 	// 王手回避の指し手を返す
@@ -447,7 +474,7 @@ Move MovePicker::next_move() {
 		{
 			move = pick_best(cur++, endMoves);
 			if (move != ttMove
-				&& pos.see(move) > threshold)
+				&& pos.see_ge(move, threshold + 1))
 				return move;
 		}
 		break;

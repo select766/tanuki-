@@ -486,51 +486,36 @@ void Search::clear() {}
 
 namespace
 {
-  // 思考エンジンの実行ファイル名
-  string engine_name[2];
+	// 思考エンジンの実行ファイル名
+	string engine_name[2];
 
-  // usiコマンドに応答として返ってきたエンジン名
-  string usi_engine_name[2];
+	// usiコマンドに応答として返ってきたエンジン名
+	string usi_engine_name[2];
 
-  // 思考エンジンの設定
-  vector<string> engine_config_lines[2];
+	// 思考エンジンの設定
+	vector<string> engine_config_lines[2];
 
-  // 思考コマンド
-  string think_cmd[2];
+	// 思考コマンド
+	string think_cmd[2];
 
-  // 勝数のトータル
-  uint64_t win, draw, lose;
+	// 勝数のトータル
+	uint64_t win, draw, lose;
 
-  // 次のplayer1の手番
-  Color next_player1_color = BLACK;
+	vector<string> book;
+	PRNG book_rand; // 定跡用の乱数生成器
+	Mutex local_mutex;
 
-  vector<string> book;
-  PRNG book_rand; // 定跡用の乱数生成器
-  Mutex local_mutex;
+	int64_t get_rand(size_t n)
+	{
+		std::unique_lock<Mutex> lk(local_mutex);
+		return book_rand.rand(n);
+	}
 
-  Color get_next_player1_color_unlocked()
-  {
-    Color color = next_player1_color;
-    next_player1_color = ~next_player1_color;
-    return color;
-  }
-  Color get_next_player1_color()
-  {
-    std::unique_lock<Mutex> lk(local_mutex);
-    return get_next_player1_color_unlocked();
-  }
+	// 対局数
+	atomic<int> games = 0;
 
-  int64_t get_rand(size_t n)
-  {
-    std::unique_lock<Mutex> lk(local_mutex);
-    return book_rand.rand(n);
-  }
-
-  // 対局数
-  volatile int games = 0;
-
-  // gamesをインクリメントするときに必要なmutex
-  Mutex games_mutex;
+	// gamesをインクリメントするときに必要なmutex(atomicなのだが、勢い余って2足すとまずいので..)
+	Mutex games_mutex;
 }
 
 void MainThread::think() {

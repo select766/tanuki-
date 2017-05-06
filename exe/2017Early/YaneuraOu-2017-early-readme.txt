@@ -1,32 +1,35 @@
 ﻿
-・やねうら王2016 Midとは？
+・やねうら王2017 Earlyとは？
 
-やねうら王2016 Midはやねうら王classic-tceに対してApery(WCSC26)の評価関数バイナリの
-読み込みに対応させたものです。(R3400程度)
+やねうら王2017 Earlyとは、「真やねうら王」からの改造です。
 
-・やねうら王2016 Midの遊び方
+複数CPU搭載のときに全スレッドを使い切ることが出来るようになりました。Xeon 22コア×Dualのような構成のときに、88論理スレッドすべてを使い切ることが出来るようになりました。
+
+・やねうら王2017 Earlyの遊び方
 
     将棋所かShogiGUIから思考エンジンとして登録して使ってください。
     実行ファイルはWindows 64bit版、CPUはAVX2用にコンパイルされています。
-    ※　昔のCPU環境で動く実行ファイルに関しては要望が多ければコンパイルしたものを公開します。
+	またAVX2有りの場合、Skylake以降だと(Skylake以前のAVX2と比較して)
+	10%程度さらに高速化されます。
 
     以下のようにファイルを配置します。
 
-    YaneuraOu-2016-mid.exe      : やねうら王2016 Mid本体
-    YaneuraOu-2016-mid_ja.txt   : これを用いると思考エンジンの設定項目の表示が日本語化される。
+    YaneuraOu-2017-early.exe      : やねうら王2017 Early本体
+    YaneuraOu-2017-early_ja.txt   : これを用いると思考エンジンの設定項目の表示が日本語化される。
     book/standard_book.db   : 基本定跡
 	book/yaneura_book1.db   : やねうら大定跡(これは別途ダウンロードが必要)
+	book/yaneura_book3.db   : 真やねうら定跡(これは別途ダウンロードが必要)
 		※　やねうら大定跡のダウンロードは https://github.com/yaneurao/YaneuraOu の
 			末尾のところにダウンロードリンクがあります。
 
 	※　AVX2に対応していないCPUの場合、以下のなかから
 　　　　　　ターゲット環境のCPUのものを選択して、それを
-	    YaneuraOu-2016-mid.exeとリネームしてお使いください。
+	    YaneuraOu-2017-early.exeとリネームしてお使いください。
 
-		YaneuraOu-2016-mid-sse42.exe : SSE4.2以降用
-		YaneuraOu-2016-mid-sse4.exe  : SSE4  以降用
-		YaneuraOu-2016-mid-sse2.exe  : SSE2  以降用
-		YaneuraOu-2016-mid-nosse.exe : SSEなし
+		YaneuraOu-2017-early-sse42.exe : SSE4.2以降用
+		YaneuraOu-2017-early-sse4.exe  : SSE4  以降用
+		YaneuraOu-2017-early-sse2.exe  : SSE2  以降用
+		YaneuraOu-2017-early-nosse.exe : SSEなし
 
     eval/KK_synthesized.bin        : 3駒関係の評価関数で用いるファイル(KK)
     eval/KKP_synthesized.bin       : 3駒関係の評価関数で用いるファイル(KKP)
@@ -34,10 +37,11 @@
 
         evalフォルダに入れる評価関数バイナリ(上記の3ファイル)は、以下のところからダウンロード出来ます。
 
-			やねうら王で使える評価関数ファイル28バリエーション公開しました
-			http://yaneuraou.yaneu.com/2016/07/22/%E3%82%84%E3%81%AD%E3%81%86%E3%82%89%E7%8E%8B%E3%81%A7%E4%BD%BF%E3%81%88%E3%82%8B%E8%A9%95%E4%BE%A1%E9%96%A2%E6%95%B0%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB28%E3%83%90%E3%83%AA%E3%82%A8%E3%83%BC%E3%82%B7/
+			https://github.com/yaneurao/YaneuraOu
+			の「やねうら王評価関数バイナリ」のところ。
 
-		また、Apery(WCSC26)の評価関数ファイルもそのまま使えます。
+		また、Apery(WCSC26),Apery(2016 = 浮かむ瀬)の
+		評価関数ファイルもそのまま使えます。
 		これについては、Aperyの公式サイトからダウンロード出来ます。
 
 			Aperyの公式サイト

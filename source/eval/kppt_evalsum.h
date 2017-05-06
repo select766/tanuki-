@@ -130,7 +130,7 @@ namespace Eval {
       
       struct {
         uint64_t data[3];
-        uint64_t key; // ehash用。
+        uint64_t key; // EVAL_HASH用。pos.key() >> 1 したもの。
       };
 #if defined(USE_AVX2)
       __m256i mm;
@@ -170,7 +170,12 @@ namespace Eval {
   // evaluateしたものを保存しておくHashTable(俗にいうehash)
 
   // 134MB(魔女設定)
-  struct EvaluateHashTable: HashTable<EvalSum, 0x400000> {};
+  struct EvaluateHashTable:HashTable<EvalSum, 0x400000> {};
+
+  // prefetch有りなら大きいほうが良いのでは…。
+  // →　あまり変わらないし、メモリもったいないので↑の設定で良いか…。
+  // struct EvaluateHashTable :HashTable<EvalSum, 0x2000000> {};
+
   extern EvaluateHashTable g_evalTable;
 #endif
 

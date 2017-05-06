@@ -93,11 +93,13 @@
 
 // #define EVAL_NO_USE    // 評価関数を用いないとき。
 // #define EVAL_MATERIAL  // 駒得のみの評価関数
-// #define EVAL_PP        // ツツカナ型 2駒関係
+// #define EVAL_PP        // ツツカナ型 2駒関係(開発するかも)
 // #define EVAL_KPP       // Bonanza型 3駒関係
 // #define EVAL_KPPT      // Bonanza型 3駒関係、手番つき(Apery WCSC26相当)
-// #define EVAL_KPPT_FAST // KPPTのAVX2/AVX-512による高速化。(非公開)
-// #define EVAL_PPET      // 技巧型 2駒+利き+手番(開発予定)
+// #define EVAL_KKPT      // KKP手番あり + KPP手番なし(Ponanza WCSC26相当)
+// #define EVAL_PPET      // 技巧型 2駒+利き+手番(開発するかも/しないかも)
+// #define EVAL_KKPPT     // KKPPT型 4駒関係ね手番つき(55将棋、56将棋で用いる)
+// #define EVAL_PPAT      // 3駒 + Piece-Piece-and Pawn型
 
 // KPPT評価関数の学習に使うときのモード
 // #define EVAL_LEARN
@@ -144,6 +146,12 @@
 
 // 指し手生成のときに上位16bitにto(移動後の升)に来る駒を格納する。
 // #define KEEP_PIECE_IN_GENERATE_MOVES
+
+// 探索スレッドごとにCounterMoveHistoryを持つ。
+// #define PER_THREAD_COUNTERMOVEHISTORY
+
+// 探索StackごとにHistoryを持つ。
+// #define PER_STACK_HISTORY
 
 // 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
 // #define USE_EVAL_HASH
@@ -242,12 +250,7 @@
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
-// デバッグ絡み
-//#define ASSERT_LV 3
 #define ENABLE_TEST_CMD
-// 学習絡みのオプション
-//#define USE_SFEN_PACKER
-//#define EVAL_LEARN
 // 定跡生成絡み
 //#define ENABLE_MAKEBOOK_CMD
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
@@ -265,9 +268,67 @@
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
 #define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
+#define ENABLE_TEST_CMD
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+#define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
+#endif
+
+#ifdef YANEURAOU_2017_EARLY_ENGINE
+#define ENGINE_NAME "YaneuraOu 2017 Early"
+#define EVAL_KPPT
+#define USE_EVAL_HASH
+#define USE_SEE
+#define USE_MOVE_PICKER_2017Q2
+#define USE_MATE_1PLY
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
 // デバッグ絡み
 //#define ASSERT_LV 3
 //#define USE_DEBUG_ASSERT
+
+#define ENABLE_TEST_CMD
+// 学習絡みのオプション
+#define USE_SFEN_PACKER
+#define EVAL_LEARN
+// 定跡生成絡み
+#define ENABLE_MAKEBOOK_CMD
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+#define USE_SHARED_MEMORY_IN_EVAL
+// パラメーターの自動調整絡み
+#define USE_GAMEOVER_HANDLER
+//#define LONG_EFFECT_LIBRARY
+#endif
+
+#ifdef MUST_CAPTURE_SHOGI_ENGINE
+#define ENGINE_NAME "YaneuraOu MustCaptureShogi"
+#define EVAL_KPPT
+//#define USE_EVAL_HASH
+#define USE_SEE
+#define USE_MOVE_PICKER_2016Q3
+#define USE_ENTERING_KING_WIN
+#define USE_TIME_MANAGEMENT
+#define KEEP_PIECE_IN_GENERATE_MOVES
+#define ONE_PLY_EQ_1
+#define PER_THREAD_COUNTERMOVEHISTORY
+#define PER_STACK_HISTORY
+
+// デバッグ絡み
+#define ASSERT_LV 3
+#define USE_DEBUG_ASSERT
+
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
 //#define USE_SFEN_PACKER
@@ -349,6 +410,7 @@
 #include <climits>  // INT_MAX
 #include <ctime>    // std::ctime()
 #include <random>   // random_device
+#include <cstddef>  // offsetof
 
 // --------------------
 //   diable warnings
@@ -597,8 +659,14 @@ inline int MKDIR(std::string dir_name)
 
 // PP,KPP,KPPT,PPEならdo_move()のときに移動した駒の管理をして差分計算
 // また、それらの評価関数は駒割りの計算(EVAL_MATERIAL)に依存するので、それをdefineしてやる。
-#if defined(EVAL_PP) || defined(EVAL_KPP) || defined(EVAL_KPPT) || defined(EVAL_KPPT_FAST) || defined(EVAL_PPE)
+#if defined(EVAL_PP) || defined(EVAL_KPP) || defined(EVAL_KPPT) || defined(EVAL_PPE)
 #define USE_EVAL_DIFF
+#endif
+
+// AVX2を用いたKPPT評価関数は高速化できるので特別扱い。
+// Skylake以降でないとほぼ効果がないが…。
+#if defined(EVAL_KPPT) && defined(USE_AVX2)
+#define USE_FAST_KPPT
 #endif
 
 // -- 評価関数の種類により、盤面の利きの更新ときの処理が異なる。(このタイミングで評価関数の差分計算をしたいので)

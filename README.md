@@ -1,8 +1,8 @@
 # About this project
 
-hakubishin (tanuki-sdt4 ver) is a shogi engine (AI player) based on YaneuraOu.  The development concept is "easily and for fun!".
+"The Minstrel's Ballad: Tanuki's Reign" (tanuki-wcsc27 ver) is a shogi engine (AI player) based on YaneuraOu.  The development concept is "easily and for fun!".
 
-†白美神†(tanuki-第4回電王トーナメントバージョン)はやねうら王から派生したコンピューター将棋エンジンです。開発コンセプトは「楽に！楽しく！」です。
+蒼天幻想ナイツ・オブ・タヌキ(tanuki-第27回世界コンピュータ将棋選手権バージョン)はやねうら王から派生したコンピューター将棋エンジンです。開発コンセプトは「楽に！楽しく！」です。
 
 [やねうら王mini 公式サイト (解説記事、開発者向け情報等)](http://yaneuraou.yaneu.com/YaneuraOu_Mini/)
 

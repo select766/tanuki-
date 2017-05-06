@@ -59,9 +59,6 @@
     <Filter Include="リソース ファイル\engine\2016-mid-engine">
       <UniqueIdentifier>{307735dd-d642-4bb7-a1c0-4b578152201a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="doc\old">
-      <UniqueIdentifier>{aefbe5b2-c4db-408d-b69f-3084701e0753}</UniqueIdentifier>
-    </Filter>
     <Filter Include="リソース ファイル\engine\2016-late-engine">
       <UniqueIdentifier>{340f8b93-a0de-4836-a164-61971b2d3ce6}</UniqueIdentifier>
     </Filter>
@@ -70,6 +67,15 @@
     </Filter>
     <Filter Include="script">
       <UniqueIdentifier>{efb5b189-918a-4b2a-ba65-731c674603a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\2017-early-engine">
+      <UniqueIdentifier>{d3dd072e-59ab-4ec3-a846-36d845709d2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\check-shogi-engine">
+      <UniqueIdentifier>{11d51fe5-ad3a-4a26-a710-6db4f036a01a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="リソース ファイル\engine\must-capture-shogi-engine">
+      <UniqueIdentifier>{5dd99140-04f4-49f4-9699-713b1b7ee46a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -155,6 +161,21 @@
       <Filter>リソース ファイル\engine\2016-late-engine</Filter>
     </ClInclude>
     <ClInclude Include="extra\move_picker_2016Q3.h">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\2016-late-engine\2016-late-param_body.h">
+      <Filter>リソース ファイル\engine\2016-late-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\2017-early-engine\2017-early-param.h">
+      <Filter>リソース ファイル\engine\2017-early-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\check-shogi-engine\check-shogi-param.h">
+      <Filter>リソース ファイル\engine\check-shogi-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="engine\must-capture-shogi-engine\must-capture-shogi-param.h">
+      <Filter>リソース ファイル\engine\must-capture-shogi-engine</Filter>
+    </ClInclude>
+    <ClInclude Include="extra\move_picker_2017Q2.h">
       <Filter>リソース ファイル\extra</Filter>
     </ClInclude>
   </ItemGroup>
@@ -264,9 +285,6 @@
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp">
       <Filter>リソース ファイル\engine\help-mate-engine</Filter>
     </ClCompile>
-    <ClCompile Include="eval\evaluate_kppt_fast.cpp">
-      <Filter>リソース ファイル\eval</Filter>
-    </ClCompile>
     <ClCompile Include="learn\learner.cpp">
       <Filter>リソース ファイル\learn</Filter>
     </ClCompile>
@@ -285,63 +303,39 @@
     <ClCompile Include="extra\mate_n_ply.cpp">
       <Filter>リソース ファイル\extra</Filter>
     </ClCompile>
+    <ClCompile Include="engine\2017-early-engine\2017-early-search.cpp">
+      <Filter>リソース ファイル\engine\2017-early-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\check-shogi-engine\check-shogi.cpp">
+      <Filter>リソース ファイル\engine\check-shogi-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="engine\must-capture-shogi-engine\must-capture-shogi.cpp">
+      <Filter>リソース ファイル\engine\must-capture-shogi-engine</Filter>
+    </ClCompile>
+    <ClCompile Include="extra\move_picker_2017Q2.cpp">
+      <Filter>リソース ファイル\extra</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
       <Filter>doc</Filter>
     </Text>
-    <Text Include="..\docs\更新履歴.txt">
-      <Filter>doc</Filter>
-    </Text>
     <Text Include="..\docs\解説.txt">
       <Filter>doc</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-nano_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-nano-readme.txt">
-      <Filter>exe</Filter>
     </Text>
     <Text Include="..\exe\eval\readme.txt">
       <Filter>exe\eval</Filter>
     </Text>
-    <Text Include="..\exe\YaneuraOu-nano-plus_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-nano-plus-readme.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-mini_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-mini-readme.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-classic_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-classic-readme.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-classic-tce_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\exe\YaneuraOu-classic-tce-readme.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\docs\実験記録.txt">
+    <Text Include="..\docs\やねうら大定跡.txt">
       <Filter>doc</Filter>
     </Text>
-    <Text Include="..\docs\old\更新履歴2016Q2まで.txt">
-      <Filter>doc\old</Filter>
+    <Text Include="..\docs\更新履歴.txt">
+      <Filter>doc</Filter>
     </Text>
-    <Text Include="..\exe\YaneuraOu-2016-mid.txt">
-      <Filter>exe</Filter>
+    <Text Include="..\script\readme.txt">
+      <Filter>script</Filter>
     </Text>
-    <Text Include="..\exe\YaneuraOu-2016-mid_ja.txt">
-      <Filter>exe</Filter>
-    </Text>
-    <Text Include="..\docs\やねうら大定跡.txt">
+    <Text Include="..\docs\開発メモ2017.txt">
       <Filter>doc</Filter>
     </Text>
   </ItemGroup>
@@ -349,44 +343,11 @@
     <None Include="..\README.md">
       <Filter>doc</Filter>
     </None>
-    <None Include="..\exe\YaneuraOu-nano.exe">
-      <Filter>exe</Filter>
-    </None>
     <None Include="..\exe\book\standard_book.db">
       <Filter>exe\book</Filter>
     </None>
-    <None Include="..\exe\YaneuraOu-nano-plus.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-mini.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-classic.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-classic-tce.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-local-server.exe">
-      <Filter>exe</Filter>
-    </None>
     <None Include="Makefile">
       <Filter>doc</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-mid.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-mid-nosse.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-mid-sse2.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-mid-sse42.exe">
-      <Filter>exe</Filter>
-    </None>
-    <None Include="..\exe\YaneuraOu-2016-mid-sse41.exe">
-      <Filter>exe</Filter>
     </None>
     <None Include="..\script\calc_rating.py">
       <Filter>script</Filter>
@@ -397,7 +358,10 @@
     <None Include="..\script\engine_invoker1.py">
       <Filter>script</Filter>
     </None>
-    <None Include="..\script\engine_invoker4.py">
+    <None Include="..\script\analyze_yane_log.py">
+      <Filter>script</Filter>
+    </None>
+    <None Include="..\script\engine_invoker5.py">
       <Filter>script</Filter>
     </None>
   </ItemGroup>

@@ -348,7 +348,7 @@ namespace YaneuraOuClassicTce
     if ((Limits.use_time_management() &&
         ( elapsed > Time.maximum() - 10 || (Time.search_end > 0 && elapsed > Time.search_end - 10)))
       || (Limits.movetime && elapsed >= Limits.movetime)
-      || (Limits.nodes && Threads.nodes_searched() >= Limits.nodes))
+      || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
       Signals.stop = true;
   }
 
@@ -607,7 +607,7 @@ namespace YaneuraOuClassicTce
 
         // futilityBaseはこの局面のevalにmargin値を加算しているのだが、それがalphaを超えないし、
         // かつseeがプラスではない指し手なので悪い手だろうから枝刈りしてしまう。
-        if (futilityBase <= alpha && pos.see(move) <= VALUE_ZERO)
+        if (futilityBase <= alpha && !pos.see_ge(move, VALUE_ZERO + 1))
         {
           bestValue = std::max(bestValue, futilityBase);
           continue;
@@ -626,8 +626,8 @@ namespace YaneuraOuClassicTce
         && !pos.capture(move);
 
       if (  (!InCheck || evasionPrunable)
-          &&  !is_promote(move)
-          &&  pos.see_sign(move) < VALUE_ZERO)
+          && !is_promote(move)
+          && !pos.see_ge(move, VALUE_ZERO))
           continue;
 
       // -----------------------
@@ -1247,7 +1247,7 @@ namespace YaneuraOuClassicTce
       Depth extension = DEPTH_ZERO;
 
       // 王手となる指し手でSEE >= 0であれば残り探索深さに1手分だけ足す。
-      if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
+      if (givesCheck && pos.see_ge(move, VALUE_ZERO))
         extension = ONE_PLY;
 
       //
@@ -1360,7 +1360,7 @@ namespace YaneuraOuClassicTce
         }
 
         // 次の子nodeにおいて浅い深さになる場合、負のSSE値を持つ指し手の枝刈り
-        if (predictedDepth < 4 * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
+        if (predictedDepth < 4 * ONE_PLY && !pos.see_ge(move, VALUE_ZERO))
           continue;
       }
 
@@ -2232,7 +2232,7 @@ ID_END:;
     // ベストなスレッドの指し手を返す。
     sync_cout << "bestmove " << bestThread->rootMoves[0].pv[0];
 
-    // pomderの指し手の出力。
+    // ponderの指し手の出力。
     // pvにはbestmoveのときの読み筋(PV)が格納されているので、ponderとしてpv[1]があればそれを出力してやる。
     // また、pv[1]がない場合(rootでfail highを起こしたなど)、置換表からひねり出してみる。
     if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos, ponder_candidate))
