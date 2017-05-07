@@ -282,7 +282,7 @@
 #endif
 
 #ifdef YANEURAOU_2017_EARLY_ENGINE
-#define ENGINE_NAME "YaneuraOu 2017 Early"
+#define ENGINE_NAME "Tanuki WCSC27"
 #define EVAL_KPPT
 #define USE_EVAL_HASH
 #define USE_SEE

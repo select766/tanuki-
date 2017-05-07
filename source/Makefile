@@ -19,17 +19,17 @@ COMPILER = g++
 CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fopenmp -fpermissive -D_WIN64
 # ltoオプションを指定すると実行同時にSegmentation Faultで落ちるときがあるので、そのときは、コメントアウトしてください。
 # CFLAGS   += -flto
-CFLAGS   += -march=native
+# CFLAGS   += -march=native
 LDFLAGS  = -lpthread #-lboost_mpi -lboost_serialization
 LIBS     =
 INCLUDE  = #-I../include
 
 ifeq ($(OS),Windows_NT)
   LDFLAGS += -static
-  TARGET = YaneuraOu-by-gcc.exe
+  TARGET = tanuki-wcsc27.exe
 else
   CFLAGS += -D_LINUX
-  TARGET = YaneuraOu-by-gcc
+  TARGET = tanuki-wcsc27
 endif
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""

@@ -75,7 +75,7 @@ const string engine_info() {
      << ENGINE_VERSION << setfill('0')
      << (Is64Bit ? " 64" : " 32")
      << TARGET_CPU << endl
-     << "id author by yaneurao" << endl;
+     << "id author by yaneurao with tanuki-" << endl;
 
   return ss.str();
 }
