@@ -16,7 +16,7 @@ class State(enum.Enum):
   generate_kifu = 1
   generate_kifu_for_test = 2
   learn = 3
-  self_play_with_original = 4
+  self_play_with_elmo = 4
   self_play_with_tanuki_wcsc27 = 5
   self_play_with_base = 6
 
@@ -108,8 +108,8 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games,
   print(locals(), flush=True)
   args = [
     'TanukiColiseum.exe',
-    '--engine1', 'YaneuraOu.2017-04-28.exe',
-    '--engine2', 'YaneuraOu.2017-04-28.exe',
+    '--engine1', 'tanuki-wcsc27-2017-05-07-1-avx2.exe',
+    '--engine2', 'tanuki-wcsc27-2017-05-07-1-avx2.exe',
     '--eval1', new_eval_folder_path,
     '--eval2', old_eval_folder_path,
     '--num_concurrent_games', str(num_threads),
@@ -169,15 +169,15 @@ def main():
     required=True,
     help='Initial state. [' + ', '.join([state.name for state in State]) + ']')
   parser.add_argument(
-    '--original_eval_folder_path',
+    '--elmo_eval_folder_path',
     action='store',
     required=True,
-    help='Folder path of the original eval files. ex) eval/apery_wcsc26')
+    help='Folder path of the original eval files. ex) eval/elmo_wcsc27')
   parser.add_argument(
     '--tanuki_wcsc27_eval_folder_path',
     action='store',
     required=True,
-    help='Folder path of the tanuki-wcsc27 eval files. ex) eval/apery_sdt4')
+    help='Folder path of the tanuki-wcsc27 eval files. ex) eval/tanuki_wcsc27')
   parser.add_argument(
     '--generate_kifu_exe_file_path',
     action='store',
@@ -311,7 +311,7 @@ def main():
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
-  original_eval_folder_path = args.original_eval_folder_path
+  elmo_eval_folder_path = args.elmo_eval_folder_path
   tanuki_wcsc27_eval_folder_path = args.tanuki_wcsc27_eval_folder_path
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
@@ -370,10 +370,10 @@ def main():
             learning_rate, num_positions_to_generator_train, mini_batch_size, fobos_l1_parameter,
             fobos_l2_parameter)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
-      state = State.self_play_with_original
+      state = State.self_play_with_elmo
 
-    elif state == State.self_play_with_original:
-      SelfPlay(original_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
+    elif state == State.self_play_with_elmo:
+      SelfPlay(elmo_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
                num_games_to_selfplay, num_numa_nodes)
       state = State.self_play_with_tanuki_wcsc27
 
