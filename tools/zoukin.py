@@ -82,7 +82,7 @@ setoption name LearningRate value {learning_rate}
 setoption name KifuForTestDir value {kif_for_test_folder_path}
 setoption name LearnerNumPositionsForTest value 1000000
 setoption name MiniBatchSize value {mini_batch_size}
-setoption name ReadBatchSize value {num_actual_positions}
+setoption name ReadBatchSize value 100000000
 setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
 isready
