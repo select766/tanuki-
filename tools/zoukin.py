@@ -102,14 +102,14 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
   print(locals(), flush=True)
   args = [
     'TanukiColiseum.exe',
-    '--engine1', 'tanuki-wcsc27-2017-05-07-1-avx2.exe',
-    '--engine2', 'tanuki-wcsc27-2017-05-07-1-avx2.exe',
+    '--engine1', args.selfplay_exe_file_path,
+    '--engine2', args.selfplay_exe_file_path,
     '--eval1', new_eval_folder_path,
     '--eval2', old_eval_folder_path,
     '--num_concurrent_games', str(args.num_threads_to_selfplay),
     '--num_games', str(args.num_games_to_selfplay),
     '--hash', '256',
-    '--time', '1000',
+    '--time', str(args.thinking_time_ms),
     '--num_numa_nodes', str(args.num_numa_nodes)]
   print(args, flush=True)
   if subprocess.run(args).returncode:
@@ -273,6 +273,17 @@ def main():
     action='store',
     required=True,
     help='Comma-separated folder paths for reference eval files. ex) eval/tanuki_wcsc27,eval/elmo_wcsc27')
+  parser.add_argument(
+    '--selfplay_exe_file_path',
+    action='store',
+    required=True,
+    help='Exe file name for the self plays. ex) tanuki-wcsc27-2017-05-07-1-avx2.exe')
+  parser.add_argument(
+    '--thinking_time_ms',
+    action='store',
+    type=int,
+    required=True,
+    help='Thinking time for self play in milliseconds. ex) 1000')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
