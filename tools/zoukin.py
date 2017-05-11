@@ -173,21 +173,6 @@ def main():
     required=True,
     help='Exe file name of the learner. ex) YaneuraOu.2016-08-05.generate_kifu.exe')
   parser.add_argument(
-    '--local_game_server_exe_file_path',
-    action='store',
-    required=True,
-    help='Exe file name of the local game server. ex) YaneuraOu-local-game-server.exe')
-  parser.add_argument(
-    '--vs_original_result_file_path',
-    action='store',
-    required=True,
-    help='Result file path for VS original eval. ex) vs_original.2016-08-05.csv')
-  parser.add_argument(
-    '--vs_base_result_file_path',
-    action='store',
-    required=True,
-    help='Result file path for VS base eval. ex) vs_base.2016-08-05.csv')
-  parser.add_argument(
     '--num_threads_to_generate_kifu',
     action='store',
     type=int,
@@ -303,9 +288,6 @@ def main():
   reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
-  local_game_server_exe_file_path = args.local_game_server_exe_file_path
-  vs_original_result_file_path = args.vs_original_result_file_path
-  vs_base_result_file_path = args.vs_base_result_file_path
   num_threads_to_generate_kifu = args.num_threads_to_generate_kifu
   num_threads_to_learn = args.num_threads_to_learn
   num_threads_to_selfplay = args.num_threads_to_selfplay
