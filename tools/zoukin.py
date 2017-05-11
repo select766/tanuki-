@@ -35,13 +35,12 @@ def AdoptSubfolder(subfolder):
   return num_positions % 1000000000 == 0 or num_positions % 10000 != 0
 
 
-def GenerateKifu(eval_folder_path, kifu_folder_path, num_threads, num_positions, search_depth,
-                 kifu_tag, generate_kifu_exe_file_path):
+def GenerateKifu(args, eval_folder_path, kifu_folder_path, num_positions, kifu_tag):
   print(locals(), flush=True)
   input = '''usi
 setoption name EvalDir value {eval_folder_path}
 setoption name KifuDir value {kifu_folder_path}
-setoption name Threads value {num_threads}
+setoption name Threads value {num_threads_to_generate_kifu}
 setoption name Hash value 16384
 setoption name GeneratorNumPositions value {num_positions}
 setoption name GeneratorMinSearchDepth value {search_depth}
@@ -60,20 +59,18 @@ generate_kifu
 '''.format(
   eval_folder_path=eval_folder_path,
   kifu_folder_path=kifu_folder_path,
-  num_threads=num_threads,
+  num_threads_to_generate_kifu=args.num_threads_to_generate_kifu,
   num_positions=num_positions,
-  search_depth=search_depth,
+  search_depth=args.search_depth,
   kifu_tag=kifu_tag).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
-  subprocess.run([generate_kifu_exe_file_path], input=input, check=True)
+  subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
 
-def Learn(num_threads, eval_folder_path, kifu_folder_path, num_positions_to_learn,
-          kif_for_test_folder_path, output_folder_path_base, learner_exe_file_path, learning_rate,
-          num_actual_positions, mini_batch_size, fobos_l1_parameter, fobos_l2_parameter):
+def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path):
   print(locals(), flush=True)
   input = '''usi
-setoption name Threads value {num_threads}
+setoption name Threads value {num_threads_to_learn}l
 setoption name MaxMovesToDraw value 300
 setoption name EvalDir value {eval_folder_path}
 setoption name KifuDir value {kifu_folder_path}
@@ -87,24 +84,23 @@ setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
 isready
 usinewgame
-learn output_folder_path_base {output_folder_path_base}
+learn output_folder_path_base {learner_output_folder_path_base}
 '''.format(
-  num_threads=num_threads,
+  num_threads_to_learn=args.num_threads_to_learn,
   eval_folder_path=eval_folder_path,
   kifu_folder_path=kifu_folder_path,
-  num_positions_to_learn=num_positions_to_learn,
+  num_positions_to_learn=args.num_positions_to_learn,
   kif_for_test_folder_path=kif_for_test_folder_path,
-  output_folder_path_base=output_folder_path_base,
-  learning_rate=learning_rate,
-  num_actual_positions=num_actual_positions,
-  mini_batch_size=mini_batch_size,
-  fobos_l1_parameter=fobos_l1_parameter,
-  fobos_l2_parameter=fobos_l2_parameter).encode('utf-8')
+  learner_output_folder_path_base=args.learner_output_folder_path_base,
+  learning_rate=args.learning_rate,
+  mini_batch_size=args.mini_batch_size,
+  fobos_l1_parameter=args.fobos_l1_parameter,
+  fobos_l2_parameter=args.fobos_l2_parameter).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
-  subprocess.run([learner_exe_file_path], input=input, check=True)
+  subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
 
-def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games, num_numa_nodes):
+def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
   print(locals(), flush=True)
   args = [
     'TanukiColiseum.exe',
@@ -112,11 +108,11 @@ def SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads, num_games,
     '--engine2', 'tanuki-wcsc27-2017-05-07-1-avx2.exe',
     '--eval1', new_eval_folder_path,
     '--eval2', old_eval_folder_path,
-    '--num_concurrent_games', str(num_threads),
-    '--num_games', str(num_games),
+    '--num_concurrent_games', str(args.num_threads_to_selfplay),
+    '--num_games', str(args.num_games_to_selfplay),
     '--hash', '256',
     '--time', '1000',
-    '--num_numa_nodes', str(num_numa_nodes)]
+    '--num_numa_nodes', str(args.num_numa_nodes)]
   print(args, flush=True)
   if subprocess.run(args).returncode:
     sys.exit('Failed to calculate the winning rate...');
@@ -350,9 +346,9 @@ def main():
     if state == State.generate_kifu:
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
       for division in range(initial_division_to_generator_train, num_divisions_to_generator_train):
-          GenerateKifu(old_eval_folder_path, kifu_folder_path, num_threads_to_generate_kifu,
+          GenerateKifu(args, old_eval_folder_path, kifu_folder_path,
                        num_positions_to_generator_train / num_divisions_to_generator_train,
-                       search_depth, 'train.{0}'.format(division), generate_kifu_exe_file_path)
+                       'train.{0}'.format(division))
       state = State.generate_kifu_for_test
 
     elif state == State.generate_kifu_for_test:
@@ -365,26 +361,20 @@ def main():
 
     elif state == State.learn:
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
-      Learn(num_threads_to_learn, old_eval_folder_path, kifu_folder_path, num_positions_to_learn,
-            kifu_for_test_folder_path, new_eval_folder_path_base, learner_exe_file_path,
-            learning_rate, num_positions_to_generator_train, mini_batch_size, fobos_l1_parameter,
-            fobos_l2_parameter)
+      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play_with_elmo
 
     elif state == State.self_play_with_elmo:
-      SelfPlay(elmo_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay, num_numa_nodes)
+      SelfPlay(args, elmo_eval_folder_path, new_eval_folder_path)
       state = State.self_play_with_tanuki_wcsc27
 
     elif state == State.self_play_with_tanuki_wcsc27:
-      SelfPlay(tanuki_wcsc27_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay, num_numa_nodes)
+      SelfPlay(args, tanuki_wcsc27_eval_folder_path, new_eval_folder_path)
       state = State.self_play_with_base
 
     elif state == State.self_play_with_base:
-      SelfPlay(old_eval_folder_path, new_eval_folder_path, num_threads_to_selfplay,
-               num_games_to_selfplay, num_numa_nodes)
+      SelfPlay(args, old_eval_folder_path, new_eval_folder_path)
       state = State.generate_kifu
       iteration += 1
       old_eval_folder_path = new_eval_folder_path
