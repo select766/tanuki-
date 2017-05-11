@@ -264,7 +264,7 @@ def main():
     action='store',
     type=int,
     required=True,
-    help='Learning rate. ex) 2.0')
+    help='Learning rate. ex) 1000000')
   parser.add_argument(
     '--fobos_l1_parameter',
     action='store',
