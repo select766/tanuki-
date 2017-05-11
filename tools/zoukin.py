@@ -16,9 +16,7 @@ class State(enum.Enum):
   generate_kifu = 1
   generate_kifu_for_test = 2
   learn = 3
-  self_play_with_elmo = 4
-  self_play_with_tanuki_wcsc27 = 5
-  self_play_with_base = 6
+  self_play = 4
 
 
 def GetSubfolders(folder_path):
@@ -165,16 +163,6 @@ def main():
     required=True,
     help='Initial state. [' + ', '.join([state.name for state in State]) + ']')
   parser.add_argument(
-    '--elmo_eval_folder_path',
-    action='store',
-    required=True,
-    help='Folder path of the original eval files. ex) eval/elmo_wcsc27')
-  parser.add_argument(
-    '--tanuki_wcsc27_eval_folder_path',
-    action='store',
-    required=True,
-    help='Folder path of the tanuki-wcsc27 eval files. ex) eval/tanuki_wcsc27')
-  parser.add_argument(
     '--generate_kifu_exe_file_path',
     action='store',
     required=True,
@@ -295,6 +283,11 @@ def main():
     type=int,
     default=0,
     help='Initial division to generate train data. ex) 2')
+  parser.add_argument(
+    '--reference_eval_folder_paths',
+    action='store',
+    required=True,
+    help='Comma-separated folder paths for reference eval files. ex) eval/tanuki_wcsc27,eval/elmo_wcsc27')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -307,8 +300,7 @@ def main():
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
-  elmo_eval_folder_path = args.elmo_eval_folder_path
-  tanuki_wcsc27_eval_folder_path = args.tanuki_wcsc27_eval_folder_path
+  reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
   local_game_server_exe_file_path = args.local_game_server_exe_file_path
@@ -365,16 +357,9 @@ def main():
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play_with_elmo
 
-    elif state == State.self_play_with_elmo:
-      SelfPlay(args, elmo_eval_folder_path, new_eval_folder_path)
-      state = State.self_play_with_tanuki_wcsc27
-
-    elif state == State.self_play_with_tanuki_wcsc27:
-      SelfPlay(args, tanuki_wcsc27_eval_folder_path, new_eval_folder_path)
-      state = State.self_play_with_base
-
-    elif state == State.self_play_with_base:
-      SelfPlay(args, old_eval_folder_path, new_eval_folder_path)
+    elif state == State.self_play:
+      for reference_eval_folder_path in [old_eval_folder_path] + reference_eval_folder_paths:
+        SelfPlay(args, reference_eval_folder_path, new_eval_folder_path)
       state = State.generate_kifu
       iteration += 1
       old_eval_folder_path = new_eval_folder_path
