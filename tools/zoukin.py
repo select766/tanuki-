@@ -266,7 +266,7 @@ def main():
     '--initial_division_to_generator_train',
     action='store',
     type=int,
-    default=0,
+    required=True,
     help='Initial division to generate train data. ex) 2')
   parser.add_argument(
     '--reference_eval_folder_paths',
