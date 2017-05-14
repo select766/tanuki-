@@ -65,7 +65,8 @@ generate_kifu
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
 
-def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path):
+def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path,
+          new_eval_folder_path_base):
   print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {num_threads_to_learn}l
@@ -89,7 +90,7 @@ learn output_folder_path_base {learner_output_folder_path_base}
   kifu_folder_path=kifu_folder_path,
   num_positions_to_learn=args.num_positions_to_learn,
   kif_for_test_folder_path=kif_for_test_folder_path,
-  learner_output_folder_path_base=args.learner_output_folder_path_base,
+  learner_output_folder_path_base=new_eval_folder_path_base,
   learning_rate=args.learning_rate,
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
@@ -357,8 +358,10 @@ def main():
       state = State.learn
 
     elif state == State.learn:
-      new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
-      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path)
+      new_eval_folder_path_base = os.path.join(learner_output_folder_path_base,
+                                               GetDateTimeString())
+      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path,
+            new_eval_folder_path_base)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play
 
