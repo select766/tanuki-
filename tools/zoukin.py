@@ -110,7 +110,13 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
     '--num_games', str(args.num_games_to_selfplay),
     '--hash', '256',
     '--time', str(args.thinking_time_ms),
-    '--num_numa_nodes', str(args.num_numa_nodes)]
+    '--num_numa_nodes', str(args.num_numa_nodes),
+    '--num_book_moves1', '0',
+    '--num_book_moves2', '0',
+    '--book_file_name1', 'no_book',
+    '--book_file_name2', 'no_book',
+    '--num_book_moves', '24',
+	]
   print(args, flush=True)
   if subprocess.run(args).returncode:
     sys.exit('Failed to calculate the winning rate...');
@@ -284,6 +290,12 @@ def main():
     type=int,
     required=True,
     help='Thinking time for self play in milliseconds. ex) 1000')
+  parser.add_argument(
+    '--self_play_hash_size',
+    action='store',
+    type=int,
+    required=True,
+    help='Hash size for self play. ex) 256')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
