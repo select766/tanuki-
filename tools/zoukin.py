@@ -108,7 +108,7 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
     '--eval2', old_eval_folder_path,
     '--num_concurrent_games', str(args.num_threads_to_selfplay),
     '--num_games', str(args.num_games_to_selfplay),
-    '--hash', '256',
+    '--hash', str(args.self_play_hash_size),
     '--time', str(args.thinking_time_ms),
     '--num_numa_nodes', str(args.num_numa_nodes),
     '--num_book_moves1', '0',
@@ -360,7 +360,7 @@ def main():
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
       Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
-      state = State.self_play_with_elmo
+      state = State.self_play
 
     elif state == State.self_play:
       for reference_eval_folder_path in [old_eval_folder_path] + reference_eval_folder_paths:
