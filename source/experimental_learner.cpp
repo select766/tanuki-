@@ -589,6 +589,7 @@ void Learner::Learn(std::istringstream& iss) {
 #pragma omp parallel
 		{
 			int thread_index = omp_get_thread_num();
+			WinProcGroup::bindThisThread(thread_index);
 			// ミニバッチ
 			// num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(guided) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy)
