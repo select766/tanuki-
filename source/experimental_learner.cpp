@@ -592,7 +592,7 @@ void Learner::Learn(std::istringstream& iss) {
 			WinProcGroup::bindThisThread(thread_index);
 			// ミニバッチ
 			// num_records個の学習データの勾配の和を求めて重みを更新する
-#pragma omp for schedule(guided) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy)
+#pragma omp for schedule(dynamic, 1000) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
 				auto f = [elmo_coefficient, &weights, &sum_train_squared_error_of_value, &sum_norm,
 					&sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy](
@@ -666,7 +666,7 @@ void Learner::Learn(std::istringstream& iss) {
 			}
 
 			// 損失関数を計算する
-#pragma omp for schedule(guided) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy)
+#pragma omp for schedule(dynamic, 1000) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
 				auto f = [elmo_coefficient, &weights, &sum_test_squared_error_of_value,
 					&sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy](
@@ -690,7 +690,7 @@ void Learner::Learn(std::istringstream& iss) {
 
 			// 低次元へ分配する
 			// 並列化を効かせたいのでdimension_indexで回す
-#pragma omp for schedule(guided)
+#pragma omp for schedule(dynamic, 20000)
 			for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
 				if (Kpp::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
@@ -726,7 +726,7 @@ void Learner::Learn(std::istringstream& iss) {
 			double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
 
 			// 並列化を効かせたいのでdimension_indexで回す
-#pragma omp for schedule(guided)
+#pragma omp for schedule(dynamic, 20000)
 			for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
 				if (Kpp::IsValid(dimension_index)) {
 					Kpp kpp = Kpp::ForIndex(dimension_index);
