@@ -600,16 +600,17 @@ void Learner::Learn(std::istringstream& iss) {
 					// 評価値から推定した勝率の分布の交差エントロピー
 					double p = winning_percentage(record_value);
 					double q = winning_percentage(value);
-					double r = (root_color == win_color) ? 1.0 : 0.0;
-					WeightType delta = (q - p) + elmo_coefficient * (q - r);
+					double t = (root_color == win_color) ? 1.0 : 0.0;
+					WeightType delta = (q - p) + elmo_coefficient * (q - t);
 
 					double diff_value = record_value - value;
 					sum_train_squared_error_of_value += diff_value * diff_value;
-					double diff_winning_percentage = delta;
+					double diff_winning_percentage = q - p;
 					sum_train_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
 					sum_train_cross_entropy +=
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps)) +
+						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
 					sum_norm += abs(value);
 
 					// 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
@@ -674,16 +675,17 @@ void Learner::Learn(std::istringstream& iss) {
 					// 評価値から推定した勝率の分布の交差エントロピー
 					double p = winning_percentage(record_value);
 					double q = winning_percentage(value);
-					double r = (root_color == win_color) ? 1.0 : 0.0;
-					WeightType delta = (q - p) + elmo_coefficient * (q - r);
+					double t = (root_color == win_color) ? 1.0 : 0.0;
+					WeightType delta = (q - p) + elmo_coefficient * (q - t);
 
 					double diff_value = record_value - value;
 					sum_test_squared_error_of_value += diff_value * diff_value;
-					double diff_winning_percentage = delta;
+					double diff_winning_percentage = q - p;
 					sum_test_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
 					sum_test_cross_entropy +=
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps)) +
+						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
 				};
 				Strap(records_for_test[record_index], pv_strap_max_depth, f);
 			}
