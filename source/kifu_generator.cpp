@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include "kifu_writer.h"
+#include "misc.h"
 #include "search.h"
 #include "thread.h"
 
@@ -293,6 +294,7 @@ void Learner::GenerateKifu()
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
+	WinProcGroup::bindThisThread(thread_index);
     char output_file_path[1024];
     std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
       output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
