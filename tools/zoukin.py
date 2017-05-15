@@ -309,7 +309,10 @@ def main():
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
-  reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
+  if args.reference_eval_folder_paths:
+    reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
+  else:
+    reference_eval_folder_paths = []
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
   num_threads_to_generate_kifu = args.num_threads_to_generate_kifu
