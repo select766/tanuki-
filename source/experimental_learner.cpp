@@ -3,7 +3,6 @@
 #include <array>
 #include <ctime>
 #include <direct.h>
-#include <experimental/generator>
 #include <fstream>
 #include <numeric>
 #include <omp.h>
@@ -127,6 +126,8 @@ namespace
 
 	class Kpp {
 	public:
+		Kpp() { }
+
 		Kpp(Square king, BonaPiece piece0, BonaPiece piece1, WeightKind weight_kind)
 			: king_(king), piece0_(piece0), piece1_(piece1), weight_kind_(weight_kind) {
 		}
@@ -157,11 +158,11 @@ namespace
 			return index;
 		}
 
-		auto ToLowerDimensions() const {
-			yield Kpp(king_, piece0_, piece1_, weight_kind_);
-			yield Kpp(king_, piece1_, piece0_, weight_kind_);
-			yield Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
-			yield Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
+		void ToLowerDimensions(Kpp kpp[4]) const {
+			kpp[0] = Kpp(king_, piece0_, piece1_, weight_kind_);
+			kpp[1] = Kpp(king_, piece1_, piece0_, weight_kind_);
+			kpp[2] = Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
+			kpp[3] = Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
 		}
 
 		static Kpp ForIndex(int index) {
@@ -199,6 +200,8 @@ namespace
 
 	class Kkp {
 	public:
+		Kkp() { }
+
 		Kkp(Square king0, Square king1, BonaPiece piece, WeightKind weight_kind)
 			: king0_(king0), king1_(king1), piece_(piece), weight_kind_(weight_kind) {
 		}
@@ -229,9 +232,9 @@ namespace
 			return index;
 		}
 
-		auto ToLowerDimensions() const {
-			yield Kkp(king0_, king1_, piece_, weight_kind_);
-			yield Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
+		void ToLowerDimensions(Kkp kkp[2]) const {
+			kkp[0] = Kkp(king0_, king1_, piece_, weight_kind_);
+			kkp[1] = Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
 		}
 
 		static Kkp ForIndex(int index) {
@@ -269,6 +272,8 @@ namespace
 
 	class Kk {
 	public:
+		Kk() { }
+
 		Kk(Square king0, Square king1, WeightKind weight_kind)
 			: king0_(king0), king1_(king1), weight_kind_(weight_kind) {
 		}
@@ -299,8 +304,8 @@ namespace
 			return index;
 		}
 
-		auto ToLowerDimensions() const {
-			yield Kk(king0_, king1_, weight_kind_);
+		void ToLowerDimensions(Kk kk[1]) const {
+			kk[0] = Kk(king0_, king1_, weight_kind_);
 		}
 
 		static Kk ForIndex(int index) {
@@ -688,19 +693,25 @@ void Learner::Learn(std::istringstream& iss) {
 			for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
 				if (Kpp::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
-					for (const auto& to : Kpp::ForIndex(dimension_index).ToLowerDimensions()) {
+					Kpp kpp[4];
+					Kpp::ForIndex(dimension_index).ToLowerDimensions(kpp);
+					for (const auto& to : kpp) {
 						weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
 					}
 				}
 				else if (Kkp::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
-					for (const auto& to : Kkp::ForIndex(dimension_index).ToLowerDimensions()) {
+					Kkp kkp[2];
+					Kkp::ForIndex(dimension_index).ToLowerDimensions(kkp);
+					for (const auto& to : kkp) {
 						weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
 					}
 				}
 				else if (Kk::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
-					for (const auto& to : Kk::ForIndex(dimension_index).ToLowerDimensions()) {
+					Kk kk[1];
+					Kk::ForIndex(dimension_index).ToLowerDimensions(kk);
+					for (const auto& to : kk) {
 						weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
 					}
 				}
