@@ -355,9 +355,8 @@ def main():
     elif state == State.generate_kifu_for_test:
       kifu_for_test_folder_path = os.path.join(kifu_for_test_output_folder_path_base,
                                                GetDateTimeString())
-      GenerateKifu(old_eval_folder_path, kifu_for_test_folder_path, num_threads_to_generate_kifu,
-                   num_positions_to_generator_test, search_depth, 'test',
-                   generate_kifu_exe_file_path)
+      GenerateKifu(args, old_eval_folder_path, kifu_for_test_folder_path,
+                   num_positions_to_generator_test, 'test')
       state = State.learn
 
     elif state == State.learn:
