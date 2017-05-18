@@ -14,7 +14,6 @@ YaneuraOu_backup*.lnk
 evaluate_kppt_fast_body.cpp
 *Private.*
 *.vspx
-2016-late-param_body.h
 
 # cf. https://twitter.com/496_/status/673758920846917632
 YaneuraOu.VC.opendb
@@ -45,6 +44,7 @@ bld/
 
 # Visual Studio 2015 cache/options directory
 .vs/
+enc_temp_folder
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -231,4 +231,3 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
-/exe/param/parameters_slave.h

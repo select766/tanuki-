@@ -11,10 +11,8 @@
 // I pay my respects to his great achievements.
 //
 
-
 #ifdef EVAL_KPPT
 
-#include <direct.h>
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
@@ -30,7 +28,7 @@ namespace Eval
 {
 
 // 評価関数パラメーター
-#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
+#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32)
 
 	// 共有メモリ上に確保する場合。
 
@@ -68,20 +66,39 @@ namespace Eval
 			else goto Error;
 
 #if 0
+			// kppのp1==p2のところ、値はゼロとなっていること。(参照はするけど学習のときに使いたくないので)
+			{
+				const ValueKpp kpp_zero = { 0,0 };
+				float sum = 0;
+				for (auto sq : SQ)
+					for (auto p = BONA_PIECE_ZERO; p < fe_end; ++p)
+					{
+						sum += abs(kpp[sq][p][p][0]) + abs(kpp[sq][p][p][1]);
+						kpp[sq][p][p] = kpp_zero;
+					}
+				cout << "sum kp = " << sum << endl;
+			}
+
+#endif
+
+#if 0
 			// Aperyの評価関数バイナリ、kppのp=0のところでゴミが入っている。
 			// 駒落ちなどではここを利用したいので0クリアすべき。
-			const ValueKpp kpp_zero = { 0,0 };
-			for (auto sq : SQ)
-				for (BonaPiece p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
-				{
-					kpp[sq][p1][0] = kpp_zero;
-					kpp[sq][0][p1] = kpp_zero;
-				}
+			{
+				const ValueKpp kpp_zero = { 0,0 };
+				for (auto sq : SQ)
+					for (BonaPiece p1 = BONA_PIECE_ZERO; p1 < fe_end; ++p1)
+					{
+						kpp[sq][p1][0] = kpp_zero;
+						kpp[sq][0][p1] = kpp_zero;
+					}
 
-			const ValueKkp kkp_zero = { 0,0 };
-			for (auto sq1 : SQ)
-				for (auto sq2 : SQ)
-					kkp[sq1][sq2][0] = kkp_zero;
+				const ValueKkp kkp_zero = { 0,0 };
+				for (auto sq1 : SQ)
+					for (auto sq2 : SQ)
+						kkp[sq1][sq2][0] = kkp_zero;
+
+			}
 #endif
 
 #if 0
@@ -150,50 +167,59 @@ namespace Eval
 	}
 
 
-	s32 calc_check_sum()
+	u64 calc_check_sum()
 	{
-		s32 sum = 0;
+		u64 sum = 0;
 		
-		auto add_sum = [&](s32*ptr , size_t t)
+		auto add_sum = [&](u32*ptr , size_t t)
 		{
 			for (size_t i = 0; i < t; ++i)
 				sum += ptr[i];
 		};
 		
-		add_sum(reinterpret_cast<s32*>(kk) , sizeof(kk ) / sizeof(s32));
-		add_sum(reinterpret_cast<s32*>(kkp), sizeof(kkp) / sizeof(s32));
-		add_sum(reinterpret_cast<s32*>(kpp), sizeof(kpp) / sizeof(s32));
+		add_sum(reinterpret_cast<u32*>(kk) , sizeof(kk ) / sizeof(u32));
+		add_sum(reinterpret_cast<u32*>(kkp), sizeof(kkp) / sizeof(u32));
+		add_sum(reinterpret_cast<u32*>(kpp), sizeof(kpp) / sizeof(u32));
 
 		return sum;
 	}
 
 
-#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
+#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32)
 	// 評価関数の共有を行うための大掛かりな仕組み
+	// gccでコンパイルするときもWindows環境であれば、これが有効になって欲しいので defined(_WIN32) で判定。
 
 #include <windows.h>
 
 	void load_eval()
 	{
+		// 評価関数を共有するのか
 		if (!(bool)Options["EvalShare"])
 		{
 			// このメモリは、プロセス終了のときに自動開放されることを期待している。
 			auto shared_eval_ptr = new SharedEval();
 
-			kk_ = &(shared_eval_ptr->kk_);
-			kkp_ = &(shared_eval_ptr->kkp_);
-			kpp_ = &(shared_eval_ptr->kpp_);
+			if (shared_eval_ptr == nullptr)
+			{
+				sync_cout << "info string can't allocate eval memory." << sync_endl;
+			}
+			else
+			{
+				kk_ = &(shared_eval_ptr->kk_);
+				kkp_ = &(shared_eval_ptr->kkp_);
+				kpp_ = &(shared_eval_ptr->kpp_);
 
-			load_eval_impl();
-			// 共有されていないメモリを用いる。
-			sync_cout << "info string use non-shared eval_memory." << sync_endl;
+				load_eval_impl();
+				// 共有されていないメモリを用いる。
+				sync_cout << "info string use non-shared eval_memory." << sync_endl;
+			}
 			return;
 		}
 
 		// エンジンのバージョンによって評価関数は一意に定まるものとする。
 		// Numaで確保する名前を変更しておく。
 
-		auto dir_name = (string)Options["EvalDir"] + "Numa" + (string)Options["EngineNuma"];
+		auto dir_name = (string)Options["EvalDir"];
 		// Mutex名にbackslashは使えないらしいので、escapeする。念のため'/'もescapeする。
 		replace(dir_name.begin(), dir_name.end(), '\\', '_');
 		replace(dir_name.begin(), dir_name.end(), '/', '_');
@@ -223,26 +249,34 @@ namespace Eval
 			// ビュー
 			auto shared_eval_ptr = (SharedEval *)MapViewOfFile(hMap, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(SharedEval));
 
-			kk_ = &(shared_eval_ptr->kk_);
-			kkp_ = &(shared_eval_ptr->kkp_);
-			kpp_ = &(shared_eval_ptr->kpp_);
-
-			if (!already_exists)
+			// メモリが確保できないときはshared_eval_ptr == null。このチェックをしたほうがいいような..。
+			if (shared_eval_ptr == nullptr)
 			{
-				// 新規作成されてしまった
+				sync_cout << "info string can't allocate shared eval memory." << sync_endl;
+			}
+			else
+			{
+				kk_ = &(shared_eval_ptr->kk_);
+				kkp_ = &(shared_eval_ptr->kkp_);
+				kpp_ = &(shared_eval_ptr->kpp_);
 
-				// このタイミングで評価関数バイナリを読み込む
-				load_eval_impl();
+				if (!already_exists)
+				{
+					// 新規作成されてしまった
 
-				auto check_sum = calc_check_sum();
-				sync_cout << "info string created shared eval memory. Display : check_sum = " << std::hex << check_sum << std::dec << sync_endl;
+					// このタイミングで評価関数バイナリを読み込む
+					load_eval_impl();
 
-			} else {
+					sync_cout << "info string created shared eval memory." << sync_endl;
 
-				// 評価関数バイナリを読み込む必要はない。ファイルマッピングが成功した時点で
-				// 評価関数バイナリは他のプロセスによって読み込まれていると考えられる。
+				}
+				else {
 
-				sync_cout << "info string use shared eval memory." << sync_endl;
+					// 評価関数バイナリを読み込む必要はない。ファイルマッピングが成功した時点で
+					// 評価関数バイナリは他のプロセスによって読み込まれていると考えられる。
+
+					sync_cout << "info string use shared eval memory." << sync_endl;
+				}
 			}
 		}
 		ReleaseMutex(hMutex);
@@ -251,7 +285,7 @@ namespace Eval
 		// 1) ::ReleaseMutex()
 		// 2) ::UnmapVieOfFile()
 		// が必要であるが、1),2)がプロセスが解体されるときに自動でなされるので、この処理は特に入れない。
-	}
+
 #else
 
 	// 評価関数のプロセス間共有を行わないときは、普通に
@@ -259,37 +293,32 @@ namespace Eval
 	void load_eval()
 	{
 		load_eval_impl();
-	}
-
 #endif
 
-  // 評価関数ファイルを保存する
-  void save_eval() {
-    do {
-      // KK
-      std::ofstream ofsKK((string)Options["EvalDir"] + "/" + KK_BIN, std::ios::binary);
-      if (ofsKK) ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
-      else goto Error;
+		// 共有メモリを使う/使わないときの共通の処理
+		auto check_sum = calc_check_sum();
 
-      // KKP
-      std::ofstream ofsKKP((string)Options["EvalDir"] + "/" + KKP_BIN, std::ios::binary);
-      if (ofsKKP) ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp));
-      else goto Error;
+		// 評価関数ファイルの正体
+		string softname = "unknown";
 
-      // KPP
-      std::ofstream ofsKPP((string)Options["EvalDir"] + "/" + KPP_BIN, std::ios::binary);
-      if (ofsKPP) ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp));
-      else goto Error;
+		// ソフト名自動判別
+		map<u64, string> list = {
+			{ 0x7171a5469027ebf , "ShinYane(20161010)" } ,
+			{ 0x71fc7fd40c668cc , "Ukamuse(sdt4)" } ,
 
-  } while (0);
+			{ 0x65cd7c55a9d4cd9 , "elmo(WCSC27)" } ,
+			{ 0x3aa68b055a020a8 , "Yomita(WCSC27)" } ,
+			{ 0x702fb2ee5672156 , "Qhapaq(WCSC27)" } ,
+			{ 0x6c54a1bcb654e37 , "tanuki(WCSC27)" } ,
+		};
+		if (list.count(check_sum))
+			softname = list[check_sum];
 
-  return;
+		sync_cout << "info string Eval Check Sum = " << std::hex << check_sum << std::dec
+				  << " , Eval File = " << softname << sync_endl;
+	}
 
-Error:;
-  std::cout << "\ninfo string save evaluation file failed.\n";
-  }
-  
-  // KP,KPP,KKPのスケール
+	// KP,KPP,KKPのスケール
 	const int FV_SCALE = 32;
 
 	// 駒割り以外の全計算
@@ -298,7 +327,7 @@ Error:;
 	// なので、この関数の最適化は頑張らない。
 	Value compute_eval(const Position& pos)
 	{
-#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_MSC_VER)
+#if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32)
 		// shared memoryを用いているときには、is_ready()で評価関数を読み込み、
 		// 初期化してからしかcompute_eval()を呼び出すことは出来ない。
 		ASSERT_LV1(kk_ != nullptr);
@@ -409,7 +438,9 @@ Error:;
 
 		const auto* pkppb = kpp[sq_bk][ebp.fb];
 		const auto* pkppw = kpp[Inv(sq_wk)][ebp.fw];
-#if defined (USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
+
+#if defined (USE_AVX2)
+		
 		__m256i zero = _mm256_setzero_si256();
 		__m256i sum0 = zero;
 		__m256i sum1 = zero;
@@ -468,6 +499,7 @@ Error:;
 		sum.p[1] += sum1_array;
 
 #elif defined (USE_SSE41)
+
 		sum.m[0] = _mm_set_epi32(0, 0, *reinterpret_cast<const s32*>(&pkppw[list1[0]][0]), *reinterpret_cast<const s32*>(&pkppb[list0[0]][0]));
 		sum.m[0] = _mm_cvtepi16_epi32(sum.m[0]);
 		for (int i = 1; i < PIECE_NO_KING; ++i) {
@@ -493,6 +525,13 @@ Error:;
 
 #ifdef USE_EVAL_HASH
 	EvaluateHashTable g_evalTable;
+
+	// prefetchする関数も用意しておく。
+	void prefetch_evalhash(const Key key)
+	{
+		prefetch(g_evalTable[key >> 1]);
+	}
+
 #endif
 
 	void evaluateBody(const Position& pos)
@@ -516,6 +555,7 @@ Error:;
 		{
 			// 全計算
 			compute_eval(pos);
+
 			return;
 			// 結果は、pos->state().sumから取り出すべし。
 		}
@@ -554,11 +594,12 @@ Error:;
 			{
 				const auto ppkppw = kpp[Inv(sq_wk)];
 
-#if defined(USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
 				// ΣWKPP = 0
 				diff.p[1][0] = 0;
 				diff.p[1][1] = 0;
 
+#if defined(USE_AVX2)
+				
 				__m256i zero = _mm256_setzero_si256();
 				__m256i diffp1 = zero;
 				for (int i = 0; i < PIECE_NO_KING; ++i)
@@ -615,11 +656,7 @@ Error:;
 				std::array<int32_t, 2> diffp1_sum;
 				_mm_storel_epi64(reinterpret_cast<__m128i*>(&diffp1_sum), diffp1_128);
 				diff.p[1] += diffp1_sum;
-
 #else
-        // ΣWKPP = 0
-        diff.p[1][0] = 0;
-        diff.p[1][1] = 0;
 
 				for (int i = 0; i < PIECE_NO_KING; ++i)
 				{
@@ -647,10 +684,10 @@ Error:;
 					// こうすることで前nodeのpiece_listを持たなくて済む。
 
 					const int listIndex_cap = dp.pieceNo[1];
-					diff.p[0] += do_a_black(pos, dp.pieceNow[1]);
-					list0[listIndex_cap] = dp.piecePrevious[1].fb;
-					diff.p[0] -= do_a_black(pos, dp.piecePrevious[1]);
-					list0[listIndex_cap] = dp.pieceNow[1].fb;
+					diff.p[0] += do_a_black(pos, dp.changed_piece[1].new_piece);
+					list0[listIndex_cap] = dp.changed_piece[1].old_piece.fb;
+					diff.p[0] -= do_a_black(pos, dp.changed_piece[1].old_piece);
+					list0[listIndex_cap] = dp.changed_piece[1].new_piece.fb;
 				}
 
 			} else {
@@ -658,11 +695,11 @@ Error:;
 				// 先手玉の移動
 				// さきほどの処理と同様。
 
-        const auto* ppkppb = kpp[sq_bk];
-
-#if defined(USE_AVX2) && defined(YANEURAOU_2016_LATE_ENGINE)
+				const auto* ppkppb = kpp[sq_bk];
 				diff.p[0][0] = 0;
 				diff.p[0][1] = 0;
+
+#if defined(USE_AVX2)
 
 				__m256i zero = _mm256_setzero_si256();
 				__m256i diffp0 = zero;
@@ -716,10 +753,7 @@ Error:;
 				_mm_storel_epi64(reinterpret_cast<__m128i*>(&diffp0_sum), diffp0_128);
 				diff.p[0] += diffp0_sum;
 #else
-        diff.p[0][0] = 0;
-        diff.p[0][1] = 0;
-
-        for (int i = 0; i < PIECE_NO_KING; ++i)
+				for (int i = 0; i < PIECE_NO_KING; ++i)
 				{
 					const int k0 = list0[i];
 					const auto* pkppb = ppkppb[k0];
@@ -733,10 +767,10 @@ Error:;
 
 				if (moved_piece_num == 2) {
 					const int listIndex_cap = dp.pieceNo[1];
-					diff.p[1] += do_a_white(pos, dp.pieceNow[1]);
-					list1[listIndex_cap] = dp.piecePrevious[1].fw;
-					diff.p[1] -= do_a_white(pos, dp.piecePrevious[1]);
-					list1[listIndex_cap] = dp.pieceNow[1].fw;
+					diff.p[1] += do_a_white(pos, dp.changed_piece[1].new_piece);
+					list1[listIndex_cap] = dp.changed_piece[1].old_piece.fw;
+					diff.p[1] -= do_a_white(pos, dp.changed_piece[1].old_piece);
+					list1[listIndex_cap] = dp.changed_piece[1].new_piece.fw;
 				}
 			}
 
@@ -750,13 +784,13 @@ Error:;
 
 			const int listIndex = dp.pieceNo[0];
 
-			auto diff = do_a_pc(pos, dp.pieceNow[0]);
+			auto diff = do_a_pc(pos, dp.changed_piece[0].new_piece);
 			if (moved_piece_num == 1) {
 
 				// 動いた駒が1つ。
-				list0[listIndex] = dp.piecePrevious[0].fb;
-				list1[listIndex] = dp.piecePrevious[0].fw;
-				diff -= do_a_pc(pos, dp.piecePrevious[0]);
+				list0[listIndex] = dp.changed_piece[0].old_piece.fb;
+				list1[listIndex] = dp.changed_piece[0].old_piece.fw;
+				diff -= do_a_pc(pos, dp.changed_piece[0].old_piece);
 
 			} else {
 
@@ -765,27 +799,27 @@ Error:;
 				auto sq_bk = pos.king_square(BLACK);
 				auto sq_wk = pos.king_square(WHITE);
 
-				diff += do_a_pc(pos, dp.pieceNow[1]);
-				diff.p[0] -= kpp[sq_bk][dp.pieceNow[0].fb][dp.pieceNow[1].fb];
-				diff.p[1] -= kpp[Inv(sq_wk)][dp.pieceNow[0].fw][dp.pieceNow[1].fw];
+				diff += do_a_pc(pos, dp.changed_piece[1].new_piece);
+				diff.p[0] -= kpp[sq_bk][dp.changed_piece[0].new_piece.fb][dp.changed_piece[1].new_piece.fb];
+				diff.p[1] -= kpp[Inv(sq_wk)][dp.changed_piece[0].new_piece.fw][dp.changed_piece[1].new_piece.fw];
 
 				const PieceNo listIndex_cap = dp.pieceNo[1];
-				list0[listIndex_cap] = dp.piecePrevious[1].fb;
-				list1[listIndex_cap] = dp.piecePrevious[1].fw;
+				list0[listIndex_cap] = dp.changed_piece[1].old_piece.fb;
+				list1[listIndex_cap] = dp.changed_piece[1].old_piece.fw;
 
-				list0[listIndex] = dp.piecePrevious[0].fb;
-				list1[listIndex] = dp.piecePrevious[0].fw;
-				diff -= do_a_pc(pos, dp.piecePrevious[0]);
-				diff -= do_a_pc(pos, dp.piecePrevious[1]);
+				list0[listIndex] = dp.changed_piece[0].old_piece.fb;
+				list1[listIndex] = dp.changed_piece[0].old_piece.fw;
+				diff -= do_a_pc(pos, dp.changed_piece[0].old_piece);
+				diff -= do_a_pc(pos, dp.changed_piece[1].old_piece);
 
-				diff.p[0] += kpp[sq_bk][dp.piecePrevious[0].fb][dp.piecePrevious[1].fb];
-				diff.p[1] += kpp[Inv(sq_wk)][dp.piecePrevious[0].fw][dp.piecePrevious[1].fw];
-				list0[listIndex_cap] = dp.pieceNow[1].fb;
-				list1[listIndex_cap] = dp.pieceNow[1].fw;
+				diff.p[0] += kpp[sq_bk][dp.changed_piece[0].old_piece.fb][dp.changed_piece[1].old_piece.fb];
+				diff.p[1] += kpp[Inv(sq_wk)][dp.changed_piece[0].old_piece.fw][dp.changed_piece[1].old_piece.fw];
+				list0[listIndex_cap] = dp.changed_piece[1].new_piece.fb;
+				list1[listIndex_cap] = dp.changed_piece[1].new_piece.fw;
 			}
 
-			list0[listIndex] = dp.pieceNow[0].fb;
-			list1[listIndex] = dp.pieceNow[0].fw;
+			list0[listIndex] = dp.changed_piece[0].new_piece.fb;
+			list1[listIndex] = dp.changed_piece[0].new_piece.fw;
 
 			// 前nodeからの駒割りの増分を加算。
 			diff.p[2][0] += (now->materialValue - prev->materialValue) * FV_SCALE;
@@ -808,15 +842,19 @@ Error:;
 #ifdef USE_EVAL_HASH
 		// evaluate hash tableにはあるかも。
 
-		const Key keyExcludeTurn = st->key() & ~1; // 手番を消した局面hash key
-		EvalSum entry = *g_evalTable[keyExcludeTurn];       // atomic にデータを取得する必要がある。
+		// 手番を消した局面hash key
+		const Key keyExcludeTurn = st->key() >> 1;
+//		cout << "EvalSum " << hex << g_evalTable[keyExcludeTurn] << endl;
+		EvalSum entry = *g_evalTable[keyExcludeTurn];   // atomic にデータを取得する必要がある。
 		entry.decode();
 		if (entry.key == keyExcludeTurn)
 		{
+//			dbg_hit_on(true);
 			// あった！
-			st->sum = entry;
+			sum = entry;
 			return Value(entry.sum(pos.side_to_move()) / FV_SCALE);
 		}
+//		dbg_hit_on(false);
 #endif
 
 		// 評価関数本体を呼び出して求める。
@@ -824,9 +862,9 @@ Error:;
 
 #ifdef USE_EVAL_HASH
 		// せっかく計算したのでevaluate hash tableに保存しておく。
-		st->sum.key = keyExcludeTurn;
-		st->sum.encode();
-		*g_evalTable[keyExcludeTurn] = st->sum;
+		sum.key = keyExcludeTurn;
+		sum.encode();
+		*g_evalTable[keyExcludeTurn] = sum;
 #endif
 
 		ASSERT_LV5(pos.state()->materialValue == Eval::material(pos));
@@ -841,7 +879,7 @@ Error:;
 		}
 #endif
 
-		return Value(st->sum.sum(pos.side_to_move()) / FV_SCALE);
+		return Value(sum.sum(pos.side_to_move()) / FV_SCALE);
 	}
 
 	void evaluate_with_no_return(const Position& pos)

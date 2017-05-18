@@ -20,8 +20,8 @@ using USI::OptionsMap;
 
 namespace Learner
 {
-  std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
-  std::pair<Value, std::vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
+  std::pair<Value, std::vector<Move> > search(Position& pos, int depth);
+  std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
 namespace
@@ -181,7 +181,7 @@ namespace
     std::mt19937_64& mt19937_64, Position& pos, Learner::KifuWriter& kifu_writer,
     std::atomic_int64_t& global_position_index, Move& pv_move) {
     int search_depth = search_depth_distribution(mt19937_64);
-    auto valueAndPv = Learner::search(pos, -VALUE_INFINITE, VALUE_INFINITE, search_depth);
+    auto valueAndPv = Learner::search(pos, search_depth);
 
     // Aperyでは後手番でもスコアの値を反転させずに学習に用いている
     Value value = valueAndPv.first;

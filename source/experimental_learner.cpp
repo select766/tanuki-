@@ -17,8 +17,8 @@ using USI::OptionsMap;
 
 namespace Learner
 {
-  std::pair<Value, std::vector<Move> > search(Position& pos, Value alpha, Value beta, int depth);
-  std::pair<Value, std::vector<Move> > qsearch(Position& pos, Value alpha, Value beta);
+  std::pair<Value, std::vector<Move> > search(Position& pos, int depth);
+  std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
 namespace Eval
@@ -197,7 +197,7 @@ namespace
     root_color = pos.side_to_move();
 
     // 0手読み+静止探索を行う
-    auto valueAndPv = Learner::qsearch(pos, -VALUE_INFINITE, VALUE_INFINITE);
+    auto valueAndPv = Learner::qsearch(pos);
 
     // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
     // 全計算はPosition::set()の中で行われているので差分計算ができる
