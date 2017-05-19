@@ -122,7 +122,7 @@ void Learner::GenerateKifu()
 {
 #ifdef USE_FALSE_PROBE_IN_TT
 	sync_cout << "Please undefine USE_FALSE_PROBE_IN_TT." << sync_endl;
-	ASSERT_LV3(false);
+	std::exit(1);
 #endif
 
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
