@@ -5,8 +5,8 @@
 
 namespace Learner
 {
-  void InitializeGenerator(USI::OptionsMap& o);
-  void GenerateKifu();
+	void InitializeGenerator(USI::OptionsMap& o);
+	void GenerateKifu();
 }
 
 #endif

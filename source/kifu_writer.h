@@ -7,19 +7,19 @@
 
 namespace Learner {
 
-  class KifuWriter {
-  public:
-    KifuWriter(const std::string& output_file_path);
-    virtual ~KifuWriter();
-    bool Write(const Record& record);
-    bool Close();
+	class KifuWriter {
+	public:
+		KifuWriter(const std::string& output_file_path);
+		virtual ~KifuWriter();
+		bool Write(const Record& record);
+		bool Close();
 
-  private:
-    const std::string output_file_path_;
-    FILE* file_ = nullptr;
+	private:
+		const std::string output_file_path_;
+		FILE* file_ = nullptr;
 
-    bool EnsureOpen();
-  };
+		bool EnsureOpen();
+	};
 
 }
 

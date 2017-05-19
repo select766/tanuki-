@@ -449,7 +449,7 @@ void Learner::Learn(std::istringstream& iss) {
 	std::exit(1);
 #endif
 
-		Eval::eval_learn_init();
+	Eval::eval_learn_init();
 
 	omp_set_num_threads((int)Options["Threads"]);
 
