@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26430.6
+VisualStudioVersion = 15.0.26430.4
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "YaneuraOu", "source\YaneuraOu.vcxproj", "{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}"
 EndProject
@@ -11,6 +11,10 @@ Global
 		Debug-2017Early|x86 = Debug-2017Early|x86
 		Debug-2017Goku|x64 = Debug-2017Goku|x64
 		Debug-2017Goku|x86 = Debug-2017Goku|x86
+		Debug-KifuGenerator|x64 = Debug-KifuGenerator|x64
+		Debug-KifuGenerator|x86 = Debug-KifuGenerator|x86
+		Debug-Learner|x64 = Debug-Learner|x64
+		Debug-Learner|x86 = Debug-Learner|x86
 		Debug-mate|x64 = Debug-mate|x64
 		Debug-mate|x86 = Debug-mate|x86
 		Debug-user|x64 = Debug-user|x64
@@ -31,6 +35,10 @@ Global
 		Release-2017Goku-sse41|x86 = Release-2017Goku-sse41|x86
 		Release-2017Goku-sse42|x64 = Release-2017Goku-sse42|x64
 		Release-2017Goku-sse42|x86 = Release-2017Goku-sse42|x86
+		Release-KifuGenerator|x64 = Release-KifuGenerator|x64
+		Release-KifuGenerator|x86 = Release-KifuGenerator|x86
+		Release-Learner|x64 = Release-Learner|x64
+		Release-Learner|x86 = Release-Learner|x86
 		Release-mate|x64 = Release-mate|x64
 		Release-mate|x86 = Release-mate|x86
 		Release-mate-sse2|x64 = Release-mate-sse2|x64
@@ -57,6 +65,12 @@ Global
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-2017Goku|x64.Build.0 = Debug-2017Goku|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-2017Goku|x86.ActiveCfg = Debug-2017Goku|Win32
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-2017Goku|x86.Build.0 = Debug-2017Goku|Win32
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-KifuGenerator|x64.ActiveCfg = Debug-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-KifuGenerator|x64.Build.0 = Debug-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-KifuGenerator|x86.ActiveCfg = Debug-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-Learner|x64.ActiveCfg = Debug-Learner|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-Learner|x64.Build.0 = Debug-Learner|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-Learner|x86.ActiveCfg = Debug-Learner|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-mate|x64.ActiveCfg = Debug-mate|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-mate|x64.Build.0 = Debug-mate|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Debug-mate|x86.ActiveCfg = Debug-mate|Win32
@@ -91,6 +105,12 @@ Global
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-2017Goku-sse42|x64.ActiveCfg = Release-2017Goku-sse42|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-2017Goku-sse42|x64.Build.0 = Release-2017Goku-sse42|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-2017Goku-sse42|x86.ActiveCfg = Release-2017Goku-sse42|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-KifuGenerator|x64.ActiveCfg = Release-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-KifuGenerator|x64.Build.0 = Release-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-KifuGenerator|x86.ActiveCfg = Release-KifuGenerator|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-Learner|x64.ActiveCfg = Release-Learner|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-Learner|x64.Build.0 = Release-Learner|x64
+		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-Learner|x86.ActiveCfg = Release-Learner|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-mate|x64.ActiveCfg = Release-mate|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-mate|x64.Build.0 = Release-mate|x64
 		{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}.Release-mate|x86.ActiveCfg = Release-mate|Win32
