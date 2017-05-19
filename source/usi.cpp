@@ -1,6 +1,8 @@
 ﻿#include <sstream>
 #include <queue>
 
+#include "kifu_generator.h"
+#include "experimental_learner.h"
 #include "shogi.h"
 #include "position.h"
 #include "search.h"
@@ -285,6 +287,7 @@ namespace USI
 #endif
 
 		o["EvalDir"] << Option("eval");
+		o["KifuDir"] << Option("kifu");
 
 #if defined(EVAL_KPPT) && defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32)
 		// 評価関数パラメーターを共有するか
@@ -297,6 +300,8 @@ namespace USI
 		o["EngineNuma"] << Option(-1, 0, 99999);
 #endif
 
+		Learner::InitializeGenerator(o);
+		Learner::InitializeLearner(o);
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 	}
@@ -743,7 +748,10 @@ void USI::loop(int argc, char* argv[])
 		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
 		// 我々はこれに関知しないので単に無視すれば良い。
 		else if (token == "usinewgame") continue;
-
+		else if (token == "generate_kifu") {
+			Learner::GenerateKifu();
+			break;
+		}
 		else
 		{
 			//    簡略表現として、

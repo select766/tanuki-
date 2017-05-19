@@ -553,6 +553,7 @@
     <ClInclude Include="eval\evaluate_kppt.h" />
     <ClInclude Include="eval\kppt_evalsum.h" />
     <ClInclude Include="eval\progress.h" />
+    <ClInclude Include="experimental_learner.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book\apery_book.h" />
@@ -567,6 +568,9 @@
     <ClInclude Include="extra\move_picker\move_picker_2016Q2.h" />
     <ClInclude Include="extra\move_picker\move_picker_2016Q3.h" />
     <ClInclude Include="extra\move_picker\move_picker_2017Q2.h" />
+    <ClInclude Include="kifu_generator.h" />
+    <ClInclude Include="kifu_reader.h" />
+    <ClInclude Include="kifu_writer.h" />
     <ClInclude Include="learn\learn.h" />
     <ClInclude Include="learn\multi_think.h" />
     <ClInclude Include="misc.h" />
@@ -601,6 +605,7 @@
     <ClCompile Include="eval\evaluate_material.cpp" />
     <ClCompile Include="eval\evaluate_no_eval.cpp" />
     <ClCompile Include="eval\progress.cpp" />
+    <ClCompile Include="experimental_learner.cpp" />
     <ClCompile Include="extra\benchmark.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book\apery_book.cpp" />
@@ -617,6 +622,9 @@
     <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
+    <ClCompile Include="kifu_generator.cpp" />
+    <ClCompile Include="kifu_reader.cpp" />
+    <ClCompile Include="kifu_writer.cpp" />
     <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
     <ClCompile Include="learn\learner.cpp" />
     <ClCompile Include="learn\multi_think.cpp" />
