@@ -65,7 +65,8 @@ generate_kifu
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
 
-def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path):
+def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path,
+          new_eval_folder_path_base):
   print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {num_threads_to_learn}l
@@ -89,7 +90,7 @@ learn output_folder_path_base {learner_output_folder_path_base}
   kifu_folder_path=kifu_folder_path,
   num_positions_to_learn=args.num_positions_to_learn,
   kif_for_test_folder_path=kif_for_test_folder_path,
-  learner_output_folder_path_base=args.learner_output_folder_path_base,
+  learner_output_folder_path_base=new_eval_folder_path_base,
   learning_rate=args.learning_rate,
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
@@ -108,9 +109,15 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
     '--eval2', old_eval_folder_path,
     '--num_concurrent_games', str(args.num_threads_to_selfplay),
     '--num_games', str(args.num_games_to_selfplay),
-    '--hash', '256',
+    '--hash', str(args.self_play_hash_size),
     '--time', str(args.thinking_time_ms),
-    '--num_numa_nodes', str(args.num_numa_nodes)]
+    '--num_numa_nodes', str(args.num_numa_nodes),
+    '--num_book_moves1', '0',
+    '--num_book_moves2', '0',
+    '--book_file_name1', 'no_book',
+    '--book_file_name2', 'no_book',
+    '--num_book_moves', '24',
+	]
   print(args, flush=True)
   if subprocess.run(args).returncode:
     sys.exit('Failed to calculate the winning rate...');
@@ -284,6 +291,12 @@ def main():
     type=int,
     required=True,
     help='Thinking time for self play in milliseconds. ex) 1000')
+  parser.add_argument(
+    '--self_play_hash_size',
+    action='store',
+    type=int,
+    required=True,
+    help='Hash size for self play. ex) 256')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -296,7 +309,10 @@ def main():
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
-  reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
+  if args.reference_eval_folder_paths:
+    reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
+  else:
+    reference_eval_folder_paths = []
   generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
   learner_exe_file_path = args.learner_exe_file_path
   num_threads_to_generate_kifu = args.num_threads_to_generate_kifu
@@ -339,16 +355,17 @@ def main():
     elif state == State.generate_kifu_for_test:
       kifu_for_test_folder_path = os.path.join(kifu_for_test_output_folder_path_base,
                                                GetDateTimeString())
-      GenerateKifu(old_eval_folder_path, kifu_for_test_folder_path, num_threads_to_generate_kifu,
-                   num_positions_to_generator_test, search_depth, 'test',
-                   generate_kifu_exe_file_path)
+      GenerateKifu(args, old_eval_folder_path, kifu_for_test_folder_path,
+                   num_positions_to_generator_test, 'test')
       state = State.learn
 
     elif state == State.learn:
-      new_eval_folder_path_base = os.path.join(learner_output_folder_path_base, GetDateTimeString())
-      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path)
+      new_eval_folder_path_base = os.path.join(learner_output_folder_path_base,
+                                               GetDateTimeString())
+      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path,
+            new_eval_folder_path_base)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
-      state = State.self_play_with_elmo
+      state = State.self_play
 
     elif state == State.self_play:
       for reference_eval_folder_path in [old_eval_folder_path] + reference_eval_folder_paths:
