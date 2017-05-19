@@ -42,7 +42,7 @@
 #include "../../thread.h"
 #include "../../misc.h"
 #include "../../tt.h"
-#include "../../extra/book.h"
+#include "../../extra/book/book.h"
 #include "../../move_picker.h"
 #include "../../learn/learn.h"
 
@@ -821,14 +821,6 @@ namespace YaneuraOu2016Mid
     return bestValue;
   }
 
-
-  // valueをlowerBoundからupperBoundの間でクランプする
-  Value clamp(Value value, Value lowerBound, Value upperBound)
-  {
-    value = std::max(value, lowerBound);
-    value = std::min(value, upperBound);
-    return value;
-  }
 
   // -----------------------
   //      通常探索
