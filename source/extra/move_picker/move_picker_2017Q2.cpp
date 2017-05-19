@@ -2,7 +2,7 @@
 
 #ifdef USE_MOVE_PICKER_2017Q2
 
-#include "../thread.h"
+#include "../../thread.h"
 
 namespace {
 
@@ -90,18 +90,18 @@ enum Stages: int {
 
 // partial_insertion_sort()は指し手を与えられたlimitまで降順でソートする。
 // limitよりも小さい値の指し手の順序については、不定。
-// 実装を単純にするため、*beginは常にソートされる指し手に含まれるものとする。
+// 将棋だと指し手の数が多い(ことがある)ので、数が多いときは途中で打ち切ったほうがいいかも。
+// 現状、全体時間の7%程度をこの関数で消費している。
 void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
 
-	for (ExtMove *sortedEnd = begin + 1, *p = begin + 1; p < end; ++p)
+	for (ExtMove *sortedEnd = begin, *p = begin + 1; p < end; ++p)
 		if (p->value >= limit)
 		{
 			ExtMove tmp = *p, *q;
-			*p = *sortedEnd;
+			*p = *++sortedEnd;
 			for (q = sortedEnd; q != begin && *(q - 1) < tmp; --q)
 				*q = *(q - 1);
 			*q = tmp;
-			++sortedEnd;
 		}
 }
 
