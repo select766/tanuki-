@@ -1,30 +1,34 @@
 #include "kifu_reader.h"
 
+#include <numeric>
 #include <sstream>
 #define NOMINMAX
 #include <Windows.h>
 #undef NOMINMAX
 
 #include "misc.h"
+#include "shogi.h"
+
+using USI::Option;
+using USI::OptionsMap;
 
 namespace {
-  constexpr int kBatchSize = 1000'0000;
   constexpr Value kCloseOutValueThreshold = Value(VALUE_INFINITE);
   constexpr int kBufferSize = 1 << 24; // 16MB
+  constexpr char* kOptionValueReadBatchSize = "ReadBatchSize";
 }
 
 Learner::KifuReader::KifuReader(const std::string& folder_name, bool shuffle)
-  : folder_name_(folder_name), shuffle_(shuffle) {
-  for (int i = 0; i < kBatchSize; ++i) {
-    permutation_.push_back(i);
-  }
-  if (shuffle) {
-    std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::random_device()()));
-  }
+  : folder_name_(folder_name), shuffle_(shuffle),
+    read_match_size_((int)Options[kOptionValueReadBatchSize]){
 }
 
 Learner::KifuReader::~KifuReader() {
   Close();
+}
+
+void Learner::KifuReader::Initialize(USI::OptionsMap& o) {
+    o[kOptionValueReadBatchSize] << Option(1000'0000, 0, INT_MAX);
 }
 
 bool Learner::KifuReader::Read(int num_records, std::vector<Record>& records) {
@@ -44,7 +48,7 @@ bool Learner::KifuReader::Read(Record& record) {
 
   if (record_index_ >= static_cast<int>(records_.size())) {
     records_.clear();
-    while (records_.size() < kBatchSize) {
+    while (records_.size() < read_match_size_) {
       if (std::fread(&record, sizeof(record), 1, file_) != 1) {
         // ファイルの終端に辿り着いた
         if (++file_index_ >= static_cast<int>(file_paths_.size())) {
@@ -68,13 +72,13 @@ bool Learner::KifuReader::Read(Record& record) {
           // ファイルを開くのに失敗したら
           // 読み込みを終了する
           sync_cout << "into string Failed to open a kifu file: "
-            << file_paths_[0] << sync_endl;
+            << file_paths_[file_index_] << sync_endl;
           return false;
         }
 
         if (std::setvbuf(file_, nullptr, _IOFBF, kBufferSize)) {
           sync_cout << "into string Failed to set a file buffer: "
-            << file_paths_[0] << sync_endl;
+            << file_paths_[file_index_] << sync_endl;
         }
 
         if (std::fread(&record, sizeof(record), 1, file_) != 1) {
@@ -97,6 +101,18 @@ bool Learner::KifuReader::Read(Record& record) {
 
   if (records_.empty()) {
     return false;
+  }
+
+  // 読み込んだ局面数がkBatchSizeに満たない場合、
+  // permutation配列経由のアクセスで範囲外アクセスが起こる。
+  // これを防ぐため、permutation配列を再作成する。
+  if (records_.size() != permutation_.size()) {
+    permutation_.resize(records_.size());
+    std::iota(permutation_.begin(), permutation_.end(), 0);
+    if (shuffle_) {
+      std::shuffle(permutation_.begin(), permutation_.end(), std::mt19937_64(std::time(nullptr)));
+    }
+
   }
 
   record = records_[permutation_[record_index_]];
@@ -126,7 +142,8 @@ bool Learner::KifuReader::EnsureOpen() {
   find = FindFirstFileA(search_name.c_str(), &find_data);
 
   if (find == INVALID_HANDLE_VALUE) {
-    sync_cout << "info string Failed to find kifu files." << sync_endl;
+    sync_cout << "Failed to find kifu files." << sync_endl;
+    sync_cout << "search_name=" << search_name << sync_endl;
     return false;
   }
 

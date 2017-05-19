@@ -1,6 +1,7 @@
 #include "progress_report.h"
 
 #include <cstdio>
+#include <ctime>
 
 namespace {
   double kAlpha = 0.1;

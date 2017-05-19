@@ -7,8 +7,6 @@
 #include <vector>
 
 #include "experimental_learner.h"
-#include "position.h"
-#include "shogi.h"
 
 namespace Learner {
 
@@ -16,6 +14,7 @@ namespace Learner {
   public:
     KifuReader(const std::string& folder_name, bool shuffle);
     virtual ~KifuReader();
+    static void Initialize(USI::OptionsMap& o);
     // 棋譜ファイルからデータを読み込む
     // 棋譜の読み込みは対称のフォルダ内の複数のファイルから行う
     // ファイルの順番をシャッフルし、
@@ -27,6 +26,7 @@ namespace Learner {
   private:
     // 棋譜ファイルからデータを1局面読み込む
     bool Read(Record& record);
+    bool EnsureOpen();
 
     const std::string folder_name_;
     std::vector<std::string> file_paths_;
@@ -37,8 +37,7 @@ namespace Learner {
     std::vector<Record> records_;
     std::vector<int> permutation_;
     bool shuffle_;
-
-    bool EnsureOpen();
+    int read_match_size_;
   };
 
 }

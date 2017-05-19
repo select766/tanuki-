@@ -2,7 +2,6 @@
 #define _PROGRESS_REPORT_H_
 
 #include <cstdint>
-#include <ctime>
 
 class ProgressReport {
 public:

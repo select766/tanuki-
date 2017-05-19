@@ -208,6 +208,9 @@
     <ClInclude Include="kifu_writer.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="progress_report.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -367,6 +370,9 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="kifu_writer.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="progress_report.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

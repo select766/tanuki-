@@ -917,6 +917,14 @@ namespace USI
 		// string型への暗黙の変換子
 		operator std::string() const { ASSERT_LV1(type == "string" || type == "combo" || type == "spin");  return currentValue; }
 
+		template<typename T>
+		T cast() const {
+			ASSERT_LV1(type == "string" || type == "combo" || type == "spin");
+			T value;
+			std::istringstream(currentValue) >> value;
+			return value;
+		}
+
 	private:
 		friend std::ostream& operator<<(std::ostream& os, const OptionsMap& om);
 

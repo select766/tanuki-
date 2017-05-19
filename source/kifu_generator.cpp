@@ -11,6 +11,7 @@
 
 #include "kifu_writer.h"
 #include "misc.h"
+#include "progress_report.h"
 #include "search.h"
 #include "thread.h"
 
@@ -171,6 +172,7 @@ void Learner::GenerateKifu()
   std::uniform_int<> opening_index(0, static_cast<int>(book.size() - 1));
   // スレッド間で共有する
   std::atomic_int64_t global_position_index = 0;
+  ProgressReport progress_report(num_positions, 10 * 60);
 #pragma omp parallel
   {
     int thread_index = ::omp_get_thread_num();
@@ -270,8 +272,9 @@ void Learner::GenerateKifu()
           sync_cout << "info string Failed to write a record." << sync_endl;
           std::exit(1);
         }
-        Learner::ShowProgress(start_time, ++global_position_index, num_positions, show_progress_per_positions);
       }
+
+	  progress_report.Show(global_position_index += records.size());
     }
 
     // 必要局面数生成したら全スレッドの探索を停止する
