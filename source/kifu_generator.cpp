@@ -1,3 +1,5 @@
+#ifdef USE_KIFU_GENERATOR
+
 #include "kifu_generator.h"
 
 #include <atomic>
@@ -121,8 +123,7 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
 void Learner::GenerateKifu()
 {
 #ifdef USE_FALSE_PROBE_IN_TT
-	sync_cout << "Please undefine USE_FALSE_PROBE_IN_TT." << sync_endl;
-	std::exit(1);
+	static_assert(false, "Please undefine USE_FALSE_PROBE_IN_TT.");
 #endif
 
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
@@ -282,3 +283,5 @@ void Learner::GenerateKifu()
 		Search::Signals.stop = true;
 	}
 }
+
+#endif // USE_KIFU_GENERATOR

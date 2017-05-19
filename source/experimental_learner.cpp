@@ -1,3 +1,5 @@
+#ifdef USE_EXPERIMENTAL_LEARNER
+
 #include "experimental_learner.h"
 
 #include <array>
@@ -435,6 +437,10 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 }
 
 void Learner::Learn(std::istringstream& iss) {
+#ifndef USE_FALSE_PROBE_IN_TT
+	static_assert(false, "Please define USE_FALSE_PROBE_IN_TT.");
+#endif
+
 	sync_cout << "Learner::Learn()" << sync_endl;
 
 	Eval::eval_learn_init();
@@ -444,10 +450,6 @@ void Learner::Learn(std::istringstream& iss) {
 		static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
 		static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
 		static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
-#ifndef USE_FALSE_PROBE_IN_TT
-	sync_cout << "Please define USE_FALSE_PROBE_IN_TT." << sync_endl;
-	std::exit(1);
-#endif
 
 	Eval::eval_learn_init();
 
@@ -799,3 +801,5 @@ void Learner::Learn(std::istringstream& iss) {
 
 	sync_cout << "Finished..." << sync_endl;
 }
+
+#endif // USE_EXPERIMENTAL_LEARNER

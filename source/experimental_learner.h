@@ -15,8 +15,10 @@ namespace Learner
 	};
 	static_assert(sizeof(Record) == 36, "Size of Record is not 36");
 
+#ifdef USE_EXPERIMENTAL_LEARNER
 	void InitializeLearner(USI::OptionsMap& o);
 	void Learn(std::istringstream& iss);
+#endif
 }
 
 #endif
