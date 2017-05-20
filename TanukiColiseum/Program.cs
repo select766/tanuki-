@@ -235,7 +235,6 @@ namespace TanukiColiseum
 
     class Program
     {
-        private const string BookFilePath = @"book\records2016_10818.sfen";
         //private const string BookFilePath = @"book.sfen";
         private SemaphoreSlim GameSemaphoreSlim;
         private SemaphoreSlim FinishSemaphoreSlim = new SemaphoreSlim(0);
@@ -262,6 +261,7 @@ namespace TanukiColiseum
             string bookFileName1 = "no_book";
             string bookFileName2 = "no_book";
             int numBookMoves = 0;
+            string sfenFilePath = "records_2017-05-19.sfen";
 
             for (int i = 0; i < args.Length; ++i)
             {
@@ -309,6 +309,9 @@ namespace TanukiColiseum
                     case "--num_book_moves":
                         numBookMoves = int.Parse(args[++i]);
                         break;
+                    case "--sfen_file_name":
+                        sfenFilePath = args[++i];
+                        break;
                     default:
                         Environment.FailFast("Unexpected option: " + args[i]);
                         break;
@@ -349,7 +352,7 @@ namespace TanukiColiseum
             }
 
             // 定跡ファイルの読み込み
-            string[] book = File.ReadAllLines(BookFilePath);
+            string[] book = File.ReadAllLines(sfenFilePath);
 
             Console.WriteLine("Initializing engines...");
             Console.Out.Flush();
