@@ -1,12 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Diagnostics;
-using System.Threading;
-using System.Text.RegularExpressions;
-using System.IO;
+using System.Windows.Forms;
 
 namespace TanukiColiseum
 {
@@ -24,10 +17,18 @@ namespace TanukiColiseum
                 Environment.FailFast("Failed to start TanukiColiseum.", e);
             }
 
-            var cli = new Cli();
-            cli.Run(options);
+            if (options.Interface == Options.UserInterface.Cli)
+            {
+                var cli = new Cli();
+                cli.Run(options);
+            }
+            else
+            {
+                Application.Run(new Gui());
+            }
         }
 
+        [STAThread]
         static void Main(string[] args)
         {
             new Program().Run(args);

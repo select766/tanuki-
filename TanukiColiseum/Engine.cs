@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace TanukiColiseum
 {
@@ -20,6 +20,10 @@ namespace TanukiColiseum
         public Engine(string fileName, List<string> options, Coliseum coliseum, int processIndex, int gameIndex, int engineIndex, int numaNode)
         {
             this.Process.StartInfo.FileName = "cmd.exe";
+            if (Path.IsPathRooted(fileName))
+            {
+                this.Process.StartInfo.WorkingDirectory = Path.GetDirectoryName(fileName);
+            }
             this.Process.StartInfo.Arguments = string.Format("/c start /B /WAIT /NODE {0} {1}", numaNode, fileName);
             this.Process.StartInfo.UseShellExecute = false;
             this.Process.StartInfo.RedirectStandardInput = true;
@@ -155,6 +159,11 @@ namespace TanukiColiseum
                 game.OnMove(command[1]);
                 game.Go();
             }
+        }
+
+        public void Stop()
+        {
+            Send("stop");
         }
     }
 }

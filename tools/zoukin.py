@@ -117,6 +117,7 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
     '--book_file_name1', 'no_book',
     '--book_file_name2', 'no_book',
     '--num_book_moves', '24',
+    '--no_gui',
 	]
   print(args, flush=True)
   if subprocess.run(args).returncode:
