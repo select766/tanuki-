@@ -180,6 +180,7 @@ namespace TanukiColiseum
             int engine1WhiteWinRatio = 100 * engine1WhiteWin / (engine1Win + engine2Win);
             int engine2BlackWinRatio = 100 * engine2BlackWin / (engine1Win + engine2Win);
             int engine2WhiteWinRatio = 100 * engine2WhiteWin / (engine1Win + engine2Win);
+            int numFinishedGames = engine1Win + engine2Win + numDraw;
 
             string text = string.Format(
                 @"対局数{0} 先手勝ち{1}({2}%) 後手勝ち{3}({4}%) 引き分け{5}
@@ -187,14 +188,13 @@ namespace TanukiColiseum
 勝ち{7}({8}%) 先手勝ち{9}({10}%) 後手勝ち{11}({12}%)
 {13}
 勝ち{14}({15}%) 先手勝ち{16}({17}%) 後手勝ち{18}({19}%)",
-                numGames, blackWin, blackWinRatio, whiteWin, whiteWinRatio, numDraw,
+                numFinishedGames, blackWin, blackWinRatio, whiteWin, whiteWinRatio, numDraw,
                 engine1,
                 engine1Win, engine1WinRatio, engine1BlackWin, engine1BlackWinRatio, engine1WhiteWin, engine1WhiteWinRatio,
                 engine2,
                 engine2Win, engine2WinRatio, engine2BlackWin, engine2BlackWinRatio, engine2WhiteWin, engine2WhiteWinRatio);
             textBoxOutput.Text = text;
 
-            int numFinishedGames = engine1Win + engine2Win + numDraw;
             progressBar1.Maximum = numGames;
             progressBar1.Value = numFinishedGames;
         }
@@ -211,6 +211,7 @@ namespace TanukiColiseum
             coliseum.OnStatusChanged += ShowProgress;
             EnableControls(false);
             progressBar1.Value = 0;
+            textBoxOutput.Text = "(対局準備中です。しばらくお待ちください。)";
             await Task.Run(() => coliseum.Run(options));
             EnableControls(true);
         }
