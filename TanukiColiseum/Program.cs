@@ -24,8 +24,8 @@ namespace TanukiColiseum
                 Environment.FailFast("Failed to start TanukiColiseum.", e);
             }
 
-            var coliseum = new Coliseum();
-            coliseum.Run(options);
+            var cli = new Cli();
+            cli.Run(options);
         }
 
         static void Main(string[] args)

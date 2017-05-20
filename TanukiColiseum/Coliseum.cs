@@ -16,6 +16,8 @@ namespace TanukiColiseum
         private DateTime LastOutput = DateTime.Now;
         private const double OutputResultsPerMin = 1.0;
         private Status Status { get; } = new Status();
+        public delegate void StatusHandler(Status status);
+        public event StatusHandler OnStatusChanged;
 
         public void Run(Options options)
         {
@@ -103,7 +105,7 @@ namespace TanukiColiseum
 
             Console.WriteLine("engine1={0} eval1={1}", options.Engine1FilePath, options.Eval1FolderPath);
             Console.WriteLine("engine2={0} eval2={1}", options.Engine2FilePath, options.Eval2FolderPath);
-            OutputResult();
+            OnStatusChanged(new Status(Status));
         }
 
         public void OnGameFinished(int enginWin, int blackWhiteWin, bool draw)
@@ -119,35 +121,11 @@ namespace TanukiColiseum
 
             if (LastOutput.AddMinutes(OutputResultsPerMin) < DateTime.Now)
             {
-                OutputResult();
+                OnStatusChanged(new Status(Status));
                 LastOutput = DateTime.Now;
             }
             GameSemaphoreSlim.Release();
             FinishSemaphoreSlim.Release();
-        }
-
-        private void OutputResult()
-        {
-            var status = new Status(Status);
-
-            int engine1Win = status.Win[0, 0] + status.Win[0, 1];
-            int engine2Win = status.Win[1, 0] + status.Win[1, 1];
-            int draw = status.NumDraw;
-            int blackWin = status.Win[0, 0] + status.Win[1, 0];
-            int whiteWin = status.Win[0, 1] + status.Win[1, 1];
-
-            // T1,b10000,433 - 54 - 503(46.26% R-26.03) win black : white = 52.42% : 47.58%
-            double winRate = engine1Win / (double)(engine1Win + engine2Win);
-            double rating = 0.0;
-            if (1e-8 < winRate && winRate < 1.0 - 1e-8)
-            {
-                rating = -400.0 * Math.Log10((1.0 - winRate) / winRate);
-            }
-            double black = blackWin / (double)(blackWin + whiteWin);
-            double white = whiteWin / (double)(blackWin + whiteWin);
-            Console.WriteLine("T1,b{0},{1} - {2} - {3}({4:0.00%} R{5:0.00}) win black: white = {6:0.00%} : {7:0.00%}",
-                status.TimeMs, engine1Win, draw, engine2Win, winRate, rating, black, white);
-            Console.Out.Flush();
         }
     }
 }

@@ -8,6 +8,12 @@ namespace TanukiColiseum
 {
     public class Options
     {
+        public enum UserInterface
+        {
+            Cli,
+            Gui,
+        }
+
         public string Engine1FilePath { get; set; } = null;
         public string Engine2FilePath { get; set; } = null;
         public string Eval1FolderPath { get; set; } = null;
@@ -23,6 +29,7 @@ namespace TanukiColiseum
         public string SfenFilePath { get; set; } = "records_2017-05-19.sfen";
         public int TimeMs { get; set; } = 0;
         public int NumNumaNodes { get; set; } = 1;
+        public UserInterface Interface { get; set; } = UserInterface.Gui;
 
         public void Parse(string[] args)
         {
@@ -74,6 +81,9 @@ namespace TanukiColiseum
                         break;
                     case "--sfen_file_name":
                         SfenFilePath = args[++i];
+                        break;
+                    case "--no_gui":
+                        Interface = UserInterface.Cli;
                         break;
                     default:
                         throw new ArgumentException("Unexpected option: " + args[i]);
