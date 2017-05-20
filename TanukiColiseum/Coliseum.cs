@@ -146,7 +146,7 @@ namespace TanukiColiseum
             double black = blackWin / (double)(blackWin + whiteWin);
             double white = whiteWin / (double)(blackWin + whiteWin);
             Console.WriteLine("T1,b{0},{1} - {2} - {3}({4:0.00%} R{5:0.00}) win black: white = {6:0.00%} : {7:0.00%}",
-                status.TimeMs, engine1Win, draw, whiteWin, winRate, rating, black, white);
+                status.TimeMs, engine1Win, draw, engine2Win, winRate, rating, black, white);
             Console.Out.Flush();
         }
     }
