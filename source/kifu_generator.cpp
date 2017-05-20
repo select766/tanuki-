@@ -3,6 +3,8 @@
 #include "kifu_generator.h"
 
 #include <atomic>
+#include <cmath>
+#include <cstdlib>
 #include <ctime>
 #include <direct.h>
 #include <fstream>
@@ -16,6 +18,10 @@
 #include "progress_report.h"
 #include "search.h"
 #include "thread.h"
+
+#ifdef abs
+#undef abs
+#endif
 
 using Search::RootMove;
 using USI::Option;
@@ -41,12 +47,6 @@ namespace
 	constexpr char* kOptionGeneratorMinBookMove = "GeneratorMinBookMove";
 	constexpr char* kOptionGeneratorMaxBookMove = "GeneratorMaxBookMove";
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
-	constexpr char* kOptionGeneratorDoRandomKingMoveProbability = "GeneratorDoRandomKingMoveProbability";
-	constexpr char* kOptionGeneratorSwapTwoPiecesProbability = "GeneratorSwapTwoPiecesProbability";
-	constexpr char* kOptionGeneratorDoRandomMoveProbability = "GeneratorDoRandomMoveProbability";
-	constexpr char* kOptionGeneratorDoRandomMoveAfterBook = "GeneratorDoRandomMoveAfterBook";
-	constexpr char* kOptionGeneratorWriteAnotherPosition = "GeneratorWriteAnotherPosition";
-	constexpr char* kOptionGeneratorShowProgressPerPositions = "GeneratorShowProgressPerPositions";
 
 	std::vector<std::string> book;
 	std::uniform_real_distribution<> probability_distribution;
@@ -111,13 +111,7 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
 	o[kOptionGeneratorMinBookMove] << Option(0, 1, MAX_PLY);
 	o[kOptionGeneratorMaxBookMove] << Option(32, 1, MAX_PLY);
-	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
-	o[kOptionGeneratorDoRandomKingMoveProbability] << Option("0.1");
-	o[kOptionGeneratorSwapTwoPiecesProbability] << Option("0.1");
-	o[kOptionGeneratorDoRandomMoveProbability] << Option("0.1");
-	o[kOptionGeneratorDoRandomMoveAfterBook] << Option(true);
-	o[kOptionGeneratorWriteAnotherPosition] << Option(true);
-	o[kOptionGeneratorShowProgressPerPositions] << Option("1000000");
+	o[kOptionGeneratorValueThreshold] << Option(3000, 0, VALUE_MATE);
 }
 
 void Learner::GenerateKifu()
@@ -154,18 +148,8 @@ void Learner::GenerateKifu()
 	int max_book_move = Options[kOptionGeneratorMaxBookMove];
 	std::uniform_int_distribution<> num_book_move_distribution(min_book_move, max_book_move);
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
-	double do_random_king_move_probability =
-		ParseOptionOrDie<double>(kOptionGeneratorDoRandomKingMoveProbability);
-	double swap_two_pieces_probability =
-		ParseOptionOrDie<double>(kOptionGeneratorSwapTwoPiecesProbability);
-	double do_random_move_probability =
-		ParseOptionOrDie<double>(kOptionGeneratorDoRandomMoveProbability);
-	bool do_random_move_after_book = (bool)Options[kOptionGeneratorDoRandomMoveAfterBook];
 	int value_threshold = Options[kOptionGeneratorValueThreshold];
 	std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
-	bool write_another_position = (bool)Options[kOptionGeneratorWriteAnotherPosition];
-	int64_t show_progress_per_positions =
-		ParseOptionOrDie<int64_t>(kOptionGeneratorShowProgressPerPositions);
 
 	time_t start_time;
 	std::time(&start_time);
@@ -219,7 +203,8 @@ void Learner::GenerateKifu()
 				Eval::evaluate(pos);
 			}
 
-			if (do_random_move_after_book) {
+			if (!pos.in_check())
+			{
 				// 開始局面からランダムに手を指して、局面をバラけさせる
 				Move move = Move::MOVE_NONE;
 				DoRandomMove(pos, mt19937_64, state, move);
@@ -228,7 +213,8 @@ void Learner::GenerateKifu()
 			}
 
 			std::vector<Learner::Record> records;
-			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated()) {
+			Value last_value;
+			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() && pos.is_repetition() == REPETITION_NONE) {
 				pos.set_this_thread(&thread);
 
 				Move pv_move = Move::MOVE_NONE;
@@ -236,8 +222,17 @@ void Learner::GenerateKifu()
 				auto valueAndPv = Learner::search(pos, search_depth);
 
 				// Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-				Value value = valueAndPv.first;
+				last_value = valueAndPv.first;
+
+				// 評価値の絶対値が閾値を超えたら終了する
+				if (std::abs(last_value) > value_threshold) {
+					break;
+				}
+
 				const std::vector<Move>& pv = valueAndPv.second;
+
+				// 詰みの場合はpvが空になる
+				// 上記の条件があるのでこれはいらないかもしれない
 				if (pv.empty()) {
 					break;
 				}
@@ -249,7 +244,7 @@ void Learner::GenerateKifu()
 
 				Learner::Record record = { 0 };
 				pos.sfen_pack(record.packed);
-				record.value = value;
+				record.value = last_value;
 				records.push_back(record);
 
 				pv_move = pv[0];
@@ -258,12 +253,48 @@ void Learner::GenerateKifu()
 				Eval::evaluate(pos);
 			}
 
-			if (!pos.is_mated()) {
+			Color win;
+			RepetitionState repetition_state = pos.is_repetition();
+			if (last_value > value_threshold) {
+				// 勝ち
+				// 入玉勝利もここに入るはず
+				win = pos.side_to_move();
+			}
+			else if (last_value < -value_threshold) {
+				// 負け
+				win = ~pos.side_to_move();
+			}
+			else if (repetition_state == REPETITION_NONE) {
+				// 千日手ではない
+				// 学習データには含めない
 				continue;
 			}
+			else if (repetition_state == REPETITION_WIN) {
+				// 連続王手の千日手による勝ち
+				// value = VALUE_MATEとなるためここには来ないはず
+				win = pos.side_to_move();
+			}
+			else if (repetition_state == REPETITION_LOSE) {
+				// 連続王手の千日手による負け
+				// value = -VALUE_MATEとなるためここには来ないはず
+				win = ~pos.side_to_move();
+			}
+			else if (repetition_state == REPETITION_DRAW) {
+				// 連続王手ではない普通の千日手
+				// 学習データには含めない
+				continue;
+			}
+			else if (repetition_state == REPETITION_SUPERIOR) {
+				// 優等局面(盤上の駒が同じで手駒が相手より優れている)
+				// value = VALUE_SUPERIORとなるためここには来ないはず
+				win = pos.side_to_move();
+			}
+			else if (repetition_state == REPETITION_INFERIOR) {
+				// 劣等局面(盤上の駒が同じで手駒が相手より優れている)
+				// value = -VALUE_SUPERIORとなるためここには来ないはず
+				win = ~pos.side_to_move();
+			}
 
-			Color win;
-			win = ~pos.side_to_move();
 			for (auto& record : records) {
 				record.win_color = win;
 			}

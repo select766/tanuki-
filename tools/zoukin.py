@@ -46,11 +46,8 @@ setoption name GeneratorMaxSearchDepth value {search_depth}
 setoption name GeneratorKifuTag value {kifu_tag}
 setoption name GeneratorStartposFileName value startpos.sfen
 setoption name GeneratorMinBookMove value 0
+setoption name GeneratorMaxBookMove value 32
 setoption name GeneratorValueThreshold value 3000
-setoption name GeneratorDoRandomKingMoveProbability value 0
-setoption name GeneratorSwapTwoPiecesProbability value 0
-setoption name GeneratorDoRandomMoveProbability value 0.1
-setoption name GeneratorDoRandomMoveAfterBook value 0.1
 isready
 usinewgame
 generate_kifu
