@@ -14,7 +14,7 @@ namespace TanukiColiseum
         private SemaphoreSlim FinishSemaphoreSlim = new SemaphoreSlim(0);
         public List<Game> Games { get; } = new List<Game>();
         private DateTime LastOutput = DateTime.Now;
-        private const double OutputResultsPerMin = 1.0;
+        private int ProgressIntervalMs;
         private Status Status { get; } = new Status();
         public delegate void StatusHandler(Status status);
         public event StatusHandler OnStatusChanged;
@@ -23,6 +23,7 @@ namespace TanukiColiseum
         {
             Status.NumGames = options.NumGames;
             Status.TimeMs = options.TimeMs;
+            ProgressIntervalMs = options.ProgressIntervalMs;
 
             // 定跡ファイルの読み込み
             string[] book = File.ReadAllLines(options.SfenFilePath);
@@ -119,7 +120,7 @@ namespace TanukiColiseum
                 Interlocked.Increment(ref Status.NumDraw);
             }
 
-            if (LastOutput.AddMinutes(OutputResultsPerMin) < DateTime.Now)
+            if (LastOutput.AddMilliseconds(ProgressIntervalMs) <= DateTime.Now)
             {
                 OnStatusChanged(new Status(Status));
                 LastOutput = DateTime.Now;

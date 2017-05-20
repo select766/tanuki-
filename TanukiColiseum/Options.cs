@@ -30,6 +30,7 @@ namespace TanukiColiseum
         public int TimeMs { get; set; } = 0;
         public int NumNumaNodes { get; set; } = 1;
         public UserInterface Interface { get; set; } = UserInterface.Gui;
+        public int ProgressIntervalMs { get; set; } = 60 * 1000;
 
         public void Parse(string[] args)
         {
@@ -85,10 +86,12 @@ namespace TanukiColiseum
                     case "--no_gui":
                         Interface = UserInterface.Cli;
                         break;
+                    case "--progress_interval_ms":
+                        ProgressIntervalMs = int.Parse(args[++i]);
+                        break;
                     default:
                         throw new ArgumentException("Unexpected option: " + args[i]);
                 }
-
             }
 
             if (Engine1FilePath == null)
