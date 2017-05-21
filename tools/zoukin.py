@@ -78,6 +78,7 @@ setoption name MiniBatchSize value {mini_batch_size}
 setoption name ReadBatchSize value 100000000
 setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
+setoption name ElmoLambda value {elmo_lambda}
 isready
 usinewgame
 learn output_folder_path_base {learner_output_folder_path_base}
@@ -91,7 +92,8 @@ learn output_folder_path_base {learner_output_folder_path_base}
   learning_rate=args.learning_rate,
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
-  fobos_l2_parameter=args.fobos_l2_parameter).encode('utf-8')
+  fobos_l2_parameter=args.fobos_l2_parameter,
+  elmo_lambda=args.elmo_lambda).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
@@ -295,6 +297,12 @@ def main():
     type=int,
     required=True,
     help='Hash size for self play. ex) 256')
+  parser.add_argument(
+    '--elmo_lambda',
+    action='store',
+    type=float,
+    required=True,
+    help='Elmo Lambda. ex) 1.0')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
