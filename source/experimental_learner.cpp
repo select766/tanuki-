@@ -124,7 +124,7 @@ namespace
 	constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
 	constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
 	constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
-	constexpr char* kOptionValueElmoCoefficient = "ElmoCoefficient";
+	constexpr char* kOptionValueElmoLambda = "ElmoLambda";
 
 	class Kpp {
 	public:
@@ -433,7 +433,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 	char buffer[1024];
 	sprintf(buffer, "%.20f", fobos_l2_parameter);
 	o[kOptionValueFobosL2Parameter] << Option(buffer);
-	o[kOptionValueElmoCoefficient] << Option("1.0");
+	o[kOptionValueElmoLambda] << Option("1.0");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -534,7 +534,7 @@ void Learner::Learn(std::istringstream& iss) {
 	int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
 	double fobos_l1_parameter = Options[kOptionValueFobosL1Parameter].cast<double>();
 	double fobos_l2_parameter = Options[kOptionValueFobosL2Parameter].cast<double>();
-	double elmo_coefficient = Options[kOptionValueElmoCoefficient].cast<double>();
+	double elmo_lambda = Options[kOptionValueElmoLambda].cast<double>();
 
 	sync_cout << "learning_rate=" << learning_rate << sync_endl;
 	sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -547,7 +547,7 @@ void Learner::Learn(std::istringstream& iss) {
 	sync_cout << "mini_batch_size=" << mini_batch_size << sync_endl;
 	sync_cout << "fobos_l1_parameter=" << fobos_l1_parameter << sync_endl;
 	sync_cout << "fobos_l2_parameter=" << fobos_l2_parameter << sync_endl;
-	sync_cout << "elmo_coefficient=" << elmo_coefficient << sync_endl;
+	sync_cout << "elmo_lambda=" << elmo_lambda << sync_endl;
 
 	auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
 	std::vector<Record> records_for_test;
@@ -600,7 +600,7 @@ void Learner::Learn(std::istringstream& iss) {
 			// num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(dynamic, 1000) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy) reduction(+:sum_train_cross_entropy_eval) reduction(+:sum_train_cross_entropy_win)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
-				auto f = [elmo_coefficient, &weights, &sum_train_squared_error_of_value, &sum_norm,
+				auto f = [elmo_lambda, &weights, &sum_train_squared_error_of_value, &sum_norm,
 					&sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
 					&sum_train_cross_entropy_eval, &sum_train_cross_entropy_win](
 						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
@@ -608,20 +608,21 @@ void Learner::Learn(std::istringstream& iss) {
 					double p = winning_percentage(record_value);
 					double q = winning_percentage(value);
 					double t = (root_color == win_color) ? 1.0 : 0.0;
-					WeightType delta = (q - p) + elmo_coefficient * (q - t);
+					// elmo_lambdaは浅い探索の評価値で深い探索の評価値を近似する項に入れる
+					WeightType delta = elmo_lambda * (q - p) + (q - t);
 
 					double diff_value = record_value - value;
 					sum_train_squared_error_of_value += diff_value * diff_value;
 					double diff_winning_percentage = q - p;
 					sum_train_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
-					sum_train_cross_entropy +=
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps)) +
-						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
-					sum_train_cross_entropy_eval +=
-						-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps);
-					sum_train_cross_entropy_win +=
+					double cross_entropy_eval = elmo_lambda *
+						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+					double cross_entropy_win =
 						-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps);
+					sum_train_cross_entropy_eval += cross_entropy_eval;
+					sum_train_cross_entropy_win += cross_entropy_win;
+					sum_train_cross_entropy += cross_entropy_eval + cross_entropy_win;
 					sum_norm += abs(value);
 
 					// 先手から見た評価値の差分。sum.p[?][0]に足したり引いたりする。
@@ -680,7 +681,7 @@ void Learner::Learn(std::istringstream& iss) {
 			// 損失関数を計算する
 #pragma omp for schedule(dynamic, 1000) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy) reduction(+:sum_test_cross_entropy_eval) reduction(+:sum_test_cross_entropy_win)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
-				auto f = [elmo_coefficient, &weights, &sum_test_squared_error_of_value,
+				auto f = [elmo_lambda, &weights, &sum_test_squared_error_of_value,
 					&sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy,
 					&sum_test_cross_entropy_eval, &sum_test_cross_entropy_win](
 						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
@@ -688,20 +689,20 @@ void Learner::Learn(std::istringstream& iss) {
 					double p = winning_percentage(record_value);
 					double q = winning_percentage(value);
 					double t = (root_color == win_color) ? 1.0 : 0.0;
-					WeightType delta = (q - p) + elmo_coefficient * (q - t);
+					WeightType delta = elmo_lambda * (q - p) + (q - t);
 
 					double diff_value = record_value - value;
 					sum_test_squared_error_of_value += diff_value * diff_value;
 					double diff_winning_percentage = q - p;
 					sum_test_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
-					sum_test_cross_entropy +=
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps)) +
-						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
-					sum_test_cross_entropy_eval +=
-						-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps);
-					sum_test_cross_entropy_win +=
+					double cross_entropy_eval = elmo_lambda *
+						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
+					double cross_entropy_win =
 						-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps);
+					sum_test_cross_entropy_eval += cross_entropy_eval;
+					sum_test_cross_entropy_win += cross_entropy_win;
+					sum_test_cross_entropy += cross_entropy_eval + cross_entropy_win;
 				};
 				Strap(records_for_test[record_index], pv_strap_max_depth, f);
 			}
