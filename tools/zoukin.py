@@ -79,6 +79,7 @@ setoption name ReadBatchSize value 100000000
 setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
 setoption name ElmoLambda value {elmo_lambda}
+setoption name ElmoMu value {elmo_mu}
 isready
 usinewgame
 learn output_folder_path_base {learner_output_folder_path_base}
@@ -93,7 +94,8 @@ learn output_folder_path_base {learner_output_folder_path_base}
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
   fobos_l2_parameter=args.fobos_l2_parameter,
-  elmo_lambda=args.elmo_lambda).encode('utf-8')
+  elmo_lambda=args.elmo_lambda,
+  elmo_mu=args.elmo_mu).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
@@ -303,6 +305,12 @@ def main():
     type=float,
     required=True,
     help='Elmo Lambda. ex) 1.0')
+  parser.add_argument(
+    '--elmo_mu',
+    action='store',
+    type=float,
+    required=True,
+    help='Elmo Mu. ex) 1.0')
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
