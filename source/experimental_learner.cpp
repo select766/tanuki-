@@ -565,8 +565,7 @@ void Learner::Learn(std::istringstream& iss) {
 
 	// ‘¹¸ŠÖ”ƒƒO‚Ìì¬
 	char train_loss_file_name[_MAX_PATH];
-	std::sprintf(train_loss_file_name, "%s/loss_%I64d.csv", output_folder_path_base.c_str(),
-		start);
+	std::sprintf(train_loss_file_name, "%s/loss.csv", output_folder_path_base.c_str());
 	FILE* file_loss = std::fopen(train_loss_file_name, "w");
 	std::fprintf(file_loss, ",train_rmse_value,train_rmse_winning_percentage,train_mean_cross_entropy,train_mean_cross_entropy_eval,train_mean_cross_entropy_win,test_rmse_value,test_rmse_winning_percentage,test_mean_cross_entropy,test_mean_cross_entropy_eval,test_mean_cross_entropy_win,norm\n");
 	std::fflush(file_loss);
