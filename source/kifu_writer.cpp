@@ -3,8 +3,7 @@
 #include "misc.h"
 
 namespace {
-	constexpr int64_t kFlushPerPositions = 1000000;
-	constexpr int kBufferSize = 1 << 24; // 16MB
+	constexpr int kBufferSize = 1 << 20; // 1MB
 }
 
 Learner::KifuWriter::KifuWriter(const std::string& output_file_path) :

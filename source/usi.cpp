@@ -4,12 +4,13 @@
 #include "experimental_learner.h"
 #include "kifu_generator.h"
 #include "kifu_reader.h"
-#include "shogi.h"
+#include "kifu_shuffler.h"
+#include "misc.h"
 #include "position.h"
 #include "search.h"
+#include "shogi.h"
 #include "thread.h"
 #include "tt.h"
-#include "misc.h"
 
 using namespace std;
 
@@ -307,7 +308,7 @@ namespace USI
 #ifdef USE_EXPERIMENTAL_LEARNER
 		Learner::InitializeLearner(o);
 #endif
-		Learner::KifuReader::Initialize(o);
+		Learner::InitializeKifuShuffler(o);
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
@@ -767,6 +768,10 @@ void USI::loop(int argc, char* argv[])
 			break;
 		}
 #endif
+		else if (token == "shuffle_kifu") {
+			Learner::ShuffleKifu();
+			break;
+		}
 		else
 		{
 			//    簡略表現として、

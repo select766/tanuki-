@@ -211,6 +211,7 @@
     <ClInclude Include="progress_report.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="kifu_shuffler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -375,6 +376,7 @@
     <ClCompile Include="progress_report.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="kifu_shuffler.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\docs\USI拡張コマンド.txt">
