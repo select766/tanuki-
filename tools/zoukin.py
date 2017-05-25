@@ -70,7 +70,7 @@ setoption name KifuDir value {kifu_folder_path}
 setoption name ShuffledKifuDir value {shuffled_kifu_folder_path}
 isready
 usinewgame
-generate_kifu
+shuffle_kifu
 '''.format(
   kifu_folder_path=kifu_folder_path,
   shuffled_kifu_folder_path=shuffled_kifu_folder_path).encode('utf-8')
@@ -385,7 +385,7 @@ def main():
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
       for division in range(initial_division_to_generator_train, num_divisions_to_generator_train):
           GenerateKifu(args, old_eval_folder_path, kifu_folder_path,
-                       num_positions_to_generator_train / num_divisions_to_generator_train,
+                       int(num_positions_to_generator_train / num_divisions_to_generator_train),
                        'train.{0}'.format(division))
       state = State.generate_kifu_for_test
 
