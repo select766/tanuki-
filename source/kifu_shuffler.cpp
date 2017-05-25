@@ -48,7 +48,7 @@ void Learner::ShuffleKifu() {
 			sync_cout << "info string Failed to write a record to a kifu file. " << sync_endl;
 		}
 		++num_records;
-		if (num_records % 1000000 == 0) {
+		if (num_records % 10000000 == 0) {
 			sync_cout << "info string " << num_records << sync_endl;
 		}
 	}
