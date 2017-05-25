@@ -15,8 +15,9 @@ import sys
 class State(enum.Enum):
   generate_kifu = 1
   generate_kifu_for_test = 2
-  learn = 3
-  self_play = 4
+  shuffle_kifu = 3
+  learn = 4
+  self_play = 5
 
 
 def GetSubfolders(folder_path):
@@ -58,6 +59,21 @@ generate_kifu
   num_positions=num_positions,
   search_depth=args.search_depth,
   kifu_tag=kifu_tag).encode('utf-8')
+  print(input.decode('utf-8'), flush=True)
+  subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
+
+
+def ShuffleKifu(args, kifu_folder_path, shuffled_kifu_folder_path):
+  print(locals(), flush=True)
+  input = '''usi
+setoption name KifuDir value {kifu_folder_path}
+setoption name ShuffledKifuDir value {shuffled_kifu_folder_path}
+isready
+usinewgame
+generate_kifu
+'''.format(
+  kifu_folder_path=kifu_folder_path,
+  shuffled_kifu_folder_path=shuffled_kifu_folder_path).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
@@ -155,12 +171,17 @@ def main():
     '--initial_kifu_folder_path',
     action='store',
     required=True,
-    help='Folder path of the inintial kifu files. ex) kifu')
+    help='Folder path of the inintial kifu files. ex) kifu/2017-05-25')
   parser.add_argument(
     '--initial_kifu_for_test_folder_path',
     action='store',
     required=True,
-    help='Folder path of the inintial kifu files for test. ex) kifu_for_test')
+    help='Folder path of the inintial kifu files for test. ex) kifu_for_test/2017-05-25')
+  parser.add_argument(
+    '--initial_shuffled_kifu_folder_path',
+    action='store',
+    required=True,
+    help='Folder path of the inintial shuffled kifu files. ex) kifu/2017-05-25-shuffled')
   parser.add_argument(
     '--initial_new_eval_folder_path_base',
     action='store',
@@ -319,6 +340,7 @@ def main():
   initial_eval_folder_path = args.initial_eval_folder_path
   initial_kifu_folder_path = args.initial_kifu_folder_path
   initial_kifu_for_test_folder_path = args.initial_kifu_for_test_folder_path
+  initial_shuffled_kifu_folder_path = args.initial_shuffled_kifu_folder_path
   initial_new_eval_folder_path_base = args.initial_new_eval_folder_path_base
   initial_state = State[args.initial_state]
   if not initial_state:
@@ -348,6 +370,7 @@ def main():
 
   kifu_folder_path = initial_kifu_folder_path
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
+  shuffled_kifu_folder_path = initial_shuffled_kifu_folder_path
   old_eval_folder_path = initial_eval_folder_path
   new_eval_folder_path = os.path.join(initial_new_eval_folder_path_base, str(num_positions_to_learn))
   state = initial_state
@@ -371,12 +394,17 @@ def main():
                                                GetDateTimeString())
       GenerateKifu(args, old_eval_folder_path, kifu_for_test_folder_path,
                    num_positions_to_generator_test, 'test')
+      state = State.shuffle_kifu
+
+    elif state == State.shuffle_kifu:
+      shuffled_kifu_folder_path = kifu_folder_path + '-shuffled'
+      ShuffleKifu(args, kifu_folder_path, shuffled_kifu_folder_path)
       state = State.learn
 
     elif state == State.learn:
       new_eval_folder_path_base = os.path.join(learner_output_folder_path_base,
                                                GetDateTimeString())
-      Learn(args, old_eval_folder_path, kifu_folder_path, kifu_for_test_folder_path,
+      Learn(args, old_eval_folder_path, shuffled_kifu_folder_path, kifu_for_test_folder_path,
             new_eval_folder_path_base)
       new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
       state = State.self_play
