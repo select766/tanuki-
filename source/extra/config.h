@@ -297,7 +297,7 @@
 #define EVAL_KPPT
 //#define EVAL_KKPT
 
-#define USE_EVAL_HASH
+//#define USE_EVAL_HASH
 //#define USE_LARGE_EVAL_HASH
 
 #define USE_SEE
