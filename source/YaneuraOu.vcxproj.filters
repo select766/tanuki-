@@ -214,6 +214,9 @@
     <ClInclude Include="kifu_shuffler.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="experimental_book.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -379,6 +382,9 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="kifu_shuffler.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="experimental_book.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

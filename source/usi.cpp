@@ -1,6 +1,7 @@
 ﻿#include <sstream>
 #include <queue>
 
+#include "experimental_book.h"
 #include "experimental_learner.h"
 #include "kifu_generator.h"
 #include "kifu_reader.h"
@@ -309,6 +310,7 @@ namespace USI
 		Learner::InitializeLearner(o);
 #endif
 		Learner::InitializeKifuShuffler(o);
+		Book::Initialize(o);
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
@@ -770,6 +772,14 @@ void USI::loop(int argc, char* argv[])
 #endif
 		else if (token == "shuffle_kifu") {
 			Learner::ShuffleKifu();
+			break;
+		}
+		else if (token == "create_raw_book") {
+			Book::CreateRawBook();
+			break;
+		}
+		else if (token == "create_scored_book") {
+			Book::CreateScoredBook();
 			break;
 		}
 		else

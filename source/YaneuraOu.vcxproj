@@ -627,6 +627,7 @@
     <ClInclude Include="eval\kppt_evalsum.h" />
     <ClInclude Include="eval\progress.h" />
     <ClInclude Include="experimental_learner.h" />
+    <ClInclude Include="experimental_book.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book\apery_book.h" />
@@ -682,6 +683,7 @@
     <ClCompile Include="eval\progress.cpp" />
     <ClCompile Include="experimental_learner.cpp" />
     <ClCompile Include="extra\benchmark.cpp" />
+    <ClCompile Include="experimental_book.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book\apery_book.cpp" />
     <ClCompile Include="extra\book\book.cpp" />
