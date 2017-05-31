@@ -48,7 +48,7 @@ setoption name GeneratorKifuTag value {kifu_tag}
 setoption name GeneratorStartposFileName value startpos.sfen
 setoption name GeneratorMinBookMove value 0
 setoption name GeneratorMaxBookMove value 32
-setoption name GeneratorValueThreshold value 3000
+setoption name GeneratorValueThreshold value {value_threshold}
 isready
 usinewgame
 generate_kifu
@@ -58,7 +58,8 @@ generate_kifu
   num_threads_to_generate_kifu=args.num_threads_to_generate_kifu,
   num_positions=num_positions,
   search_depth=args.search_depth,
-  kifu_tag=kifu_tag).encode('utf-8')
+  kifu_tag=kifu_tag,
+  value_threshold=args.value_threshold).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
@@ -82,7 +83,7 @@ def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path,
           new_eval_folder_path_base):
   print(locals(), flush=True)
   input = '''usi
-setoption name Threads value {num_threads_to_learn}l
+setoption name Threads value {num_threads_to_learn}
 setoption name MaxMovesToDraw value 300
 setoption name EvalDir value {eval_folder_path}
 setoption name KifuDir value {kifu_folder_path}
@@ -323,6 +324,13 @@ def main():
     type=float,
     required=True,
     help='Elmo Lambda. ex) 1.0')
+  parser.add_argument(
+    '--value_threshold',
+    action='store',
+    type=int,
+    required=True,
+    help='Value threshold to include positions to the learning data. ex) 30000')
+  
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
