@@ -214,7 +214,9 @@ void Learner::GenerateKifu()
 
 			std::vector<Learner::Record> records;
 			Value last_value;
-			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() && pos.is_repetition() == REPETITION_NONE) {
+			while (pos.game_ply() < kMaxGamePlay &&
+				!pos.is_mated() &&
+				pos.DeclarationWin() == MOVE_NONE) {
 				pos.set_this_thread(&thread);
 
 				Move pv_move = Move::MOVE_NONE;
@@ -255,44 +257,26 @@ void Learner::GenerateKifu()
 
 			Color win;
 			RepetitionState repetition_state = pos.is_repetition();
-			if (last_value > value_threshold) {
+			if (pos.is_mated()) {
+				// 負け
+				// 詰まされた
+				win = ~pos.side_to_move();
+			}
+			else if (pos.DeclarationWin() != MOVE_NONE) {
 				// 勝ち
-				// 入玉勝利もここに入るはず
+				// 入玉勝利
+				win = pos.side_to_move();
+			}
+			else if (last_value > value_threshold) {
+				// 勝ち
 				win = pos.side_to_move();
 			}
 			else if (last_value < -value_threshold) {
 				// 負け
 				win = ~pos.side_to_move();
 			}
-			else if (repetition_state == REPETITION_NONE) {
-				// 千日手ではない
-				// 学習データには含めない
+			else {
 				continue;
-			}
-			else if (repetition_state == REPETITION_WIN) {
-				// 連続王手の千日手による勝ち
-				// value = VALUE_MATEとなるためここには来ないはず
-				win = pos.side_to_move();
-			}
-			else if (repetition_state == REPETITION_LOSE) {
-				// 連続王手の千日手による負け
-				// value = -VALUE_MATEとなるためここには来ないはず
-				win = ~pos.side_to_move();
-			}
-			else if (repetition_state == REPETITION_DRAW) {
-				// 連続王手ではない普通の千日手
-				// 学習データには含めない
-				continue;
-			}
-			else if (repetition_state == REPETITION_SUPERIOR) {
-				// 優等局面(盤上の駒が同じで手駒が相手より優れている)
-				// value = VALUE_SUPERIORとなるためここには来ないはず
-				win = pos.side_to_move();
-			}
-			else if (repetition_state == REPETITION_INFERIOR) {
-				// 劣等局面(盤上の駒が同じで手駒が相手より優れている)
-				// value = -VALUE_SUPERIORとなるためここには来ないはず
-				win = ~pos.side_to_move();
 			}
 
 			for (auto& record : records) {
