@@ -125,6 +125,7 @@ namespace
 	constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
 	constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 	constexpr char* kOptionValueElmoLambda = "ElmoLambda";
+	constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 
 	class Kpp {
 	public:
@@ -343,8 +344,8 @@ namespace
 		return 1.0 / (1.0 + std::exp(-x));
 	}
 
-	double winning_percentage(Value value) {
-		return sigmoid(static_cast<int>(value) / 600.0);
+	double winning_rate(Value value, double value_to_winning_rate_coefficient) {
+		return sigmoid(static_cast<int>(value) / value_to_winning_rate_coefficient);
 	}
 
 	double dsigmoid(double x) {
@@ -434,6 +435,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 	sprintf(buffer, "%.20f", fobos_l2_parameter);
 	o[kOptionValueFobosL2Parameter] << Option(buffer);
 	o[kOptionValueElmoLambda] << Option("1.0");
+	o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -536,6 +538,8 @@ void Learner::Learn(std::istringstream& iss) {
 	double fobos_l1_parameter = Options[kOptionValueFobosL1Parameter].cast<double>();
 	double fobos_l2_parameter = Options[kOptionValueFobosL2Parameter].cast<double>();
 	double elmo_lambda = Options[kOptionValueElmoLambda].cast<double>();
+	double value_to_winning_rate_coefficient =
+		Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
 
 	sync_cout << "learning_rate=" << learning_rate << sync_endl;
 	sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -549,6 +553,8 @@ void Learner::Learn(std::istringstream& iss) {
 	sync_cout << "fobos_l1_parameter=" << fobos_l1_parameter << sync_endl;
 	sync_cout << "fobos_l2_parameter=" << fobos_l2_parameter << sync_endl;
 	sync_cout << "elmo_lambda=" << elmo_lambda << sync_endl;
+	sync_cout << "value_to_winning_rate_coefficient=" << value_to_winning_rate_coefficient <<
+		sync_endl;
 
 	auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
 	std::vector<Record> records_for_test;
@@ -602,14 +608,15 @@ void Learner::Learn(std::istringstream& iss) {
 			// num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(dynamic, 1000) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy) reduction(+:sum_train_cross_entropy_eval) reduction(+:sum_train_cross_entropy_win) reduction(+:sum_test_squared_error_of_win_or_lose)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
-				auto f = [elmo_lambda, &weights, &sum_train_squared_error_of_value,
-					&sum_norm, &sum_train_squared_error_of_winning_percentage,
-					&sum_train_cross_entropy, &sum_train_cross_entropy_eval,
-					&sum_train_cross_entropy_win, &sum_train_squared_error_of_win_or_lose](
+				auto f = [elmo_lambda, value_to_winning_rate_coefficient, &weights,
+					&sum_train_squared_error_of_value, &sum_norm,
+					&sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
+					&sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
+					&sum_train_squared_error_of_win_or_lose](
 						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
 					// 評価値から推定した勝率の分布の交差エントロピー
-					double p = winning_percentage(record_value);
-					double q = winning_percentage(value);
+					double p = winning_rate(record_value, value_to_winning_rate_coefficient);
+					double q = winning_rate(value, value_to_winning_rate_coefficient);
 					double t = (root_color == win_color) ? 1.0 : 0.0;
 					// elmo_lambdaは浅い探索の評価値で深い探索の評価値を近似する項に入れる
 					WeightType delta = elmo_lambda * (q - p) + (1.0 - elmo_lambda) * (q - t);
@@ -685,14 +692,14 @@ void Learner::Learn(std::istringstream& iss) {
 			// 損失関数を計算する
 #pragma omp for schedule(dynamic, 1000) reduction(+:sum_test_squared_error_of_value) reduction(+:sum_test_squared_error_of_winning_percentage) reduction(+:sum_test_cross_entropy) reduction(+:sum_test_cross_entropy_eval) reduction(+:sum_test_cross_entropy_win) reduction(+:sum_test_squared_error_of_win_or_lose)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
-				auto f = [elmo_lambda, &weights, &sum_test_squared_error_of_value,
-					&sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy,
-					&sum_test_cross_entropy_eval, &sum_test_cross_entropy_win,
-					&sum_test_squared_error_of_win_or_lose](
+				auto f = [elmo_lambda, value_to_winning_rate_coefficient, &weights,
+					&sum_test_squared_error_of_value, &sum_test_squared_error_of_winning_percentage,
+					&sum_test_cross_entropy, &sum_test_cross_entropy_eval,
+					&sum_test_cross_entropy_win, &sum_test_squared_error_of_win_or_lose](
 						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
 					// 評価値から推定した勝率の分布の交差エントロピー
-					double p = winning_percentage(record_value);
-					double q = winning_percentage(value);
+					double p = winning_rate(record_value, value_to_winning_rate_coefficient);
+					double q = winning_rate(value, value_to_winning_rate_coefficient);
 					double t = (root_color == win_color) ? 1.0 : 0.0;
 					WeightType delta = elmo_lambda * (q - p) + (1.0 - elmo_lambda) * (q - t);
 
