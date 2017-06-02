@@ -95,6 +95,7 @@ setoption name MiniBatchSize value {mini_batch_size}
 setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
 setoption name ElmoLambda value {elmo_lambda}
+setoption name ValueToWinningRateCoefficient value {value_to_winning_rate_coefficient}
 isready
 usinewgame
 learn output_folder_path_base {learner_output_folder_path_base}
@@ -109,7 +110,8 @@ learn output_folder_path_base {learner_output_folder_path_base}
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
   fobos_l2_parameter=args.fobos_l2_parameter,
-  elmo_lambda=args.elmo_lambda).encode('utf-8')
+  elmo_lambda=args.elmo_lambda,
+  value_to_winning_rate_coefficient=args.value_to_winning_rate_coefficient).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
@@ -330,6 +332,13 @@ def main():
     type=int,
     required=True,
     help='Value threshold to include positions to the learning data. ex) 30000')
+  parser.add_argument(
+    '--value_to_winning_rate_coefficient',
+    action='store',
+    type=float,
+    required=True,
+    help='Coefficient to convert a value to the winning rate. ex) 600.0')
+  
   
   args = parser.parse_args()
 
