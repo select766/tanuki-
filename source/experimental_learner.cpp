@@ -473,7 +473,8 @@ void Learner::Learn(std::istringstream& iss) {
 
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-	auto kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"], true);
+	auto kifu_reader = std::make_unique<Learner::KifuReader>(
+		(std::string)Options["KifuDir"], std::numeric_limits<int>::max());
 
 	Eval::load_eval();
 
