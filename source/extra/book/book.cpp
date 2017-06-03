@@ -1215,12 +1215,22 @@ namespace Book
 				// http://yaneuraou.yaneu.com/2015/01/03/stockfish-dd-book-%E5%AE%9A%E8%B7%A1%E9%83%A8/
 
 				u64 sum_move_counts = 0;
-				for(auto &move : move_list)
+				for (auto &move : move_list)
 				{
-					u64 move_count = std::max<u64>(1, move.num);
-					sum_move_counts += move_count;
-					if (prng.rand(sum_move_counts) < move_count)
-						bestPos = move;
+					sum_move_counts += move.num;
+				}
+
+				// 指し手の採択回数が記録されている場合は採択率に従って指し手を決める
+				// そうでない場合は当確率で指し手を決める
+				if (sum_move_counts > 0) {
+					sum_move_counts = 0;
+					for (auto &move : move_list)
+					{
+						u64 move_count = std::max<u64>(1, move.num);
+						sum_move_counts += move_count;
+						if (prng.rand(sum_move_counts) < move_count)
+							bestPos = move;
+					}
 				}
 			}
 			auto bestMove = bestPos.bestMove;
