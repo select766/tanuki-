@@ -126,20 +126,20 @@ namespace TanukiColiseum
             {
                 int engineWin;
                 int blackWhiteWin;
-                bool draw;
+                bool draw = false;
+                bool declaration = false;
                 if (command[1] == "resign")
                 {
                     // 相手側の勝数を上げる
                     engineWin = game.Turn ^ 1;
                     blackWhiteWin = (game.Moves.Count + 1) & 1;
-                    draw = false;
                 }
                 else if (command[1] == "win")
                 {
                     // 自分側の勝数を上げる
                     engineWin = game.Turn;
                     blackWhiteWin = game.Moves.Count & 1;
-                    draw = false;
+                    declaration = true;
                 }
                 else
                 {
@@ -152,7 +152,7 @@ namespace TanukiColiseum
                 // 次の対局を開始する
                 // 先にGame.OnGameFinished()を読んでゲームの状態を停止状態に移行する
                 game.OnGameFinished();
-                Coliseum.OnGameFinished(engineWin, blackWhiteWin, draw);
+                Coliseum.OnGameFinished(engineWin, blackWhiteWin, draw, declaration);
             }
             else
             {

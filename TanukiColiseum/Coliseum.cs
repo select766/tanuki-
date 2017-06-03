@@ -108,15 +108,20 @@ namespace TanukiColiseum
             OnStatusChanged(new Status(Status));
         }
 
-        public void OnGameFinished(int enginWin, int blackWhiteWin, bool draw)
+        public void OnGameFinished(int engineWin, int blackWhiteWin, bool draw, bool declarationWin)
         {
             if (!draw)
             {
-                Interlocked.Increment(ref Status.Win[enginWin, blackWhiteWin]);
+                Interlocked.Increment(ref Status.Win[engineWin, blackWhiteWin]);
             }
             else
             {
                 Interlocked.Increment(ref Status.NumDraw);
+            }
+
+            if (declarationWin)
+            {
+                Interlocked.Increment(ref Status.DeclarationWin[engineWin]);
             }
 
             if (LastOutput.AddMilliseconds(ProgressIntervalMs) <= DateTime.Now)
