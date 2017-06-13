@@ -139,7 +139,8 @@ bool Book::CreateScoredBook() {
 
 	std::atomic_int global_position_index = 0;
 	std::mutex output_book_mutex;
-	ProgressReport progress_report(num_sfens, kShowProgressAtMostSec);
+	ProgressReport progress_report(num_sfens - output_book.book_body.size(),
+        kShowProgressAtMostSec);
 #pragma omp parallel
 	{
 		int thread_index = omp_get_thread_num();
