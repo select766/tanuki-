@@ -128,6 +128,7 @@ bool Book::CreateScoredBook() {
 	for (const auto& sfen_and_count : input_book.book_body) {
 		sfens.push_back(sfen_and_count.first);
 	}
+    int num_sfens = sfens.size();
 
 	time_t start_time = 0;
 	std::time(&start_time);
@@ -136,17 +137,14 @@ bool Book::CreateScoredBook() {
 	output_book_file = "book/" + output_book_file;
 	read_book(output_book_file, output_book);
 
-	int num_positions = sfens.size() - output_book.book_body.size();
-
 	std::atomic_int global_position_index = 0;
 	std::mutex output_book_mutex;
-	ProgressReport progress_report(num_positions, kShowProgressAtMostSec);
+	ProgressReport progress_report(num_sfens, kShowProgressAtMostSec);
 #pragma omp parallel
 	{
 		int thread_index = omp_get_thread_num();
 		WinProcGroup::bindThisThread(thread_index);
 
-        int num_sfens = sfens.size();
 #pragma omp for schedule(static, 1)
 		for (int i = 0; i < num_sfens; ++i) {
 			const std::string& sfen = sfens[i];
