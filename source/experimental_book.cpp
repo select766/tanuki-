@@ -140,14 +140,15 @@ bool Book::CreateScoredBook() {
 
 	std::atomic_int global_position_index = 0;
 	std::mutex output_book_mutex;
-	ProgressReport progress_report(sfens.size(), kShowProgressAtMostSec);
+	ProgressReport progress_report(num_positions, kShowProgressAtMostSec);
 #pragma omp parallel
 	{
 		int thread_index = omp_get_thread_num();
 		WinProcGroup::bindThisThread(thread_index);
 
-#pragma omp for schedule(dynamic)
-		for (int i = 0; i < sfens.size(); ++i) {
+        int num_sfens = sfens.size();
+#pragma omp for schedule(static, 1)
+		for (int i = 0; i < num_sfens; ++i) {
 			const std::string& sfen = sfens[i];
 			if (output_book.book_body.find(sfen) != output_book.end()) {
 				continue;
