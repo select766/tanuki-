@@ -193,6 +193,11 @@ def main():
     required=True,
     help='Initial state. [' + ', '.join([state.name for state in State]) + ']')
   parser.add_argument(
+    '--final_state',
+    action='store',
+    required=True,
+    help='Final state. [' + ', '.join([state.name for state in State]) + ']')
+  parser.add_argument(
     '--generate_kifu_exe_file_path',
     action='store',
     required=True,
@@ -339,7 +344,6 @@ def main():
     required=True,
     help='Coefficient to convert a value to the winning rate. ex) 600.0')
   
-  
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -353,6 +357,9 @@ def main():
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
+  final_state = State[args.final_state]
+  if not final_state:
+    sys.exit('Unknown final state: %s' % args.initial_state)
   if args.reference_eval_folder_paths:
     reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
   else:
@@ -388,6 +395,8 @@ def main():
     print('-' * 80)
     print('- %s' % state)
     print('-' * 80, flush=True)
+
+    stop_on_this_state = (state == final_state)
 
     if state == State.generate_kifu:
       kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
@@ -426,6 +435,9 @@ def main():
 
     else:
       sys.exit('Invalid state: state=%s' % state)
+
+    if stop_on_this_state:
+      break
 
 
 if __name__ == '__main__':
