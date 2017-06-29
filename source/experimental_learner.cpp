@@ -626,13 +626,14 @@ void Learner::Learn(std::istringstream& iss) {
 					double diff_winning_percentage = q - p;
 					sum_train_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
-					double cross_entropy_eval = elmo_lambda *
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
-					double cross_entropy_win = (1.0 - elmo_lambda) *
-						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
+					double cross_entropy_eval = -p * std::log(q + kEps) -
+                        (1.0 - p) * std::log(1.0 - q + kEps);
+					double cross_entropy_win = -t * std::log(q + kEps) -
+                        (1.0 - t) * std::log(1.0 - q + kEps);
 					sum_train_cross_entropy_eval += cross_entropy_eval;
 					sum_train_cross_entropy_win += cross_entropy_win;
-					sum_train_cross_entropy += cross_entropy_eval + cross_entropy_win;
+					sum_train_cross_entropy += elmo_lambda * cross_entropy_eval +
+                        (1.0 - elmo_lambda) * cross_entropy_win;
 					sum_norm += abs(value);
 					sum_train_squared_error_of_win_or_lose += (q - t) * (q - t);
 
@@ -701,21 +702,21 @@ void Learner::Learn(std::istringstream& iss) {
 					double p = winning_rate(record_value, value_to_winning_rate_coefficient);
 					double q = winning_rate(value, value_to_winning_rate_coefficient);
 					double t = (root_color == win_color) ? 1.0 : 0.0;
-					WeightType delta = elmo_lambda * (q - p) + (1.0 - elmo_lambda) * (q - t);
 
 					double diff_value = record_value - value;
 					sum_test_squared_error_of_value += diff_value * diff_value;
 					double diff_winning_percentage = q - p;
 					sum_test_squared_error_of_winning_percentage +=
 						diff_winning_percentage * diff_winning_percentage;
-					double cross_entropy_eval = elmo_lambda *
-						(-p * std::log(q + kEps) - (1.0 - p) * std::log(1.0 - q + kEps));
-					double cross_entropy_win = (1.0 - elmo_lambda) *
-						(-t * std::log(q + kEps) - (1.0 - t) * std::log(1.0 - q + kEps));
-					sum_test_cross_entropy_eval += cross_entropy_eval;
-					sum_test_cross_entropy_win += cross_entropy_win;
-					sum_test_cross_entropy += cross_entropy_eval + cross_entropy_win;
-					sum_test_squared_error_of_win_or_lose += (q - t) * (q - t);
+                    double cross_entropy_eval = -p * std::log(q + kEps) -
+                        (1.0 - p) * std::log(1.0 - q + kEps);
+                    double cross_entropy_win = -t * std::log(q + kEps) -
+                        (1.0 - t) * std::log(1.0 - q + kEps);
+                    sum_test_cross_entropy_eval += cross_entropy_eval;
+                    sum_test_cross_entropy_win += cross_entropy_win;
+                    sum_test_cross_entropy += elmo_lambda * cross_entropy_eval +
+                        (1.0 - elmo_lambda) * cross_entropy_win;
+                    sum_test_squared_error_of_win_or_lose += (q - t) * (q - t);
 				};
 				Strap(records_for_test[record_index], pv_strap_max_depth, f);
 			}
