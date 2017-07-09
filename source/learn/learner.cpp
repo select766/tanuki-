@@ -46,7 +46,7 @@ namespace Learner
 {
 // いまのところ、やねうら王2017Early/王手将棋しか、このスタブを持っていない。
 extern pair<Value, vector<Move> > qsearch(Position& pos);
-extern pair<Value, vector<Move> >  search(Position& pos, int depth);
+extern pair<Value, vector<Move> >  search(Position& pos, int depth, size_t multiPV = 1);
 
 // -----------------------------------
 //    局面のファイルへの書き出し

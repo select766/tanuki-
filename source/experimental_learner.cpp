@@ -17,7 +17,6 @@
 
 namespace Learner
 {
-	std::pair<Value, std::vector<Move> > search(Position& pos, int depth);
 	std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 

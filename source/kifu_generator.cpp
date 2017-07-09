@@ -29,7 +29,7 @@ using USI::OptionsMap;
 
 namespace Learner
 {
-	std::pair<Value, std::vector<Move> > search(Position& pos, int depth);
+	std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
 	std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
@@ -47,6 +47,9 @@ namespace
 	constexpr char* kOptionGeneratorMinBookMove = "GeneratorMinBookMove";
 	constexpr char* kOptionGeneratorMaxBookMove = "GeneratorMaxBookMove";
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+	constexpr char* kOptionGeneratorMinMultiPvMoves = "GeneratorMinMultiPvMoves";
+	constexpr char* kOptionGeneratorMaxMultiPvMoves = "GeneratorMaxMultiPvMoves";
+	constexpr char* kOptionGeneratorMaxValueDifferenceInMultiPv = "GeneratorMaxValueDifferenceInMultiPv";
 
 	std::vector<std::string> book;
 	std::uniform_real_distribution<> probability_distribution;
@@ -89,18 +92,6 @@ namespace
 		}
 		return value;
 	}
-
-	// 合法手の中からランダムに1手指す
-	//https://github.com/yaneurao/YaneuraOu/blob/master/source/learn/learner.cpp
-	bool DoRandomMove(Position& pos, std::mt19937_64& mt, StateInfo* state, Move& move) {
-		// 合法手のなかからランダムに1手選ぶフェーズ
-		MoveList<LEGAL> list(pos);
-		move = list.at(std::uniform_int_distribution<>(0, static_cast<int>(list.size()) - 1)(mt));
-		pos.do_move(move, state[pos.game_ply()]);
-		// 差分計算のためevaluate()を呼び出す
-		Eval::evaluate(pos);
-		return true;
-	}
 }
 
 void Learner::InitializeGenerator(USI::OptionsMap& o) {
@@ -112,6 +103,10 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorMinBookMove] << Option(0, 1, MAX_PLY);
 	o[kOptionGeneratorMaxBookMove] << Option(32, 1, MAX_PLY);
 	o[kOptionGeneratorValueThreshold] << Option(3000, 0, VALUE_MATE);
+	o[kOptionGeneratorMinMultiPvMoves] << Option(0, 0, MAX_PLY);
+	o[kOptionGeneratorMaxMultiPvMoves] << Option(6, 0, MAX_PLY);
+	o[kOptionGeneratorMaxValueDifferenceInMultiPv] << Option(32000, 0, MAX_PLY);
+
 }
 
 void Learner::GenerateKifu()
@@ -150,6 +145,11 @@ void Learner::GenerateKifu()
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
 	int value_threshold = Options[kOptionGeneratorValueThreshold];
 	std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
+	int min_multi_pv_moves = Options[kOptionGeneratorMinMultiPvMoves];
+	int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPvMoves];
+	std::uniform_int_distribution<> multi_pv_moves_distribution(min_multi_pv_moves, max_multi_pv_moves);
+	int multi_pv = Options["MultiPV"];
+	int max_value_difference_in_multi_pv = Options[kOptionGeneratorMaxValueDifferenceInMultiPv];
 
 	time_t start_time;
 	std::time(&start_time);
@@ -203,14 +203,8 @@ void Learner::GenerateKifu()
 				Eval::evaluate(pos);
 			}
 
-			if (!pos.in_check())
-			{
-				// 開始局面からランダムに手を指して、局面をバラけさせる
-				Move move = Move::MOVE_NONE;
-				DoRandomMove(pos, mt19937_64, state, move);
-				// 差分計算のためevaluate()を呼び出す
-				Eval::evaluate(pos);
-			}
+			// pos.game_ply()がこの値未満の場合はmulti pvでsearchし、ランダムに指し手を選択する
+			int multi_pv_until_play = pos.game_ply() + multi_pv_moves_distribution(mt19937_64);
 
 			std::vector<Learner::Record> records;
 			Value last_value;
@@ -221,17 +215,31 @@ void Learner::GenerateKifu()
 
 				Move pv_move = Move::MOVE_NONE;
 				int search_depth = search_depth_distribution(mt19937_64);
-				auto valueAndPv = Learner::search(pos, search_depth);
+				int multi_pv_on_this_play = (pos.game_ply() < multi_pv_until_play ? multi_pv : 1);
+				Learner::search(pos, search_depth, multi_pv_on_this_play);
+				multi_pv_on_this_play = std::min(
+					multi_pv_on_this_play, static_cast<int>(pos.this_thread()->rootMoves.size()));
 
-				// Aperyでは後手番でもスコアの値を反転させずに学習に用いている
-				last_value = valueAndPv.first;
+				const auto& root_moves = pos.this_thread()->rootMoves;
+				int num_valid_root_moves = 0;
+				for (int root_move_index = 0; root_move_index < multi_pv_on_this_play;
+					++root_move_index) {
+					if (root_moves[0].score > root_moves[root_move_index].score +
+						max_value_difference_in_multi_pv) {
+						break;
+					}
+					++num_valid_root_moves;
+				}
+				int selected_root_move_index =
+					std::uniform_int_distribution<>(0, num_valid_root_moves - 1)(mt19937_64);
+				const auto& root_move = root_moves[selected_root_move_index];
+				last_value = root_move.score;
+				const std::vector<Move>& pv = root_move.pv;
 
 				// 評価値の絶対値が閾値を超えたら終了する
 				if (std::abs(last_value) > value_threshold) {
 					break;
 				}
-
-				const std::vector<Move>& pv = valueAndPv.second;
 
 				// 詰みの場合はpvが空になる
 				// 上記の条件があるのでこれはいらないかもしれない

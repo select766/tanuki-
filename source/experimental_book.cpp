@@ -28,7 +28,7 @@ namespace {
 
 namespace Learner
 {
-	std::pair<Value, std::vector<Move> > search(Position& pos, int depth);
+	std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
 }
 
 bool Book::Initialize(USI::OptionsMap& o) {
@@ -165,7 +165,7 @@ bool Book::CreateScoredBook() {
 				continue;
 			}
 
-			Learner::search(pos, search_depth);
+			Learner::search(pos, search_depth, multi_pv);
 
 			int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
 			for (int pv_index = 0; pv_index < num_pv; ++pv_index) {

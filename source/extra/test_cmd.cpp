@@ -16,7 +16,7 @@ extern void is_ready();
 namespace Learner
 {
 	extern pair<Value, vector<Move> > qsearch(Position& pos);
-	extern pair<Value, vector<Move> >  search(Position& pos, int depth);
+	extern pair<Value, vector<Move> >  search(Position& pos, int depth, size_t multiPV = 1);
 }
 #endif
 
