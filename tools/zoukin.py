@@ -50,6 +50,7 @@ setoption name GeneratorMinBookMove value 0
 setoption name GeneratorMaxBookMove value 32
 setoption name GeneratorValueThreshold value {value_threshold}
 setoption name MultiPV 5
+setoption name GeneratorMaxValueDifferenceInMultiPv {max_value_difference_in_multi_pv}
 isready
 usinewgame
 generate_kifu
@@ -60,7 +61,8 @@ generate_kifu
   num_positions=num_positions,
   search_depth=args.search_depth,
   kifu_tag=kifu_tag,
-  value_threshold=args.value_threshold).encode('utf-8')
+  value_threshold=args.value_threshold,
+  max_value_difference_in_multi_pv=args.max_value_difference_in_multi_pv).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
@@ -344,6 +346,12 @@ def main():
     type=float,
     required=True,
     help='Coefficient to convert a value to the winning rate. ex) 600.0')
+  parser.add_argument(
+    '--max_value_difference_in_multi_pv',
+    action='store',
+    type=int,
+    required=True,
+    help='Max value difference in Multi PV. ex) 100')
   
   args = parser.parse_args()
 
