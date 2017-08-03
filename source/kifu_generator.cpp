@@ -151,6 +151,18 @@ void Learner::GenerateKifu()
 	int multi_pv = Options["MultiPV"];
 	int max_value_difference_in_multi_pv = Options[kOptionGeneratorMaxValueDifferenceInMultiPv];
 
+	std::cout << "min_search_depth=" << min_search_depth << std::endl;
+	std::cout << "max_search_depth=" << max_search_depth << std::endl;
+	std::cout << "min_book_move=" << min_book_move << std::endl;
+	std::cout << "max_book_move=" << max_book_move << std::endl;
+	std::cout << "num_positions=" << num_positions << std::endl;
+	std::cout << "value_threshold=" << value_threshold << std::endl;
+	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
+	std::cout << "min_multi_pv_moves=" << min_multi_pv_moves << std::endl;
+	std::cout << "max_multi_pv_moves=" << max_multi_pv_moves << std::endl;
+	std::cout << "multi_pv=" << multi_pv << std::endl;
+	std::cout << "max_value_difference_in_multi_pv=" << max_value_difference_in_multi_pv << std::endl;
+
 	time_t start_time;
 	std::time(&start_time);
 	ASSERT_LV3(book.size());
