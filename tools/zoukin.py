@@ -49,8 +49,8 @@ setoption name GeneratorStartposFileName value startpos.sfen
 setoption name GeneratorMinBookMove value 0
 setoption name GeneratorMaxBookMove value 32
 setoption name GeneratorValueThreshold value {value_threshold}
-setoption name MultiPV 5
-setoption name GeneratorMaxValueDifferenceInMultiPv {max_value_difference_in_multi_pv}
+setoption name MultiPV value 5
+setoption name GeneratorMaxValueDifferenceInMultiPv value {max_value_difference_in_multi_pv}
 isready
 usinewgame
 generate_kifu
