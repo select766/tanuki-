@@ -45,13 +45,9 @@ bool KifuConverter::ConvertKifuToText(Position& pos, std::istringstream& ssCmd) 
 
         int64_t num_records = 0;
         Learner::Record record = { 0 };
-        while (ifs) {
+        while (ifs.read(reinterpret_cast<char*>(&record), sizeof(record))) {
             if (++num_records % 10000000 == 0) {
                 std::cerr << num_records << std::endl;
-            }
-
-            if (!ifs.read(reinterpret_cast<char*>(&record), sizeof(record))) {
-                break;
             }
 
             pos.set_from_packed_sfen(record.packed);
