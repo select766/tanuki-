@@ -642,6 +642,7 @@
     <ClInclude Include="extra\move_picker\move_picker_2016Q2.h" />
     <ClInclude Include="extra\move_picker\move_picker_2016Q3.h" />
     <ClInclude Include="extra\move_picker\move_picker_2017Q2.h" />
+    <ClInclude Include="kifu_converter.hpp" />
     <ClInclude Include="kifu_generator.h" />
     <ClInclude Include="kifu_reader.h" />
     <ClInclude Include="kifu_shuffler.h" />
@@ -699,6 +700,7 @@
     <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
+    <ClCompile Include="kifu_converter.cpp" />
     <ClCompile Include="kifu_generator.cpp" />
     <ClCompile Include="kifu_reader.cpp" />
     <ClCompile Include="kifu_shuffler.cpp" />

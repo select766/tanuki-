@@ -3,6 +3,7 @@
 
 #include "experimental_book.h"
 #include "experimental_learner.h"
+#include "kifu_converter.hpp"
 #include "kifu_generator.h"
 #include "kifu_reader.h"
 #include "kifu_shuffler.h"
@@ -778,11 +779,23 @@ void USI::loop(int argc, char* argv[])
 			Book::CreateRawBook();
 			break;
 		}
-		else if (token == "create_scored_book") {
-			Book::CreateScoredBook();
-			break;
-		}
-		else
+        else if (token == "create_scored_book") {
+            Book::CreateScoredBook();
+            break;
+        }
+#ifdef USE_SFEN_PACKER
+        else if (token == "convert_kifu_to_text") {
+            if (!KifuConverter::ConvertKifuToText(pos, is)) {
+                std::exit(-1);
+            }
+        }
+        else if (token == "convert_kifu_to_binary") {
+            if (!KifuConverter::ConvertKifuToBinary(pos, is)) {
+                std::exit(-1);
+            }
+        }
+#endif
+        else
 		{
 			//    簡略表現として、
 			//> threads 1
