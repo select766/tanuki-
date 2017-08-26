@@ -357,7 +357,7 @@ def main():
   parser.add_argument(
     '--adam_beta2',
     action='store',
-    type=int,
+    type=float,
     required=True,
     help='Adam beta2 coefficient. ex) 0.999')
   
