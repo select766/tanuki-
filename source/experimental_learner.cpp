@@ -75,11 +75,12 @@ namespace
 		}
 
 		template<typename T>
-		void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2_t, double learning_rate,
-			double fobos_l1_parameter, double fobos_l2_parameter, T& eval_weight) {
+		void Weight::UpdateWeight(double adam_beta1_t, double adam_beta2, double adam_beta2_t,
+            double learning_rate, double fobos_l1_parameter, double fobos_l2_parameter,
+            T& eval_weight) {
 			// Adam
 			m = kAdamBeta1 * m + (1.0 - kAdamBeta1) * sum_gradient_lower_dimension;
-			v = kAdamBeta2 * v + (1.0 - kAdamBeta2) * sum_gradient_lower_dimension * sum_gradient_lower_dimension;
+			v = adam_beta2 * v + (1.0 - adam_beta2) * sum_gradient_lower_dimension * sum_gradient_lower_dimension;
 			// 高速化のためpow(ADAM_BETA1, t)の値を保持しておく
 			WeightType mm = m / (1.0 - adam_beta1_t);
 			WeightType vv = v / (1.0 - adam_beta2_t);
@@ -107,7 +108,6 @@ namespace
 	constexpr int kFvScale = 32;
 	constexpr WeightType kEps = 1e-8;
 	constexpr WeightType kAdamBeta1 = 0.9;
-	constexpr WeightType kAdamBeta2 = 0.999;
 	constexpr int kMaxGamePlay = 256;
 	constexpr int64_t kMaxPositionsForErrorMeasurement = 1000'0000LL;
 	constexpr int64_t kMaxPositionsForBenchmark = 1'0000'0000LL;
@@ -124,7 +124,8 @@ namespace
 	constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
 	constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 	constexpr char* kOptionValueElmoLambda = "ElmoLambda";
-	constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
+    constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
+    constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
 
 	class Kpp {
 	public:
@@ -435,6 +436,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 	o[kOptionValueFobosL2Parameter] << Option(buffer);
 	o[kOptionValueElmoLambda] << Option("1.0");
 	o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
+    o[kOptionValueAdamBeta2] << Option("0.999");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -539,6 +541,7 @@ void Learner::Learn(std::istringstream& iss) {
 	double elmo_lambda = Options[kOptionValueElmoLambda].cast<double>();
 	double value_to_winning_rate_coefficient =
 		Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
+    double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
 
 	sync_cout << "learning_rate=" << learning_rate << sync_endl;
 	sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
@@ -554,6 +557,7 @@ void Learner::Learn(std::istringstream& iss) {
 	sync_cout << "elmo_lambda=" << elmo_lambda << sync_endl;
 	sync_cout << "value_to_winning_rate_coefficient=" << value_to_winning_rate_coefficient <<
 		sync_endl;
+    sync_cout << "adam_beta2=" << adam_beta2 << sync_endl;
 
 	auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
 	std::vector<Record> records_for_test;
@@ -755,27 +759,27 @@ void Learner::Learn(std::istringstream& iss) {
 
 			// 重みを更新する
 			double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
-			double adam_beta2_t = std::pow(kAdamBeta2, num_mini_batches);
+			double adam_beta2_t = std::pow(adam_beta2, num_mini_batches);
 
 			// 並列化を効かせたいのでdimension_indexで回す
 #pragma omp for schedule(dynamic, 20000)
 			for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
 				if (Kpp::IsValid(dimension_index)) {
 					Kpp kpp = Kpp::ForIndex(dimension_index);
-					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-						fobos_l1_parameter, fobos_l2_parameter,
+					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2, adam_beta2_t,
+                        learning_rate, fobos_l1_parameter, fobos_l2_parameter,
 						Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
 				}
 				else if (Kkp::IsValid(dimension_index)) {
 					Kkp kkp = Kkp::ForIndex(dimension_index);
-					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-						fobos_l1_parameter, fobos_l2_parameter,
+					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2, adam_beta2_t,
+                        learning_rate, fobos_l1_parameter, fobos_l2_parameter,
 						Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
 				}
 				else if (Kk::IsValid(dimension_index)) {
 					Kk kk = Kk::ForIndex(dimension_index);
-					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2_t, learning_rate,
-						fobos_l1_parameter, fobos_l2_parameter,
+					weights[dimension_index].UpdateWeight(adam_beta1_t, adam_beta2, adam_beta2_t,
+                        learning_rate, fobos_l1_parameter, fobos_l2_parameter,
 						Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
 				}
 				else {

@@ -99,6 +99,7 @@ setoption name FobosL1Parameter value {fobos_l1_parameter}
 setoption name FobosL2Parameter value {fobos_l2_parameter}
 setoption name ElmoLambda value {elmo_lambda}
 setoption name ValueToWinningRateCoefficient value {value_to_winning_rate_coefficient}
+setoption name AdamBeta2 value {adam_beta2}
 isready
 usinewgame
 learn output_folder_path_base {learner_output_folder_path_base}
@@ -114,7 +115,8 @@ learn output_folder_path_base {learner_output_folder_path_base}
   fobos_l1_parameter=args.fobos_l1_parameter,
   fobos_l2_parameter=args.fobos_l2_parameter,
   elmo_lambda=args.elmo_lambda,
-  value_to_winning_rate_coefficient=args.value_to_winning_rate_coefficient).encode('utf-8')
+  value_to_winning_rate_coefficient=args.value_to_winning_rate_coefficient,
+  adam_beta2=args.adam_beta2).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
@@ -352,6 +354,12 @@ def main():
     type=int,
     required=True,
     help='Max value difference in Multi PV. ex) 100')
+  parser.add_argument(
+    '--adam_beta2',
+    action='store',
+    type=int,
+    required=True,
+    help='Adam beta2 coefficient. ex) 0.999')
   
   args = parser.parse_args()
 
