@@ -100,6 +100,7 @@ setoption name FobosL2Parameter value {fobos_l2_parameter}
 setoption name ElmoLambda value {elmo_lambda}
 setoption name ValueToWinningRateCoefficient value {value_to_winning_rate_coefficient}
 setoption name AdamBeta2 value {adam_beta2}
+setoption name UseProgressAsElmoLambda value {use_progress_as_elmo_lambda}
 isready
 usinewgame
 learn output_folder_path_base {learner_output_folder_path_base}
@@ -116,7 +117,8 @@ learn output_folder_path_base {learner_output_folder_path_base}
   fobos_l2_parameter=args.fobos_l2_parameter,
   elmo_lambda=args.elmo_lambda,
   value_to_winning_rate_coefficient=args.value_to_winning_rate_coefficient,
-  adam_beta2=args.adam_beta2).encode('utf-8')
+  adam_beta2=args.adam_beta2,
+  use_progress_as_elmo_lambda=args.use_progress_as_elmo_lambda).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.learner_exe_file_path], input=input, check=True)
 
@@ -360,6 +362,13 @@ def main():
     type=float,
     required=True,
     help='Adam beta2 coefficient. ex) 0.999')
+  parser.add_argument(
+    '--use_progress_as_elmo_lambda',
+    action='store',
+    type=str,
+    required=True,
+    help='"true" to use progress as elmo lambda. Otherwise, "false" ex) true')
+  
   
   args = parser.parse_args()
 

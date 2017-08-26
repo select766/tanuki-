@@ -9,6 +9,7 @@
 #include <numeric>
 #include <omp.h>
 
+#include "eval/progress.h"
 #include "kifu_reader.h"
 #include "position.h"
 #include "progress_report.h"
@@ -114,7 +115,6 @@ namespace
 	constexpr int64_t kShowProgressAtMostSec = 600; // 10分
 
 	constexpr char* kOptionValueLearnerNumPositions = "LearnerNumPositions";
-	constexpr char* kOptionValueLearnerPvStrapMaxDepth = "LearnerPvStrapMaxDepth";
 	constexpr char* kOptionValueLearningRate = "LearningRate";
 	constexpr char* kOptionValueLearningRateDecayRate = "LearningRateDecayRate";
 	constexpr char* kOptionValueNumPositionsToDecayLearningRate = "NumPositionsToDecayLearningRate";
@@ -126,6 +126,7 @@ namespace
 	constexpr char* kOptionValueElmoLambda = "ElmoLambda";
     constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
     constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
+    constexpr char* kOptionValueUseProgressAsElmoLambda = "UseProgressAsElmoLambda";
 
 	class Kpp {
 	public:
@@ -375,8 +376,14 @@ namespace
 	}
 
 	// 浅い探索付きの*Strapを行う
-	void Strap(const Learner::Record& record, int pv_strap_max_depth,
-		std::function<void(Value record_value, Color win_color, Value value, Color root_color, Position& pos)> f) {
+    // record 学習局面
+    // elmo_lambda elmo lambda係数 use_progress_as_elmo_lambdaがtrueの場合、この値は無視される
+    // use_progress_as_elmo_lambda elmo_lambdaの代わりに進行度を用いる
+    // progress 進行度推定ルーチン
+    // f 各局面の学習に使用するコールバック
+	void Strap(const Learner::Record& record, double elmo_lambda, bool use_progress_as_elmo_lambda,
+        const std::shared_ptr<Progress>& progress,
+		std::function<void(Value record_value, Color win_color, Value value, Color root_color, double elmo_lambda, Position& pos)> f) {
 		int thread_index = omp_get_thread_num();
 		Thread& thread = *Threads[thread_index];
 		Position& pos = thread.rootPos;
@@ -411,7 +418,12 @@ namespace
 			value = -value;
 		}
 
-		f(static_cast<Value>(record.value), static_cast<Color>(record.win_color), value, root_color, pos);
+        if (use_progress_as_elmo_lambda) {
+            elmo_lambda = 1.0 - progress->Estimate(pos);
+        }
+
+		f(static_cast<Value>(record.value), static_cast<Color>(record.win_color), value, root_color,
+            elmo_lambda, pos);
 
 		// 局面を浅い探索のroot局面にもどす
 		for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
@@ -422,7 +434,6 @@ namespace
 
 void Learner::InitializeLearner(USI::OptionsMap& o) {
 	o[kOptionValueLearnerNumPositions] << Option("10000000000");
-	o[kOptionValueLearnerPvStrapMaxDepth] << Option(0, 0, MAX_PLY);
 	o[kOptionValueLearningRate] << Option("1.0");
 	o[kOptionValueNumPositionsToDecayLearningRate] << Option("1000000000");
 	o[kOptionValueLearningRateDecayRate] << Option("1.0");
@@ -437,6 +448,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 	o[kOptionValueElmoLambda] << Option("1.0");
 	o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
     o[kOptionValueAdamBeta2] << Option("0.999");
+    o[kOptionValueUseProgressAsElmoLambda] << Option(false);
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -532,7 +544,6 @@ void Learner::Learn(std::istringstream& iss) {
 		Options[kOptionValueNumPositionsToDecayLearningRate].cast<int64_t>();
 	int64_t next_positionsto_decay_learning_rate = num_positions_to_decay_learning_rate;
 	int64_t max_positions_for_learning = Options[kOptionValueLearnerNumPositions].cast<int64_t>();
-	int pv_strap_max_depth = Options[kOptionValueLearnerPvStrapMaxDepth];
 	std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
 	int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
 	int64_t mini_batch_size = Options[kOptionValueMiniBatchSize].cast<int64_t>();
@@ -542,13 +553,13 @@ void Learner::Learn(std::istringstream& iss) {
 	double value_to_winning_rate_coefficient =
 		Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
     double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
+    bool use_progress_as_elmo_lambda = Options[kOptionValueUseProgressAsElmoLambda];
 
 	sync_cout << "learning_rate=" << learning_rate << sync_endl;
 	sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
 	sync_cout << "num_positions_to_decay_learning_rate=" << num_positions_to_decay_learning_rate
 		<< sync_endl;
 	sync_cout << "max_positions_for_learning=" << max_positions_for_learning << sync_endl;
-	sync_cout << "pv_strap_max_depth=" << pv_strap_max_depth << sync_endl;
 	sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
 	sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
 	sync_cout << "mini_batch_size=" << mini_batch_size << sync_endl;
@@ -558,6 +569,7 @@ void Learner::Learn(std::istringstream& iss) {
 	sync_cout << "value_to_winning_rate_coefficient=" << value_to_winning_rate_coefficient <<
 		sync_endl;
     sync_cout << "adam_beta2=" << adam_beta2 << sync_endl;
+    sync_cout << "use_progress_as_elmo_lambda=" << use_progress_as_elmo_lambda << sync_endl;
 
 	auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
 	std::vector<Record> records_for_test;
@@ -565,6 +577,14 @@ void Learner::Learn(std::istringstream& iss) {
 		sync_cout << "Failed to read kifu for test." << sync_endl;
 		std::exit(1);
 	}
+
+    std::shared_ptr<Progress> progress;
+    if (use_progress_as_elmo_lambda) {
+        progress = std::make_shared<Progress>();
+        if (!progress->Load()) {
+            std::exit(1);
+        }
+    }
 
 	// 未学習の評価関数ファイルを出力しておく
 	save_eval(output_folder_path_base, 0);
@@ -611,12 +631,13 @@ void Learner::Learn(std::istringstream& iss) {
 			// num_records個の学習データの勾配の和を求めて重みを更新する
 #pragma omp for schedule(dynamic, 1000) reduction(+:sum_train_squared_error_of_value) reduction(+:sum_norm) reduction(+:sum_train_squared_error_of_winning_percentage) reduction(+:sum_train_cross_entropy) reduction(+:sum_train_cross_entropy_eval) reduction(+:sum_train_cross_entropy_win) reduction(+:sum_test_squared_error_of_win_or_lose)
 			for (int record_index = 0; record_index < num_records; ++record_index) {
-				auto f = [elmo_lambda, value_to_winning_rate_coefficient, &weights,
-					&sum_train_squared_error_of_value, &sum_norm,
-					&sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
-					&sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
-					&sum_train_squared_error_of_win_or_lose](
-						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
+				auto f = [value_to_winning_rate_coefficient, &weights,
+                    &sum_train_squared_error_of_value, &sum_norm,
+                    &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
+                    &sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
+                    &sum_train_squared_error_of_win_or_lose, &progress](Value record_value,
+                        Color win_color, Value value, Color root_color, double elmo_lambda,
+                        Position& pos) {
 					// 評価値から推定した勝率の分布の交差エントロピー
 					double p = winning_rate(record_value, value_to_winning_rate_coefficient);
 					double q = winning_rate(value, value_to_winning_rate_coefficient);
@@ -690,7 +711,7 @@ void Learner::Learn(std::istringstream& iss) {
 							.AddRawGradient(delta_turn);
 					}
 				};
-				Strap(records[record_index], pv_strap_max_depth, f);
+				Strap(records[record_index], elmo_lambda, use_progress_as_elmo_lambda, progress, f);
 			}
 
 			// 損失関数を計算する
@@ -700,7 +721,8 @@ void Learner::Learn(std::istringstream& iss) {
 					&sum_test_squared_error_of_value, &sum_test_squared_error_of_winning_percentage,
 					&sum_test_cross_entropy, &sum_test_cross_entropy_eval,
 					&sum_test_cross_entropy_win, &sum_test_squared_error_of_win_or_lose](
-						Value record_value, Color win_color, Value value, Color root_color, Position& pos) {
+						Value record_value, Color win_color, Value value, Color root_color,
+                        double elmo_lambda, Position& pos) {
 					// 評価値から推定した勝率の分布の交差エントロピー
 					double p = winning_rate(record_value, value_to_winning_rate_coefficient);
 					double q = winning_rate(value, value_to_winning_rate_coefficient);
@@ -721,7 +743,7 @@ void Learner::Learn(std::istringstream& iss) {
                         (1.0 - elmo_lambda) * cross_entropy_win;
                     sum_test_squared_error_of_win_or_lose += (q - t) * (q - t);
 				};
-				Strap(records_for_test[record_index], pv_strap_max_depth, f);
+				Strap(records_for_test[record_index], elmo_lambda, use_progress_as_elmo_lambda, progress, f);
 			}
 
 			// 低次元へ分配する

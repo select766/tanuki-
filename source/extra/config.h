@@ -309,6 +309,7 @@
 #define ONE_PLY_EQ_1
 #define PER_THREAD_COUNTERMOVEHISTORY
 #define PER_STACK_HISTORY
+#define USE_PROGRESS
 
 // デバッグ絡み
 //#define ASSERT_LV 3

@@ -1,6 +1,7 @@
 ﻿#include <sstream>
 #include <queue>
 
+#include "eval/progress.h"
 #include "experimental_book.h"
 #include "experimental_learner.h"
 #include "kifu_converter.hpp"
@@ -311,6 +312,9 @@ namespace USI
 		Learner::InitializeLearner(o);
 #endif
 		Learner::InitializeKifuShuffler(o);
+#ifdef USE_PROGRESS
+        Progress::Initialize(o);
+#endif
 		Book::Initialize(o);
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
