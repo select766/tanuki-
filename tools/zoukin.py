@@ -91,7 +91,9 @@ setoption name MaxMovesToDraw value 300
 setoption name EvalDir value {eval_folder_path}
 setoption name KifuDir value {kifu_folder_path}
 setoption name LearnerNumPositions value {num_positions_to_learn}
-setoption name LearningRate value {learning_rate}
+setoption name MinLearningRate value {min_learning_rate}
+setoption name MaxLearningRate value {max_learning_rate}
+setoption name NumLearningRateCycles value {num_learning_rate_cycles}
 setoption name KifuForTestDir value {kif_for_test_folder_path}
 setoption name LearnerNumPositionsForTest value 1000000
 setoption name MiniBatchSize value {mini_batch_size}
@@ -111,7 +113,9 @@ learn output_folder_path_base {learner_output_folder_path_base}
   num_positions_to_learn=args.num_positions_to_learn,
   kif_for_test_folder_path=kif_for_test_folder_path,
   learner_output_folder_path_base=new_eval_folder_path_base,
-  learning_rate=args.learning_rate,
+  min_learning_rate=args.min_learning_rate,
+  max_learning_rate=args.max_learning_rate,
+  num_learning_rate_cycles=args.num_learning_rate_cycles,
   mini_batch_size=args.mini_batch_size,
   fobos_l1_parameter=args.fobos_l1_parameter,
   fobos_l2_parameter=args.fobos_l2_parameter,
@@ -269,11 +273,23 @@ def main():
     required=True,
     help='Search depth. ex) 8')
   parser.add_argument(
-    '--learning_rate',
+    '--min_learning_rate',
     action='store',
     type=float,
     required=True,
-    help='Learning rate. ex) 2.0')
+    help='Min learning rate. ex) 2.0')
+  parser.add_argument(
+    '--max_learning_rate',
+    action='store',
+    type=float,
+    required=True,
+    help='Max learning rate. ex) 2.0')
+  parser.add_argument(
+    '--num_learning_rate_cycles',
+    action='store',
+    type=float,
+    required=True,
+    help='Number of learning rate cycles. ex) 10')
   parser.add_argument(
     '--mini_batch_size',
     action='store',
