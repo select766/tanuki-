@@ -417,7 +417,6 @@ def main():
   num_positions_to_learn = args.num_positions_to_learn
   num_iterations = args.num_iterations
   search_depth = args.search_depth
-  learning_rate = args.learning_rate
   mini_batch_size = args.mini_batch_size
   fobos_l1_parameter = args.fobos_l1_parameter
   fobos_l2_parameter = args.fobos_l2_parameter
