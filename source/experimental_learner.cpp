@@ -115,9 +115,9 @@ namespace
 	constexpr int64_t kShowProgressAtMostSec = 600; // 10分
 
 	constexpr char* kOptionValueLearnerNumPositions = "LearnerNumPositions";
-	constexpr char* kOptionValueLearningRate = "LearningRate";
-	constexpr char* kOptionValueLearningRateDecayRate = "LearningRateDecayRate";
-	constexpr char* kOptionValueNumPositionsToDecayLearningRate = "NumPositionsToDecayLearningRate";
+    constexpr char* kOptionValueMinLearningRate = "MinLearningRate";
+    constexpr char* kOptionValueMaxLearningRate = "MaxLearningRate";
+    constexpr char* kOptionValueNumLearningRateCycles = "NumLearningRateCycles";
 	constexpr char* kOptionValueKifuForTestDir = "KifuForTestDir";
 	constexpr char* kOptionValueLearnerNumPositionsForTest = "LearnerNumPositionsForTest";
 	constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
@@ -434,9 +434,9 @@ namespace
 
 void Learner::InitializeLearner(USI::OptionsMap& o) {
 	o[kOptionValueLearnerNumPositions] << Option("10000000000");
-	o[kOptionValueLearningRate] << Option("1.0");
-	o[kOptionValueNumPositionsToDecayLearningRate] << Option("1000000000");
-	o[kOptionValueLearningRateDecayRate] << Option("1.0");
+    o[kOptionValueMinLearningRate] << Option("0.5");
+    o[kOptionValueMaxLearningRate] << Option("0.5");
+    o[kOptionValueNumLearningRateCycles] << Option(10);
 	o[kOptionValueKifuForTestDir] << Option("kifu_for_test");
 	o[kOptionValueLearnerNumPositionsForTest] << Option("1000000");
 	o[kOptionValueMiniBatchSize] << Option("1000000");
@@ -538,11 +538,9 @@ void Learner::Learn(std::istringstream& iss) {
 	time_t start;
 	std::time(&start);
 	int num_mini_batches = 0;
-	double learning_rate = Options[kOptionValueLearningRate].cast<double>();
-	double learning_rate_decay_rate = Options[kOptionValueLearningRateDecayRate].cast<double>();
-	int64_t num_positions_to_decay_learning_rate =
-		Options[kOptionValueNumPositionsToDecayLearningRate].cast<int64_t>();
-	int64_t next_positionsto_decay_learning_rate = num_positions_to_decay_learning_rate;
+    double min_learning_rate = Options[kOptionValueMinLearningRate].cast<double>();
+    double max_learning_rate = Options[kOptionValueMaxLearningRate].cast<double>();
+    double num_learning_rate_cycles = Options[kOptionValueNumLearningRateCycles].cast<double>();
 	int64_t max_positions_for_learning = Options[kOptionValueLearnerNumPositions].cast<int64_t>();
 	std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
 	int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
@@ -555,10 +553,9 @@ void Learner::Learn(std::istringstream& iss) {
     double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
     bool use_progress_as_elmo_lambda = Options[kOptionValueUseProgressAsElmoLambda];
 
-	sync_cout << "learning_rate=" << learning_rate << sync_endl;
-	sync_cout << "learning_rate_decay_rate=" << learning_rate_decay_rate << sync_endl;
-	sync_cout << "num_positions_to_decay_learning_rate=" << num_positions_to_decay_learning_rate
-		<< sync_endl;
+    sync_cout << "min_learning_rate=" << min_learning_rate << sync_endl;
+    sync_cout << "max_learning_rate=" << max_learning_rate << sync_endl;
+    sync_cout << "num_learning_rate_cycles=" << num_learning_rate_cycles << sync_endl;
 	sync_cout << "max_positions_for_learning=" << max_positions_for_learning << sync_endl;
 	sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
 	sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
@@ -783,6 +780,19 @@ void Learner::Learn(std::istringstream& iss) {
 			double adam_beta1_t = std::pow(kAdamBeta1, num_mini_batches);
 			double adam_beta2_t = std::pow(adam_beta2, num_mini_batches);
 
+            // Cyclical Learning Rates for Training Neural Networks
+            // https://arxiv.org/abs/1506.01186
+            double learning_rate_scale = static_cast<double>(num_processed_positions) *
+                num_learning_rate_cycles / static_cast<double>(max_positions_for_learning);
+            double learning_rate_scale_raw = learning_rate_scale;
+            learning_rate_scale = fmod(learning_rate_scale, 1.0);
+            learning_rate_scale *= 2.0;
+            if (learning_rate_scale > 1.0) {
+                learning_rate_scale = 2.0 - learning_rate_scale;
+            }
+            double learning_rate = (max_learning_rate - min_learning_rate) * learning_rate_scale +
+                min_learning_rate;
+
 			// 並列化を効かせたいのでdimension_indexで回す
 #pragma omp for schedule(dynamic, 20000)
 			for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
@@ -828,14 +838,6 @@ void Learner::Learn(std::istringstream& iss) {
 		std::fflush(file_loss);
 
 		num_processed_positions += num_records;
-
-		// 学習率の減衰
-		if (num_processed_positions >= next_positionsto_decay_learning_rate) {
-			learning_rate *= learning_rate_decay_rate;
-			next_positionsto_decay_learning_rate += num_positions_to_decay_learning_rate;
-			std::printf("Decayed the learning rate: learning_rate=%f\n", learning_rate);
-			std::fflush(stdout);
-		}
 	}
 
 	// 評価関数ファイルの書き出し
