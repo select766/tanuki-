@@ -436,7 +436,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
 	o[kOptionValueLearnerNumPositions] << Option("10000000000");
     o[kOptionValueMinLearningRate] << Option("0.5");
     o[kOptionValueMaxLearningRate] << Option("0.5");
-    o[kOptionValueNumLearningRateCycles] << Option(10);
+    o[kOptionValueNumLearningRateCycles] << Option("10.0");
 	o[kOptionValueKifuForTestDir] << Option("kifu_for_test");
 	o[kOptionValueLearnerNumPositionsForTest] << Option("1000000");
 	o[kOptionValueMiniBatchSize] << Option("1000000");
