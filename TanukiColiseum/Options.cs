@@ -27,6 +27,8 @@ namespace TanukiColiseum
         public int NumNumaNodes { get; set; } = 1;
         public UserInterface Interface { get; set; } = UserInterface.Gui;
         public int ProgressIntervalMs { get; set; } = 60 * 1000;
+        public int NumThreads1 { get; set; } = 1;
+        public int NumThreads2 { get; set; } = 1;
 
         public void Parse(string[] args)
         {
@@ -84,6 +86,12 @@ namespace TanukiColiseum
                         break;
                     case "--progress_interval_ms":
                         ProgressIntervalMs = int.Parse(args[++i]);
+                        break;
+                    case "--num_threads1":
+                        NumThreads1 = int.Parse(args[++i]);
+                        break;
+                    case "--num_threads2":
+                        NumThreads2 = int.Parse(args[++i]);
                         break;
                     default:
                         throw new ArgumentException("Unexpected option: " + args[i]);

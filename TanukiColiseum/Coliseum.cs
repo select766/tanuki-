@@ -45,6 +45,7 @@ namespace TanukiColiseum
                 options1.Add("setoption name EvalShare value true");
                 options1.Add("setoption name BookMoves value " + options.NumBookMoves1);
                 options1.Add("setoption name BookFile value " + options.BookFileName1);
+                options1.Add("setoption name Threads value " + options.NumThreads1);
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
                 var engine1 = new Engine(options.Engine1FilePath, options1, this, gameIndex * 2, gameIndex, 0, numaNode);
@@ -62,6 +63,7 @@ namespace TanukiColiseum
                 options2.Add("setoption name EvalShare value true");
                 options2.Add("setoption name BookMoves value " + options.NumBookMoves2);
                 options2.Add("setoption name BookFile value " + options.BookFileName2);
+                options2.Add("setoption name Threads value " + options.NumThreads2);
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
                 var engine2 = new Engine(options.Engine2FilePath, options2, this, gameIndex * 2 + 1, gameIndex, 1, numaNode);
