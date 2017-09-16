@@ -206,8 +206,10 @@ namespace
 	public:
 		Kkp() { }
 
-		Kkp(Square king0, Square king1, BonaPiece piece, WeightKind weight_kind)
-			: king0_(king0), king1_(king1), piece_(piece), weight_kind_(weight_kind) {
+		Kkp(Square king0, Square king1, BonaPiece piece, WeightKind weight_kind,
+            bool invert_sign = false)
+			: king0_(king0), king1_(king1), piece_(piece), weight_kind_(weight_kind),
+            invert_sign_(invert_sign) {
 		}
 
 		// Inclusive
@@ -236,10 +238,14 @@ namespace
 			return index;
 		}
 
-		void ToLowerDimensions(Kkp kkp[2]) const {
+		void ToLowerDimensions(Kkp kkp[4]) const {
 			kkp[0] = Kkp(king0_, king1_, piece_, weight_kind_);
 			kkp[1] = Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
-		}
+            kkp[2] = Kkp(Inv(king1_), Inv(king0_), inv_piece[piece_], weight_kind_,
+                weight_kind_ == WEIGHT_KIND_COLOR);
+            kkp[3] = Kkp(Inv(Mir(king1_)), Inv(Mir(king0_)), inv_piece[mir_piece[piece_]],
+                weight_kind_, weight_kind_ == WEIGHT_KIND_COLOR);
+        }
 
 		static Kkp ForIndex(int index) {
 			int original_index = index;
@@ -266,21 +272,23 @@ namespace
 		Square king1() const { return king1_; }
 		BonaPiece piece() const { return piece_; }
 		WeightKind weight_kind() const { return weight_kind_; }
+        bool invert_sign() const { return invert_sign_; }
 
 	private:
 		Square king0_;
 		Square king1_;
 		BonaPiece piece_;
 		WeightKind weight_kind_;
+        bool invert_sign_;
 	};
 
 	class Kk {
 	public:
 		Kk() { }
 
-		Kk(Square king0, Square king1, WeightKind weight_kind)
-			: king0_(king0), king1_(king1), weight_kind_(weight_kind) {
-		}
+        Kk(Square king0, Square king1, WeightKind weight_kind, bool invert_sign = false)
+            : king0_(king0), king1_(king1), weight_kind_(weight_kind), invert_sign_(invert_sign) {
+        }
 
 		// Inclusive
 		static int MinIndex() {
@@ -308,9 +316,13 @@ namespace
 			return index;
 		}
 
-		void ToLowerDimensions(Kk kk[1]) const {
-			kk[0] = Kk(king0_, king1_, weight_kind_);
-		}
+		void ToLowerDimensions(Kk kk[4]) const {
+            kk[0] = Kk(king0_, king1_, weight_kind_);
+            kk[1] = Kk(Mir(king0_), Mir(king1_), weight_kind_);
+            kk[2] = Kk(Inv(king1_), Inv(king0_), weight_kind_, weight_kind_ == WEIGHT_KIND_COLOR);
+            kk[3] = Kk(Inv(Mir(king1_)), Inv(Mir(king0_)), weight_kind_,
+                weight_kind_ == WEIGHT_KIND_COLOR);
+        }
 
 		static Kk ForIndex(int index) {
 			int original_index = index;
@@ -334,11 +346,13 @@ namespace
 		Square king0() const { return king0_; }
 		Square king1() const { return king1_; }
 		WeightKind weight_kind() const { return weight_kind_; }
+        bool invert_sign() const { return invert_sign_; }
 
 	private:
 		Square king0_;
 		Square king1_;
 		WeightKind weight_kind_;
+        bool invert_sign_;
 	};
 
 	double sigmoid(double x) {
@@ -757,18 +771,20 @@ void Learner::Learn(std::istringstream& iss) {
 				}
 				else if (Kkp::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
-					Kkp kkp[2];
+					Kkp kkp[4];
 					Kkp::ForIndex(dimension_index).ToLowerDimensions(kkp);
 					for (const auto& to : kkp) {
-						weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
+						weights[to.ToIndex()].AddLowerDimensionGradient(
+                            !to.invert_sign() ? from.sum_gradient_raw : -from.sum_gradient_raw);
 					}
 				}
 				else if (Kk::IsValid(dimension_index)) {
 					auto& from = weights[dimension_index];
-					Kk kk[1];
+					Kk kk[4];
 					Kk::ForIndex(dimension_index).ToLowerDimensions(kk);
 					for (const auto& to : kk) {
-						weights[to.ToIndex()].AddLowerDimensionGradient(from.sum_gradient_raw);
+						weights[to.ToIndex()].AddLowerDimensionGradient(
+                            !to.invert_sign() ? from.sum_gradient_raw : -from.sum_gradient_raw);
 					}
 				}
 				else {
