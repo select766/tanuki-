@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <fstream>
-#include <omp.h>
 #include <sstream>
 
 #include "extra/book.h"
@@ -116,8 +115,6 @@ bool Book::CreateScoredBook() {
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
 
-	omp_set_num_threads(num_threads);
-
 	MemoryBook input_book;
 	input_book_file = "book/" + input_book_file;
 	sync_cout << "Reading " << input_book_file << sync_endl;
@@ -141,61 +138,68 @@ bool Book::CreateScoredBook() {
 	std::mutex output_book_mutex;
 	ProgressReport progress_report(num_sfens - output_book.book_body.size(),
         kShowProgressAtMostSec);
-#pragma omp parallel
-	{
-		int thread_index = omp_get_thread_num();
-		WinProcGroup::bindThisThread(thread_index);
 
-#pragma omp for schedule(static, 1)
-		for (int i = 0; i < num_sfens; ++i) {
-			const std::string& sfen = sfens[i];
-			if (output_book.book_body.find(sfen) != output_book.end()) {
-				continue;
-			}
+    std::vector<std::thread> threads;
+    std::atomic_int global_pos_index = 0;
+    for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+        threads.push_back(std::thread([thread_index, num_sfens, search_depth, multi_pv,
+            save_per_positions, &global_pos_index, &sfens, &output_book, &output_book_mutex,
+            &progress_report, &output_book_file]() {
+            WinProcGroup::bindThisThread(thread_index);
 
-			int thread_index = omp_get_thread_num();
-			Thread& thread = *Threads[thread_index];
-			Position& pos = thread.rootPos;
-			pos.set(sfen);
-			// Position::set()で内容が全てクリアされるので
-			// 後からset_this_thread()を行う。
-			pos.set_this_thread(&thread);
+            for (int position_index = global_pos_index++; position_index < num_sfens;
+                position_index = global_pos_index++) {
+                const std::string& sfen = sfens[position_index];
+                if (output_book.book_body.find(sfen) != output_book.end()) {
+                    continue;
+                }
 
-			if (pos.is_mated()) {
-				continue;
-			}
+                Thread& thread = *Threads[thread_index];
+                Position& pos = thread.rootPos;
+                pos.set(sfen);
+                // Position::set()で内容が全てクリアされるので
+                // 後からset_this_thread()を行う。
+                pos.set_this_thread(&thread);
 
-			Learner::search(pos, search_depth, multi_pv);
+                if (pos.is_mated()) {
+                    continue;
+                }
 
-			int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
-			for (int pv_index = 0; pv_index < num_pv; ++pv_index) {
-				const auto& root_move = thread.rootMoves[pv_index];
-				Move best = Move::MOVE_NONE;
-				if (root_move.pv.size() >= 1) {
-					best = root_move.pv[0];
-				}
-				Move next = Move::MOVE_NONE;
-				if (root_move.pv.size() >= 2) {
-					next = root_move.pv[1];
-				}
-				int value = root_move.score;
-				BookPos book_pos(best, next, value, search_depth, 0);
-				{
-					std::lock_guard<std::mutex> lock(output_book_mutex);
-					insert_book_pos(output_book, sfen, book_pos);
-				}
-			}
+                Learner::search(pos, search_depth, multi_pv);
 
-			int position_index = global_position_index++;
-			progress_report.Show(position_index);
+                int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
+                for (int pv_index = 0; pv_index < num_pv; ++pv_index) {
+                    const auto& root_move = thread.rootMoves[pv_index];
+                    Move best = Move::MOVE_NONE;
+                    if (root_move.pv.size() >= 1) {
+                        best = root_move.pv[0];
+                    }
+                    Move next = Move::MOVE_NONE;
+                    if (root_move.pv.size() >= 2) {
+                        next = root_move.pv[1];
+                    }
+                    int value = root_move.score;
+                    BookPos book_pos(best, next, value, search_depth, 0);
+                    {
+                        std::lock_guard<std::mutex> lock(output_book_mutex);
+                        insert_book_pos(output_book, sfen, book_pos);
+                    }
+                }
 
-			if (position_index && position_index % save_per_positions == 0) {
-				std::lock_guard<std::mutex> lock(output_book_mutex);
-				sync_cout << "info string Writing the book file..." << sync_endl;
-				write_book(output_book_file, output_book, false);
-				sync_cout << "done..." << sync_endl;
-			}
-		}
+                progress_report.Show(position_index);
+
+                if (position_index && position_index % save_per_positions == 0) {
+                    std::lock_guard<std::mutex> lock(output_book_mutex);
+                    sync_cout << "info string Writing the book file..." << sync_endl;
+                    write_book(output_book_file, output_book, false);
+                    sync_cout << "done..." << sync_endl;
+                }
+            }
+        }));
 	}
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
 	return true;
 }
