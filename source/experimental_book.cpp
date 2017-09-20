@@ -117,27 +117,32 @@ bool Book::CreateScoredBook() {
 
 	MemoryBook input_book;
 	input_book_file = "book/" + input_book_file;
-	sync_cout << "Reading " << input_book_file << sync_endl;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	read_book(input_book_file, input_book);
 	sync_cout << "done..." << sync_endl;
 
-	std::vector<std::string> sfens;
+    MemoryBook output_book;
+    output_book_file = "book/" + output_book_file;
+    sync_cout << "Reading output book file: " << input_book_file << sync_endl;
+    read_book(output_book_file, output_book);
+    sync_cout << "done..." << sync_endl;
+
+    std::vector<std::string> sfens;
 	for (const auto& sfen_and_count : input_book.book_body) {
+        if (output_book.book_body.find(sfen_and_count.first) != output_book.book_body.end()) {
+            continue;
+        }
 		sfens.push_back(sfen_and_count.first);
 	}
     int num_sfens = sfens.size();
+    sync_cout << "Number of the positions to be processed: " << num_sfens << sync_endl;
 
 	time_t start_time = 0;
 	std::time(&start_time);
 
-	MemoryBook output_book;
-	output_book_file = "book/" + output_book_file;
-	read_book(output_book_file, output_book);
-
 	std::atomic_int global_position_index = 0;
 	std::mutex output_book_mutex;
-	ProgressReport progress_report(num_sfens - output_book.book_body.size(),
-        kShowProgressAtMostSec);
+	ProgressReport progress_report(num_sfens, kShowProgressAtMostSec);
 
     std::vector<std::thread> threads;
     std::atomic_int global_pos_index = 0;
@@ -150,10 +155,6 @@ bool Book::CreateScoredBook() {
             for (int position_index = global_pos_index++; position_index < num_sfens;
                 position_index = global_pos_index++) {
                 const std::string& sfen = sfens[position_index];
-                if (output_book.book_body.find(sfen) != output_book.end()) {
-                    continue;
-                }
-
                 Thread& thread = *Threads[thread_index];
                 Position& pos = thread.rootPos;
                 pos.set(sfen);
