@@ -764,10 +764,14 @@ void USI::loop(int argc, char* argv[])
 		// 我々はこれに関知しないので単に無視すれば良い。
 		else if (token == "usinewgame") continue;
 #ifdef USE_KIFU_GENERATOR
-		else if (token == "generate_kifu") {
-			Learner::GenerateKifu();
-			break;
-		}
+        else if (token == "generate_kifu") {
+            Learner::GenerateKifu();
+            break;
+        }
+        else if (token == "measure_move_times") {
+            Learner::MeasureMoveTimes();
+            break;
+        }
 #endif
 #ifdef USE_EXPERIMENTAL_LEARNER
 		else if (token == "learn" || token == "l") {
