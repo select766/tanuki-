@@ -128,7 +128,8 @@ void Learner::GenerateKifu()
     omp_set_num_threads((int)Options["Threads"]);
 
     Search::LimitsType limits;
-    limits.max_game_ply = kMaxGamePlay;
+    // 256Žè–Ú•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ð–h‚®‚½‚ß+100‚·‚é
+    limits.max_game_ply = kMaxGamePlay + 100;
     limits.depth = MAX_PLY;
     limits.silent = true;
     Search::Limits = limits;
@@ -335,7 +336,8 @@ void Learner::MeasureMoveTimes() {
     Eval::load_eval();
 
     Search::LimitsType limits;
-    limits.max_game_ply = kMaxGamePlay;
+    // 256Žè–Ú•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ð–h‚®‚½‚ß+100‚·‚é
+    limits.max_game_ply = kMaxGamePlay + 100;
     limits.depth = MAX_PLY;
     limits.silent = true;
     Search::Limits = limits;
