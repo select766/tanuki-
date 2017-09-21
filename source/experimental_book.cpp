@@ -36,7 +36,7 @@ bool Book::Initialize(USI::OptionsMap& o) {
 	o[kBookSearchDepth] << Option(24, 0, 256);
 	o[kBookInputFile] << Option("user_book1.db");
 	o[kBookOutputFile] << Option("user_book2.db");
-	o[kBookSavePerPositions] << Option(10000, 1, std::numeric_limits<int>::max());
+	o[kBookSavePerPositions] << Option(1000, 1, std::numeric_limits<int>::max());
 	return true;
 }
 
@@ -146,11 +146,11 @@ bool Book::CreateScoredBook() {
 
     std::vector<std::thread> threads;
     std::atomic_int global_pos_index = 0;
-    std::atomic_int num_processed_positions = 0;
+    std::atomic_int global_num_processed_positions = 0;
     for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
         threads.push_back(std::thread([thread_index, num_sfens, search_depth, multi_pv,
             save_per_positions, &global_pos_index, &sfens, &output_book, &output_book_mutex,
-            &progress_report, &output_book_file, &num_processed_positions]() {
+            &progress_report, &output_book_file, &global_num_processed_positions]() {
             WinProcGroup::bindThisThread(thread_index);
 
             for (int position_index = global_pos_index++; position_index < num_sfens;
@@ -188,11 +188,12 @@ bool Book::CreateScoredBook() {
                     }
                 }
 
-                progress_report.Show(++num_processed_positions);
+                int num_processed_positions = ++global_num_processed_positions;
+                progress_report.Show(num_processed_positions);
 
-                if (position_index && position_index % save_per_positions == 0) {
+                if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
                     std::lock_guard<std::mutex> lock(output_book_mutex);
-                    sync_cout << "info string Writing the book file..." << sync_endl;
+                    sync_cout << "Writing the book file..." << sync_endl;
                     write_book(output_book_file, output_book, false);
                     sync_cout << "done..." << sync_endl;
                 }
@@ -203,5 +204,10 @@ bool Book::CreateScoredBook() {
     for (auto& thread : threads) {
         thread.join();
     }
-	return true;
+    
+    sync_cout << "Writing the book file..." << sync_endl;
+    write_book(output_book_file, output_book, false);
+    sync_cout << "done..." << sync_endl;
+    
+    return true;
 }
