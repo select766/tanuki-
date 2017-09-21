@@ -123,7 +123,7 @@ bool Book::CreateScoredBook() {
 
     MemoryBook output_book;
     output_book_file = "book/" + output_book_file;
-    sync_cout << "Reading output book file: " << input_book_file << sync_endl;
+    sync_cout << "Reading output book file: " << output_book_file << sync_endl;
     read_book(output_book_file, output_book);
     sync_cout << "done..." << sync_endl;
 
