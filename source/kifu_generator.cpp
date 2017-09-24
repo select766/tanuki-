@@ -388,7 +388,7 @@ void Learner::MeasureMoveTimes() {
     // 各スレッドに持たせる
     std::mt19937_64 mt19937_64(start_time + thread_index);
 
-    std::ofstream ofs("measure_move_times.log.txt");
+    std::ofstream ofs("measure_move_times.log.12.txt");
 
     while (global_position_index < num_positions) {
         Thread& thread = *Threads[thread_index];
@@ -425,6 +425,13 @@ void Learner::MeasureMoveTimes() {
         // pos.game_ply()がこの値未満の場合はmulti pvでsearchし、ランダムに指し手を選択する
         int multi_pv_until_play = pos.game_ply() + multi_pv_moves_distribution(mt19937_64);
 
+        struct PositionRecord {
+            int play;
+            int time_ms;
+        };
+
+        std::vector<PositionRecord> position_records;
+
         Value last_value;
         while (pos.game_ply() < kMaxGamePlay &&
             !pos.is_mated() &&
@@ -440,14 +447,7 @@ void Learner::MeasureMoveTimes() {
             auto end_time = std::chrono::system_clock::now();
 
             if (multi_pv_on_this_play == 1) {
-                ofs << pos.game_ply() << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << std::endl;
-                std::cout << pos.game_ply() << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() << std::endl;
-
-                static int next_num_positions = 0;
-                if (global_position_index > next_num_positions) {
-                    std::cout << "!!! " << global_position_index << std::endl;
-                    next_num_positions += 100;
-                }
+                position_records.push_back({ pos.game_ply(), static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count()) });
             }
 
             multi_pv_on_this_play = std::min(
@@ -489,7 +489,6 @@ void Learner::MeasureMoveTimes() {
             pos.do_move(pv_move, state[pos.game_ply()]);
             // 差分計算のためevaluate()を呼び出す
             Eval::evaluate(pos);
-            ++global_position_index;
         }
 
         Color win;
@@ -515,6 +514,13 @@ void Learner::MeasureMoveTimes() {
         else {
             continue;
         }
+
+        for (const auto& position_record : position_records) {
+            ofs << position_record.play << "," << position_record.time_ms << std::endl;
+            std::cout << position_record.play << "," << position_record.time_ms << std::endl;
+        }
+        global_position_index += position_records.size();
+        std::cout << "!!!!! " << global_position_index << std::endl;
     }
 
     // 必要局面数生成したら全スレッドの探索を停止する
