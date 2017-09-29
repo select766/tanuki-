@@ -246,7 +246,11 @@ void Learner::GenerateKifu()
                 int selected_root_move_index =
                     std::uniform_int_distribution<>(0, num_valid_root_moves - 1)(mt19937_64);
                 const auto& root_move = root_moves[selected_root_move_index];
-                last_value = root_move.score;
+                // 最も良かったスコアをこの局面のスコアとして記録する
+                last_value = static_cast<Value>(INT_MIN);
+                for (const auto& root_move : root_moves) {
+                    last_value = std::max(last_value, root_move.score);
+                }
                 const std::vector<Move>& pv = root_move.pv;
 
                 // 評価値の絶対値が閾値を超えたら終了する
