@@ -862,4 +862,40 @@ void Learner::Learn(std::istringstream& iss) {
 	sync_cout << "Finished..." << sync_endl;
 }
 
+void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
+    sync_cout << "Learner::CalculateTestDataEntropy()" << sync_endl;
+
+    std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
+    int64_t num_positions_for_test = Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
+
+    sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
+    sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
+
+    auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
+    std::vector<Record> records_for_test;
+    if (!kifu_reader_for_test->Read(num_positions_for_test, records_for_test)) {
+        sync_cout << "Failed to read kifu for test." << sync_endl;
+        std::exit(1);
+    }
+
+    std::ofstream ofs("eval.csv");
+
+    double eval_entropy = 0.0;
+    double eval_winlose_cross_entropy = 0.0;
+    Position& pos = Threads[0]->rootPos;
+    for (const auto& record : records_for_test) {
+        pos.set_from_packed_sfen(record.packed);
+        double p = winning_rate(static_cast<Value>(record.value), 600.0);
+        double t = (pos.side_to_move() == record.win_color) ? 1.0 : 0.0;
+        eval_entropy += -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);
+        eval_winlose_cross_entropy += -t * std::log(p + kEps) -
+            (1.0 - t) * std::log(1.0 - p + kEps);
+        ofs << record.value << std::endl;
+    }
+
+    sync_cout << "eval_entropy=" << eval_entropy / records_for_test.size() << sync_endl;
+    sync_cout << "eval_winlose_cross_entropy=" << eval_winlose_cross_entropy / records_for_test.size() << sync_endl;
+
+}
+
 #endif // USE_EXPERIMENTAL_LEARNER

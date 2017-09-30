@@ -17,7 +17,8 @@ namespace Learner
 
 #ifdef USE_EXPERIMENTAL_LEARNER
 	void InitializeLearner(USI::OptionsMap& o);
-	void Learn(std::istringstream& iss);
+    void Learn(std::istringstream& iss);
+    void CalculateTestDataEntropy(std::istringstream& iss);
 #endif
 }
 

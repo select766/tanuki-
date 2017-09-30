@@ -774,10 +774,14 @@ void USI::loop(int argc, char* argv[])
         }
 #endif
 #ifdef USE_EXPERIMENTAL_LEARNER
-		else if (token == "learn" || token == "l") {
-			Learner::Learn(is);
-			break;
-		}
+        else if (token == "learn" || token == "l") {
+            Learner::Learn(is);
+            break;
+        }
+        else if (token == "calculate_test_data_entropy") {
+            Learner::CalculateTestDataEntropy(is);
+            break;
+        }
 #endif
 		else if (token == "shuffle_kifu") {
 			Learner::ShuffleKifu();
