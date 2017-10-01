@@ -585,10 +585,23 @@ void Learner::Learn(std::istringstream& iss) {
     std::sprintf(train_loss_file_name, "%s/loss.csv", output_folder_path_base.c_str());
     FILE* file_loss = std::fopen(train_loss_file_name, "w");
     std::fprintf(file_loss,
-                 ",train_rmse_value,train_rmse_winning_percentage,train_mean_cross_entropy,train_"
-                 "mean_cross_entropy_eval,train_mean_cross_entropy_win,test_rmse_value,test_rmse_"
-                 "winning_percentage,test_mean_cross_entropy,test_mean_cross_entropy_eval,test_"
-                 "mean_cross_entropy_win,norm,train_rmse_win_or_lose,test_rmse_win_or_lose\n");
+                 ",train_rmse_value,"
+                 "train_rmse_winning_percentage,"
+                 "train_mean_cross_entropy,"
+                 "train_mean_cross_entropy_eval,"
+                 "train_mean_cross_entropy_win,"
+                 "test_rmse_value,"
+                 "test_rmse_winning_percentage,"
+                 "test_mean_cross_entropy,"
+                 "test_mean_cross_entropy_eval,"
+                 "test_mean_cross_entropy_win,"
+                 "norm,"
+                 "train_rmse_win_or_lose,"
+                 "test_rmse_win_or_lose,"
+                 "train_mean_entropy_eval,"
+                 "train_mean_kld_eval,"
+                 "test_mean_entropy_eval,"
+                 "test_mean_kld_eval\n");
     std::fflush(file_loss);
 
     ProgressReport progress_report(max_positions_for_learning, kShowProgressAtMostSec);
@@ -611,11 +624,15 @@ void Learner::Learn(std::istringstream& iss) {
         double sum_train_cross_entropy = 0.0;
         double sum_train_cross_entropy_eval = 0.0;
         double sum_train_cross_entropy_win = 0.0;
+        double sum_train_entropy_eval = 0.0;
+        double sum_train_kld_eval = 0.0;
         double sum_test_squared_error_of_value = 0.0;
         double sum_test_squared_error_of_winning_percentage = 0.0;
         double sum_test_cross_entropy = 0.0;
         double sum_test_cross_entropy_eval = 0.0;
         double sum_test_cross_entropy_win = 0.0;
+        double sum_test_entropy_eval = 0.0;
+        double sum_test_kld_eval = 0.0;
         double sum_train_squared_error_of_win_or_lose = 0.0;
         double sum_test_squared_error_of_win_or_lose = 0.0;
 
@@ -628,15 +645,18 @@ void Learner::Learn(std::istringstream& iss) {
 #pragma omp for schedule(dynamic, 1000) reduction(+ : sum_train_squared_error_of_value) reduction( \
     + : sum_norm) reduction(+ : sum_train_squared_error_of_winning_percentage) reduction(          \
         + : sum_train_cross_entropy) reduction(+ : sum_train_cross_entropy_eval) reduction(        \
-            + : sum_train_cross_entropy_win) reduction(+ : sum_test_squared_error_of_win_or_lose)
+            + : sum_train_cross_entropy_win)                                                       \
+                reduction(+ : sum_test_squared_error_of_win_or_lose) reduction(                    \
+                    + : sum_train_entropy_eval) reduction(+ : sum_train_kld_eval)
             for (int record_index = 0; record_index < num_records; ++record_index) {
                 auto f = [value_to_winning_rate_coefficient, &weights,
                           &sum_train_squared_error_of_value, &sum_norm,
                           &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
                           &sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
-                          &sum_train_squared_error_of_win_or_lose,
-                          &progress](Value record_value, Color win_color, Value value,
-                                     Color root_color, double elmo_lambda, Position& pos) {
+                          &sum_train_squared_error_of_win_or_lose, &progress,
+                          &sum_train_entropy_eval, &sum_train_kld_eval](
+                    Value record_value, Color win_color, Value value, Color root_color,
+                    double elmo_lambda, Position& pos) {
                     // 評価値から推定した勝率の分布の交差エントロピー
                     double p = winning_rate(record_value, value_to_winning_rate_coefficient);
                     double q = winning_rate(value, value_to_winning_rate_coefficient);
@@ -657,6 +677,10 @@ void Learner::Learn(std::istringstream& iss) {
                     sum_train_cross_entropy_win += cross_entropy_win;
                     sum_train_cross_entropy +=
                         elmo_lambda * cross_entropy_eval + (1.0 - elmo_lambda) * cross_entropy_win;
+                    double entropy_eval =
+                        -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);
+                    sum_train_entropy_eval += entropy_eval;
+                    sum_train_kld_eval += cross_entropy_eval - entropy_eval;
                     sum_norm += abs(value);
                     sum_train_squared_error_of_win_or_lose += (q - t) * (q - t);
 
@@ -717,17 +741,19 @@ void Learner::Learn(std::istringstream& iss) {
 
 // 損失関数を計算する
 #pragma omp for schedule(dynamic, 1000) reduction(+ : sum_test_squared_error_of_value) reduction( \
-    + : sum_test_squared_error_of_winning_percentage) reduction(                                  \
-        + : sum_test_cross_entropy) reduction(+ : sum_test_cross_entropy_eval) reduction(         \
-            + : sum_test_cross_entropy_win) reduction(+ : sum_test_squared_error_of_win_or_lose)
+    + : sum_test_squared_error_of_winning_percentage)                                             \
+        reduction(+ : sum_test_cross_entropy) reduction(                                          \
+            + : sum_test_cross_entropy_eval) reduction(+ : sum_test_cross_entropy_win) reduction( \
+                + : sum_test_squared_error_of_win_or_lose)                                        \
+                    reduction(+ : sum_test_entropy_eval) reduction(+ : sum_test_kld_eval)
             for (int record_index = 0; record_index < num_records; ++record_index) {
                 auto f = [elmo_lambda, value_to_winning_rate_coefficient, &weights,
                           &sum_test_squared_error_of_value,
                           &sum_test_squared_error_of_winning_percentage, &sum_test_cross_entropy,
                           &sum_test_cross_entropy_eval, &sum_test_cross_entropy_win,
-                          &sum_test_squared_error_of_win_or_lose](
-                    Value record_value, Color win_color, Value value, Color root_color,
-                    double elmo_lambda, Position& pos) {
+                          &sum_test_squared_error_of_win_or_lose, &sum_test_entropy_eval,
+                          &sum_test_kld_eval](Value record_value, Color win_color, Value value,
+                                              Color root_color, double elmo_lambda, Position& pos) {
                     // 評価値から推定した勝率の分布の交差エントロピー
                     double p = winning_rate(record_value, value_to_winning_rate_coefficient);
                     double q = winning_rate(value, value_to_winning_rate_coefficient);
@@ -746,6 +772,10 @@ void Learner::Learn(std::istringstream& iss) {
                     sum_test_cross_entropy_win += cross_entropy_win;
                     sum_test_cross_entropy +=
                         elmo_lambda * cross_entropy_eval + (1.0 - elmo_lambda) * cross_entropy_win;
+                    double entropy_eval =
+                        -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);
+                    sum_test_entropy_eval += entropy_eval;
+                    sum_test_kld_eval += cross_entropy_eval - entropy_eval;
                     sum_test_squared_error_of_win_or_lose += (q - t) * (q - t);
                 };
                 Strap(records_for_test[record_index], elmo_lambda, use_progress_as_elmo_lambda,
@@ -829,7 +859,7 @@ void Learner::Learn(std::istringstream& iss) {
         }
 
         // 損失関数の値を出力する
-        fprintf(file_loss, "%I64d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
+        fprintf(file_loss, "%I64d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
                 num_processed_positions, std::sqrt(sum_train_squared_error_of_value / num_records),
                 std::sqrt(sum_train_squared_error_of_winning_percentage / num_records),
                 sum_train_cross_entropy / num_records, sum_train_cross_entropy_eval / num_records,
@@ -839,7 +869,9 @@ void Learner::Learn(std::istringstream& iss) {
                 sum_test_cross_entropy / num_records, sum_test_cross_entropy_eval / num_records,
                 sum_test_cross_entropy_win / num_records, sum_norm / num_records,
                 std::sqrt(sum_train_squared_error_of_win_or_lose / num_records),
-                std::sqrt(sum_test_squared_error_of_win_or_lose / num_records));
+                std::sqrt(sum_test_squared_error_of_win_or_lose / num_records),
+                sum_train_entropy_eval / num_records, sum_train_kld_eval / num_records,
+                sum_test_entropy_eval / num_records, sum_test_kld_eval / num_records);
         std::fflush(file_loss);
 
         num_processed_positions += num_records;
