@@ -102,10 +102,10 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
     o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
     o[kOptionGeneratorMinBookMove] << Option(0, 1, MAX_PLY);
     o[kOptionGeneratorMaxBookMove] << Option(32, 1, MAX_PLY);
-    o[kOptionGeneratorValueThreshold] << Option(3000, 0, VALUE_MATE);
+    o[kOptionGeneratorValueThreshold] << Option(32000, 0, VALUE_MATE);
     o[kOptionGeneratorMinMultiPvMoves] << Option(0, 0, MAX_PLY);
     o[kOptionGeneratorMaxMultiPvMoves] << Option(6, 0, MAX_PLY);
-    o[kOptionGeneratorMaxValueDifferenceInMultiPv] << Option(32000, 0, MAX_PLY);
+    o[kOptionGeneratorMaxValueDifferenceInMultiPv] << Option(100, 0, MAX_PLY);
 
 }
 
