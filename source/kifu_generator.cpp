@@ -2,14 +2,14 @@
 
 #include "kifu_generator.h"
 
+#include <direct.h>
+#include <omp.h>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
-#include <direct.h>
 #include <fstream>
 #include <memory>
-#include <omp.h>
 #include <random>
 #include <sstream>
 
@@ -27,72 +27,67 @@ using Search::RootMove;
 using USI::Option;
 using USI::OptionsMap;
 
-namespace Learner
-{
-    std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
-    std::pair<Value, std::vector<Move> > qsearch(Position& pos);
+namespace Learner {
+std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
+std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
-namespace
-{
-    constexpr int kMaxGamePlay = 256;
-    constexpr int kMaxSwapTrials = 10;
-    constexpr int kMaxTrialsToSelectSquares = 100;
+namespace {
+constexpr int kMaxGamePlay = 256;
+constexpr int kMaxSwapTrials = 10;
+constexpr int kMaxTrialsToSelectSquares = 100;
 
-    constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
-    constexpr char* kOptionGeneratorMinSearchDepth = "GeneratorMinSearchDepth";
-    constexpr char* kOptionGeneratorMaxSearchDepth = "GeneratorMaxSearchDepth";
-    constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
-    constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
-    constexpr char* kOptionGeneratorMinBookMove = "GeneratorMinBookMove";
-    constexpr char* kOptionGeneratorMaxBookMove = "GeneratorMaxBookMove";
-    constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
-    constexpr char* kOptionGeneratorMinMultiPvMoves = "GeneratorMinMultiPvMoves";
-    constexpr char* kOptionGeneratorMaxMultiPvMoves = "GeneratorMaxMultiPvMoves";
-    constexpr char* kOptionGeneratorMaxValueDifferenceInMultiPv = "GeneratorMaxValueDifferenceInMultiPv";
+constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
+constexpr char* kOptionGeneratorMinSearchDepth = "GeneratorMinSearchDepth";
+constexpr char* kOptionGeneratorMaxSearchDepth = "GeneratorMaxSearchDepth";
+constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
+constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
+constexpr char* kOptionGeneratorMinBookMove = "GeneratorMinBookMove";
+constexpr char* kOptionGeneratorMaxBookMove = "GeneratorMaxBookMove";
+constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+constexpr char* kOptionGeneratorMinMultiPvMoves = "GeneratorMinMultiPvMoves";
+constexpr char* kOptionGeneratorMaxMultiPvMoves = "GeneratorMaxMultiPvMoves";
+constexpr char* kOptionGeneratorMaxValueDifferenceInMultiPv =
+    "GeneratorMaxValueDifferenceInMultiPv";
 
-    std::vector<std::string> book;
-    std::uniform_real_distribution<> probability_distribution;
+std::vector<std::string> book;
+std::uniform_real_distribution<> probability_distribution;
 
-    bool ReadBook()
-    {
-        // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
-        std::string book_file_name = Options[kOptionGeneratorStartposFileName];
-        std::ifstream fs_book;
-        fs_book.open(book_file_name);
+bool ReadBook() {
+    // 定跡ファイル(というか単なる棋譜ファイル)の読み込み
+    std::string book_file_name = Options[kOptionGeneratorStartposFileName];
+    std::ifstream fs_book;
+    fs_book.open(book_file_name);
 
-        if (!fs_book.is_open())
-        {
-            sync_cout << "Error! : can't read " << book_file_name << sync_endl;
-            return false;
-        }
-
-        sync_cout << "Reading " << book_file_name << sync_endl;
-        std::string line;
-        while (!fs_book.eof())
-        {
-            std::getline(fs_book, line);
-            if (!line.empty())
-                book.push_back(line);
-            if ((book.size() % 1000) == 0)
-                std::cout << ".";
-        }
-        std::cout << std::endl;
-        sync_cout << "Book size: " << book.size() << sync_endl;
-        return true;
+    if (!fs_book.is_open()) {
+        sync_cout << "Error! : can't read " << book_file_name << sync_endl;
+        return false;
     }
 
-    template<typename T>
-    T ParseOptionOrDie(const char* name) {
-        std::string value_string = (std::string)Options[name];
-        std::istringstream iss(value_string);
-        T value;
-        if (!(iss >> value)) {
-            sync_cout << "Failed to parse an option. Exitting...: name=" << name << " value=" << value << sync_endl;
-            std::exit(1);
-        }
-        return value;
+    sync_cout << "Reading " << book_file_name << sync_endl;
+    std::string line;
+    while (!fs_book.eof()) {
+        std::getline(fs_book, line);
+        if (!line.empty()) book.push_back(line);
+        if ((book.size() % 1000) == 0) std::cout << ".";
     }
+    std::cout << std::endl;
+    sync_cout << "Book size: " << book.size() << sync_endl;
+    return true;
+}
+
+template <typename T>
+T ParseOptionOrDie(const char* name) {
+    std::string value_string = (std::string)Options[name];
+    std::istringstream iss(value_string);
+    T value;
+    if (!(iss >> value)) {
+        sync_cout << "Failed to parse an option. Exitting...: name=" << name << " value=" << value
+                  << sync_endl;
+        std::exit(1);
+    }
+    return value;
+}
 }
 
 void Learner::InitializeGenerator(USI::OptionsMap& o) {
@@ -107,11 +102,9 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
     o[kOptionGeneratorMinMultiPvMoves] << Option(0, 0, MAX_PLY);
     o[kOptionGeneratorMaxMultiPvMoves] << Option(6, 0, MAX_PLY);
     o[kOptionGeneratorMaxValueDifferenceInMultiPv] << Option(100, 0, MAX_PLY);
-
 }
 
-void Learner::GenerateKifu()
-{
+void Learner::GenerateKifu() {
 #ifdef USE_FALSE_PROBE_IN_TT
     static_assert(false, "Please undefine USE_FALSE_PROBE_IN_TT.");
 #endif
@@ -149,7 +142,8 @@ void Learner::GenerateKifu()
     std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
     int min_multi_pv_moves = Options[kOptionGeneratorMinMultiPvMoves];
     int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPvMoves];
-    std::uniform_int_distribution<> multi_pv_moves_distribution(min_multi_pv_moves, max_multi_pv_moves);
+    std::uniform_int_distribution<> multi_pv_moves_distribution(min_multi_pv_moves,
+                                                                max_multi_pv_moves);
     int multi_pv = Options["MultiPV"];
     int max_value_difference_in_multi_pv = Options[kOptionGeneratorMaxValueDifferenceInMultiPv];
 
@@ -163,7 +157,8 @@ void Learner::GenerateKifu()
     std::cout << "min_multi_pv_moves=" << min_multi_pv_moves << std::endl;
     std::cout << "max_multi_pv_moves=" << max_multi_pv_moves << std::endl;
     std::cout << "multi_pv=" << multi_pv << std::endl;
-    std::cout << "max_value_difference_in_multi_pv=" << max_value_difference_in_multi_pv << std::endl;
+    std::cout << "max_value_difference_in_multi_pv=" << max_value_difference_in_multi_pv
+              << std::endl;
 
     time_t start_time;
     std::time(&start_time);
@@ -178,8 +173,8 @@ void Learner::GenerateKifu()
         WinProcGroup::bindThisThread(thread_index);
         char output_file_path[1024];
         std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
-            output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
-            thread_index);
+                     output_file_name_tag.c_str(), min_search_depth, max_search_depth,
+                     num_positions, thread_index);
         // 各スレッドに持たせる
         std::unique_ptr<Learner::KifuWriter> kifu_writer =
             std::make_unique<Learner::KifuWriter>(output_file_path);
@@ -189,25 +184,23 @@ void Learner::GenerateKifu()
             Thread& thread = *Threads[thread_index];
             Position& pos = thread.rootPos;
             pos.set_hirate();
-            StateInfo state_infos[512] = { 0 };
+            StateInfo state_infos[512] = {0};
             StateInfo* state = state_infos + 8;
 
             const std::string& opening = book[opening_index(mt19937_64)];
             std::istringstream is(opening);
             std::string token;
             int num_book_move = num_book_move_distribution(mt19937_64);
-            while (global_position_index < num_positions && pos.game_ply() < num_book_move)
-            {
+            while (global_position_index < num_positions && pos.game_ply() < num_book_move) {
                 if (!(is >> token)) {
                     break;
                 }
-                if (token == "startpos" || token == "moves")
-                    continue;
+                if (token == "startpos" || token == "moves") continue;
 
                 Move m = move_from_usi(pos, token);
-                if (!is_ok(m) || !pos.legal(m))
-                {
-                    //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
+                if (!is_ok(m) || !pos.legal(m)) {
+                    //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " <<
+                    //  token << endl << rootPos << sync_endl;
                     // →　エラー扱いはしない。
                     break;
                 }
@@ -222,9 +215,8 @@ void Learner::GenerateKifu()
 
             std::vector<Learner::Record> records;
             Value last_value;
-            while (pos.game_ply() < kMaxGamePlay &&
-                !pos.is_mated() &&
-                pos.DeclarationWin() == MOVE_NONE) {
+            while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
+                   pos.DeclarationWin() == MOVE_NONE) {
                 pos.set_this_thread(&thread);
 
                 Move pv_move = Move::MOVE_NONE;
@@ -237,9 +229,9 @@ void Learner::GenerateKifu()
                 const auto& root_moves = pos.this_thread()->rootMoves;
                 int num_valid_root_moves = 0;
                 for (int root_move_index = 0; root_move_index < multi_pv_on_this_play;
-                    ++root_move_index) {
-                    if (root_moves[0].score > root_moves[root_move_index].score +
-                        max_value_difference_in_multi_pv) {
+                     ++root_move_index) {
+                    if (root_moves[0].score >
+                        root_moves[root_move_index].score + max_value_difference_in_multi_pv) {
                         break;
                     }
                     ++num_valid_root_moves;
@@ -270,7 +262,7 @@ void Learner::GenerateKifu()
                     break;
                 }
 
-                Learner::Record record = { 0 };
+                Learner::Record record = {0};
                 pos.sfen_pack(record.packed);
                 record.value = last_value;
                 records.push_back(record);
@@ -287,21 +279,17 @@ void Learner::GenerateKifu()
                 // 負け
                 // 詰まされた
                 win = ~pos.side_to_move();
-            }
-            else if (pos.DeclarationWin() != MOVE_NONE) {
+            } else if (pos.DeclarationWin() != MOVE_NONE) {
                 // 勝ち
                 // 入玉勝利
                 win = pos.side_to_move();
-            }
-            else if (last_value > value_threshold) {
+            } else if (last_value > value_threshold) {
                 // 勝ち
                 win = pos.side_to_move();
-            }
-            else if (last_value < -value_threshold) {
+            } else if (last_value < -value_threshold) {
                 // 負け
                 win = ~pos.side_to_move();
-            }
-            else {
+            } else {
                 continue;
             }
 
@@ -361,7 +349,8 @@ void Learner::MeasureMoveTimes() {
     std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
     int min_multi_pv_moves = Options[kOptionGeneratorMinMultiPvMoves];
     int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPvMoves];
-    std::uniform_int_distribution<> multi_pv_moves_distribution(min_multi_pv_moves, max_multi_pv_moves);
+    std::uniform_int_distribution<> multi_pv_moves_distribution(min_multi_pv_moves,
+                                                                max_multi_pv_moves);
     int multi_pv = Options["MultiPV"];
     int max_value_difference_in_multi_pv = Options[kOptionGeneratorMaxValueDifferenceInMultiPv];
 
@@ -375,7 +364,8 @@ void Learner::MeasureMoveTimes() {
     std::cout << "min_multi_pv_moves=" << min_multi_pv_moves << std::endl;
     std::cout << "max_multi_pv_moves=" << max_multi_pv_moves << std::endl;
     std::cout << "multi_pv=" << multi_pv << std::endl;
-    std::cout << "max_value_difference_in_multi_pv=" << max_value_difference_in_multi_pv << std::endl;
+    std::cout << "max_value_difference_in_multi_pv=" << max_value_difference_in_multi_pv
+              << std::endl;
 
     time_t start_time;
     std::time(&start_time);
@@ -388,8 +378,8 @@ void Learner::MeasureMoveTimes() {
     WinProcGroup::bindThisThread(thread_index);
     char output_file_path[1024];
     std::sprintf(output_file_path, "%s/kifu.%s.%d-%d.%I64d.%03d.bin", kifu_directory.c_str(),
-        output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
-        thread_index);
+                 output_file_name_tag.c_str(), min_search_depth, max_search_depth, num_positions,
+                 thread_index);
     // 各スレッドに持たせる
     std::mt19937_64 mt19937_64(start_time + thread_index);
 
@@ -399,25 +389,23 @@ void Learner::MeasureMoveTimes() {
         Thread& thread = *Threads[thread_index];
         Position& pos = thread.rootPos;
         pos.set_hirate();
-        StateInfo state_infos[512] = { 0 };
+        StateInfo state_infos[512] = {0};
         StateInfo* state = state_infos + 8;
 
         const std::string& opening = book[opening_index(mt19937_64)];
         std::istringstream is(opening);
         std::string token;
         int num_book_move = num_book_move_distribution(mt19937_64);
-        while (global_position_index < num_positions && pos.game_ply() < num_book_move)
-        {
+        while (global_position_index < num_positions && pos.game_ply() < num_book_move) {
             if (!(is >> token)) {
                 break;
             }
-            if (token == "startpos" || token == "moves")
-                continue;
+            if (token == "startpos" || token == "moves") continue;
 
             Move m = move_from_usi(pos, token);
-            if (!is_ok(m) || !pos.legal(m))
-            {
-                //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " << token << endl << rootPos << sync_endl;
+            if (!is_ok(m) || !pos.legal(m)) {
+                //  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " <<
+                //  token << endl << rootPos << sync_endl;
                 // →　エラー扱いはしない。
                 break;
             }
@@ -438,9 +426,8 @@ void Learner::MeasureMoveTimes() {
         std::vector<PositionRecord> position_records;
 
         Value last_value;
-        while (pos.game_ply() < kMaxGamePlay &&
-            !pos.is_mated() &&
-            pos.DeclarationWin() == MOVE_NONE) {
+        while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
+               pos.DeclarationWin() == MOVE_NONE) {
             pos.set_this_thread(&thread);
 
             Move pv_move = Move::MOVE_NONE;
@@ -452,18 +439,22 @@ void Learner::MeasureMoveTimes() {
             auto end_time = std::chrono::system_clock::now();
 
             if (multi_pv_on_this_play == 1) {
-                position_records.push_back({ pos.game_ply(), static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count()) });
+                position_records.push_back(
+                    {pos.game_ply(),
+                     static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          end_time - start_time)
+                                          .count())});
             }
 
-            multi_pv_on_this_play = std::min(
-                multi_pv_on_this_play, static_cast<int>(pos.this_thread()->rootMoves.size()));
+            multi_pv_on_this_play = std::min(multi_pv_on_this_play,
+                                             static_cast<int>(pos.this_thread()->rootMoves.size()));
 
             const auto& root_moves = pos.this_thread()->rootMoves;
             int num_valid_root_moves = 0;
             for (int root_move_index = 0; root_move_index < multi_pv_on_this_play;
-                ++root_move_index) {
-                if (root_moves[0].score > root_moves[root_move_index].score +
-                    max_value_difference_in_multi_pv) {
+                 ++root_move_index) {
+                if (root_moves[0].score >
+                    root_moves[root_move_index].score + max_value_difference_in_multi_pv) {
                     break;
                 }
                 ++num_valid_root_moves;
@@ -502,21 +493,17 @@ void Learner::MeasureMoveTimes() {
             // 負け
             // 詰まされた
             win = ~pos.side_to_move();
-        }
-        else if (pos.DeclarationWin() != MOVE_NONE) {
+        } else if (pos.DeclarationWin() != MOVE_NONE) {
             // 勝ち
             // 入玉勝利
             win = pos.side_to_move();
-        }
-        else if (last_value > value_threshold) {
+        } else if (last_value > value_threshold) {
             // 勝ち
             win = pos.side_to_move();
-        }
-        else if (last_value < -value_threshold) {
+        } else if (last_value < -value_threshold) {
             // 負け
             win = ~pos.side_to_move();
-        }
-        else {
+        } else {
             continue;
         }
 
@@ -533,4 +520,4 @@ void Learner::MeasureMoveTimes() {
     Search::Signals.stop = true;
 }
 
-#endif // USE_KIFU_GENERATOR
+#endif  // USE_KIFU_GENERATOR
