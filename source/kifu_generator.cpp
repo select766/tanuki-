@@ -67,7 +67,7 @@ namespace
             return false;
         }
 
-        sync_cout << "read book.sfen " << sync_endl;
+        sync_cout << "Reading " << book_file_name << sync_endl;
         std::string line;
         while (!fs_book.eof())
         {
@@ -78,6 +78,7 @@ namespace
                 std::cout << ".";
         }
         std::cout << std::endl;
+        sync_cout << "Book size: " << book.size() << sync_endl;
         return true;
     }
 
