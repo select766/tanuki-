@@ -146,6 +146,7 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
     '--book_file_name2', 'no_book',
     '--num_book_moves', '24',
     '--no_gui',
+    '--sfen_file_name', args.startpos_file_name_for_self_play,
 	]
   print(args, flush=True)
   if subprocess.run(args).returncode:
@@ -384,6 +385,12 @@ def main():
     type=str,
     required=True,
     help='"true" to use progress as elmo lambda. Otherwise, "false" ex) true')
+  parser.add_argument(
+    '--startpos_file_name_for_self_play',
+    action='store',
+    default='records_2017-05-19.sfen',
+    type=str,
+    help='')
   
   
   args = parser.parse_args()
