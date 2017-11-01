@@ -30,7 +30,7 @@ namespace TanukiColiseum
             }
             double black = blackWin / (double)(blackWin + whiteWin);
             double white = whiteWin / (double)(blackWin + whiteWin);
-            Console.WriteLine("T1,b{0},{1} - {2} - {3}({4:0.00%} R{5:0.00}) win black: white = {6:0.00%} : {7:0.00%} declaration win black={8} white={9}",
+            Console.WriteLine("T1,b{0},{1} - {2} - {3}({4:0.00%} R{5:0.00}) win black: white = {6:0.00%} : {7:0.00%} declaration win engine1={8} engine2={9}",
                 status.TimeMs, engine1Win, draw, engine2Win, winRate, rating, black, white,
                 engine1DeclarationWin, engine2DeclarationWin);
             Console.Out.Flush();
