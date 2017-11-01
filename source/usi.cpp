@@ -772,6 +772,10 @@ void USI::loop(int argc, char* argv[])
             Learner::MeasureMoveTimes();
             break;
         }
+        else if (token == "convert_sfen_to_learning_data") {
+            Learner::ConvertSfenToLearningData();
+            break;
+        }
 #endif
 #ifdef USE_EXPERIMENTAL_LEARNER
         else if (token == "learn" || token == "l") {

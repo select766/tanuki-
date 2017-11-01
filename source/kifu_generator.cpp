@@ -49,6 +49,9 @@ constexpr char* kOptionGeneratorMinMultiPvMoves = "GeneratorMinMultiPvMoves";
 constexpr char* kOptionGeneratorMaxMultiPvMoves = "GeneratorMaxMultiPvMoves";
 constexpr char* kOptionGeneratorMaxValueDifferenceInMultiPv =
     "GeneratorMaxValueDifferenceInMultiPv";
+constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName = "ConvertSfenToLearningDataInputSfenFileName";
+constexpr char* kOptionConvertSfenToLearningDataSearchDepth = "ConvertSfenToLearningDataSearchDepth";
+constexpr char* kOptionConvertSfenToLearningDataOutputFileName = "ConvertSfenToLearningDataOutputFileName";
 
 std::vector<std::string> book;
 std::uniform_real_distribution<> probability_distribution;
@@ -102,6 +105,9 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
     o[kOptionGeneratorMinMultiPvMoves] << Option(0, 0, MAX_PLY);
     o[kOptionGeneratorMaxMultiPvMoves] << Option(6, 0, MAX_PLY);
     o[kOptionGeneratorMaxValueDifferenceInMultiPv] << Option(100, 0, MAX_PLY);
+    o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
+    o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
+    o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
 }
 
 void Learner::GenerateKifu() {
@@ -126,6 +132,7 @@ void Learner::GenerateKifu() {
     limits.max_game_ply = kMaxGamePlay + 100;
     limits.depth = MAX_PLY;
     limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
     Search::Limits = limits;
 
     std::string kifu_directory = (std::string)Options["KifuDir"];
@@ -333,6 +340,7 @@ void Learner::MeasureMoveTimes() {
     limits.max_game_ply = kMaxGamePlay + 100;
     limits.depth = MAX_PLY;
     limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
     Search::Limits = limits;
 
     std::string kifu_directory = (std::string)Options["KifuDir"];
@@ -518,6 +526,124 @@ void Learner::MeasureMoveTimes() {
     // 必要局面数生成したら全スレッドの探索を停止する
     // こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
     Search::Signals.stop = true;
+}
+
+void Learner::ConvertSfenToLearningData() {
+#ifdef USE_FALSE_PROBE_IN_TT
+    static_assert(false, "Please undefine USE_FALSE_PROBE_IN_TT.");
+#endif
+
+    Eval::load_eval();
+
+    omp_set_num_threads((int)Options["Threads"]);
+
+    Search::LimitsType limits;
+    // 256手目付近で引き分けの値が返るのを防ぐため+100する
+    limits.max_game_ply = kMaxGamePlay + 100;
+    limits.depth = MAX_PLY;
+    limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
+    Search::Limits = limits;
+
+    std::string input_sfen_file_name = (std::string)Options[kOptionConvertSfenToLearningDataInputSfenFileName];
+    int search_depth = Options[kOptionConvertSfenToLearningDataSearchDepth];
+    std::string output_file_name = Options[kOptionConvertSfenToLearningDataOutputFileName];
+
+    std::cout << "input_sfen_file_name=" << input_sfen_file_name << std::endl;
+    std::cout << "search_depth=" << search_depth << std::endl;
+    std::cout << "output_file_name=" << output_file_name << std::endl;
+
+    time_t start_time;
+    std::time(&start_time);
+
+    std::vector<std::string> sfens;
+    {
+        std::ifstream ifs(input_sfen_file_name);
+        std::string sfen;
+        while (std::getline(ifs, sfen)) {
+            sfens.push_back(sfen);
+        }
+    }
+
+    // スレッド間で共有する
+    std::atomic_int64_t global_sfen_index = 0;
+    int64_t num_sfens = sfens.size();
+    ProgressReport progress_report(num_sfens, 60);
+    std::unique_ptr<Learner::KifuWriter> kifu_writer =
+        std::make_unique<Learner::KifuWriter>(output_file_name);
+    std::mutex mutex;
+#pragma omp parallel
+    {
+        int thread_index = ::omp_get_thread_num();
+        WinProcGroup::bindThisThread(thread_index);
+
+        for (int64_t sfen_index = global_sfen_index++; sfen_index < num_sfens; sfen_index = global_sfen_index++) {
+            const std::string& sfen = sfens[sfen_index];
+            Thread& thread = *Threads[thread_index];
+            Position& pos = thread.rootPos;
+            pos.set_hirate();
+            pos.set_this_thread(&thread);
+            StateInfo state_infos[2048] = { 0 };
+            StateInfo* state = state_infos + 8;
+
+            std::istringstream iss(sfen);
+            // startpos moves 7g7f 3c3d 2g2f
+            std::vector<Learner::Record> records;
+            std::string token;
+            Color win = COLOR_NB;
+            while (iss >> token) {
+                if (token == "startpos" || token == "moves") {
+                    continue;
+                }
+
+                Move m = move_from_usi(pos, token);
+                if (!is_ok(m) || !pos.legal(m)) {
+                    break;
+                }
+
+                pos.do_move(m, state[pos.game_ply()]);
+
+                Learner::search(pos, search_depth);
+                const auto& root_moves = pos.this_thread()->rootMoves;
+                const auto& root_move = root_moves[0];
+
+                Learner::Record record = { 0 };
+                pos.sfen_pack(record.packed);
+                record.value = root_move.score;
+                records.push_back(record);
+
+                if (pos.DeclarationWin()) {
+                    win = pos.side_to_move();
+                    break;
+                }
+            }
+
+            //sync_cout << pos << sync_endl;
+            //pos.DeclarationWin();
+
+            if (win == COLOR_NB) {
+                sync_cout << "Skipped..." << sync_endl;
+                continue;
+            }
+            sync_cout << "DeclarationWin..." << sync_endl;
+
+            for (auto& record : records) {
+                record.win_color = win;
+            }
+
+            std::lock_guard<std::mutex> lock_gurad(mutex);
+            {
+                for (const auto& record : records) {
+                    if (!kifu_writer->Write(record)) {
+                        sync_cout << "info string Failed to write a record." << sync_endl;
+                        std::exit(1);
+                    }
+                }
+            }
+
+            progress_report.Show(global_sfen_index);
+        }
+    }
 }
 
 #endif  // USE_KIFU_GENERATOR
