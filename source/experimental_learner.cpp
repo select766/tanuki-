@@ -519,9 +519,11 @@ void Learner::Learn(std::istringstream& iss) {
     }
 
     Search::LimitsType limits;
-    limits.max_game_ply = kMaxGamePlay;
-    limits.depth = 1;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
+    limits.depth = MAX_PLY;
     limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
     Search::Limits = limits;
 
     // 作成・破棄のコストが高いためループの外に宣言する
