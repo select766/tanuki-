@@ -1006,12 +1006,28 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
 
 namespace {
 template <typename WeightType>
-void Blend(WeightType base, WeightType another, WeightType& output) {
+void Blend(WeightType base, WeightType another, WeightType& output, int& num_zero_base,
+           int& num_zero_another, int& num_zero_both) {
+    if (base == 0) {
+        ++num_zero_base;
+    }
+    if (another == 0) {
+        ++num_zero_another;
+    }
+    if (base == 0 && another == 0) {
+        ++num_zero_both;
+    }
+
     if (base != 0) {
         output = base;
     } else {
         output = another;
     }
+
+    // double ratio = std::pow(2.0, -std::abs(base));
+    // output = static_cast<WeightType>(std::round((1.0 - ratio) * base + ratio * another));
+
+    // output = (base + another) / 2;
 }
 }
 
@@ -1028,11 +1044,15 @@ void Learner::BreedEval(std::istringstream& iss) {
     }
 
     std::unique_ptr<Weights> another_weights = std::make_unique<Weights>();
-    if (!base_weights->load(another_folder_path)) {
+    if (!another_weights->load(another_folder_path)) {
         std::exit(-1);
     }
 
     std::unique_ptr<Weights> output_weights = std::make_unique<Weights>();
+
+    int num_zero_base = 0;
+    int num_zero_another = 0;
+    int num_zero_both = 0;
 
     int vector_length = Kk::MaxIndex();
     for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
@@ -1053,7 +1073,8 @@ void Learner::BreedEval(std::istringstream& iss) {
                     output_weight = 0;
                     continue;
                 }
-                Blend(base_weight, another_weight, output_weight);
+                Blend(base_weight, another_weight, output_weight, num_zero_base, num_zero_another,
+                      num_zero_both);
             }
         } else if (Kkp::IsValid(dimension_index)) {
             Kkp kkp = Kkp::ForIndex(dimension_index);
@@ -1066,7 +1087,8 @@ void Learner::BreedEval(std::istringstream& iss) {
                     output_weight = 0;
                     continue;
                 }
-                Blend(base_weight, another_weight, output_weight);
+                Blend(base_weight, another_weight, output_weight, num_zero_base, num_zero_another,
+                      num_zero_both);
             }
         } else if (Kk::IsValid(dimension_index)) {
             Kk kk = Kk::ForIndex(dimension_index);
@@ -1074,7 +1096,8 @@ void Learner::BreedEval(std::istringstream& iss) {
                 auto base_weight = base_weights->kk[kk.king0()][kk.king1()][i];
                 auto another_weight = another_weights->kk[kk.king0()][kk.king1()][i];
                 auto& output_weight = output_weights->kk[kk.king0()][kk.king1()][i];
-                Blend(base_weight, another_weight, output_weight);
+                Blend(base_weight, another_weight, output_weight, num_zero_base, num_zero_another,
+                      num_zero_both);
             }
         } else {
             sync_cout << "Invalid dimension index." << sync_endl;
@@ -1082,7 +1105,12 @@ void Learner::BreedEval(std::istringstream& iss) {
         }
     }
 
+    output_weights->save(output_folder_path);
+
     sync_cout << "Finished..." << sync_endl;
+    sync_cout << "num_zero_base   =" << num_zero_base << sync_endl;
+    sync_cout << "num_zero_another=" << num_zero_another << sync_endl;
+    sync_cout << "num_zero_both   =" << num_zero_both << sync_endl;
 }
 
 #endif  // USE_EXPERIMENTAL_LEARNER
