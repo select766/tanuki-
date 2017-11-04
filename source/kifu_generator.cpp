@@ -128,8 +128,8 @@ void Learner::GenerateKifu() {
     omp_set_num_threads((int)Options["Threads"]);
 
     Search::LimitsType limits;
-    // 256手目付近で引き分けの値が返るのを防ぐため+100する
-    limits.max_game_ply = kMaxGamePlay + 100;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
     limits.depth = MAX_PLY;
     limits.silent = true;
     limits.enteringKingRule = EKR_27_POINT;
@@ -336,8 +336,8 @@ void Learner::MeasureMoveTimes() {
     Eval::load_eval();
 
     Search::LimitsType limits;
-    // 256手目付近で引き分けの値が返るのを防ぐため+100する
-    limits.max_game_ply = kMaxGamePlay + 100;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
     limits.depth = MAX_PLY;
     limits.silent = true;
     limits.enteringKingRule = EKR_27_POINT;
@@ -538,8 +538,8 @@ void Learner::ConvertSfenToLearningData() {
     omp_set_num_threads((int)Options["Threads"]);
 
     Search::LimitsType limits;
-    // 256手目付近で引き分けの値が返るのを防ぐため+100する
-    limits.max_game_ply = kMaxGamePlay + 100;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
     limits.depth = MAX_PLY;
     limits.silent = true;
     limits.enteringKingRule = EKR_27_POINT;

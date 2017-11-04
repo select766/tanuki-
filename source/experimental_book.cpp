@@ -41,7 +41,15 @@ bool Book::Initialize(USI::OptionsMap& o) {
 }
 
 bool Book::CreateRawBook() {
-	std::string sfen_file = Options[kBookSfenFile];
+    Search::LimitsType limits;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
+    limits.depth = MAX_PLY;
+    limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
+    Search::Limits = limits;
+    
+    std::string sfen_file = Options[kBookSfenFile];
 	int max_moves = (int)Options[kBookMaxMoves];
 
 	std::ifstream ifs(sfen_file);
@@ -101,7 +109,15 @@ bool Book::CreateRawBook() {
 }
 
 bool Book::CreateScoredBook() {
-	int num_threads = (int)Options[kThreads];
+    Search::LimitsType limits;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
+    limits.depth = MAX_PLY;
+    limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
+    Search::Limits = limits;
+    
+    int num_threads = (int)Options[kThreads];
 	std::string input_book_file = Options[kBookInputFile];
 	int search_depth = (int)Options[kBookSearchDepth];
 	int multi_pv = (int)Options[kMultiPV];
