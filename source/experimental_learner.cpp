@@ -451,7 +451,7 @@ void Learner::Learn(std::istringstream& iss) {
     static_assert(false, "Please define USE_FALSE_PROBE_IN_TT.");
 #endif
 
-    sync_cout << "Learner::Learn()" << sync_endl;
+    sync_cout << __FUNCTION__ << sync_endl;
 
     Eval::eval_learn_init();
 
@@ -884,7 +884,7 @@ void Learner::Learn(std::istringstream& iss) {
 }
 
 void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
-    sync_cout << "Learner::CalculateTestDataEntropy()" << sync_endl;
+    sync_cout << __FUNCTION__ << sync_endl;
 
     std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
     int64_t num_positions_for_test =
