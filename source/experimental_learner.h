@@ -18,6 +18,7 @@ static_assert(sizeof(Record) == 36, "Size of Record is not 36");
 void InitializeLearner(USI::OptionsMap& o);
 void Learn(std::istringstream& iss);
 void CalculateTestDataEntropy(std::istringstream& iss);
+void BreedEval(std::istringstream& iss);
 #endif
 }
 

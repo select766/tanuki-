@@ -121,6 +121,9 @@ constexpr char* kOptionValueElmoLambda = "ElmoLambda";
 constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
 constexpr char* kOptionValueUseProgressAsElmoLambda = "UseProgressAsElmoLambda";
+constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
+constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
+constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
 
 class Kpp {
    public:
@@ -337,6 +340,82 @@ class Kk {
     bool invert_sign_;
 };
 
+struct Weights {
+    typedef std::array<int16_t, 2> ValueKpp;
+    typedef std::array<int32_t, 2> ValueKkp;
+    typedef std::array<int32_t, 2> ValueKk;
+
+    static constexpr const char* kKkSynthesizedFileName = "KK_synthesized.bin";
+    static constexpr const char* kKkpSynthesizedFileName = "KKP_synthesized.bin";
+    static constexpr const char* kKppSynthesizedFileName = "KPP_synthesized.bin";
+
+    ValueKk kk[SQ_NB][SQ_NB];
+    ValueKpp kpp[SQ_NB][BonaPiece::fe_end][BonaPiece::fe_end];
+    ValueKkp kkp[SQ_NB][SQ_NB][BonaPiece::fe_end];
+
+    bool load(const std::string& folder_path) {
+        sync_cout << __FUNCTION__ << " " << folder_path << sync_endl;
+
+        // KK
+        std::ifstream ifsKK(path_combine(folder_path, kKkSynthesizedFileName), std::ios::binary);
+        if (!ifsKK) {
+            sync_cout << "Failed to open " << kKkSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ifsKK.read(reinterpret_cast<char*>(kk), sizeof(kk));
+
+        // KKP
+        std::ifstream ifsKKP(path_combine(folder_path, kKkpSynthesizedFileName), std::ios::binary);
+        if (!ifsKKP) {
+            sync_cout << "Failed to open " << kKkpSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ifsKKP.read(reinterpret_cast<char*>(kkp), sizeof(kkp));
+
+        // KPP
+        std::ifstream ifsKPP(path_combine(folder_path, kKppSynthesizedFileName), std::ios::binary);
+        if (!ifsKPP) {
+            sync_cout << "Failed to open " << kKppSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ifsKPP.read(reinterpret_cast<char*>(kpp), sizeof(kpp));
+
+        return true;
+    }
+
+    bool save(const std::string& folder_path) {
+        sync_cout << __FUNCTION__ << " " << folder_path << sync_endl;
+
+        mkdir(folder_path.c_str());
+
+        // KK
+        std::ofstream ofsKK(path_combine(folder_path, kKkSynthesizedFileName), std::ios::binary);
+        if (!ofsKK) {
+            sync_cout << "Failed to open " << kKkSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
+
+        // KKP
+        std::ofstream ofsKKP(path_combine(folder_path, kKkpSynthesizedFileName), std::ios::binary);
+        if (!ofsKKP) {
+            sync_cout << "Failed to open " << kKkpSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp));
+
+        // KPP
+        std::ofstream ofsKPP(path_combine(folder_path, kKppSynthesizedFileName), std::ios::binary);
+        if (!ofsKPP) {
+            sync_cout << "Failed to open " << kKppSynthesizedFileName << sync_endl;
+            return false;
+        }
+        ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp));
+
+        return true;
+    }
+};
+
 double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
 double winning_rate(Value value, double value_to_winning_rate_coefficient) {
@@ -444,6 +523,9 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
     o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
     o[kOptionValueAdamBeta2] << Option("0.999");
     o[kOptionValueUseProgressAsElmoLambda] << Option(false);
+    o[kOptionValueBreedEvalBaseFolderPath] << Option("eval");
+    o[kOptionValueBreedEvalAnotherFolderPath] << Option("eval");
+    o[kOptionValueBreedEvalOutputFolderPath] << Option("eval");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -918,6 +1000,87 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     sync_cout << "eval_entropy=" << eval_entropy / records_for_test.size() << sync_endl;
     sync_cout << "eval_winlose_cross_entropy="
               << eval_winlose_cross_entropy / records_for_test.size() << sync_endl;
+}
+
+namespace {
+template <typename WeightType>
+void Blend(WeightType base, WeightType another, WeightType& output) {
+    if (base != 0) {
+        output = base;
+    } else {
+        output = another;
+    }
+}
+}
+
+void Learner::BreedEval(std::istringstream& iss) {
+    sync_cout << __FUNCTION__ << sync_endl;
+
+    std::string base_folder_path = Options[kOptionValueBreedEvalBaseFolderPath];
+    std::string another_folder_path = Options[kOptionValueBreedEvalAnotherFolderPath];
+    std::string output_folder_path = Options[kOptionValueBreedEvalOutputFolderPath];
+
+    std::unique_ptr<Weights> base_weights = std::make_unique<Weights>();
+    if (!base_weights->load(base_folder_path)) {
+        std::exit(-1);
+    }
+
+    std::unique_ptr<Weights> another_weights = std::make_unique<Weights>();
+    if (!base_weights->load(another_folder_path)) {
+        std::exit(-1);
+    }
+
+    std::unique_ptr<Weights> output_weights = std::make_unique<Weights>();
+
+    int vector_length = Kk::MaxIndex();
+    for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+        if (dimension_index % 1000000 == 0) {
+            sync_cout << dimension_index << " / " << vector_length << sync_endl;
+        }
+
+        if (Kpp::IsValid(dimension_index)) {
+            Kpp kpp = Kpp::ForIndex(dimension_index);
+            for (int i = 0; i < 2; ++i) {
+                auto base_weight = base_weights->kpp[kpp.king()][kpp.piece0()][kpp.piece1()][i];
+                auto another_weight =
+                    another_weights->kpp[kpp.king()][kpp.piece0()][kpp.piece1()][i];
+                auto& output_weight =
+                    output_weights->kpp[kpp.king()][kpp.piece0()][kpp.piece1()][i];
+                if (kpp.piece0() == BonaPiece::BONA_PIECE_ZERO ||
+                    kpp.piece1() == BonaPiece::BONA_PIECE_ZERO) {
+                    output_weight = 0;
+                    continue;
+                }
+                Blend(base_weight, another_weight, output_weight);
+            }
+        } else if (Kkp::IsValid(dimension_index)) {
+            Kkp kkp = Kkp::ForIndex(dimension_index);
+            for (int i = 0; i < 2; ++i) {
+                auto base_weight = base_weights->kkp[kkp.king0()][kkp.king1()][kkp.piece()][i];
+                auto another_weight =
+                    another_weights->kkp[kkp.king0()][kkp.king1()][kkp.piece()][i];
+                auto& output_weight = output_weights->kkp[kkp.king0()][kkp.king1()][kkp.piece()][i];
+                if (kkp.piece() == BonaPiece::BONA_PIECE_ZERO) {
+                    output_weight = 0;
+                    continue;
+                }
+                Blend(base_weight, another_weight, output_weight);
+            }
+        } else if (Kk::IsValid(dimension_index)) {
+            Kk kk = Kk::ForIndex(dimension_index);
+            for (int i = 0; i < 2; ++i) {
+                auto base_weight = base_weights->kk[kk.king0()][kk.king1()][i];
+                auto another_weight = another_weights->kk[kk.king0()][kk.king1()][i];
+                auto& output_weight = output_weights->kk[kk.king0()][kk.king1()][i];
+                Blend(base_weight, another_weight, output_weight);
+            }
+        } else {
+            sync_cout << "Invalid dimension index." << sync_endl;
+            std::exit(-1);
+        }
+    }
+
+    sync_cout << "Finished..." << sync_endl;
 }
 
 #endif  // USE_EXPERIMENTAL_LEARNER

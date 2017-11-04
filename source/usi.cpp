@@ -786,6 +786,10 @@ void USI::loop(int argc, char* argv[])
             Learner::CalculateTestDataEntropy(is);
             break;
         }
+        else if (token == "breed_eval") {
+            Learner::BreedEval(is);
+            break;
+        }
 #endif
 		else if (token == "shuffle_kifu") {
 			Learner::ShuffleKifu();
