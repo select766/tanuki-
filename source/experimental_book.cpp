@@ -23,6 +23,7 @@ namespace {
 	constexpr char* kThreads = "Threads";
 	constexpr char* kMultiPV = "MultiPV";
     constexpr char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
+    constexpr char* kBookNarrowBook = "NarrowBook";
     constexpr int kShowProgressAtMostSec = 10 * 60;
 }
 
@@ -53,6 +54,7 @@ bool Book::CreateRawBook() {
     
     std::string sfen_file = Options[kBookSfenFile];
 	int max_moves = (int)Options[kBookMaxMoves];
+    bool narrow_book = static_cast<bool>(Options[kBookNarrowBook]);
 
 	std::ifstream ifs(sfen_file);
 	if (!ifs) {
@@ -91,12 +93,14 @@ bool Book::CreateRawBook() {
 
 	sync_cout << "info string |sfen_to_count|=" << sfen_to_count.size() << sync_endl;
 
-	std::vector<std::pair<std::string, int> > narrow_book(sfen_to_count.begin(), sfen_to_count.end());
-	narrow_book.erase(std::remove_if(narrow_book.begin(), narrow_book.end(), [](const auto& x) { return x.second == 1; }), narrow_book.end());
-	sync_cout << "info string |sfen_to_count|=" << narrow_book.size() << " (narrow)" << sync_endl;
+	std::vector<std::pair<std::string, int> > narrowed_book(sfen_to_count.begin(), sfen_to_count.end());
+    if (narrow_book) {
+        narrowed_book.erase(std::remove_if(narrowed_book.begin(), narrowed_book.end(), [](const auto& x) { return x.second == 1; }), narrowed_book.end());
+    }
+	sync_cout << "info string |sfen_to_count|=" << narrowed_book.size() << " (narrow)" << sync_endl;
 
 	MemoryBook memory_book;
-	for (const auto& sfen_and_count : narrow_book) {
+	for (const auto& sfen_and_count : narrowed_book) {
 		const std::string& sfen = sfen_and_count.first;
 		int count = sfen_and_count.second;
 		BookPos book_pos(Move::MOVE_NONE, Move::MOVE_NONE, 0, 0, count);
