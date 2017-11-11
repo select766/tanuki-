@@ -140,12 +140,14 @@ bool Book::CreateScoredBook() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	read_book(input_book_file, input_book);
 	sync_cout << "done..." << sync_endl;
+    sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
 
     MemoryBook output_book;
     output_book_file = "book/" + output_book_file;
     sync_cout << "Reading output book file: " << output_book_file << sync_endl;
     read_book(output_book_file, output_book);
     sync_cout << "done..." << sync_endl;
+    sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
 
     std::vector<std::string> sfens;
 	for (const auto& sfen_and_count : input_book.book_body) {
