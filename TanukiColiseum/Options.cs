@@ -29,6 +29,10 @@ namespace TanukiColiseum
         public int ProgressIntervalMs { get; set; } = 60 * 1000;
         public int NumThreads1 { get; set; } = 1;
         public int NumThreads2 { get; set; } = 1;
+        public int BookEvalDiff1 { get; set; } = 30;
+        public int BookEvalDiff2 { get; set; } = 30;
+        public string ConsiderBookMoveCount1 { get; set; } = "false";
+        public string ConsiderBookMoveCount2 { get; set; } = "false";
 
         public void Parse(string[] args)
         {
@@ -92,6 +96,18 @@ namespace TanukiColiseum
                         break;
                     case "--num_threads2":
                         NumThreads2 = int.Parse(args[++i]);
+                        break;
+                    case "--book_eval_diff1":
+                        BookEvalDiff1 = int.Parse(args[++i]);
+                        break;
+                    case "--book_eval_diff2":
+                        BookEvalDiff2 = int.Parse(args[++i]);
+                        break;
+                    case "--consider_book_move_count1":
+                        ConsiderBookMoveCount1 = args[++i];
+                        break;
+                    case "--consider_book_move_count2":
+                        ConsiderBookMoveCount2 = args[++i];
                         break;
                     default:
                         throw new ArgumentException("Unexpected option: " + args[i]);
