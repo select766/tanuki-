@@ -22,7 +22,8 @@ namespace {
 	constexpr char* kBookSavePerPositions = "BookSavePerPositions";
 	constexpr char* kThreads = "Threads";
 	constexpr char* kMultiPV = "MultiPV";
-	constexpr int kShowProgressAtMostSec = 10 * 60;
+    constexpr char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
+    constexpr int kShowProgressAtMostSec = 10 * 60;
 }
 
 namespace Learner
@@ -37,7 +38,8 @@ bool Book::Initialize(USI::OptionsMap& o) {
 	o[kBookInputFile] << Option("user_book1.db");
 	o[kBookOutputFile] << Option("user_book2.db");
 	o[kBookSavePerPositions] << Option(1000, 1, std::numeric_limits<int>::max());
-	return true;
+    o[kBookOverwriteExistingPositions] << Option(false);
+    return true;
 }
 
 bool Book::CreateRawBook() {
@@ -123,6 +125,7 @@ bool Book::CreateScoredBook() {
 	int multi_pv = (int)Options[kMultiPV];
 	std::string output_book_file = Options[kBookOutputFile];
 	int save_per_positions = (int)Options[kBookSavePerPositions];
+    bool overwrite_existing_positions = static_cast<bool>(Options[kBookOverwriteExistingPositions]);
 
 	sync_cout << "info string num_threads=" << num_threads << sync_endl;
 	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
@@ -130,6 +133,7 @@ bool Book::CreateScoredBook() {
 	sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
+    sync_cout << "info string overwrite_existing_positions=" << overwrite_existing_positions << sync_endl;
 
 	MemoryBook input_book;
 	input_book_file = "book/" + input_book_file;
@@ -145,7 +149,7 @@ bool Book::CreateScoredBook() {
 
     std::vector<std::string> sfens;
 	for (const auto& sfen_and_count : input_book.book_body) {
-        if (output_book.book_body.find(sfen_and_count.first) != output_book.book_body.end()) {
+        if (!overwrite_existing_positions && output_book.book_body.find(sfen_and_count.first) != output_book.book_body.end()) {
             continue;
         }
 		sfens.push_back(sfen_and_count.first);
