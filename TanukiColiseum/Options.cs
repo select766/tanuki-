@@ -40,6 +40,8 @@ namespace TanukiColiseum
             {
                 switch (args[i])
                 {
+                    case "TanukiColiseum.exe":
+                        break;
                     case "--engine1":
                         Engine1FilePath = args[++i];
                         break;
