@@ -768,10 +768,10 @@ void USI::loop(int argc, char* argv[])
             Learner::GenerateKifu();
             break;
         }
-        else if (token == "measure_move_times") {
-            Learner::MeasureMoveTimes();
-            break;
-        }
+        //else if (token == "measure_move_times") {
+        //    Learner::MeasureMoveTimes();
+        //    break;
+        //}
         else if (token == "convert_sfen_to_learning_data") {
             Learner::ConvertSfenToLearningData();
             break;

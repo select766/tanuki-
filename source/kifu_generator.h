@@ -8,7 +8,6 @@ namespace Learner
 #ifdef USE_KIFU_GENERATOR
 	void InitializeGenerator(USI::OptionsMap& o);
     void GenerateKifu();
-    void MeasureMoveTimes();
     void ConvertSfenToLearningData();
 #endif
 }
