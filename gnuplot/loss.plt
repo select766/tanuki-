@@ -2,21 +2,6 @@ set terminal png
 set datafile separator ","
 set grid
 
-set output "00_rmse_value.png"
-set title "rmse value"
-plot "loss.csv" using 1:2 with lines title "train" , \
-     "loss.csv" using 1:7 with lines title "test"
-
-set output "01_rmse_winning_percentage.png"
-set title "rmse winning percentage"
-plot "loss.csv" using 1:3 with lines title "train" , \
-     "loss.csv" using 1:8 with lines title "test"
-
-set output "02_rmse_win_lose.png"
-set title "rmse win lose"
-plot "loss.csv" using 1:13 with lines title "train" , \
-     "loss.csv" using 1:14 with lines title "test"
-
 set output "03_mean_cross_entropy.png"
 set title "mean cross entropy"
 plot "loss.csv" using 1:4 with lines title "train" , \
@@ -52,4 +37,23 @@ set output "09_mean_kld_eval.png"
 set title "mean kld eval"
 plot "loss.csv" using 1:16 with lines title "train" , \
      "loss.csv" using 1:18 with lines title "test"
-	
+
+set output "10_mean_eval_value.png"
+set title "mean eval value"
+plot "loss.csv" using 1:19 with lines title "train mean eval value", \
+     "loss.csv" using 1:23 with lines title "test mean eval value"
+
+set output "11_sd_eval_value.png"
+set title "sd eval value"
+plot "loss.csv" using 1:20 with lines title "train sd eval value", \
+     "loss.csv" using 1:24 with lines title "test sd eval value"
+
+set output "12_mean_abs_eval_value.png"
+set title "mean eval value"
+plot "loss.csv" using 1:21 with lines title "train mean abs eval value", \
+     "loss.csv" using 1:25 with lines title "test mean abs eval value"
+
+set output "13_sd_abs_eval_value.png"
+set title "sd eval value"
+plot "loss.csv" using 1:22 with lines title "train sd abs eval value", \
+     "loss.csv" using 1:26 with lines title "test sd abs eval value"
