@@ -552,8 +552,6 @@ void Learner::Learn(std::istringstream& iss) {
                        static_cast<int>(Eval::fe_end) * WEIGHT_KIND_NB +
                    static_cast<int>(SQ_NB) * static_cast<int>(SQ_NB) * WEIGHT_KIND_NB);
 
-    Eval::eval_learn_init();
-
     omp_set_num_threads((int)Options["Threads"]);
 
     std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
