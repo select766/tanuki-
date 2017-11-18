@@ -1012,6 +1012,15 @@ void Learner::Learn(std::istringstream& iss) {
     // 評価関数ファイルの書き出し
     Eval::save_eval();
 
+    std::fclose(file_loss);
+    file_loss = nullptr;
+
+    char current_directory_path[1024];
+    _getcwd(current_directory_path, sizeof(current_directory_path) - 1);
+    _chdir(eval_save_directory_path.c_str());
+    system("gnuplot.exe ..\\..\\..\\gnuplot\\loss.plt");
+    _chdir(current_directory_path);
+
     sync_cout << "Finished..." << sync_endl;
 }
 
