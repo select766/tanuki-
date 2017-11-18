@@ -124,6 +124,7 @@ constexpr char* kOptionValueUseProgressAsElmoLambda = "UseProgressAsElmoLambda";
 constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
 constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
+constexpr char* kOptionValueEvalSaveDir = "EvalSaveDir";
 
 class Kpp {
    public:
@@ -432,21 +433,6 @@ std::string GetDateTimeString() {
     return buffer;
 }
 
-void save_eval(const std::string& output_folder_path_base, int64_t position_index) {
-    sync_cout << "Creating a folder: output_folder_path_base=" << output_folder_path_base
-              << sync_endl;
-    _mkdir(output_folder_path_base.c_str());
-
-    char buffer[1024];
-    std::sprintf(buffer, "%s/%I64d", output_folder_path_base.c_str(), position_index);
-    std::printf("Writing eval files: %s\n", buffer);
-    std::fflush(stdout);
-    Options["EvalDir"] = buffer;
-    sync_cout << "Creating a folder: buffer=" << buffer << sync_endl;
-    _mkdir(buffer);
-    Eval::save_eval();
-}
-
 // 浅い探索付きの*Strapを行う
 // record 学習局面
 // elmo_lambda elmo lambda係数 use_progress_as_elmo_lambdaがtrueの場合、この値は無視される
@@ -554,22 +540,6 @@ void Learner::Learn(std::istringstream& iss) {
 
     omp_set_num_threads((int)Options["Threads"]);
 
-    std::string output_folder_path_base = "learner_output/" + GetDateTimeString();
-    std::string token;
-    while (iss >> token) {
-        if (token == "output_folder_path_base") {
-            iss >> output_folder_path_base;
-        }
-    }
-
-    std::vector<int64_t> write_eval_per_positions;
-    for (int64_t i = 1; i <= 20; ++i) {
-        write_eval_per_positions.push_back(i * 5'0000'0000LL);
-    }
-    write_eval_per_positions.push_back(std::numeric_limits<int64_t>::max());
-    std::sort(write_eval_per_positions.begin(), write_eval_per_positions.end());
-    int write_eval_per_positions_index = 0;
-
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
     auto kifu_reader = std::make_unique<Learner::KifuReader>((std::string)Options["KifuDir"],
@@ -636,6 +606,7 @@ void Learner::Learn(std::istringstream& iss) {
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
     double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
     bool use_progress_as_elmo_lambda = Options[kOptionValueUseProgressAsElmoLambda];
+    std::string eval_save_directory_path = (std::string)Options[kOptionValueEvalSaveDir];
 
     sync_cout << "min_learning_rate=" << min_learning_rate << sync_endl;
     sync_cout << "max_learning_rate=" << max_learning_rate << sync_endl;
@@ -651,6 +622,7 @@ void Learner::Learn(std::istringstream& iss) {
               << sync_endl;
     sync_cout << "adam_beta2=" << adam_beta2 << sync_endl;
     sync_cout << "use_progress_as_elmo_lambda=" << use_progress_as_elmo_lambda << sync_endl;
+    sync_cout << "eval_save_directory_path=" << eval_save_directory_path << sync_endl;
 
     auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
     std::vector<Record> records_for_test;
@@ -667,12 +639,10 @@ void Learner::Learn(std::istringstream& iss) {
         }
     }
 
-    // 未学習の評価関数ファイルを出力しておく
-    save_eval(output_folder_path_base, 0);
-
     // 損失関数ログの作成
+    _mkdir(eval_save_directory_path.c_str());
     char train_loss_file_name[_MAX_PATH];
-    std::sprintf(train_loss_file_name, "%s/loss.csv", output_folder_path_base.c_str());
+    std::sprintf(train_loss_file_name, "%s/loss.csv", eval_save_directory_path.c_str());
     FILE* file_loss = std::fopen(train_loss_file_name, "w");
     std::fprintf(file_loss,
                  ","
@@ -1040,7 +1010,7 @@ void Learner::Learn(std::istringstream& iss) {
     }
 
     // 評価関数ファイルの書き出し
-    save_eval(output_folder_path_base, max_positions_for_learning);
+    Eval::save_eval();
 
     sync_cout << "Finished..." << sync_endl;
 }

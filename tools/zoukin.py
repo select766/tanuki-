@@ -78,12 +78,13 @@ shuffle_kifu
 
 
 def Learn(args, eval_folder_path, kifu_folder_path, kif_for_test_folder_path,
-          new_eval_folder_path_base):
+          new_eval_folder_path):
   print(locals(), flush=True)
   input = '''usi
 setoption name Threads value {num_threads_to_learn}
 setoption name MaxMovesToDraw value 300
 setoption name EvalDir value {eval_folder_path}
+setoption name EvalSaveDir value {new_eval_folder_path}
 setoption name KifuDir value {kifu_folder_path}
 setoption name LearnerNumPositions value {num_positions_to_learn}
 setoption name MinLearningRate value {min_learning_rate}
@@ -100,14 +101,14 @@ setoption name AdamBeta2 value {adam_beta2}
 setoption name UseProgressAsElmoLambda value {use_progress_as_elmo_lambda}
 isready
 usinewgame
-learn output_folder_path_base {learner_output_folder_path_base}
+learn
 '''.format(
   num_threads_to_learn=args.num_threads_to_learn,
   eval_folder_path=eval_folder_path,
   kifu_folder_path=kifu_folder_path,
   num_positions_to_learn=args.num_positions_to_learn,
   kif_for_test_folder_path=kif_for_test_folder_path,
-  learner_output_folder_path_base=new_eval_folder_path_base,
+  new_eval_folder_path=new_eval_folder_path,
   min_learning_rate=args.min_learning_rate,
   max_learning_rate=args.max_learning_rate,
   num_learning_rate_cycles=args.num_learning_rate_cycles,
@@ -190,7 +191,7 @@ def main():
     required=True,
     help='Folder path of the inintial shuffled kifu files. ex) kifu/2017-05-25-shuffled')
   parser.add_argument(
-    '--initial_new_eval_folder_path_base',
+    '--initial_new_eval_folder_path',
     action='store',
     required=True,
     help='Folder path base of the inintial new eval files. ex) eval')
@@ -208,12 +209,12 @@ def main():
     '--generate_kifu_exe_file_path',
     action='store',
     required=True,
-    help='Exe file name of the kifu generator. ex) YaneuraOu.2016-08-05.learn.exe')
+    help='Exe file name of the kifu generator. ex) YaneuraOu.2016-08-05.generate_kifu.exe')
   parser.add_argument(
     '--learner_exe_file_path',
     action='store',
     required=True,
-    help='Exe file name of the learner. ex) YaneuraOu.2016-08-05.generate_kifu.exe')
+    help='Exe file name of the learner. ex) YaneuraOu.2016-08-05.learn.exe')
   parser.add_argument(
     '--num_threads_to_generate_kifu',
     action='store',
@@ -381,7 +382,6 @@ def main():
     type=str,
     help='')
   
-  
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
@@ -391,7 +391,7 @@ def main():
   initial_kifu_folder_path = args.initial_kifu_folder_path
   initial_kifu_for_test_folder_path = args.initial_kifu_for_test_folder_path
   initial_shuffled_kifu_folder_path = args.initial_shuffled_kifu_folder_path
-  initial_new_eval_folder_path_base = args.initial_new_eval_folder_path_base
+  initial_new_eval_folder_path = args.initial_new_eval_folder_path
   initial_state = State[args.initial_state]
   if not initial_state:
     sys.exit('Unknown initial state: %s' % args.initial_state)
@@ -424,7 +424,7 @@ def main():
   kifu_for_test_folder_path = initial_kifu_for_test_folder_path
   shuffled_kifu_folder_path = initial_shuffled_kifu_folder_path
   old_eval_folder_path = initial_eval_folder_path
-  new_eval_folder_path = os.path.join(initial_new_eval_folder_path_base, str(num_positions_to_learn))
+  new_eval_folder_path = initial_new_eval_folder_path
   state = initial_state
 
   iteration = 0
@@ -456,11 +456,10 @@ def main():
       state = State.learn
 
     elif state == State.learn:
-      new_eval_folder_path_base = os.path.join(learner_output_folder_path_base,
-                                               GetDateTimeString())
+      new_eval_folder_path = os.path.join(learner_output_folder_path_base,
+                                          GetDateTimeString())
       Learn(args, old_eval_folder_path, shuffled_kifu_folder_path, kifu_for_test_folder_path,
-            new_eval_folder_path_base)
-      new_eval_folder_path = os.path.join(new_eval_folder_path_base, str(num_positions_to_learn))
+            new_eval_folder_path)
       state = State.self_play
 
     elif state == State.self_play:
