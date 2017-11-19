@@ -79,7 +79,8 @@ struct Weight {
         WeightType mm = m / (1.0 - adam_beta1_t);
         WeightType vv = v / (1.0 - adam_beta2_t);
         WeightType delta = learning_rate * mm / (std::sqrt(vv) + kEps);
-        w -= delta;
+
+        // FOBOS L1正則化
         if (w > fobos_l1_parameter) {
             w -= fobos_l1_parameter;
         } else if (w < -fobos_l1_parameter) {
@@ -87,7 +88,12 @@ struct Weight {
         } else {
             w = 0.0;
         }
+
+        // [1711.05101] Fixing Weight Decay Regularization in Adam https://arxiv.org/abs/1711.05101
+        // FOBOS L2正則化
         w *= fobos_l2_parameter;
+
+        w -= delta;
 
         // 重みテーブルに書き戻す
         eval_weight = static_cast<T>(std::round(w));
