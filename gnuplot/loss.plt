@@ -49,11 +49,11 @@ plot "loss.csv" using 1:20 with lines title "train sd eval value", \
      "loss.csv" using 1:24 with lines title "test sd eval value"
 
 set output "12_mean_abs_eval_value.png"
-set title "mean eval value"
+set title "mean abs eval value"
 plot "loss.csv" using 1:21 with lines title "train mean abs eval value", \
      "loss.csv" using 1:25 with lines title "test mean abs eval value"
 
 set output "13_sd_abs_eval_value.png"
-set title "sd eval value"
+set title "sd abs eval value"
 plot "loss.csv" using 1:22 with lines title "train sd abs eval value", \
      "loss.csv" using 1:26 with lines title "test sd abs eval value"
