@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <direct.h>
+#include <random>
 
 #include "experimental_learner.h"
 #include "kifu_reader.h"

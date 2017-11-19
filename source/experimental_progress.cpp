@@ -1,16 +1,18 @@
 #include "experimental_progress.h"
 
+#include <ctime>
 #include <fstream>
 #include <omp.h>
+#include <random>
 #include <sstream>
 #include <vector>
-#include <ctime>
 
 #include "math.h"
 #include "misc.h"
 #include "position.h"
 #include "search.h"
 #include "shogi.h"
+#include "thread.h"
 
 #ifndef _MAX_PATH
 #   define _MAX_PATH   260
@@ -97,10 +99,11 @@ bool Progress::Learn() {
   while (std::getline(ifs, line)) {
     std::istringstream iss(line);
     std::string move_str;
+    StateInfo state_info[1024] = { 0 };
+    StateInfo* state = state_info + 8;
     Position pos;
-    pos.set_hirate();
+    pos.set_hirate(state, Threads[0]);
     std::vector<Move> game;
-    auto state_stack = Search::StateStackPtr(new aligned_stack<StateInfo>);
     while (iss >> move_str) {
       if (move_str == "startpos" || move_str == "moves") {
         continue;
@@ -111,8 +114,7 @@ bool Progress::Learn() {
         break;
       }
 
-      state_stack->push(StateInfo());
-      pos.do_move(move, state_stack->top());
+      pos.do_move(move, state[pos.game_ply()]);
       game.push_back(move);
     }
 
@@ -166,13 +168,14 @@ bool Progress::Learn() {
     for (int game_index = 0; game_index < num_games_for_training; ++game_index) {
       int thread_index = ::omp_get_thread_num();
       const auto& game = games_for_training[game_index];
+      StateInfo state_info[1024] = { 0 };
+      StateInfo* state = state_info + 8;
       Position pos;
-      pos.set_hirate();
+      pos.set_hirate(state, Threads[thread_index]);
       int num_moves = static_cast<int>(game.size());
       //sync_cout << "num_moves: " << num_moves << sync_endl;
-      StateInfo state_infos[300] = {{ 0 }};
       for (int move_index = 0; move_index < num_moves; ++move_index) {
-        pos.do_move(game[move_index], state_infos[move_index]);
+        pos.do_move(game[move_index], state[pos.game_ply()]);
 
         double expected = move_index / static_cast<double>(num_moves - 1);
         double actual = Estimate(pos);
@@ -192,7 +195,7 @@ bool Progress::Learn() {
         Square sq_wk = Inv(pos.king_square(WHITE));
         const auto& list0 = pos.eval_list()->piece_list_fb();
         const auto& list1 = pos.eval_list()->piece_list_fw();
-        for (int i = 0; i < PIECE_NO_KING; ++i) {
+        for (int i = 0; i < PIECE_NUMBER_KING; ++i) {
           int black_index = sq_bk * static_cast<int>(Eval::fe_end) + list0[i];
           sum_gradients[thread_index][black_index] += g;
           int white_index = sq_wk * static_cast<int>(Eval::fe_end) + list1[i];
@@ -209,12 +212,13 @@ bool Progress::Learn() {
     for (int game_index = 0; game_index < num_games_for_testing; ++game_index) {
       int thread_index = ::omp_get_thread_num();
       const auto& game = games_for_testing[game_index];
+      StateInfo state_info[1024] = { 0 };
+      StateInfo* state = state_info + 8;
       Position pos;
-      pos.set_hirate();
+      pos.set_hirate(state, Threads[thread_index]);
       int num_moves = static_cast<int>(game.size());
-      StateInfo state_infos[300] = {{ 0 }};
       for (int move_index = 0; move_index < num_moves; ++move_index) {
-        pos.do_move(game[move_index], state_infos[move_index]);
+        pos.do_move(game[move_index], state[move_index]);
 
         double expected = move_index / static_cast<double>(num_moves - 1);
         double actual = Estimate(pos);
@@ -273,7 +277,7 @@ double Progress::Estimate(const Position& pos) {
   const auto& list0 = pos.eval_list()->piece_list_fb();
   const auto& list1 = pos.eval_list()->piece_list_fw();
   double sum = 0.0;
-  for (int i = 0; i < PIECE_NO_KING; ++i) {
+  for (int i = 0; i < PIECE_NUMBER_KING; ++i) {
     sum += weights_[sq_bk][list0[i]];
     sum += weights_[sq_wk][list1[i]];
   }

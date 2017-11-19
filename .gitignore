@@ -10,10 +10,21 @@
 YaneuraOu_backup*.lnk
 バージョン履歴.txt
 実験記録*.txt
+開発メモ2017.txt
+コマンドのメモ.txt
+計測資料.txt
 *.bak
-evaluate_kppt_fast_body.cpp
 *Private.*
 *.vspx
+
+# experimental
+
+evaluate_experimental.*
+evaluate_ppap*
+evaluate_nabla*
+evaluate_akashic*
+evaluate_helices*
+2017-goku-engine/
 
 # cf. https://twitter.com/496_/status/673758920846917632
 YaneuraOu.VC.opendb
@@ -41,6 +52,7 @@ build/
 bld/
 [Bb]in/
 [Oo]bj/
+exe/
 
 # Visual Studio 2015 cache/options directory
 .vs/

@@ -37,11 +37,11 @@ Bitboard RANK9_BB = Bitboard(UINT64_C(0x40201008040201) << 8, 0x201 << 8);
 Bitboard FILE_BB[FILE_NB] = { FILE1_BB,FILE2_BB,FILE3_BB,FILE4_BB,FILE5_BB,FILE6_BB,FILE7_BB,FILE8_BB,FILE9_BB };
 Bitboard RANK_BB[RANK_NB] = { RANK1_BB,RANK2_BB,RANK3_BB,RANK4_BB,RANK5_BB,RANK6_BB,RANK7_BB,RANK8_BB,RANK9_BB };
 
-Bitboard InFrontBB[COLOR_NB][RANK_NB] = {
-  { ZERO_BB,RANK1_BB, RANK1_BB | RANK2_BB , RANK1_BB | RANK2_BB | RANK3_BB , RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB,
-  ~(RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB) , ~(RANK9_BB | RANK8_BB | RANK7_BB),~(RANK9_BB | RANK8_BB),~RANK9_BB },
-  { ~RANK1_BB , ~(RANK1_BB | RANK2_BB) , ~(RANK1_BB | RANK2_BB | RANK3_BB),~(RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB),
-  RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB , RANK9_BB | RANK8_BB | RANK7_BB , RANK9_BB | RANK8_BB , RANK9_BB , ZERO_BB }
+Bitboard ForwardRanksBB[COLOR_NB][RANK_NB] = {
+  { ZERO_BB, RANK1_BB, RANK1_BB | RANK2_BB, RANK1_BB | RANK2_BB | RANK3_BB, RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB,
+  ~(RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB), ~(RANK9_BB | RANK8_BB | RANK7_BB), ~(RANK9_BB | RANK8_BB), ~RANK9_BB },
+  { ~RANK1_BB, ~(RANK1_BB | RANK2_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB),
+  RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB, RANK9_BB | RANK8_BB | RANK7_BB, RANK9_BB | RANK8_BB, RANK9_BB, ZERO_BB }
 };
 
 // 敵陣を表現するBitboard。
@@ -71,8 +71,8 @@ Bitboard BishopEffectMask[2][SQ_NB_PLUS1];
 int BishopEffectIndex[2][SQ_NB_PLUS1];
 
 // 飛車の縦、横の利き
-u64      RookEffectFile[RANK_NB + 1][128];
-Bitboard RookEffectRank[FILE_NB + 1][128];
+u64      RookFileEffect[RANK_NB + 1][128];
+Bitboard RookRankEffect[FILE_NB + 1][128];
 
 // 歩が打てる筋を得るためのBitboard
 // bit0 = 9筋に歩が打てないなら1 , bit1 = 8筋に… , bit8 = 1筋に歩が打てないなら1
@@ -80,14 +80,14 @@ Bitboard RookEffectRank[FILE_NB + 1][128];
 // テーブルサイズが大きくなるのが嫌だったので2つに分割。
 Bitboard PAWN_DROP_MASK_BB[0x80]; // p[0]には1～7筋 、p[1]には8,9筋のときのデータが入っている。
 
-Bitboard BetweenBB[SQ_NB_PLUS1][SQ_NB_PLUS1];
-Bitboard LineBB[SQ_NB_PLUS1][SQ_NB_PLUS1];
-Bitboard CheckCandidateBB[SQ_NB_PLUS1][KING][COLOR_NB];
+// LineBBは、王手の指し手生成からしか使っていないが、move_pickerからQUIET_CHECKS呼び出しているので…。
+// そして、配列シュリンクした。
+Bitboard LineBB[SQ_NB][4];
 
-// SquareからSquareWithWallへの変換テーブル
-SquareWithWall sqww_table[SQ_NB_PLUS1];
+Bitboard CheckCandidateBB[SQ_NB_PLUS1][KING-1][COLOR_NB];
+Bitboard CheckCandidateKingBB[SQ_NB_PLUS1];
 
-int Slide[SQ_NB_PLUS1] = {
+u8 Slide[SQ_NB_PLUS1] = {
   1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
   10, 10, 10, 10, 10, 10, 10, 10, 10,
   19, 19, 19, 19, 19, 19, 19, 19, 19,
@@ -99,6 +99,12 @@ int Slide[SQ_NB_PLUS1] = {
   10, 10, 10, 10, 10, 10, 10, 10, 10,
   0 , // SQ_NB用
 };
+
+Bitboard BetweenBB[785];
+u16 BetweenIndex[SQ_NB_PLUS1][SQ_NB_PLUS1];
+
+// SquareからSquareWithWallへの変換テーブル
+SquareWithWall sqww_table[SQ_NB_PLUS1];
 
 // Bitboardを表示する(USI形式ではない) デバッグ用
 std::ostream& operator<<(std::ostream& os, const Bitboard& board)
@@ -314,7 +320,7 @@ void Bitboards::init()
 				if (ii & (1 << r))
 					break;
 			}
-			RookEffectFile[rank][i] = bb.p[0];
+			RookFileEffect[rank][i] = bb.p[0];
 			// RookEffectFile[RANK_NB][x] には値を代入していないがC++の規約によりゼロ初期化されている。
 		}
 	}
@@ -342,8 +348,8 @@ void Bitboards::init()
 				if (ii & (1 << f))
 					break;
 			}
-			RookEffectRank[file][i] = bb;
-			// RookEffectRank[FILE_NB][x] には値を代入していないがC++の規約によりゼロ初期化されている。
+			RookRankEffect[file][i] = bb;
+			// RookRankEffect[FILE_NB][x] には値を代入していないがC++の規約によりゼロ初期化されている。
 		}
 	}
 
@@ -360,7 +366,7 @@ void Bitboards::init()
 		for(auto sq : SQ)
 			// 障害物がないときの香の利き
 			// これを最初に初期化しないとlanceEffect()が使えない。
-			LanceStepEffectBB[sq][c] = rookEffectFile(sq,ZERO_BB) & InFrontBB[c][rank_of(sq)];
+			LanceStepEffectBB[sq][c] = rookFileEffect(sq,ZERO_BB) & ForwardRanksBB[c][rank_of(sq)];
 
 	for (auto c : COLOR)
 		for (auto sq : SQ)
@@ -428,28 +434,67 @@ void Bitboards::init()
 	}
 
 	// 8) BetweenBB , LineBBの初期化
+	{
+		u16 between_index = 1;
+		// BetweenBB[0] == ZERO_BBであることを保証する。
 
-	for (auto s1 : SQ)
-		for (auto s2 : SQ)
-		{
-			// 方角を用いるテーブルの初期化
-			if (Effect8::directions_of(s1, s2))
+		for (auto s1 : SQ)
+			for (auto s2 : SQ)
 			{
-				// 間に挟まれた升を1に
-				Square delta = (s2 - s1) / dist(s1, s2);
-				for (Square s = s1 + delta; s != s2; s += delta)
-					BetweenBB[s1][s2] |= s;
+				// 十字方向か、斜め方向かだけを判定して、例えば十字方向なら
+				// rookEffect(sq1,Bitboard(s2)) & rookEffect(sq2,Bitboard(s1))
+				// のように初期化したほうが明快なコードだが、この初期化をそこに依存したくないので愚直にやる。
+					
+				// これについてはあとで設定する。
+				if (s1 >= s2)
+					continue;
 
-				// 間に挟まれてない升も1に
-				LineBB[s1][s2] = BetweenBB[s1][s2];
+				// 方角を用いるテーブルの初期化
+				if (Effect8::directions_of(s1, s2))
+				{
+					Bitboard bb = ZERO_BB;
+					// 間に挟まれた升を1に
+					Square delta = (s2 - s1) / dist(s1, s2);
+					for (Square s = s1 + delta; s != s2; s += delta)
+						bb |= s;
 
-				// 壁に当たるまでs1から-delta方向に延長
-				for (Square s = s1; dist(s, s + delta) <= 1; s -= delta) LineBB[s1][s2] |= s;
+					// ZERO_BBなら、このindexとしては0を指しておけば良いので書き換える必要ない。
+					if (!bb)
+						continue;
 
-				// 壁に当たるまでs2から+delta方向に延長
-				for (Square s = s2; dist(s, s - delta) <= 1; s += delta) LineBB[s1][s2] |= s;
+					BetweenIndex[s1][s2] = between_index;
+					BetweenBB[between_index++] = bb;
+				}
 			}
+
+		ASSERT_LV1(between_index == 785);
+
+		// 対称性を考慮して、さらにシュリンクする。
+		for (auto s1 : SQ)
+			for (auto s2 : SQ)
+				if (s1 > s2)
+					BetweenIndex[s1][s2] = BetweenIndex[s2][s1];
+
+	}
+	for (auto s1 : SQ)
+		for (int d = 0; d < 4; ++d)
+		{
+			// BishopEffect0 , RookRankEffect , BishopEffect1 , RookFileEffectを用いて初期化したほうが
+			// 明快なコードだが、この初期化をそこに依存したくないので愚直にやる。
+
+			const Square deltas[4] = { SQ_RU , SQ_R , SQ_RD , SQ_U };
+			const Square delta = deltas[d];
+			Bitboard bb = Bitboard(s1);
+
+			// 壁に当たるまでs1から-delta方向に延長
+			for (Square s = s1; dist(s, s - delta) <= 1; s -= delta) bb |= (s - delta);
+
+			// 壁に当たるまでs1から+delta方向に延長
+			for (Square s = s1; dist(s, s + delta) <= 1; s += delta) bb |= (s + delta);
+
+			LineBB[s1][d] = bb;
 		}
+
 
 	// 9) 王手となる候補の駒のテーブル初期化(王手の指し手生成に必要。やねうら王nanoでは削除予定)
 
@@ -517,7 +562,7 @@ void Bitboards::init()
 			// 王(24近傍が格納される)
 			target = ZERO_BB;
 			FOREACH_KING(kingEffect(ksq), kingEffect);
-			CheckCandidateBB[ksq][KING - 1][Us] = target & ~Bitboard(ksq);
+			CheckCandidateKingBB[ksq] = target & ~Bitboard(ksq);
 		}
 
 	// 10. LONG_EFFECT_LIBRARYの初期化

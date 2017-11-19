@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "extra/book.h"
+#include "extra/book/book.h"
 #include "misc.h"
 #include "position.h"
 #include "progress_report.h"
@@ -62,14 +62,14 @@ bool Book::CreateRawBook() {
     }
     std::string line;
 
-    StateInfo state_info[512];
-    memset(state_info, 0, sizeof(state_info));
+    StateInfo state_info[1024] = { 0 };
+    StateInfo* state = state_info + 8;
     std::map<std::string, int> sfen_to_count;
     int num_records = 0;
     while (std::getline(ifs, line)) {
         std::istringstream iss(line);
         Position pos;
-        pos.set_hirate();
+        pos.set_hirate(state, Threads[0]);
         ++sfen_to_count[pos.sfen()];
 
         std::string token;
@@ -79,7 +79,7 @@ bool Book::CreateRawBook() {
                 continue;
             }
             Move move = move_from_usi(pos, token);
-            pos.do_move(move, state_info[num_moves + 5]);
+            pos.do_move(move, state[num_moves]);
             ++sfen_to_count[pos.sfen()];
             ++num_moves;
         }
@@ -106,12 +106,12 @@ bool Book::CreateRawBook() {
         const std::string& sfen = sfen_and_count.first;
         int count = sfen_and_count.second;
         BookPos book_pos(Move::MOVE_NONE, Move::MOVE_NONE, 0, 0, count);
-        insert_book_pos(memory_book, sfen, book_pos);
+        memory_book.insert(sfen, book_pos);
     }
 
     std::string book_file = Options[kBookFile];
     book_file = "book/" + book_file;
-    write_book(book_file, memory_book, true);
+    memory_book.write_book(book_file, true);
 
     return true;
 }
@@ -145,14 +145,14 @@ bool Book::CreateScoredBook() {
     MemoryBook input_book;
     input_book_file = "book/" + input_book_file;
     sync_cout << "Reading input book file: " << input_book_file << sync_endl;
-    read_book(input_book_file, input_book);
+    input_book.read_book(input_book_file);
     sync_cout << "done..." << sync_endl;
     sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
 
     MemoryBook output_book;
     output_book_file = "book/" + output_book_file;
     sync_cout << "Reading output book file: " << output_book_file << sync_endl;
-    read_book(output_book_file, output_book);
+    output_book.read_book(output_book_file);
     sync_cout << "done..." << sync_endl;
     sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
 
@@ -188,11 +188,9 @@ bool Book::CreateScoredBook() {
                  position_index = global_pos_index++) {
                 const std::string& sfen = sfens[position_index];
                 Thread& thread = *Threads[thread_index];
+                StateInfo state_info = { 0 };
                 Position& pos = thread.rootPos;
-                pos.set(sfen);
-                // Position::set()で内容が全てクリアされるので
-                // 後からset_this_thread()を行う。
-                pos.set_this_thread(&thread);
+                pos.set(sfen, &state_info, &thread);
 
                 if (pos.is_mated()) {
                     continue;
@@ -215,7 +213,7 @@ bool Book::CreateScoredBook() {
                     BookPos book_pos(best, next, value, search_depth, 0);
                     {
                         std::lock_guard<std::mutex> lock(output_book_mutex);
-                        insert_book_pos(output_book, sfen, book_pos);
+                        output_book.insert(sfen, book_pos);
                     }
                 }
 
@@ -225,7 +223,7 @@ bool Book::CreateScoredBook() {
                 if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
                     std::lock_guard<std::mutex> lock(output_book_mutex);
                     sync_cout << "Writing the book file..." << sync_endl;
-                    write_book(output_book_file, output_book, false);
+                    output_book.write_book(output_book_file, false);
                     sync_cout << "done..." << sync_endl;
                 }
             }
@@ -237,7 +235,7 @@ bool Book::CreateScoredBook() {
     }
 
     sync_cout << "Writing the book file..." << sync_endl;
-    write_book(output_book_file, output_book, false);
+    output_book.write_book(output_book_file, false);
     sync_cout << "done..." << sync_endl;
 
     return true;

@@ -41,6 +41,14 @@
       <Configuration>Release-2017Early-sse42</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-2017EarlyLearn|Win32">
+      <Configuration>Release-2017EarlyLearn</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release-2017EarlyLearn|x64">
+      <Configuration>Release-2017EarlyLearn</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release-2017Early|Win32">
       <Configuration>Release-2017Early</Configuration>
       <Platform>Win32</Platform>
@@ -134,6 +142,7 @@
     <ProjectGuid>{28C8605A-4E8E-4F59-99B5-96F545BC7D5E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>YaneuraOu</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Early|Win32'" Label="Configuration">
@@ -161,6 +170,13 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
@@ -213,6 +229,13 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
@@ -390,6 +413,13 @@
     <Import Project="props\YaneuraOuEdition-2017Early.props" />
     <Import Project="props\YaneuraOuCpu-x86-nosse.props" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="props\YaneuraOu-common.props" />
+    <Import Project="props\YaneuraOuSolution-release-win32.props" />
+    <Import Project="props\YaneuraOuEdition-2017Early.props" />
+    <Import Project="props\YaneuraOuCpu-x86-nosse.props" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="props\YaneuraOu-common.props" />
@@ -440,6 +470,13 @@
     <Import Project="props\YaneuraOuCpu-x64-avx2.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="props\YaneuraOu-common.props" />
+    <Import Project="props\YaneuraOuSolution-release-x64.props" />
+    <Import Project="props\YaneuraOuEdition-2017Early.props" />
+    <Import Project="props\YaneuraOuCpu-x64-avx2.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="props\YaneuraOu-common.props" />
     <Import Project="props\YaneuraOuSolution-release-x64.props" />
@@ -584,70 +621,182 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-mate|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-user|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Goku|Win32'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Early|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-mate|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-user|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Goku|x64'" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Early|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-mate|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-user|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-2017Goku|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|Win32'" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user|Win32'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse2|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse41|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse42|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse42|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse41|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse2|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse42|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse41|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse2|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse42|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse41|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse2|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-KifuGenerator|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-KifuGenerator|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-Learner|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-Learner|x64'" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017EarlyLearn|x64'">
+    <ClCompile>
+      <OpenMPSupport>true</OpenMPSupport>
+      <PreprocessorDefinitions>USE_AVX2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse2|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse41|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early-sse42|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse42|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse41|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Goku-sse2|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse42|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse41|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse2|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse42|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse41|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse2|x64'">
+    <ClCompile>
+      <OpenMPSupport>
+      </OpenMPSupport>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bitboard.h" />
-    <ClInclude Include="engine\2016-late-engine\2016-late-param.h" />
-    <ClInclude Include="engine\2016-late-engine\2016-late-param_body.h" />
-    <ClInclude Include="engine\2016-mid-engine\2016-mid-param.h" />
     <ClInclude Include="engine\2017-early-engine\2017-early-param.h" />
-    <ClInclude Include="engine\check-shogi-engine\check-shogi-param.h" />
     <ClInclude Include="engine\help-mate-engine\help-mate-search.h" />
     <ClInclude Include="engine\mate-engine\mate-search.h" />
-    <ClInclude Include="engine\must-capture-shogi-engine\must-capture-shogi-param.h" />
     <ClInclude Include="evaluate.h" />
-    <ClInclude Include="eval\evaluate_kppt.h" />
-    <ClInclude Include="eval\kppt_evalsum.h" />
-    <ClInclude Include="eval\progress.h" />
-    <ClInclude Include="experimental_learner.h" />
+    <ClInclude Include="eval\evaluate_io.h" />
+    <ClInclude Include="eval\evaluate_common.h" />
+    <ClInclude Include="eval\evalsum.h" />
+    <ClInclude Include="eval\evaluate_mir_inv_tools.h" />
+    <ClInclude Include="eval\kkppt\evaluate_kkppt.h" />
+    <ClInclude Include="eval\kkpp_kkpt\evaluate_kkpp_kkpt.h" />
+    <ClInclude Include="eval\kpppt\evaluate_kpppt.h" />
+    <ClInclude Include="eval\kppp_kkpt\evaluate_kppp_kkpt.h" />
+    <ClInclude Include="eval\kppt\evaluate_kppt.h" />
+    <ClInclude Include="eval\kpp_kkpt\evaluate_kpp_kkpt.h" />
+    <ClInclude Include="eval\kpp_kkpt_fv_var\evaluate_kpp_kkpt_fv_var.h" />
     <ClInclude Include="experimental_book.h" />
+    <ClInclude Include="experimental_learner.h" />
+    <ClInclude Include="experimental_progress.h" />
     <ClInclude Include="extra\all.h" />
     <ClInclude Include="extra\bitop.h" />
     <ClInclude Include="extra\book\apery_book.h" />
     <ClInclude Include="extra\book\book.h" />
     <ClInclude Include="extra\book\mt64bit.h" />
     <ClInclude Include="extra\config.h" />
-    <ClInclude Include="extra\long_effect.h" />
     <ClInclude Include="extra\key128.h" />
+    <ClInclude Include="extra\kif_converter\kif_convert_consts.h" />
+    <ClInclude Include="extra\kif_converter\kif_convert_tools.h" />
+    <ClInclude Include="extra\long_effect.h" />
     <ClInclude Include="extra\macros.h" />
     <ClInclude Include="extra\mate\mate1ply.h" />
-    <ClInclude Include="extra\move_picker\move_picker_2015.h" />
-    <ClInclude Include="extra\move_picker\move_picker_2016Q2.h" />
-    <ClInclude Include="extra\move_picker\move_picker_2016Q3.h" />
-    <ClInclude Include="extra\move_picker\move_picker_2017Q2.h" />
+    <ClInclude Include="extra\thread_win32.h" />
     <ClInclude Include="kifu_converter.hpp" />
     <ClInclude Include="kifu_generator.h" />
     <ClInclude Include="kifu_reader.h" />
     <ClInclude Include="kifu_shuffler.h" />
     <ClInclude Include="kifu_writer.h" />
+    <ClInclude Include="learn\half_float.h" />
     <ClInclude Include="learn\learn.h" />
+    <ClInclude Include="learn\learning_tools.h" />
     <ClInclude Include="learn\multi_think.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="move_picker.h" />
@@ -660,42 +809,42 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bitboard.cpp" />
-    <ClCompile Include="engine\2016-late-engine\2016-late-search.cpp" />
-    <ClCompile Include="engine\2016-mid-engine\2016-mid-search.cpp" />
     <ClCompile Include="engine\2017-early-engine\2017-early-search.cpp" />
-    <ClCompile Include="engine\check-shogi-engine\check-shogi.cpp" />
-    <ClCompile Include="engine\classic-engine\classic-search.cpp" />
-    <ClCompile Include="engine\classic-tce-engine\classic-tce-search.cpp" />
     <ClCompile Include="engine\help-mate-engine\help-mate-search.cpp" />
     <ClCompile Include="engine\local-game-server\local-game-server.cpp" />
     <ClCompile Include="engine\mate-engine\mate-search.cpp" />
-    <ClCompile Include="engine\mini-engine\mini-search.cpp" />
-    <ClCompile Include="engine\must-capture-shogi-engine\must-capture-shogi.cpp" />
-    <ClCompile Include="engine\nano-engine\nano-search.cpp" />
-    <ClCompile Include="engine\nano-plus-engine\nano-plus-search.cpp" />
-    <ClCompile Include="engine\random-player-engine\random-player-search.cpp" />
     <ClCompile Include="engine\user-engine\user-search.cpp" />
     <ClCompile Include="eval\evaluate_bona_piece.cpp" />
-    <ClCompile Include="eval\evaluate_kkpt.cpp" />
-    <ClCompile Include="eval\evaluate_kpp.cpp" />
-    <ClCompile Include="eval\evaluate_kppt.cpp" />
-    <ClCompile Include="eval\evaluate_material.cpp" />
-    <ClCompile Include="eval\evaluate_no_eval.cpp" />
-    <ClCompile Include="eval\progress.cpp" />
-    <ClCompile Include="experimental_learner.cpp" />
-    <ClCompile Include="extra\benchmark.cpp" />
+    <ClCompile Include="eval\evaluate_io.cpp" />
+    <ClCompile Include="eval\evaluate.cpp" />
+    <ClCompile Include="eval\evaluate_mir_inv_tools.cpp" />
+    <ClCompile Include="eval\kkppt\evaluate_kkppt.cpp" />
+    <ClCompile Include="eval\kkppt\evaluate_kkppt_learner.cpp" />
+    <ClCompile Include="eval\kkpp_kkpt\evaluate_kkpp_kkpt.cpp" />
+    <ClCompile Include="eval\kkpp_kkpt\evaluate_kkpp_kkpt_learner.cpp" />
+    <ClCompile Include="eval\kpppt\evaluate_kpppt.cpp" />
+    <ClCompile Include="eval\kpppt\evaluate_kpppt_learner.cpp" />
+    <ClCompile Include="eval\kppp_kkpt\evaluate_kppp_kkpt.cpp" />
+    <ClCompile Include="eval\kppp_kkpt\evaluate_kppp_kkpt_learner.cpp" />
+    <ClCompile Include="eval\kppt\evaluate_kppt.cpp" />
+    <ClCompile Include="eval\kppt\evaluate_kppt_learner.cpp" />
+    <ClCompile Include="eval\kpp_kkpt\evaluate_kpp_kkpt.cpp" />
+    <ClCompile Include="eval\kpp_kkpt\evaluate_kpp_kkpt_learner.cpp" />
+    <ClCompile Include="eval\kpp_kkpt_fv_var\evaluate_kpp_kkpt_fv_var.cpp" />
+    <ClCompile Include="eval\kpp_kkpt_fv_var\evaluate_kpp_kkpt_fv_var_learner.cpp" />
     <ClCompile Include="experimental_book.cpp" />
+    <ClCompile Include="experimental_learner.cpp" />
+    <ClCompile Include="experimental_progress.cpp" />
+    <ClCompile Include="extra\benchmark.cpp" />
     <ClCompile Include="extra\bitop.cpp" />
     <ClCompile Include="extra\book\apery_book.cpp" />
     <ClCompile Include="extra\book\book.cpp" />
     <ClCompile Include="extra\entering_king_win.cpp" />
+    <ClCompile Include="extra\kif_converter\kif_convert_tools.cpp" />
     <ClCompile Include="extra\long_effect.cpp" />
     <ClCompile Include="extra\mate\mate1ply_without_effect.cpp" />
     <ClCompile Include="extra\mate\mate1ply_with_effect.cpp" />
     <ClCompile Include="extra\mate\mate_n_ply.cpp" />
-    <ClCompile Include="extra\move_picker\move_picker_2016Q2.cpp" />
-    <ClCompile Include="extra\move_picker\move_picker_2016Q3.cpp" />
-    <ClCompile Include="extra\move_picker\move_picker_2017Q2.cpp" />
     <ClCompile Include="extra\see.cpp" />
     <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
@@ -705,11 +854,12 @@
     <ClCompile Include="kifu_reader.cpp" />
     <ClCompile Include="kifu_shuffler.cpp" />
     <ClCompile Include="kifu_writer.cpp" />
-    <ClCompile Include="learn\evaluate_kppt_learn.cpp" />
     <ClCompile Include="learn\learner.cpp" />
+    <ClCompile Include="learn\learning_tools.cpp" />
     <ClCompile Include="learn\multi_think.cpp" />
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
+    <ClCompile Include="move_picker.cpp" />
     <ClCompile Include="progress_report.cpp" />
     <ClCompile Include="shogi.cpp" />
     <ClCompile Include="position.cpp" />
@@ -722,13 +872,10 @@
     <Text Include="..\docs\やねうら大定跡.txt" />
     <Text Include="..\docs\更新履歴.txt" />
     <Text Include="..\docs\解説.txt" />
-    <Text Include="..\docs\開発メモ2017.txt" />
-    <Text Include="..\exe\eval\readme.txt" />
     <Text Include="..\script\readme.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\docs\README2017.md" />
-    <None Include="..\exe\book\standard_book.db" />
     <None Include="..\README.md" />
     <None Include="..\script\analyze_result_log.py" />
     <None Include="..\script\analyze_yane_log.py" />

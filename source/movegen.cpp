@@ -134,8 +134,8 @@ template <Piece Pt, Color Us, bool All> struct make_move_target {
 			target2 = target & enemy_field(Us);
 			MAKE_MOVE_TARGET_PRO_ONLY(target2);
 			// 不成で移動する升
-			target &= All ? (Us == BLACK ? InFrontBB[WHITE][RANK_1] : InFrontBB[BLACK][RANK_9]) :
-				(Us == BLACK ? InFrontBB[WHITE][RANK_2] : InFrontBB[BLACK][RANK_8]);
+			target &= All ? (Us == BLACK ? ForwardRanksBB[WHITE][RANK_1] : ForwardRanksBB[BLACK][RANK_9]) :
+							(Us == BLACK ? ForwardRanksBB[WHITE][RANK_2] : ForwardRanksBB[BLACK][RANK_8]);
 			MAKE_MOVE_TARGET(target);
 		}
 		break;
@@ -190,7 +190,7 @@ template <Piece Pt, Color Us, bool All> struct make_move_target {
 			}
 			else
 			{
-				auto target2 = target & enemy_field(Us);
+				target2 = target & enemy_field(Us);
 				MAKE_MOVE_TARGET_PRO_BR(target2);
 				target &= ~enemy_field(Us);
 				MAKE_MOVE_TARGET(target);
@@ -204,7 +204,7 @@ template <Piece Pt, Color Us, bool All> struct make_move_target {
 			}
 			else
 			{
-				auto target2 = target & enemy_field(Us);
+				target2 = target & enemy_field(Us);
 				MAKE_MOVE_TARGET_PRO_BR_UNKNOWN(target2);
 				target &= ~enemy_field(Us);
 				MAKE_MOVE_TARGET_UNKNOWN(target);
@@ -232,7 +232,7 @@ template <MOVE_GEN_TYPE GenType, Piece Pt, Color Us, bool All> struct GeneratePi
 
 			// 移動できる場所 = 利きのある場所
 			auto target2 =
-				Pt == LANCE ? lanceEffect(Us, from, occ) :
+				Pt == LANCE  ? lanceEffect(Us, from, occ) :
 				Pt == KNIGHT ? knightEffect(Us, from) :
 				Pt == SILVER ? silverEffect(Us, from) :
 				ALL_BB; // error
@@ -420,14 +420,14 @@ template <Color Us> struct GenerateDropMoves {
 			if (hand_exists(hk, KNIGHT)) drops[num++] = make_move_drop(KNIGHT, SQ_ZERO) + OurDropPt(Us, KNIGHT);
 
 			int nextToKnight = num; // 桂を除いたdropsのindex
-			if (hand_exists(hk, LANCE)) drops[num++] = make_move_drop(LANCE, SQ_ZERO) + OurDropPt(Us, LANCE);
+			if (hand_exists(hk, LANCE) ) drops[num++] = make_move_drop(LANCE, SQ_ZERO)  + OurDropPt(Us, LANCE);
 
 			int nextToLance = num; // 香・桂を除いたdropsのindex
 
 			if (hand_exists(hk, SILVER)) drops[num++] = make_move_drop(SILVER, SQ_ZERO) + OurDropPt(Us, SILVER);
-			if (hand_exists(hk, GOLD)) drops[num++] = make_move_drop(GOLD, SQ_ZERO) + OurDropPt(Us, GOLD);
+			if (hand_exists(hk, GOLD)  ) drops[num++] = make_move_drop(GOLD  , SQ_ZERO) + OurDropPt(Us, GOLD);
 			if (hand_exists(hk, BISHOP)) drops[num++] = make_move_drop(BISHOP, SQ_ZERO) + OurDropPt(Us, BISHOP);
-			if (hand_exists(hk, ROOK)) drops[num++] = make_move_drop(ROOK, SQ_ZERO) + OurDropPt(Us, ROOK);
+			if (hand_exists(hk, ROOK)  ) drops[num++] = make_move_drop(ROOK  , SQ_ZERO) + OurDropPt(Us, ROOK);
 
 
 			// 以下、コードが膨れ上がるが、dropは比較的、数が多く時間がわりとかかるので展開しておく価値があるかと思う。
@@ -776,7 +776,7 @@ ExtMove* make_move_check(const Position& pos, Piece pc, Square from, Square ksq,
 // 王手になる駒打ち
 
 template <Color Us, Piece Pt> struct GenerateCheckDropMoves {
-	ExtMove* operator()(const Position& pos, const Bitboard& target, ExtMove* mlist)
+	ExtMove* operator()(const Position& , const Bitboard& target, ExtMove* mlist)
 	{
 		auto bb = target;
 		while (bb)
@@ -838,7 +838,7 @@ ExtMove* generate_checks(const Position& pos, ExtMove* mlist)
 			(pos.pieces(GOLDS)  & check_candidate_bb(Us, GOLD  , themKing)) |
 			(pos.pieces(BISHOP) & check_candidate_bb(Us, BISHOP, themKing)) |
 			(pos.pieces(ROOK_DRAGON)) | // ROOK,DRAGONは無条件全域
-			(pos.pieces(HORSE)  & check_candidate_bb(Us, ROOK, themKing)) // check_candidate_bbにはROOKと書いてるけど、HORSE
+			(pos.pieces(HORSE)  & check_candidate_bb(Us, ROOK  , themKing)) // check_candidate_bbにはROOKと書いてるけど、HORSE
 		) & pos.pieces(Us);
 
 	// ここには王を敵玉の8近傍に移動させる指し手も含まれるが、王が近接する形はレアケースなので
@@ -850,14 +850,17 @@ ExtMove* generate_checks(const Position& pos, ExtMove* mlist)
 		(GenType == QUIET_CHECKS || GenType == QUIET_CHECKS_ALL) ? pos.empties() :           // 捕獲の指し手を除外するため駒がない場所が移動対象升
 		ALL_BB; // Error!
 
-				// yのみ。ただしxかつyである可能性もある。
+	// yのみ。ただしxかつyである可能性もある。
 	auto src = y;
 	while (src)
 	{
 		auto from = src.pop();
 
 		// 両王手候補なので指し手を生成してしまう。
-		auto pin_line = line_bb(themKing, from); // いまの敵玉とfromを通る線上と違うところに移動させれば開き王手確定
+
+		// いまの敵玉とfromを通る直線上の升と違うところに移動させれば開き王手が確定する。その直線を求める。
+		auto pin_line = line_bb(themKing, from);
+		
 		mlist = make_move_target_general<Us, All>()(pos, pos.piece_on(from), from, target & ~pin_line, mlist);
 
 		if (x & from)

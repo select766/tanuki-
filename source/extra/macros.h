@@ -36,7 +36,7 @@ ENABLE_FULL_OPERATORS_ON(Rank)
 ENABLE_FULL_OPERATORS_ON(Square)
 ENABLE_FULL_OPERATORS_ON(SquareWithWall)
 ENABLE_FULL_OPERATORS_ON(Piece)
-ENABLE_FULL_OPERATORS_ON(PieceNo)
+ENABLE_FULL_OPERATORS_ON(PieceNumber)
 ENABLE_FULL_OPERATORS_ON(Value)
 ENABLE_FULL_OPERATORS_ON(Depth)
 ENABLE_FULL_OPERATORS_ON(Hand)
@@ -73,8 +73,8 @@ ENABLE_BIT_OPERATORS_ON(HandKind)
 // enumに対してrange forで回せるようにするためのhack(速度低下があるかも知れないので速度の要求されるところでは使わないこと)
 #define ENABLE_RANGE_OPERATORS_ON(X,ZERO,NB)     \
   inline X operator*(X x) { return x; }          \
-  inline X begin(X x) { return ZERO; }           \
-  inline X end(X x) { return NB; }
+  inline X begin(X) { return ZERO; }             \
+  inline X end(X) { return NB; }
 
 ENABLE_RANGE_OPERATORS_ON(Square, SQ_ZERO, SQ_NB)
 ENABLE_RANGE_OPERATORS_ON(Color, COLOR_ZERO, COLOR_NB)

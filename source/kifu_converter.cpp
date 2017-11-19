@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "experimental_learner.h"
+#include "thread.h"
 
 using std::experimental::filesystem::directory_iterator;
 using std::experimental::filesystem::path;
@@ -50,7 +51,8 @@ bool KifuConverter::ConvertKifuToText(Position& pos, std::istringstream& ssCmd) 
                 std::cerr << num_records << std::endl;
             }
 
-            pos.set_from_packed_sfen(record.packed);
+            StateInfo state_info = { 0 };
+            pos.set_from_packed_sfen(record.packed, &state_info, Threads[0]);
             ofs << pos.sfen() << std::endl;
             ofs << record.value << std::endl;
             ofs << record.win_color << std::endl;
@@ -93,7 +95,8 @@ bool KifuConverter::ConvertKifuToBinary(Position& pos, std::istringstream& ssCmd
             std::string _;
             std::getline(ifs, _);
 
-            pos.set(sfen);
+            StateInfo state_info = { 0 };
+            pos.set(sfen, &state_info, Threads[0]);
             Learner::Record record = { 0 };
             pos.sfen_pack(record.packed);
             record.value = eval;

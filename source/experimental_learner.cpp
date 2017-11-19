@@ -9,7 +9,7 @@
 #include <fstream>
 #include <numeric>
 
-#include "eval/progress.h"
+#include "eval/evaluate_mir_inv_tools.h"
 #include "kifu_reader.h"
 #include "position.h"
 #include "progress_report.h"
@@ -21,19 +21,16 @@ std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
 namespace Eval {
-typedef std::array<int16_t, 2> ValueKpp;
-typedef std::array<int32_t, 2> ValueKkp;
 typedef std::array<int32_t, 2> ValueKk;
+typedef std::array<int32_t, 2> ValueKkp;
+typedef std::array<int16_t, 2> ValueKpp;
 // FV_SCALEで割る前の値が入る
-extern ALIGNED(32) ValueKk kk[SQ_NB][SQ_NB];
-extern ALIGNED(32) ValueKpp kpp[SQ_NB][fe_end][fe_end];
-extern ALIGNED(32) ValueKkp kkp[SQ_NB][SQ_NB][fe_end];
+extern ValueKk(*kk_)[SQ_NB][SQ_NB];
+extern ValueKkp(*kkp_)[SQ_NB][SQ_NB][fe_end];
+extern ValueKpp(*kpp_)[SQ_NB][fe_end][fe_end];
 extern const int FV_SCALE = 32;
 
-void save_eval();
-void eval_learn_init();
-extern BonaPiece inv_piece[fe_end];
-extern BonaPiece mir_piece[fe_end];
+void save_eval(std::string dir_name);
 }
 
 using Eval::BonaPiece;
@@ -120,7 +117,6 @@ constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 constexpr char* kOptionValueElmoLambda = "ElmoLambda";
 constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
-constexpr char* kOptionValueUseProgressAsElmoLambda = "UseProgressAsElmoLambda";
 constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
 constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
@@ -158,8 +154,8 @@ class Kpp {
     void ToLowerDimensions(Kpp kpp[4]) const {
         kpp[0] = Kpp(king_, piece0_, piece1_, weight_kind_);
         kpp[1] = Kpp(king_, piece1_, piece0_, weight_kind_);
-        kpp[2] = Kpp(Mir(king_), mir_piece[piece0_], mir_piece[piece1_], weight_kind_);
-        kpp[3] = Kpp(Mir(king_), mir_piece[piece1_], mir_piece[piece0_], weight_kind_);
+        kpp[2] = Kpp(Mir(king_), mir_piece(piece0_), mir_piece(piece1_), weight_kind_);
+        kpp[3] = Kpp(Mir(king_), mir_piece(piece1_), mir_piece(piece0_), weight_kind_);
     }
 
     static Kpp ForIndex(int index) {
@@ -231,10 +227,10 @@ class Kkp {
 
     void ToLowerDimensions(Kkp kkp[4]) const {
         kkp[0] = Kkp(king0_, king1_, piece_, weight_kind_);
-        kkp[1] = Kkp(Mir(king0_), Mir(king1_), mir_piece[piece_], weight_kind_);
-        kkp[2] = Kkp(Inv(king1_), Inv(king0_), inv_piece[piece_], weight_kind_,
+        kkp[1] = Kkp(Mir(king0_), Mir(king1_), mir_piece(piece_), weight_kind_);
+        kkp[2] = Kkp(Inv(king1_), Inv(king0_), inv_piece(piece_), weight_kind_,
                      weight_kind_ == WEIGHT_KIND_COLOR);
-        kkp[3] = Kkp(Inv(Mir(king1_)), Inv(Mir(king0_)), inv_piece[mir_piece[piece_]], weight_kind_,
+        kkp[3] = Kkp(Inv(Mir(king1_)), Inv(Mir(king0_)), inv_piece(mir_piece(piece_)), weight_kind_,
                      weight_kind_ == WEIGHT_KIND_COLOR);
     }
 
@@ -435,21 +431,20 @@ std::string GetDateTimeString() {
 
 // 浅い探索付きの*Strapを行う
 // record 学習局面
-// elmo_lambda elmo lambda係数 use_progress_as_elmo_lambdaがtrueの場合、この値は無視される
-// use_progress_as_elmo_lambda elmo_lambdaの代わりに進行度を用いる
+// elmo_lambda elmo lambda係数
 // progress 進行度推定ルーチン
 // f 各局面の学習に使用するコールバック
 void Strap(
-    const Learner::Record& record, double elmo_lambda, bool use_progress_as_elmo_lambda,
-    const std::shared_ptr<Progress>& progress,
+    const Learner::Record& record, double elmo_lambda,
     std::function<void(Value record_value, Color win_color, Value value, Value material_value,
                        Color root_color, double elmo_lambda, Position& pos)>
         f) {
     int thread_index = omp_get_thread_num();
     Thread& thread = *Threads[thread_index];
+    StateInfo state_info[1024] = { 0 };
+    StateInfo* state = state_info + 8;
     Position& pos = thread.rootPos;
-    pos.set_from_packed_sfen(record.packed);
-    pos.set_this_thread(&thread);
+    pos.set_from_packed_sfen(record.packed, state, &thread);
     if (!pos.pos_is_ok()) {
         sync_cout << "Position is not ok! Exiting..." << sync_endl;
         sync_cout << pos << sync_endl;
@@ -464,12 +459,11 @@ void Strap(
     // Eval::evaluate()を使うと差分計算のおかげで少し速くなるはず
     // 全計算はPosition::set()の中で行われているので差分計算ができる
     Value value = Eval::evaluate(pos);
-    StateInfo stateInfo[MAX_PLY];
     std::vector<Move>& pv = value_and_pv.second;
     for (int shallow_search_pv_play_index = 0;
          shallow_search_pv_play_index < static_cast<int>(pv.size());
          ++shallow_search_pv_play_index) {
-        pos.do_move(pv[shallow_search_pv_play_index], stateInfo[shallow_search_pv_play_index]);
+        pos.do_move(pv[shallow_search_pv_play_index], state[shallow_search_pv_play_index]);
         value = Eval::evaluate(pos);
     }
 
@@ -484,10 +478,6 @@ void Strap(
     // 探索開始局面と手番技違う場合は符号を反転する
     if (root_color == WHITE) {
         material_value = -material_value;
-    }
-
-    if (use_progress_as_elmo_lambda) {
-        elmo_lambda = 1.0 - progress->Estimate(pos);
     }
 
     f(static_cast<Value>(record.value), static_cast<Color>(record.win_color), value, material_value,
@@ -516,7 +506,6 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
     o[kOptionValueElmoLambda] << Option("1.0");
     o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
     o[kOptionValueAdamBeta2] << Option("0.999");
-    o[kOptionValueUseProgressAsElmoLambda] << Option(false);
     o[kOptionValueBreedEvalBaseFolderPath] << Option("eval");
     o[kOptionValueBreedEvalAnotherFolderPath] << Option("eval");
     o[kOptionValueBreedEvalOutputFolderPath] << Option("eval");
@@ -529,7 +518,7 @@ void Learner::Learn(std::istringstream& iss) {
 
     sync_cout << __FUNCTION__ << sync_endl;
 
-    Eval::eval_learn_init();
+    Eval::init_mir_inv_tables();
 
     ASSERT_LV3(Kk::MaxIndex() ==
                static_cast<int>(SQ_NB) * static_cast<int>(Eval::fe_end) *
@@ -559,17 +548,17 @@ void Learner::Learn(std::istringstream& iss) {
         if (Kpp::IsValid(dimension_index)) {
             Kpp kpp = Kpp::ForIndex(dimension_index);
             weights[dimension_index].w = static_cast<WeightType>(
-                Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
+                (*Eval::kpp_)[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
 
         } else if (Kkp::IsValid(dimension_index)) {
             Kkp kkp = Kkp::ForIndex(dimension_index);
             weights[dimension_index].w = static_cast<WeightType>(
-                Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
+                (*Eval::kkp_)[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
 
         } else if (Kk::IsValid(dimension_index)) {
             Kk kk = Kk::ForIndex(dimension_index);
             weights[dimension_index].w =
-                static_cast<WeightType>(Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
+                static_cast<WeightType>((*Eval::kk_)[kk.king0()][kk.king1()][kk.weight_kind()]);
 
         } else {
             ASSERT_LV3(false);
@@ -605,7 +594,6 @@ void Learner::Learn(std::istringstream& iss) {
     double value_to_winning_rate_coefficient =
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
     double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
-    bool use_progress_as_elmo_lambda = Options[kOptionValueUseProgressAsElmoLambda];
     std::string eval_save_directory_path = (std::string)Options[kOptionValueEvalSaveDir];
 
     sync_cout << "min_learning_rate=" << min_learning_rate << sync_endl;
@@ -621,7 +609,6 @@ void Learner::Learn(std::istringstream& iss) {
     sync_cout << "value_to_winning_rate_coefficient=" << value_to_winning_rate_coefficient
               << sync_endl;
     sync_cout << "adam_beta2=" << adam_beta2 << sync_endl;
-    sync_cout << "use_progress_as_elmo_lambda=" << use_progress_as_elmo_lambda << sync_endl;
     sync_cout << "eval_save_directory_path=" << eval_save_directory_path << sync_endl;
 
     auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
@@ -629,14 +616,6 @@ void Learner::Learn(std::istringstream& iss) {
     if (!kifu_reader_for_test->Read(num_positions_for_test, records_for_test)) {
         sync_cout << "Failed to read kifu for test." << sync_endl;
         std::exit(1);
-    }
-
-    std::shared_ptr<Progress> progress;
-    if (use_progress_as_elmo_lambda) {
-        progress = std::make_shared<Progress>();
-        if (!progress->Load()) {
-            std::exit(1);
-        }
     }
 
     // 損失関数ログの作成
@@ -733,7 +712,7 @@ void Learner::Learn(std::istringstream& iss) {
                           &sum_train_squared_error_of_value, &sum_norm,
                           &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
                           &sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
-                          &sum_train_squared_error_of_win_or_lose, &progress,
+                          &sum_train_squared_error_of_win_or_lose,
                           &sum_train_entropy_eval, &sum_train_kld_eval, &sum_train_eval_value,
                           &sum_train_eval_value2, &sum_train_abs_eval_value,
                           &sum_train_abs_eval_value2](
@@ -791,7 +770,7 @@ void Learner::Learn(std::istringstream& iss) {
                     weights[Kk(sq_bk, sq_wk, WEIGHT_KIND_TURN).ToIndex()].AddRawGradient(
                         delta_turn);
 
-                    for (int i = 0; i < PIECE_NO_KING; ++i) {
+                    for (int i = 0; i < PIECE_NUMBER_KING; ++i) {
                         Eval::BonaPiece k0 = list0[i];
                         Eval::BonaPiece k1 = list1[i];
                         for (int j = 0; j < i; ++j) {
@@ -824,7 +803,7 @@ void Learner::Learn(std::istringstream& iss) {
                             delta_turn);
                     }
                 };
-                Strap(records[record_index], elmo_lambda, use_progress_as_elmo_lambda, progress, f);
+                Strap(records[record_index], elmo_lambda, f);
             }
 
 // 損失関数を計算する
@@ -876,8 +855,7 @@ void Learner::Learn(std::istringstream& iss) {
                     sum_test_abs_eval_value += abs(eval_value);
                     sum_test_abs_eval_value2 += abs(eval_value) * abs(eval_value);  // 無駄
                 };
-                Strap(records_for_test[record_index], elmo_lambda, use_progress_as_elmo_lambda,
-                      progress, f);
+                Strap(records_for_test[record_index], elmo_lambda, f);
             }
 
 // 低次元へ分配する
@@ -938,18 +916,18 @@ void Learner::Learn(std::istringstream& iss) {
                     weights[dimension_index].UpdateWeight(
                         adam_beta1_t, adam_beta2, adam_beta2_t, learning_rate, fobos_l1_parameter,
                         fobos_l2_parameter,
-                        Eval::kpp[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
+                        (*Eval::kpp_)[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()]);
                 } else if (Kkp::IsValid(dimension_index)) {
                     Kkp kkp = Kkp::ForIndex(dimension_index);
                     weights[dimension_index].UpdateWeight(
                         adam_beta1_t, adam_beta2, adam_beta2_t, learning_rate, fobos_l1_parameter,
                         fobos_l2_parameter,
-                        Eval::kkp[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
+                        (*Eval::kkp_)[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()]);
                 } else if (Kk::IsValid(dimension_index)) {
                     Kk kk = Kk::ForIndex(dimension_index);
                     weights[dimension_index].UpdateWeight(
                         adam_beta1_t, adam_beta2, adam_beta2_t, learning_rate, fobos_l1_parameter,
-                        fobos_l2_parameter, Eval::kk[kk.king0()][kk.king1()][kk.weight_kind()]);
+                        fobos_l2_parameter, (*Eval::kk_)[kk.king0()][kk.king1()][kk.weight_kind()]);
                 } else {
                     ASSERT_LV3(false);
                 }
@@ -1010,7 +988,7 @@ void Learner::Learn(std::istringstream& iss) {
     }
 
     // 評価関数ファイルの書き出し
-    Eval::save_eval();
+    Eval::save_eval("");
 
     std::fclose(file_loss);
     file_loss = nullptr;
@@ -1047,7 +1025,8 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     double eval_winlose_cross_entropy = 0.0;
     Position& pos = Threads[0]->rootPos;
     for (const auto& record : records_for_test) {
-        pos.set_from_packed_sfen(record.packed);
+        StateInfo state_info = { 0 };
+        pos.set_from_packed_sfen(record.packed, &state_info, Threads[0]);
         double p = winning_rate(static_cast<Value>(record.value), 600.0);
         double t = (pos.side_to_move() == record.win_color) ? 1.0 : 0.0;
         eval_entropy += -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);

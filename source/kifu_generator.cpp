@@ -65,10 +65,10 @@ bool ReadBook() {
     int line_index = 0;
     while (!fs_book.eof()) {
         Thread& thread = *Threads[0];
-        Position& pos = thread.rootPos;
-        pos.set_hirate();
-        StateInfo state_infos[512] = { 0 };
+        StateInfo state_infos[1024] = { 0 };
         StateInfo* state = state_infos + 8;
+        Position& pos = thread.rootPos;
+        pos.set_hirate(state, &thread);
 
         std::getline(fs_book, line);
         std::istringstream is(line);
@@ -204,11 +204,10 @@ void Learner::GenerateKifu() {
 
         while (global_position_index < num_positions) {
             Thread& thread = *Threads[thread_index];
-            Position& pos = thread.rootPos;
-            pos.set(start_positions[start_positions_index(mt19937_64)]);
-            pos.set_this_thread(&thread);
-            StateInfo state_infos[512] = {0};
+            StateInfo state_infos[1024] = { 0 };
             StateInfo* state = state_infos + 8;
+            Position& pos = thread.rootPos;
+            pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
 
             RandomMove(pos, state, mt19937_64);
 
@@ -216,8 +215,6 @@ void Learner::GenerateKifu() {
             Value last_value;
             while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
                    pos.DeclarationWin() == MOVE_NONE) {
-                pos.set_this_thread(&thread);
-
                 Move pv_move = Move::MOVE_NONE;
                 Learner::search(pos, search_depth);
 
@@ -255,7 +252,7 @@ void Learner::GenerateKifu() {
             }
 
             Color win;
-            RepetitionState repetition_state = pos.is_repetition();
+            RepetitionState repetition_state = pos.is_repetition(0);
             if (pos.is_mated()) {
                 // •‰‚¯
                 // ‹l‚Ü‚³‚ê‚½
@@ -290,7 +287,7 @@ void Learner::GenerateKifu() {
 
         // •K—v‹Ç–Ê”¶¬‚µ‚½‚ç‘SƒXƒŒƒbƒh‚Ì’Tõ‚ð’âŽ~‚·‚é
         // ‚±‚¤‚µ‚È‚¢‚Æ‘Š“ü‹Ê“™‡–@Žè‚Ì‘½‚¢‹Ç–Ê‚ÅŽ~‚Ü‚é‚Ü‚Å‚ÉŽžŠÔ‚ª‚©‚©‚é
-        Search::Signals.stop = true;
+        Threads.stop = true;
     }
 }
 
@@ -346,11 +343,10 @@ void Learner::ConvertSfenToLearningData() {
         for (int64_t sfen_index = global_sfen_index++; sfen_index < num_sfens; sfen_index = global_sfen_index++) {
             const std::string& sfen = sfens[sfen_index];
             Thread& thread = *Threads[thread_index];
-            Position& pos = thread.rootPos;
-            pos.set_hirate();
-            pos.set_this_thread(&thread);
             StateInfo state_infos[2048] = { 0 };
             StateInfo* state = state_infos + 8;
+            Position& pos = thread.rootPos;
+            pos.set_hirate(state, &thread);
 
             std::istringstream iss(sfen);
             // startpos moves 7g7f 3c3d 2g2f
