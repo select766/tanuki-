@@ -62,8 +62,7 @@ bool Book::CreateRawBook() {
     }
     std::string line;
 
-    StateInfo state_info[512];
-    memset(state_info, 0, sizeof(state_info));
+    StateInfo state_info[4096] = { 0 };
     std::map<std::string, int> sfen_to_count;
     int num_records = 0;
     while (std::getline(ifs, line)) {

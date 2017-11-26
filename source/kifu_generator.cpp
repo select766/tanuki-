@@ -67,7 +67,7 @@ bool ReadBook() {
         Thread& thread = *Threads[0];
         Position& pos = thread.rootPos;
         pos.set_hirate();
-        StateInfo state_infos[512] = { 0 };
+        StateInfo state_infos[4096] = { 0 };
         StateInfo* state = state_infos + 8;
 
         std::getline(fs_book, line);
@@ -207,7 +207,7 @@ void Learner::GenerateKifu() {
             Position& pos = thread.rootPos;
             pos.set(start_positions[start_positions_index(mt19937_64)]);
             pos.set_this_thread(&thread);
-            StateInfo state_infos[512] = {0};
+            StateInfo state_infos[4096] = {0};
             StateInfo* state = state_infos + 8;
 
             RandomMove(pos, state, mt19937_64);
@@ -349,7 +349,7 @@ void Learner::ConvertSfenToLearningData() {
             Position& pos = thread.rootPos;
             pos.set_hirate();
             pos.set_this_thread(&thread);
-            StateInfo state_infos[2048] = { 0 };
+            StateInfo state_infos[4096] = { 0 };
             StateInfo* state = state_infos + 8;
 
             std::istringstream iss(sfen);
