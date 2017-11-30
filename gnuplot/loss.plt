@@ -26,7 +26,8 @@ plot "loss.csv" using 1:5 with lines title "train eval" , \
 
 set output "07_norm.png"
 set title "norm"
-plot "loss.csv" using 1:12 with lines title "norm"
+plot "loss.csv" using 1:12 with lines title "train" , \
+     "loss.csv" using 1:27 with lines title "test"
 
 set output "08_mean_entropy_eval.png"
 set title "mean entropy eval"

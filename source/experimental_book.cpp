@@ -62,7 +62,7 @@ bool Book::CreateRawBook() {
     }
     std::string line;
 
-    StateInfo state_info[1024] = { 0 };
+    StateInfo state_info[4096] = { 0 };
     StateInfo* state = state_info + 8;
     std::map<std::string, int> sfen_to_count;
     int num_records = 0;
