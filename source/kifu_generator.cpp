@@ -194,9 +194,9 @@ void Learner::GenerateKifu() {
         int thread_index = ::omp_get_thread_num();
         WinProcGroup::bindThisThread(thread_index);
         char output_file_path[1024];
-        std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.bin", kifu_directory.c_str(),
+        std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
                      output_file_name_tag.c_str(), search_depth,
-                     num_positions, thread_index);
+                     num_positions, thread_index, start_time);
         // 各スレッドに持たせる
         std::unique_ptr<Learner::KifuWriter> kifu_writer =
             std::make_unique<Learner::KifuWriter>(output_file_path);
