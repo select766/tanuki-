@@ -2,12 +2,13 @@
 
 #include "experimental_learner.h"
 
-#include <direct.h>
-#include <omp.h>
 #include <array>
 #include <ctime>
+#include <direct.h>
 #include <fstream>
 #include <numeric>
+#include <omp.h>
+#include <random>
 
 #include "eval/evaluate_mir_inv_tools.h"
 #include "kifu_reader.h"
@@ -127,6 +128,7 @@ constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
 constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
 constexpr char* kOptionValueEvalSaveDir = "EvalSaveDir";
+constexpr char* kOptionValueGenerateInitialEvalStandardDeviation = "GenerateInitialEvalStandardDeviation";
 
 class Kpp {
    public:
@@ -515,6 +517,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
     o[kOptionValueBreedEvalBaseFolderPath] << Option("eval");
     o[kOptionValueBreedEvalAnotherFolderPath] << Option("eval");
     o[kOptionValueBreedEvalOutputFolderPath] << Option("eval");
+    o[kOptionValueGenerateInitialEvalStandardDeviation] << Option("1.0");
 }
 
 void Learner::Learn(std::istringstream& iss) {
@@ -1159,6 +1162,36 @@ void Learner::BreedEval(std::istringstream& iss) {
     sync_cout << "num_zero_base   =" << num_zero_base << sync_endl;
     sync_cout << "num_zero_another=" << num_zero_another << sync_endl;
     sync_cout << "num_zero_both   =" << num_zero_both << sync_endl;
+}
+
+void Learner::GenerateInitialEval(std::istringstream& iss) {
+    sync_cout << __FUNCTION__ << sync_endl;
+
+    std::string eval_save_directory_path = (std::string)Options[kOptionValueEvalSaveDir];
+    double standardDeviation = Options[kOptionValueGenerateInitialEvalStandardDeviation].cast<double>();
+
+    std::mt19937_64 mt(std::time(nullptr));
+    std::normal_distribution<> distribution(0.0, standardDeviation);
+    int vector_length = Kk::MaxIndex();
+    for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
+        if (Kpp::IsValid(dimension_index)) {
+            Kpp kpp = Kpp::ForIndex(dimension_index);
+            (*Eval::kpp_)[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()] = static_cast<int16_t>(std::round(distribution(mt)));
+        }
+        else if (Kkp::IsValid(dimension_index)) {
+            Kkp kkp = Kkp::ForIndex(dimension_index);
+            (*Eval::kkp_)[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()] = static_cast<int32_t>(std::round(distribution(mt)));;
+        }
+        else if (Kk::IsValid(dimension_index)) {
+            Kk kk = Kk::ForIndex(dimension_index);
+            (*Eval::kk_)[kk.king0()][kk.king1()][kk.weight_kind()] = static_cast<int32_t>(std::round(distribution(mt)));;
+        }
+        else {
+            ASSERT_LV3(false);
+        }
+    }
+
+    Eval::save_eval("");
 }
 
 #endif  // USE_EXPERIMENTAL_LEARNER

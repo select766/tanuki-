@@ -19,6 +19,7 @@ void InitializeLearner(USI::OptionsMap& o);
 void Learn(std::istringstream& iss);
 void CalculateTestDataEntropy(std::istringstream& iss);
 void BreedEval(std::istringstream& iss);
+void GenerateInitialEval(std::istringstream& iss);
 #endif
 }
 

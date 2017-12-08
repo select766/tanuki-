@@ -948,6 +948,10 @@ void USI::loop(int argc, char* argv[])
             Learner::BreedEval(is);
             break;
         }
+        else if (token == "generate_initial_eval") {
+            Learner::GenerateInitialEval(is);
+            break;
+        }
 #endif
 		else if (token == "shuffle_kifu") {
 			Learner::ShuffleKifu();
