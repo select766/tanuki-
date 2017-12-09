@@ -1,11 +1,11 @@
 #include "experimental_learner.h"
 
+#include <direct.h>
+#include <omp.h>
 #include <array>
 #include <ctime>
-#include <direct.h>
 #include <fstream>
 #include <numeric>
-#include <omp.h>
 #include <random>
 
 #include "eval/evaluate_mir_inv_tools.h"
@@ -24,9 +24,7 @@ double ToWinningRate(Value value, double value_to_winning_rate_coefficient) {
     return Sigmoid(static_cast<int>(value) / value_to_winning_rate_coefficient);
 }
 
-double InverseSigmoid(double x) {
-    return -std::log((1 - x) / x);
-}
+double InverseSigmoid(double x) { return -std::log((1 - x) / x); }
 
 Value ToValue(double winning_rate, double value_to_winning_rate_coefficient) {
     double value = value_to_winning_rate_coefficient * InverseSigmoid(winning_rate);
@@ -43,9 +41,9 @@ typedef std::array<int32_t, 2> ValueKk;
 typedef std::array<int32_t, 2> ValueKkp;
 typedef std::array<int16_t, 2> ValueKpp;
 // FV_SCALEで割る前の値が入る
-extern ValueKk(*kk_)[SQ_NB][SQ_NB];
-extern ValueKkp(*kkp_)[SQ_NB][SQ_NB][fe_end];
-extern ValueKpp(*kpp_)[SQ_NB][fe_end][fe_end];
+extern ValueKk (*kk_)[SQ_NB][SQ_NB];
+extern ValueKkp (*kkp_)[SQ_NB][SQ_NB][fe_end];
+extern ValueKpp (*kpp_)[SQ_NB][fe_end][fe_end];
 extern const int FV_SCALE = 32;
 
 void save_eval(std::string dir_name);
@@ -145,7 +143,8 @@ constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
 constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
 constexpr char* kOptionValueEvalSaveDir = "EvalSaveDir";
-constexpr char* kOptionValueGenerateInitialEvalStandardDeviation = "GenerateInitialEvalStandardDeviation";
+constexpr char* kOptionValueGenerateInitialEvalStandardDeviation =
+    "GenerateInitialEvalStandardDeviation";
 
 class Kpp {
    public:
@@ -453,8 +452,7 @@ std::string GetDateTimeString() {
 Value GetValue(const Learner::Record& record, bool use_weighted_value) {
     if (use_weighted_value) {
         return static_cast<Value>(record.weighted_value);
-    }
-    else {
+    } else {
         return static_cast<Value>(record.value);
     }
 }
@@ -471,7 +469,7 @@ void Strap(
         f) {
     int thread_index = omp_get_thread_num();
     Thread& thread = *Threads[thread_index];
-    StateInfo state_info[1024] = { 0 };
+    StateInfo state_info[1024] = {0};
     StateInfo* state = state_info + 8;
     Position& pos = thread.rootPos;
     pos.set_from_packed_sfen(record.packed, state, &thread);
@@ -510,8 +508,8 @@ void Strap(
         material_value = -material_value;
     }
 
-    f(GetValue(record, use_weighted_value), static_cast<Color>(record.win_color), value, material_value,
-      root_color, elmo_lambda, pos);
+    f(GetValue(record, use_weighted_value), static_cast<Color>(record.win_color), value,
+      material_value, root_color, elmo_lambda, pos);
 
     // 局面を浅い探索のroot局面にもどす
     for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {
@@ -747,10 +745,9 @@ void Learner::Learn(std::istringstream& iss) {
                           &sum_train_squared_error_of_value, &sum_train_norm,
                           &sum_train_squared_error_of_winning_percentage, &sum_train_cross_entropy,
                           &sum_train_cross_entropy_eval, &sum_train_cross_entropy_win,
-                          &sum_train_squared_error_of_win_or_lose,
-                          &sum_train_entropy_eval, &sum_train_kld_eval, &sum_train_eval_value,
-                          &sum_train_eval_value2, &sum_train_abs_eval_value,
-                          &sum_train_abs_eval_value2](
+                          &sum_train_squared_error_of_win_or_lose, &sum_train_entropy_eval,
+                          &sum_train_kld_eval, &sum_train_eval_value, &sum_train_eval_value2,
+                          &sum_train_abs_eval_value, &sum_train_abs_eval_value2](
                     Value record_value, Color win_color, Value value, Value material_value,
                     Color root_color, double elmo_lambda, Position& pos) {
                     // 評価値から推定した勝率の分布の交差エントロピー
@@ -1067,7 +1064,7 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     double eval_winlose_cross_entropy = 0.0;
     Position& pos = Threads[0]->rootPos;
     for (const auto& record : records_for_test) {
-        StateInfo state_info = { 0 };
+        StateInfo state_info = {0};
         pos.set_from_packed_sfen(record.packed, &state_info, Threads[0]);
         double p = ToWinningRate(GetValue(record, use_weighted_value), 600.0);
         double t = (pos.side_to_move() == record.win_color) ? 1.0 : 0.0;
@@ -1195,7 +1192,8 @@ void Learner::GenerateInitialEval(std::istringstream& iss) {
     sync_cout << __FUNCTION__ << sync_endl;
 
     std::string eval_save_directory_path = (std::string)Options[kOptionValueEvalSaveDir];
-    double standardDeviation = Options[kOptionValueGenerateInitialEvalStandardDeviation].cast<double>();
+    double standardDeviation =
+        Options[kOptionValueGenerateInitialEvalStandardDeviation].cast<double>();
 
     std::mt19937_64 mt(std::time(nullptr));
     std::normal_distribution<> distribution(0.0, standardDeviation);
@@ -1203,17 +1201,19 @@ void Learner::GenerateInitialEval(std::istringstream& iss) {
     for (int dimension_index = 0; dimension_index < vector_length; ++dimension_index) {
         if (Kpp::IsValid(dimension_index)) {
             Kpp kpp = Kpp::ForIndex(dimension_index);
-            (*Eval::kpp_)[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()] = static_cast<int16_t>(std::round(distribution(mt)));
-        }
-        else if (Kkp::IsValid(dimension_index)) {
+            (*Eval::kpp_)[kpp.king()][kpp.piece0()][kpp.piece1()][kpp.weight_kind()] =
+                static_cast<int16_t>(std::round(distribution(mt)));
+        } else if (Kkp::IsValid(dimension_index)) {
             Kkp kkp = Kkp::ForIndex(dimension_index);
-            (*Eval::kkp_)[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()] = static_cast<int32_t>(std::round(distribution(mt)));;
-        }
-        else if (Kk::IsValid(dimension_index)) {
+            (*Eval::kkp_)[kkp.king0()][kkp.king1()][kkp.piece()][kkp.weight_kind()] =
+                static_cast<int32_t>(std::round(distribution(mt)));
+            ;
+        } else if (Kk::IsValid(dimension_index)) {
             Kk kk = Kk::ForIndex(dimension_index);
-            (*Eval::kk_)[kk.king0()][kk.king1()][kk.weight_kind()] = static_cast<int32_t>(std::round(distribution(mt)));;
-        }
-        else {
+            (*Eval::kk_)[kk.king0()][kk.king1()][kk.weight_kind()] =
+                static_cast<int32_t>(std::round(distribution(mt)));
+            ;
+        } else {
             ASSERT_LV3(false);
         }
     }
