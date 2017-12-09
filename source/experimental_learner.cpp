@@ -1,5 +1,3 @@
-#ifdef USE_EXPERIMENTAL_LEARNER
-
 #include "experimental_learner.h"
 
 #include <array>
@@ -19,7 +17,26 @@
 
 namespace Learner {
 std::pair<Value, std::vector<Move> > qsearch(Position& pos);
+
+double Sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
+
+double ToWinningRate(Value value, double value_to_winning_rate_coefficient) {
+    return Sigmoid(static_cast<int>(value) / value_to_winning_rate_coefficient);
 }
+
+double InverseSigmoid(double x) {
+    return -std::log((1 - x) / x);
+}
+
+Value ToValue(double winning_rate, double value_to_winning_rate_coefficient) {
+    double value = value_to_winning_rate_coefficient * InverseSigmoid(winning_rate);
+    value = std::min<double>(value, VALUE_MATE);
+    value = std::max<double>(value, -VALUE_MATE);
+    return static_cast<Value>(static_cast<int>(std::round(value)));
+}
+}
+
+#ifdef USE_EXPERIMENTAL_LEARNER
 
 namespace Eval {
 typedef std::array<int32_t, 2> ValueKk;
@@ -122,7 +139,6 @@ constexpr char* kOptionValueMiniBatchSize = "MiniBatchSize";
 constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
 constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 constexpr char* kOptionValueElmoLambda = "ElmoLambda";
-constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
 constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
@@ -421,13 +437,7 @@ struct Weights {
     }
 };
 
-double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
-
-double winning_rate(Value value, double value_to_winning_rate_coefficient) {
-    return sigmoid(static_cast<int>(value) / value_to_winning_rate_coefficient);
-}
-
-double dsigmoid(double x) { return sigmoid(x) * (1.0 - sigmoid(x)); }
+double dsigmoid(double x) { return Learner::Sigmoid(x) * (1.0 - Learner::Sigmoid(x)); }
 
 std::string GetDateTimeString() {
     time_t time = std::time(nullptr);
@@ -729,8 +739,8 @@ void Learner::Learn(std::istringstream& iss) {
                     Value record_value, Color win_color, Value value, Value material_value,
                     Color root_color, double elmo_lambda, Position& pos) {
                     // 評価値から推定した勝率の分布の交差エントロピー
-                    double p = winning_rate(record_value, value_to_winning_rate_coefficient);
-                    double q = winning_rate(value, value_to_winning_rate_coefficient);
+                    double p = ToWinningRate(record_value, value_to_winning_rate_coefficient);
+                    double q = ToWinningRate(value, value_to_winning_rate_coefficient);
                     double t = (root_color == win_color) ? 1.0 : 0.0;
                     // elmo_lambdaは浅い探索の評価値で深い探索の評価値を近似する項に入れる
                     WeightType delta = elmo_lambda * (q - p) + (1.0 - elmo_lambda) * (q - t);
@@ -838,8 +848,8 @@ void Learner::Learn(std::istringstream& iss) {
                     Value record_value, Color win_color, Value value, Value material_value,
                     Color root_color, double elmo_lambda, Position& pos) {
                     // 評価値から推定した勝率の分布の交差エントロピー
-                    double p = winning_rate(record_value, value_to_winning_rate_coefficient);
-                    double q = winning_rate(value, value_to_winning_rate_coefficient);
+                    double p = ToWinningRate(record_value, value_to_winning_rate_coefficient);
+                    double q = ToWinningRate(value, value_to_winning_rate_coefficient);
                     double t = (root_color == win_color) ? 1.0 : 0.0;
 
                     double diff_value = record_value - value;
@@ -1042,7 +1052,7 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     for (const auto& record : records_for_test) {
         StateInfo state_info = { 0 };
         pos.set_from_packed_sfen(record.packed, &state_info, Threads[0]);
-        double p = winning_rate(static_cast<Value>(record.value), 600.0);
+        double p = ToWinningRate(static_cast<Value>(record.value), 600.0);
         double t = (pos.side_to_move() == record.win_color) ? 1.0 : 0.0;
         eval_entropy += -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);
         eval_winlose_cross_entropy +=
