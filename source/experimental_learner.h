@@ -11,8 +11,10 @@ struct Record {
     PackedSfen packed;
     int16_t value;
     int16_t win_color;
+    int16_t weighted_value;
+    int16_t last_position;
 };
-static_assert(sizeof(Record) == 36, "Size of Record is not 36");
+static_assert(sizeof(Record) == 40, "Size of Record is not 40");
 
 #ifdef USE_EXPERIMENTAL_LEARNER
 void InitializeLearner(USI::OptionsMap& o);

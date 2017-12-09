@@ -36,6 +36,7 @@ namespace {
 constexpr int kMaxGamePlay = 400;
 constexpr int kMaxSwapTrials = 10;
 constexpr int kMaxTrialsToSelectSquares = 100;
+constexpr double kDiscountRatio = 0.9;
 
 constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
 constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
@@ -274,6 +275,8 @@ void Learner::GenerateKifu() {
             for (auto& record : records) {
                 record.win_color = win;
             }
+
+            records.back().last_position = true;
 
             for (const auto& record : records) {
                 if (!kifu_writer->Write(record)) {
