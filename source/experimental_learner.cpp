@@ -140,6 +140,7 @@ constexpr char* kOptionValueFobosL1Parameter = "FobosL1Parameter";
 constexpr char* kOptionValueFobosL2Parameter = "FobosL2Parameter";
 constexpr char* kOptionValueElmoLambda = "ElmoLambda";
 constexpr char* kOptionValueAdamBeta2 = "AdamBeta2";
+constexpr char* kOptionValueUseWeightedValue = "UseWeightedValue";
 constexpr char* kOptionValueBreedEvalBaseFolderPath = "BreedEvalBaseFolderPath";
 constexpr char* kOptionValueBreedEvalAnotherFolderPath = "BreedEvalAnotherFolderPath";
 constexpr char* kOptionValueBreedEvalOutputFolderPath = "BreedEvalOutputFolderPath";
@@ -447,13 +448,24 @@ std::string GetDateTimeString() {
     return buffer;
 }
 
+// 学習データに含まれる評価値を取得する
+// 生の評価値とdiscountによる重み付き評価値を切り替えられるようにしている
+Value GetValue(const Learner::Record& record, bool use_weighted_value) {
+    if (use_weighted_value) {
+        return static_cast<Value>(record.weighted_value);
+    }
+    else {
+        return static_cast<Value>(record.value);
+    }
+}
+
 // 浅い探索付きの*Strapを行う
 // record 学習局面
 // elmo_lambda elmo lambda係数
 // progress 進行度推定ルーチン
 // f 各局面の学習に使用するコールバック
 void Strap(
-    const Learner::Record& record, double elmo_lambda,
+    const Learner::Record& record, double elmo_lambda, bool use_weighted_value,
     std::function<void(Value record_value, Color win_color, Value value, Value material_value,
                        Color root_color, double elmo_lambda, Position& pos)>
         f) {
@@ -498,7 +510,7 @@ void Strap(
         material_value = -material_value;
     }
 
-    f(static_cast<Value>(record.value), static_cast<Color>(record.win_color), value, material_value,
+    f(GetValue(record, use_weighted_value), static_cast<Color>(record.win_color), value, material_value,
       root_color, elmo_lambda, pos);
 
     // 局面を浅い探索のroot局面にもどす
@@ -524,6 +536,7 @@ void Learner::InitializeLearner(USI::OptionsMap& o) {
     o[kOptionValueElmoLambda] << Option("1.0");
     o[kOptionValueValueToWinningRateCoefficient] << Option("600.0");
     o[kOptionValueAdamBeta2] << Option("0.999");
+    o[kOptionValueUseWeightedValue] << Option(false);
     o[kOptionValueBreedEvalBaseFolderPath] << Option("eval");
     o[kOptionValueBreedEvalAnotherFolderPath] << Option("eval");
     o[kOptionValueBreedEvalOutputFolderPath] << Option("eval");
@@ -614,6 +627,7 @@ void Learner::Learn(std::istringstream& iss) {
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
     double adam_beta2 = Options[kOptionValueAdamBeta2].cast<double>();
     std::string eval_save_directory_path = (std::string)Options[kOptionValueEvalSaveDir];
+    bool use_weighted_value = (bool)Options[kOptionValueUseWeightedValue];
 
     sync_cout << "min_learning_rate=" << min_learning_rate << sync_endl;
     sync_cout << "max_learning_rate=" << max_learning_rate << sync_endl;
@@ -629,6 +643,7 @@ void Learner::Learn(std::istringstream& iss) {
               << sync_endl;
     sync_cout << "adam_beta2=" << adam_beta2 << sync_endl;
     sync_cout << "eval_save_directory_path=" << eval_save_directory_path << sync_endl;
+    sync_cout << "use_weighted_value=" << use_weighted_value << sync_endl;
 
     auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
     std::vector<Record> records_for_test;
@@ -823,7 +838,7 @@ void Learner::Learn(std::istringstream& iss) {
                             delta_turn);
                     }
                 };
-                Strap(records[record_index], elmo_lambda, f);
+                Strap(records[record_index], elmo_lambda, use_weighted_value, f);
             }
 
 // 損失関数を計算する
@@ -878,7 +893,7 @@ void Learner::Learn(std::istringstream& iss) {
                     sum_test_abs_eval_value += abs(eval_value);
                     sum_test_abs_eval_value2 += abs(eval_value) * abs(eval_value);  // 無駄
                 };
-                Strap(records_for_test[record_index], elmo_lambda, f);
+                Strap(records_for_test[record_index], elmo_lambda, use_weighted_value, f);
             }
 
 // 低次元へ分配する
@@ -1033,9 +1048,11 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     std::string kifu_for_test_dir = Options[kOptionValueKifuForTestDir];
     int64_t num_positions_for_test =
         Options[kOptionValueLearnerNumPositionsForTest].cast<int64_t>();
+    bool use_weighted_value = (bool)Options[kOptionValueUseWeightedValue];
 
     sync_cout << "kifu_for_test_dir=" << kifu_for_test_dir << sync_endl;
     sync_cout << "num_positions_for_test=" << num_positions_for_test << sync_endl;
+    sync_cout << "use_weighted_value=" << use_weighted_value << sync_endl;
 
     auto kifu_reader_for_test = std::make_unique<Learner::KifuReader>(kifu_for_test_dir, false);
     std::vector<Record> records_for_test;
@@ -1052,12 +1069,12 @@ void Learner::CalculateTestDataEntropy(std::istringstream& iss) {
     for (const auto& record : records_for_test) {
         StateInfo state_info = { 0 };
         pos.set_from_packed_sfen(record.packed, &state_info, Threads[0]);
-        double p = ToWinningRate(static_cast<Value>(record.value), 600.0);
+        double p = ToWinningRate(GetValue(record, use_weighted_value), 600.0);
         double t = (pos.side_to_move() == record.win_color) ? 1.0 : 0.0;
         eval_entropy += -p * std::log(p + kEps) - (1.0 - p) * std::log(1.0 - p + kEps);
         eval_winlose_cross_entropy +=
             -t * std::log(p + kEps) - (1.0 - t) * std::log(1.0 - p + kEps);
-        ofs << record.value << std::endl;
+        ofs << GetValue(record, use_weighted_value) << std::endl;
     }
 
     sync_cout << "eval_entropy=" << eval_entropy / records_for_test.size() << sync_endl;
