@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "experimental_learner.h"
+#include "learn/learn.h"
 
 namespace Learner {
 
@@ -14,8 +15,8 @@ namespace Learner {
 	public:
 		KifuReader(const std::string& folder_name, int num_loops);
 		virtual ~KifuReader();
-		bool Read(Record& record);
-		bool Read(int num_records, std::vector<Record>& records);
+		bool Read(PackedSfenValue& record);
+		bool Read(int num_records, std::vector<PackedSfenValue>& records);
 		bool Close();
 
 	private:

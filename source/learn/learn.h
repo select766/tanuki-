@@ -227,12 +227,20 @@ namespace Learner
 		// LEARN_GENSFEN_DRAW_RESULTが有効なときにだけ書き出す。
 		s8 game_result;
 
-		// 教師局面を書き出したファイルを他の人とやりとりするときに
-		// この構造体サイズが不定だと困るため、paddingしてどの環境でも必ず40bytesになるようにしておく。
-		u8 padding;
+        union {
+            // 教師局面を書き出したファイルを他の人とやりとりするときに
+            // この構造体サイズが不定だと困るため、paddingしてどの環境でも必ず40bytesになるようにしておく。
+            u8 padding;
+
+            // 教師局面生成の自己対戦の対局の最後の局面の場合は非0、
+            // それ以外の場合は0
+            // 主にdiscountの計算に使用する
+            u8 last_position;
+        };
 
 		// 32 + 2 + 2 + 2 + 1 + 1 = 40bytes
 	};
+    static_assert(sizeof(PackedSfenValue) == 40, "Size of PackedSfenValue is not 40");
 
 	// 読み筋とそのときの評価値を返す型
 	// Learner::search() , Learner::qsearch()で用いる。

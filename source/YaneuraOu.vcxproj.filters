@@ -199,9 +199,6 @@
     <ClInclude Include="experimental_progress.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="kifu_converter.hpp">
-      <Filter>リソース ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="kifu_generator.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
@@ -373,9 +370,6 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="experimental_progress.cpp">
-      <Filter>リソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="kifu_converter.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="kifu_generator.cpp">

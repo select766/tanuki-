@@ -24,7 +24,7 @@ Learner::KifuReader::~KifuReader() {
 	Close();
 }
 
-bool Learner::KifuReader::Read(int num_records, std::vector<Record>& records) {
+bool Learner::KifuReader::Read(int num_records, std::vector<PackedSfenValue>& records) {
 	records.resize(num_records);
 	for (auto& record : records) {
 		if (!Read(record)) {
@@ -34,7 +34,7 @@ bool Learner::KifuReader::Read(int num_records, std::vector<Record>& records) {
 	return true;
 }
 
-bool Learner::KifuReader::Read(Record& record) {
+bool Learner::KifuReader::Read(PackedSfenValue& record) {
 	// ファイルリストを取得し、ファイルを開いた状態にする
 	if (!EnsureOpen()) {
 		return false;

@@ -2,6 +2,7 @@
 #define _KIFU_WRITER_H_
 
 #include "experimental_learner.h"
+#include "learn/learn.h"
 #include "position.h"
 #include "shogi.h"
 
@@ -11,7 +12,7 @@ namespace Learner {
 	public:
 		KifuWriter(const std::string& output_file_path);
 		virtual ~KifuWriter();
-		bool Write(const Record& record);
+		bool Write(const PackedSfenValue& record);
 		bool Close();
 
 	private:

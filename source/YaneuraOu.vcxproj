@@ -789,7 +789,6 @@
     <ClInclude Include="extra\macros.h" />
     <ClInclude Include="extra\mate\mate1ply.h" />
     <ClInclude Include="extra\thread_win32.h" />
-    <ClInclude Include="kifu_converter.hpp" />
     <ClInclude Include="kifu_generator.h" />
     <ClInclude Include="kifu_reader.h" />
     <ClInclude Include="kifu_shuffler.h" />
@@ -849,7 +848,6 @@
     <ClCompile Include="extra\sfen_packer.cpp" />
     <ClCompile Include="extra\test_cmd.cpp" />
     <ClCompile Include="extra\timeman.cpp" />
-    <ClCompile Include="kifu_converter.cpp" />
     <ClCompile Include="kifu_generator.cpp" />
     <ClCompile Include="kifu_reader.cpp" />
     <ClCompile Include="kifu_shuffler.cpp" />

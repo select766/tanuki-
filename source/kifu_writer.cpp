@@ -14,7 +14,7 @@ Learner::KifuWriter::~KifuWriter() {
 	Close();
 }
 
-bool Learner::KifuWriter::Write(const Record& record) {
+bool Learner::KifuWriter::Write(const PackedSfenValue& record) {
 	if (!EnsureOpen()) {
 		return false;
 	}

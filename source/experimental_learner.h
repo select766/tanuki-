@@ -7,14 +7,11 @@
 #include "shogi.h"
 
 namespace Learner {
-struct Record {
-    PackedSfen packed;
-    int16_t value;
-    int16_t weighted_value;
-    int8_t win_color;
-    int8_t last_position;
+enum GameResult {
+    GameResultWin = 1,
+    GameResultLose = -1,
+    GameResultDraw = 0,
 };
-static_assert(sizeof(Record) == 38, "Size of Record is not 38");
 
 constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 

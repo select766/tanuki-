@@ -28,7 +28,7 @@ using USI::Option;
 using USI::OptionsMap;
 
 namespace Learner {
-std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
+std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV);
 std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 }
 
@@ -211,7 +211,7 @@ void Learner::GenerateKifu() {
 
             RandomMove(pos, state, mt19937_64);
 
-            std::vector<Learner::Record> records;
+            std::vector<Learner::PackedSfenValue> records;
             Value last_value;
             while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
                    pos.DeclarationWin() == MOVE_NONE) {
@@ -240,9 +240,10 @@ void Learner::GenerateKifu() {
                     break;
                 }
 
-                Learner::Record record = {0};
-                pos.sfen_pack(record.packed);
-                record.value = last_value;
+                Learner::PackedSfenValue record = {0};
+                pos.sfen_pack(record.sfen);
+                record.score = last_value;
+                record.gamePly = pos.game_ply();
                 records.push_back(record);
 
                 pv_move = pv[0];
@@ -251,28 +252,30 @@ void Learner::GenerateKifu() {
                 Eval::evaluate(pos);
             }
 
+            int game_result = GameResultDraw;
             Color win;
             RepetitionState repetition_state = pos.is_repetition(0);
             if (pos.is_mated()) {
                 // ïâÇØ
                 // ãlÇ‹Ç≥ÇÍÇΩ
-                win = ~pos.side_to_move();
+                game_result = GameResultLose;
             } else if (pos.DeclarationWin() != MOVE_NONE) {
                 // èüÇø
                 // ì¸ã èüóò
-                win = pos.side_to_move();
+                game_result = GameResultWin;
             } else if (last_value > value_threshold) {
                 // èüÇø
-                win = pos.side_to_move();
+                game_result = GameResultWin;
             } else if (last_value < -value_threshold) {
                 // ïâÇØ
-                win = ~pos.side_to_move();
+                game_result = GameResultLose;
             } else {
                 continue;
             }
 
-            for (auto& record : records) {
-                record.win_color = win;
+            for (int i = static_cast<int>(records.size()) - 1; i >= 0; --i) {
+                records[i].game_result = game_result;
+                game_result = -game_result;
             }
 
             if (!records.empty()) {
@@ -354,7 +357,7 @@ void Learner::ConvertSfenToLearningData() {
 
             std::istringstream iss(sfen);
             // startpos moves 7g7f 3c3d 2g2f
-            std::vector<Learner::Record> records;
+            std::vector<Learner::PackedSfenValue> records;
             std::string token;
             Color win = COLOR_NB;
             while (iss >> token) {
@@ -373,9 +376,10 @@ void Learner::ConvertSfenToLearningData() {
                 const auto& root_moves = pos.this_thread()->rootMoves;
                 const auto& root_move = root_moves[0];
 
-                Learner::Record record = { 0 };
-                pos.sfen_pack(record.packed);
-                record.value = root_move.score;
+                Learner::PackedSfenValue record = { 0 };
+                pos.sfen_pack(record.sfen);
+                record.score = root_move.score;
+                record.gamePly = pos.game_ply();
                 records.push_back(record);
 
                 if (pos.DeclarationWin()) {
@@ -393,8 +397,10 @@ void Learner::ConvertSfenToLearningData() {
             }
             sync_cout << "DeclarationWin..." << sync_endl;
 
-            for (auto& record : records) {
-                record.win_color = win;
+            int game_result = GameResultWin;
+            for (int i = static_cast<int>(records.size()) - 1; i >= 0; --i) {
+                records[i].game_result = game_result;
+                game_result = -game_result;
             }
 
             std::lock_guard<std::mutex> lock_gurad(mutex);
