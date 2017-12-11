@@ -12,6 +12,9 @@
 namespace {
 static const constexpr double kDiscountRatio = 0.9;
 static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
+// シャッフル後のファイル数
+// Windowsでは一度に512個までのファイルしか開けないため
+// 256個に制限しておく
 static const constexpr int kNumShuffledKifuFiles = 256;
 static const constexpr char* kOptoinNameUseDiscount = "UseDiscount";
 static const constexpr char* kOptoinNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
@@ -67,6 +70,9 @@ void Learner::ShuffleKifu() {
         }
 
         if (use_discount) {
+            // DeepStack: Expert-Level Artificial Intelligence in No-Limit Poker
+            // https://arxiv.org/abs/1701.01724
+            // discountを用いた重み付き評価値を計算し、元の評価値を上書きする
             for (int i = 0; i < records.size(); ++i) {
                 double sum_weighted_value = 0.0;
                 double sum_weights = 0.0;
@@ -76,9 +82,11 @@ void Learner::ShuffleKifu() {
                 for (int j = i; j < records.size(); ++j) {
                     double value;
                     if (use_winning_rate_for_discount) {
+                        // discountの計算に評価値から推定した勝率を用いる場合
                         value = ToWinningRate(static_cast<Value>(sign * records[j].score),
                                               value_to_winning_rate_coefficient);
                     } else {
+                        // discountの計算に評価値をそのまま用いる場合
                         value = sign * records[j].score;
                     }
                     sum_weighted_value += value * weight;
@@ -117,6 +125,7 @@ void Learner::ShuffleKifu() {
     for (const auto& file_path : file_paths) {
         sync_cout << "info string " << file_path << sync_endl;
 
+        // ファイル全体を読み込む
         FILE* file = std::fopen(file_path.c_str(), "rb");
         if (file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
@@ -130,8 +139,10 @@ void Learner::ShuffleKifu() {
         std::fclose(file);
         file = nullptr;
 
+        // 棋譜全体をシャッフルする
         std::shuffle(records.begin(), records.end(), mt);
 
+        // 棋譜全体を上書きして書き戻す
         file = std::fopen(file_path.c_str(), "wb");
         if (file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
