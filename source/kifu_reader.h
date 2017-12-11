@@ -11,25 +11,24 @@
 
 namespace Learner {
 
-	class KifuReader {
-	public:
-		KifuReader(const std::string& folder_name, int num_loops);
-		virtual ~KifuReader();
-		bool Read(PackedSfenValue& record);
-		bool Read(int num_records, std::vector<PackedSfenValue>& records);
-		bool Close();
+class KifuReader {
+   public:
+    KifuReader(const std::string& folder_name, int num_loops);
+    virtual ~KifuReader();
+    bool Read(PackedSfenValue& record);
+    bool Read(int num_records, std::vector<PackedSfenValue>& records);
+    bool Close();
 
-	private:
-		bool EnsureOpen();
+   private:
+    bool EnsureOpen();
 
-		const std::string folder_name_;
-		const int num_loops_;
-		std::vector<std::string> file_paths_;
-		FILE* file_;
-		int loop_ = 0;
-		int file_index_ = 0;
-	};
-
+    const std::string folder_name_;
+    const int num_loops_;
+    std::vector<std::string> file_paths_;
+    FILE* file_;
+    int loop_ = 0;
+    int file_index_ = 0;
+};
 }
 
 #endif

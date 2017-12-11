@@ -42,9 +42,12 @@ constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
 constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
 constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
 constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
-constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName = "ConvertSfenToLearningDataInputSfenFileName";
-constexpr char* kOptionConvertSfenToLearningDataSearchDepth = "ConvertSfenToLearningDataSearchDepth";
-constexpr char* kOptionConvertSfenToLearningDataOutputFileName = "ConvertSfenToLearningDataOutputFileName";
+constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
+    "ConvertSfenToLearningDataInputSfenFileName";
+constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
+    "ConvertSfenToLearningDataSearchDepth";
+constexpr char* kOptionConvertSfenToLearningDataOutputFileName =
+    "ConvertSfenToLearningDataOutputFileName";
 
 std::vector<std::string> start_positions;
 std::uniform_real_distribution<> probability_distribution;
@@ -65,7 +68,7 @@ bool ReadBook() {
     int line_index = 0;
     while (!fs_book.eof()) {
         Thread& thread = *Threads[0];
-        StateInfo state_infos[4096] = { 0 };
+        StateInfo state_infos[4096] = {0};
         StateInfo* state = state_infos + 8;
         Position& pos = thread.rootPos;
         pos.set_hirate(state, &thread);
@@ -125,23 +128,23 @@ void Learner::InitializeGenerator(USI::OptionsMap& o) {
 }
 
 namespace {
-    void RandomMove(Position& pos, StateInfo* state, std::mt19937_64& mt) {
-        ASSERT_LV3(pos.this_thread());
-        auto& root_moves = pos.this_thread()->rootMoves;
+void RandomMove(Position& pos, StateInfo* state, std::mt19937_64& mt) {
+    ASSERT_LV3(pos.this_thread());
+    auto& root_moves = pos.this_thread()->rootMoves;
 
-        root_moves.clear();
-        for (auto m : MoveList<LEGAL>(pos)) {
-            root_moves.push_back(Search::RootMove(m));
-        }
-
-        if (root_moves.empty()) {
-            return;
-        }
-
-        std::uniform_int_distribution<> dist(0, static_cast<int>(root_moves.size()) - 1);
-        pos.do_move(root_moves[dist(mt)].pv[0], state[pos.game_ply()]);
-        Eval::evaluate(pos);
+    root_moves.clear();
+    for (auto m : MoveList<LEGAL>(pos)) {
+        root_moves.push_back(Search::RootMove(m));
     }
+
+    if (root_moves.empty()) {
+        return;
+    }
+
+    std::uniform_int_distribution<> dist(0, static_cast<int>(root_moves.size()) - 1);
+    pos.do_move(root_moves[dist(mt)].pv[0], state[pos.game_ply()]);
+    Eval::evaluate(pos);
+}
 }
 
 void Learner::GenerateKifu() {
@@ -195,8 +198,8 @@ void Learner::GenerateKifu() {
         WinProcGroup::bindThisThread(thread_index);
         char output_file_path[1024];
         std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
-                     output_file_name_tag.c_str(), search_depth,
-                     num_positions, thread_index, start_time);
+                     output_file_name_tag.c_str(), search_depth, num_positions, thread_index,
+                     start_time);
         // 各スレッドに持たせる
         std::unique_ptr<Learner::KifuWriter> kifu_writer =
             std::make_unique<Learner::KifuWriter>(output_file_path);
@@ -315,7 +318,8 @@ void Learner::ConvertSfenToLearningData() {
     limits.enteringKingRule = EKR_27_POINT;
     Search::Limits = limits;
 
-    std::string input_sfen_file_name = (std::string)Options[kOptionConvertSfenToLearningDataInputSfenFileName];
+    std::string input_sfen_file_name =
+        (std::string)Options[kOptionConvertSfenToLearningDataInputSfenFileName];
     int search_depth = Options[kOptionConvertSfenToLearningDataSearchDepth];
     std::string output_file_name = Options[kOptionConvertSfenToLearningDataOutputFileName];
 
@@ -347,10 +351,11 @@ void Learner::ConvertSfenToLearningData() {
         int thread_index = ::omp_get_thread_num();
         WinProcGroup::bindThisThread(thread_index);
 
-        for (int64_t sfen_index = global_sfen_index++; sfen_index < num_sfens; sfen_index = global_sfen_index++) {
+        for (int64_t sfen_index = global_sfen_index++; sfen_index < num_sfens;
+             sfen_index = global_sfen_index++) {
             const std::string& sfen = sfens[sfen_index];
             Thread& thread = *Threads[thread_index];
-            StateInfo state_infos[4096] = { 0 };
+            StateInfo state_infos[4096] = {0};
             StateInfo* state = state_infos + 8;
             Position& pos = thread.rootPos;
             pos.set_hirate(state, &thread);
@@ -376,7 +381,7 @@ void Learner::ConvertSfenToLearningData() {
                 const auto& root_moves = pos.this_thread()->rootMoves;
                 const auto& root_move = root_moves[0];
 
-                Learner::PackedSfenValue record = { 0 };
+                Learner::PackedSfenValue record = {0};
                 pos.sfen_pack(record.sfen);
                 record.score = root_move.score;
                 record.gamePly = pos.game_ply();
@@ -388,8 +393,8 @@ void Learner::ConvertSfenToLearningData() {
                 }
             }
 
-            //sync_cout << pos << sync_endl;
-            //pos.DeclarationWin();
+            // sync_cout << pos << sync_endl;
+            // pos.DeclarationWin();
 
             if (win == COLOR_NB) {
                 sync_cout << "Skipped..." << sync_endl;

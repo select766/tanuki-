@@ -500,8 +500,8 @@ void Strap(
     }
 
     Color win_color = (record.game_result == Learner::GameResultWin) ? root_color : ~root_color;
-    f(static_cast<Value>(record.score), win_color, value,
-      material_value, root_color, elmo_lambda, pos);
+    f(static_cast<Value>(record.score), win_color, value, material_value, root_color, elmo_lambda,
+      pos);
 
     // ã«ñ ÇêÛÇ¢íTçıÇÃrootã«ñ Ç…Ç‡Ç«Ç∑
     for (auto rit = pv.rbegin(); rit != pv.rend(); ++rit) {

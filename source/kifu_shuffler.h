@@ -3,6 +3,6 @@
 #include "shogi.h"
 
 namespace Learner {
-	void InitializeKifuShuffler(USI::OptionsMap& o);
-	void ShuffleKifu();
+void InitializeKifuShuffler(USI::OptionsMap& o);
+void ShuffleKifu();
 };
