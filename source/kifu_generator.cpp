@@ -218,7 +218,6 @@ void Learner::GenerateKifu() {
             Value last_value;
             while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
                    pos.DeclarationWin() == MOVE_NONE) {
-                Move pv_move = Move::MOVE_NONE;
                 Learner::search(pos, search_depth);
 
                 const auto& root_moves = pos.this_thread()->rootMoves;
@@ -243,13 +242,15 @@ void Learner::GenerateKifu() {
                     break;
                 }
 
+                Move pv_move = pv[0];
+
                 Learner::PackedSfenValue record = {0};
                 pos.sfen_pack(record.sfen);
                 record.score = last_value;
                 record.gamePly = pos.game_ply();
+                record.move = pv_move;
                 records.push_back(record);
 
-                pv_move = pv[0];
                 pos.do_move(pv_move, state[pos.game_ply()]);
                 // ç∑ï™åvéZÇÃÇΩÇﬂevaluate()ÇåƒÇ—èoÇ∑
                 Eval::evaluate(pos);
