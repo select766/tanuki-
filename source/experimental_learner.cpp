@@ -175,10 +175,26 @@ class Kpp {
     }
 
     void ToLowerDimensions(Kpp kpp[4]) const {
-        kpp[0] = Kpp(king_, piece0_, piece1_, weight_kind_);
-        kpp[1] = Kpp(king_, piece1_, piece0_, weight_kind_);
-        kpp[2] = Kpp(Mir(king_), mir_piece(piece0_), mir_piece(piece1_), weight_kind_);
-        kpp[3] = Kpp(Mir(king_), mir_piece(piece1_), mir_piece(piece0_), weight_kind_);
+        // Kppインスタンスを生成して代入するよりフィールドに直接代入したほうが高速
+        kpp[0].king_ = king_;
+        kpp[0].piece0_ = piece0_;
+        kpp[0].piece1_ = piece1_;
+        kpp[0].weight_kind_ = weight_kind_;
+
+        kpp[1].king_ = king_;
+        kpp[1].piece0_ = piece1_;
+        kpp[1].piece1_ = piece0_;
+        kpp[1].weight_kind_ = weight_kind_;
+
+        kpp[2].king_ = Mir(king_);
+        kpp[2].piece0_ = mir_piece(piece0_);
+        kpp[2].piece1_ = mir_piece(piece1_);
+        kpp[2].weight_kind_ = weight_kind_;
+
+        kpp[3].king_ = Mir(king_);
+        kpp[3].piece0_ = mir_piece(piece1_);
+        kpp[3].piece1_ = mir_piece(piece0_);
+        kpp[3].weight_kind_ = weight_kind_;
     }
 
     static Kpp ForIndex(int index) {
@@ -249,12 +265,31 @@ class Kkp {
     }
 
     void ToLowerDimensions(Kkp kkp[4]) const {
-        kkp[0] = Kkp(king0_, king1_, piece_, weight_kind_);
-        kkp[1] = Kkp(Mir(king0_), Mir(king1_), mir_piece(piece_), weight_kind_);
-        kkp[2] = Kkp(Inv(king1_), Inv(king0_), inv_piece(piece_), weight_kind_,
-                     weight_kind_ == WEIGHT_KIND_COLOR);
-        kkp[3] = Kkp(Inv(Mir(king1_)), Inv(Mir(king0_)), inv_piece(mir_piece(piece_)), weight_kind_,
-                     weight_kind_ == WEIGHT_KIND_COLOR);
+        ASSERT_LV3(!invert_sign_);
+
+        kkp[0].king0_ = king0_;
+        kkp[0].king1_ = king1_;
+        kkp[0].piece_ = piece_;
+        kkp[0].weight_kind_ = weight_kind_;
+        kkp[0].invert_sign_ = false;
+
+        kkp[1].king0_ = Mir(king0_);
+        kkp[1].king1_ = Mir(king1_);
+        kkp[1].piece_ = mir_piece(piece_);
+        kkp[1].weight_kind_ = weight_kind_;
+        kkp[1].invert_sign_ = false;
+
+        kkp[2].king0_ = Inv(king1_);
+        kkp[2].king1_ = Inv(king0_);
+        kkp[2].piece_ = inv_piece(piece_);
+        kkp[2].weight_kind_ = weight_kind_;
+        kkp[2].invert_sign_ = weight_kind_ == WEIGHT_KIND_COLOR;
+
+        kkp[3].king0_ = Inv(Mir(king1_));
+        kkp[3].king1_ = Inv(Mir(king0_));
+        kkp[3].piece_ = inv_piece(mir_piece(piece_));
+        kkp[3].weight_kind_ = weight_kind_;
+        kkp[3].invert_sign_ = weight_kind_ == WEIGHT_KIND_COLOR;
     }
 
     static Kkp ForIndex(int index) {
@@ -322,11 +357,27 @@ class Kk {
     }
 
     void ToLowerDimensions(Kk kk[4]) const {
-        kk[0] = Kk(king0_, king1_, weight_kind_);
-        kk[1] = Kk(Mir(king0_), Mir(king1_), weight_kind_);
-        kk[2] = Kk(Inv(king1_), Inv(king0_), weight_kind_, weight_kind_ == WEIGHT_KIND_COLOR);
-        kk[3] =
-            Kk(Inv(Mir(king1_)), Inv(Mir(king0_)), weight_kind_, weight_kind_ == WEIGHT_KIND_COLOR);
+        ASSERT_LV3(!invert_sign_);
+
+        kk[0].king0_ = king0_;
+        kk[0].king1_ = king1_;
+        kk[0].weight_kind_ = weight_kind_;
+        kk[0].invert_sign_ = false;
+
+        kk[1].king0_ = Mir(king0_);
+        kk[1].king1_ = Mir(king1_);
+        kk[1].weight_kind_ = weight_kind_;
+        kk[1].invert_sign_ = false;
+
+        kk[2].king0_ = Inv(king1_);
+        kk[2].king1_ = Inv(king0_);
+        kk[2].weight_kind_ = weight_kind_;
+        kk[2].invert_sign_ = weight_kind_ == WEIGHT_KIND_COLOR;
+
+        kk[3].king0_ = Inv(Mir(king1_));
+        kk[3].king1_ = Inv(Mir(king0_));
+        kk[3].weight_kind_ = weight_kind_;
+        kk[3].invert_sign_ = weight_kind_ == WEIGHT_KIND_COLOR;
     }
 
     static Kk ForIndex(int index) {

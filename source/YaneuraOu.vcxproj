@@ -652,7 +652,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-user|Win32'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-KifuGenerator|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-KifuGenerator|x64'" />
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-Learner|x64'" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-Learner|x64'">
+    <ClCompile />
+    <ClCompile />
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-Learner|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-2017Early|x64'">
     <ClCompile>
