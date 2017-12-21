@@ -262,23 +262,27 @@ void Learner::GenerateKifu() {
             if (pos.is_mated()) {
                 // •‰‚¯
                 // ‹l‚Ü‚³‚ê‚½
-                game_result = GameResultLose;
+                // ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚ÅŸ‚¿
+                game_result = GameResultWin;
             } else if (pos.DeclarationWin() != MOVE_NONE) {
                 // Ÿ‚¿
                 // “ü‹ÊŸ—˜
-                game_result = GameResultWin;
+                // ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚Å•‰‚¯
+                game_result = GameResultLose;
             } else if (last_value > value_threshold) {
                 // Ÿ‚¿
-                game_result = GameResultWin;
+                // ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚Å•‰‚¯
+                game_result = GameResultLose;
             } else if (last_value < -value_threshold) {
                 // •‰‚¯
-                game_result = GameResultLose;
+                // ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚ÅŸ‚¿
+                game_result = GameResultWin;
             } else {
                 continue;
             }
 
-            for (int i = static_cast<int>(records.size()) - 1; i >= 0; --i) {
-                records[i].game_result = game_result;
+            for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
+                rit->game_result = game_result;
                 game_result = -game_result;
             }
 
