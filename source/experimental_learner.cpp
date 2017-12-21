@@ -20,17 +20,17 @@ std::pair<Value, std::vector<Move> > qsearch(Position& pos);
 
 double Sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
-double ToWinningRate(Value value, double value_to_winning_rate_coefficient) {
-    return Sigmoid(static_cast<int>(value) / value_to_winning_rate_coefficient);
+double ToWinningRate(double value, double value_to_winning_rate_coefficient) {
+    return Sigmoid(value / value_to_winning_rate_coefficient);
 }
 
 double InverseSigmoid(double x) { return -std::log((1 - x) / x); }
 
-Value ToValue(double winning_rate, double value_to_winning_rate_coefficient) {
+double ToValue(double winning_rate, double value_to_winning_rate_coefficient) {
     double value = value_to_winning_rate_coefficient * InverseSigmoid(winning_rate);
     value = std::min<double>(value, VALUE_MATE);
     value = std::max<double>(value, -VALUE_MATE);
-    return static_cast<Value>(static_cast<int>(std::round(value)));
+    return value;
 }
 }
 

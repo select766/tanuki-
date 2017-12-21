@@ -15,8 +15,8 @@ enum GameResult {
 
 constexpr char* kOptionValueValueToWinningRateCoefficient = "ValueToWinningRateCoefficient";
 
-double ToWinningRate(Value value, double value_to_winning_rate_coefficient);
-Value ToValue(double winning_rate, double value_to_winning_rate_coefficient);
+double ToWinningRate(double value, double value_to_winning_rate_coefficient);
+double ToValue(double winning_rate, double value_to_winning_rate_coefficient);
 
 #ifdef USE_EXPERIMENTAL_LEARNER
 void InitializeLearner(USI::OptionsMap& o);

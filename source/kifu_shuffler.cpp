@@ -18,7 +18,26 @@ static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
 static const constexpr int kNumShuffledKifuFiles = 256;
 static const constexpr char* kOptoinNameUseDiscount = "UseDiscount";
 static const constexpr char* kOptoinNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
+
+double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
+                     double value_to_winning_rate_coefficient) {
+    if (use_winning_rate_for_discount) {
+        return Learner::ToWinningRate(raw_score, value_to_winning_rate_coefficient);
+        ;
+    } else {
+        return raw_score;
+    }
 }
+
+double ToRawScore(double scaled_score, bool use_winning_rate_for_discount,
+                  double value_to_winning_rate_coefficient) {
+    if (use_winning_rate_for_discount) {
+        return Learner::ToValue(scaled_score, value_to_winning_rate_coefficient);
+    } else {
+        return scaled_score;
+    }
+}
+}  // namespace
 
 void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
@@ -52,6 +71,12 @@ void Learner::ShuffleKifu() {
         writers.push_back(std::make_shared<KifuWriter>(file_path));
     }
 
+    double weights[4096];
+    weights[0] = 1.0;
+    for (int i = 1; i < sizeof(weights) / sizeof(weights[0]); ++i) {
+        weights[i] = weights[i - 1] * kDiscountRatio;
+    }
+
     std::mt19937_64 mt(std::time(nullptr));
     std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
     int64_t num_records = 0;
@@ -69,41 +94,52 @@ void Learner::ShuffleKifu() {
             break;
         }
 
+        int game_result = GameResultDraw;
+        if (records.back().score > VALUE_ZERO) {
+            game_result = GameResultWin;
+        } else {
+            game_result = GameResultLose;
+        }
+
+        for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
+            rit->game_result = game_result;
+            game_result = -game_result;
+        }
+
         if (use_discount) {
             // DeepStack: Expert-Level Artificial Intelligence in No-Limit Poker
             // https://arxiv.org/abs/1701.01724
             // discountを用いた重み付き評価値を計算し、元の評価値を上書きする
-            for (int i = 0; i < records.size(); ++i) {
-                double sum_weighted_value = 0.0;
-                double sum_weights = 0.0;
-                double weight = 1.0;
-                // 先後の符号を反転するための変数
-                int sign = 1;
-                for (int j = i; j < records.size(); ++j) {
-                    double value;
-                    if (use_winning_rate_for_discount) {
-                        // discountの計算に評価値から推定した勝率を用いる場合
-                        value = ToWinningRate(static_cast<Value>(sign * records[j].score),
-                                              value_to_winning_rate_coefficient);
-                    } else {
-                        // discountの計算に評価値をそのまま用いる場合
-                        value = sign * records[j].score;
-                    }
-                    sum_weighted_value += value * weight;
-                    sum_weights += weight;
-                    weight *= kDiscountRatio;
-                    sign = -sign;
-                }
+            // 後ろから計算すると線形時間で計算できる
 
-                Value weighted_value;
-                if (use_winning_rate_for_discount) {
-                    double winning_rate = sum_weighted_value / sum_weights;
-                    weighted_value = ToValue(winning_rate, value_to_winning_rate_coefficient);
-                } else {
-                    weighted_value =
-                        static_cast<Value>(static_cast<int16_t>(sum_weighted_value / sum_weights));
-                }
-                records[i].score = static_cast<int16_t>(weighted_value);
+            // 各局面の評価値に重みをかけたもの
+            // use_winning_rate_for_discount の場合には勝率に変換した値が入る
+            double weighted_scores[4096];
+            int num_records = records.size();
+            // 手番から見た評価値を開始手番から見た評価値に変換するための符号
+            double sign = 1.0;
+            for (int i = 0; i < num_records; ++i) {
+                weighted_scores[i] =
+                    ToScaledScore(sign * records[i].score, use_winning_rate_for_discount,
+                                  value_to_winning_rate_coefficient) *
+                    weights[i];
+                sign = -sign;
+            }
+
+            double sum_weighted_scores = 0.0;
+            double sum_weights = 0.0;
+            // 一度反転すると最後の局面の符号と一致する
+            sign = -sign;
+            // 後ろから足していくと線形時間で計算できる
+            for (int i = static_cast<int>(records.size() - 1); i >= 0; --i) {
+                sum_weighted_scores += weighted_scores[i];
+                sum_weights += weights[i];
+                double scaled_score = sum_weighted_scores / sum_weights;
+                double raw_score = ToRawScore(scaled_score, use_winning_rate_for_discount,
+                                              value_to_winning_rate_coefficient);
+                //std::cout << records[i].score << " -> " << sign * raw_score << std::endl;
+                records[i].score = static_cast<Value>(static_cast<int>(sign * raw_score));
+                sign = -sign;
             }
         }
 
