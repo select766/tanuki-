@@ -34,6 +34,13 @@ def AdoptSubfolder(subfolder):
   return num_positions % 1000000000 == 0 or num_positions % 10000 != 0
 
 
+def ToOptionValueString(b):
+  if b:
+    return 'True'
+  else:
+    return 'False'
+
+
 def GenerateKifu(args, eval_folder_path, kifu_folder_path, num_positions, kifu_tag):
   print(locals(), flush=True)
   input = '''usi
@@ -67,12 +74,16 @@ def ShuffleKifu(args, kifu_folder_path, shuffled_kifu_folder_path):
   input = '''usi
 setoption name KifuDir value {kifu_folder_path}
 setoption name ShuffledKifuDir value {shuffled_kifu_folder_path}
+setoption name UseDiscount value {use_discount}
+setoption name UseWinningRateForDiscount value {use_winning_rate_for_discount}
 isready
 usinewgame
 shuffle_kifu
 '''.format(
   kifu_folder_path=kifu_folder_path,
-  shuffled_kifu_folder_path=shuffled_kifu_folder_path).encode('utf-8')
+  shuffled_kifu_folder_path=shuffled_kifu_folder_path,
+  use_discount=ToOptionValueString(args.use_discount),
+  use_winning_rate_for_discount=ToOptionValueString(args.use_winning_rate_for_discount)).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
@@ -381,7 +392,15 @@ def main():
     default='records_2017-05-19.sfen',
     type=str,
     help='')
-  
+  parser.add_argument(
+    '--use_discount',
+    action='store_true',
+    help='Use discount for shuffle. Otherwise, "false" ex) true')
+  parser.add_argument(
+    '--use_winning_rate_for_discount',
+    action='store_true',
+    help='Use winning rate for discount. Otherwise, "false" ex) true')
+
   args = parser.parse_args()
 
   learner_output_folder_path_base = args.learner_output_folder_path_base
