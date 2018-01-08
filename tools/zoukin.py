@@ -82,8 +82,8 @@ shuffle_kifu
 '''.format(
   kifu_folder_path=kifu_folder_path,
   shuffled_kifu_folder_path=shuffled_kifu_folder_path,
-  use_discount=ToOptionValueString(args.use_discount),
-  use_winning_rate_for_discount=ToOptionValueString(args.use_winning_rate_for_discount)).encode('utf-8')
+  use_discount=args.use_discount,
+  use_winning_rate_for_discount=args.use_winning_rate_for_discount).encode('utf-8')
   print(input.decode('utf-8'), flush=True)
   subprocess.run([args.generate_kifu_exe_file_path], input=input, check=True)
 
@@ -394,12 +394,16 @@ def main():
     help='')
   parser.add_argument(
     '--use_discount',
-    action='store_true',
-    help='Use discount for shuffle. Otherwise, "false" ex) true')
+    action='store',
+    type=str,
+    required=True,
+    help='"True" to use discount for shuffle. Otherwise, "False" ex) True')
   parser.add_argument(
     '--use_winning_rate_for_discount',
-    action='store_true',
-    help='Use winning rate for discount. Otherwise, "false" ex) true')
+    action='store',
+    type=str,
+    required=True,
+    help='"True" to winning rate for discount. Otherwise, "False" ex) True')
 
   args = parser.parse_args()
 
