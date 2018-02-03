@@ -16,8 +16,10 @@ static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
 // Windowsでは一度に512個までのファイルしか開けないため
 // 256個に制限しておく
 static const constexpr int kNumShuffledKifuFiles = 256;
+static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
 static const constexpr char* kOptoinNameUseDiscount = "UseDiscount";
 static const constexpr char* kOptoinNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
+static const constexpr char* kOptoinNameOverwriteGameResults = "OverwriteGameResults";
 
 double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
                      double value_to_winning_rate_coefficient) {
@@ -43,6 +45,7 @@ void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
     o[kOptoinNameUseDiscount] << USI::Option(false);
     o[kOptoinNameUseWinningRateForDiscount] << USI::Option(false);
+    o[kOptoinNameOverwriteGameResults] << USI::Option(true);
 }
 
 void Learner::ShuffleKifu() {
@@ -53,6 +56,7 @@ void Learner::ShuffleKifu() {
     std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
     bool use_discount = (bool)Options[kOptoinNameUseDiscount];
     bool use_winning_rate_for_discount = (bool)Options[kOptoinNameUseWinningRateForDiscount];
+    bool overwrite_game_results = (bool)Options[kOptoinNameOverwriteGameResults];
     double value_to_winning_rate_coefficient =
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
 
@@ -85,7 +89,7 @@ void Learner::ShuffleKifu() {
         PackedSfenValue record;
         while (reader->Read(record)) {
             records.push_back(record);
-            if (record.last_position) {
+            if (record.last_position || static_cast<int>(records.size()) > kMaxPackedSfenValues) {
                 break;
             }
         }
@@ -94,16 +98,18 @@ void Learner::ShuffleKifu() {
             break;
         }
 
-        int game_result = GameResultDraw;
-        if (records.back().score > VALUE_ZERO) {
-            game_result = GameResultWin;
-        } else {
-            game_result = GameResultLose;
-        }
+        if (overwrite_game_results) {
+            int game_result = GameResultDraw;
+            if (records.back().score > VALUE_ZERO) {
+                game_result = GameResultWin;
+            } else {
+                game_result = GameResultLose;
+            }
 
-        for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
-            rit->game_result = game_result;
-            game_result = -game_result;
+            for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
+                rit->game_result = game_result;
+                game_result = -game_result;
+            }
         }
 
         if (use_discount) {
@@ -137,7 +143,7 @@ void Learner::ShuffleKifu() {
                 double scaled_score = sum_weighted_scores / sum_weights;
                 double raw_score = ToRawScore(scaled_score, use_winning_rate_for_discount,
                                               value_to_winning_rate_coefficient);
-                //std::cout << records[i].score << " -> " << sign * raw_score << std::endl;
+                // std::cout << records[i].score << " -> " << sign * raw_score << std::endl;
                 records[i].score = static_cast<Value>(static_cast<int>(sign * raw_score));
                 sign = -sign;
             }
