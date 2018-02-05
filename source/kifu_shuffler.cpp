@@ -16,10 +16,10 @@ static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
 // 256å¬Ç…êßå¿ÇµÇƒÇ®Ç≠
 static const constexpr int kNumShuffledKifuFiles = 256;
 static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
-static const constexpr char* kOptoinNameUseDiscount = "UseDiscount";
-static const constexpr char* kOptoinNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
-static const constexpr char* kOptoinNameDiscountRatio = "DiscountRatio";
-static const constexpr char* kOptoinNameOverwriteGameResults = "OverwriteGameResults";
+static const constexpr char* kOptionNameUseDiscount = "UseDiscount";
+static const constexpr char* kOptionNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
+static const constexpr char* kOptionNameDiscountRatio = "DiscountRatio";
+static const constexpr char* kOptionNameOverwriteGameResults = "OverwriteGameResults";
 
 double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
                      double value_to_winning_rate_coefficient) {
@@ -43,10 +43,10 @@ double ToRawScore(double scaled_score, bool use_winning_rate_for_discount,
 
 void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
-    o[kOptoinNameUseDiscount] << USI::Option(false);
-    o[kOptoinNameUseWinningRateForDiscount] << USI::Option(false);
-    o[kOptoinNameOverwriteGameResults] << USI::Option(true);
-    o[kOptoinNameDiscountRatio] << USI::Option("0.9");
+    o[kOptionNameUseDiscount] << USI::Option(false);
+    o[kOptionNameUseWinningRateForDiscount] << USI::Option(false);
+    o[kOptionNameOverwriteGameResults] << USI::Option(true);
+    o[kOptionNameDiscountRatio] << USI::Option("0.9");
 }
 
 void Learner::ShuffleKifu() {
@@ -55,12 +55,12 @@ void Learner::ShuffleKifu() {
 
     std::string kifu_dir = Options["KifuDir"];
     std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
-    bool use_discount = (bool)Options[kOptoinNameUseDiscount];
-    bool use_winning_rate_for_discount = (bool)Options[kOptoinNameUseWinningRateForDiscount];
-    bool overwrite_game_results = (bool)Options[kOptoinNameOverwriteGameResults];
+    bool use_discount = (bool)Options[kOptionNameUseDiscount];
+    bool use_winning_rate_for_discount = (bool)Options[kOptionNameUseWinningRateForDiscount];
+    bool overwrite_game_results = (bool)Options[kOptionNameOverwriteGameResults];
     double value_to_winning_rate_coefficient =
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
-    double discount_ratio = Options[kOptoinNameDiscountRatio].cast<double>();
+    double discount_ratio = Options[kOptionNameDiscountRatio].cast<double>();
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
     _mkdir(shuffled_kifu_dir.c_str());
