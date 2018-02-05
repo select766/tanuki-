@@ -10,7 +10,6 @@
 #include "misc.h"
 
 namespace {
-static const constexpr double kDiscountRatio = 0.9;
 static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
 // シャッフル後のファイル数
 // Windowsでは一度に512個までのファイルしか開けないため
@@ -19,6 +18,7 @@ static const constexpr int kNumShuffledKifuFiles = 256;
 static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
 static const constexpr char* kOptoinNameUseDiscount = "UseDiscount";
 static const constexpr char* kOptoinNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
+static const constexpr char* kOptoinNameDiscountRatio = "DiscountRatio";
 static const constexpr char* kOptoinNameOverwriteGameResults = "OverwriteGameResults";
 
 double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
@@ -46,6 +46,7 @@ void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kOptoinNameUseDiscount] << USI::Option(false);
     o[kOptoinNameUseWinningRateForDiscount] << USI::Option(false);
     o[kOptoinNameOverwriteGameResults] << USI::Option(true);
+    o[kOptoinNameDiscountRatio] << USI::Option("0.9");
 }
 
 void Learner::ShuffleKifu() {
@@ -59,6 +60,7 @@ void Learner::ShuffleKifu() {
     bool overwrite_game_results = (bool)Options[kOptoinNameOverwriteGameResults];
     double value_to_winning_rate_coefficient =
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
+    double discount_ratio = Options[kOptoinNameDiscountRatio].cast<double>();
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
     _mkdir(shuffled_kifu_dir.c_str());
@@ -78,7 +80,7 @@ void Learner::ShuffleKifu() {
     double weights[4096];
     weights[0] = 1.0;
     for (int i = 1; i < sizeof(weights) / sizeof(weights[0]); ++i) {
-        weights[i] = weights[i - 1] * kDiscountRatio;
+        weights[i] = weights[i - 1] * discount_ratio;
     }
 
     std::mt19937_64 mt(std::time(nullptr));
