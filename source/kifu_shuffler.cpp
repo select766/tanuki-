@@ -20,6 +20,8 @@ static const constexpr char* kOptionNameUseDiscount = "UseDiscount";
 static const constexpr char* kOptionNameUseWinningRateForDiscount = "UseWinningRateForDiscount";
 static const constexpr char* kOptionNameDiscountRatio = "DiscountRatio";
 static const constexpr char* kOptionNameOverwriteGameResults = "OverwriteGameResults";
+static const constexpr char* kOptionNameUseSlide = "UseSlide";
+static const constexpr char* kOptionNameSlideAmount = "SlideAmount";
 
 double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
                      double value_to_winning_rate_coefficient) {
@@ -47,6 +49,8 @@ void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kOptionNameUseWinningRateForDiscount] << USI::Option(false);
     o[kOptionNameOverwriteGameResults] << USI::Option(true);
     o[kOptionNameDiscountRatio] << USI::Option("0.9");
+    o[kOptionNameUseSlide] << USI::Option(false);
+    o[kOptionNameSlideAmount] << USI::Option(10, INT_MIN, INT_MAX);
 }
 
 void Learner::ShuffleKifu() {
@@ -61,6 +65,8 @@ void Learner::ShuffleKifu() {
     double value_to_winning_rate_coefficient =
         Options[kOptionValueValueToWinningRateCoefficient].cast<double>();
     double discount_ratio = Options[kOptionNameDiscountRatio].cast<double>();
+    bool use_slide = (bool)Options[kOptionNameUseSlide];
+    int slide_amount = (int)Options[kOptionNameSlideAmount];
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
     _mkdir(shuffled_kifu_dir.c_str());
@@ -111,6 +117,38 @@ void Learner::ShuffleKifu() {
             for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
                 rit->game_result = game_result;
                 game_result = -game_result;
+            }
+        }
+
+        if (use_slide) {
+            int num_records = static_cast<int>(records.size());
+            std::vector<s16> scores(num_records);
+            for (int i = 0; i < num_records; ++i) {
+                scores[i] = records[i].score;
+            }
+
+            // 手番から見た評価値を開始手番から見た評価値に変換する
+            for (int i = 1; i < num_records; i += 2) {
+                scores[i] = -scores[i];
+            }
+
+            // スライドさせる
+            std::vector<s16> slided_scores(num_records);
+            for (int dst = 0; dst < num_records; ++dst) {
+                int src = dst + slide_amount;
+                src = std::max(0, src);
+                src = std::min(num_records - 1, src);
+                slided_scores[dst] = scores[src];
+            }
+
+            // 開始手番から見た評価値を手番から見た評価値に変換する
+            for (int i = 1; i < num_records; i += 2) {
+                slided_scores[i] = -slided_scores[i];
+            }
+
+            // スコアを書き戻す
+            for (int i = 0; i < num_records; ++i) {
+                records[i].score = slided_scores[i];
             }
         }
 
