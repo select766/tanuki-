@@ -22,6 +22,9 @@ static const constexpr char* kOptionNameDiscountRatio = "DiscountRatio";
 static const constexpr char* kOptionNameOverwriteGameResults = "OverwriteGameResults";
 static const constexpr char* kOptionNameUseSlide = "UseSlide";
 static const constexpr char* kOptionNameSlideAmount = "SlideAmount";
+static const constexpr char* kOptionNameUseMedianFilter = "UseMedianFilter";
+static const constexpr char* kOptionNameMedianFilterRadius = "MedianFilterRadius";
+static const constexpr int kMaxMedianFilterRadius = 256;
 
 double ToScaledScore(double raw_score, bool use_winning_rate_for_discount,
                      double value_to_winning_rate_coefficient) {
@@ -51,6 +54,8 @@ void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kOptionNameDiscountRatio] << USI::Option("0.9");
     o[kOptionNameUseSlide] << USI::Option(false);
     o[kOptionNameSlideAmount] << USI::Option(10, INT_MIN, INT_MAX);
+    o[kOptionNameUseMedianFilter] << USI::Option(false);
+    o[kOptionNameMedianFilterRadius] << USI::Option(3, 1, kMaxMedianFilterRadius);
 }
 
 void Learner::ShuffleKifu() {
@@ -67,6 +72,8 @@ void Learner::ShuffleKifu() {
     double discount_ratio = Options[kOptionNameDiscountRatio].cast<double>();
     bool use_slide = (bool)Options[kOptionNameUseSlide];
     int slide_amount = (int)Options[kOptionNameSlideAmount];
+    bool use_median_filter = (bool)Options[kOptionNameUseMedianFilter];
+    int median_filter_radius = (int)Options[kOptionNameMedianFilterRadius];
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
     _mkdir(shuffled_kifu_dir.c_str());
@@ -118,6 +125,45 @@ void Learner::ShuffleKifu() {
                 rit->game_result = game_result;
                 game_result = -game_result;
             }
+        }
+
+        if (use_median_filter) {
+            int num_records = static_cast<int>(records.size());
+            std::vector<s16> scores(num_records);
+            for (int i = 0; i < num_records; ++i) {
+                scores[i] = records[i].score;
+            }
+
+            // 手番から見た評価値を開始手番から見た評価値に変換する
+            for (int i = 1; i < num_records; i += 2) {
+                scores[i] = -scores[i];
+            }
+
+            // Median Filterを適用する
+            std::vector<s16> filtered_scores(num_records);
+            for (int dst = 0; dst < num_records; ++dst) {
+                std::vector<s16> values;
+                for (int d = -median_filter_radius; d <= median_filter_radius; ++d) {
+                    int play = dst + d;
+                    play = std::max(0, play);
+                    play = std::min(num_records - 1, play);
+                    values.push_back(scores[play]);
+                }
+                std::nth_element(values.begin(), values.begin() + median_filter_radius, values.end());
+                filtered_scores[dst] = values[median_filter_radius];
+                sync_cout << scores[dst] << "\t" << filtered_scores[dst] << sync_endl;
+            }
+
+            // 開始手番から見た評価値を手番から見た評価値に変換する
+            for (int i = 1; i < num_records; i += 2) {
+                filtered_scores[i] = -filtered_scores[i];
+            }
+
+            // スコアを書き戻す
+            for (int i = 0; i < num_records; ++i) {
+                records[i].score = filtered_scores[i];
+            }
+
         }
 
         if (use_slide) {
