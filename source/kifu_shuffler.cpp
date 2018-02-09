@@ -50,7 +50,7 @@ void Learner::InitializeKifuShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
     o[kOptionNameUseDiscount] << USI::Option(false);
     o[kOptionNameUseWinningRateForDiscount] << USI::Option(false);
-    o[kOptionNameOverwriteGameResults] << USI::Option(true);
+    o[kOptionNameOverwriteGameResults] << USI::Option(false);
     o[kOptionNameDiscountRatio] << USI::Option("0.9");
     o[kOptionNameUseSlide] << USI::Option(false);
     o[kOptionNameSlideAmount] << USI::Option(10, INT_MIN, INT_MAX);
