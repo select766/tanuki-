@@ -151,7 +151,7 @@ void Learner::ShuffleKifu() {
                 }
                 std::nth_element(values.begin(), values.begin() + median_filter_radius, values.end());
                 filtered_scores[dst] = values[median_filter_radius];
-                sync_cout << scores[dst] << "\t" << filtered_scores[dst] << sync_endl;
+                //sync_cout << scores[dst] << "\t" << filtered_scores[dst] << sync_endl;
             }
 
             // ŠJŽnŽè”Ô‚©‚çŒ©‚½•]‰¿’l‚ðŽè”Ô‚©‚çŒ©‚½•]‰¿’l‚É•ÏŠ·‚·‚é
