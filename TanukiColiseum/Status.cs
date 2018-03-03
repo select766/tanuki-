@@ -25,6 +25,10 @@
                     Win[engine, blackWhite] = status.Win[engine, blackWhite];
                 }
             }
+            for (int engine = 0; engine < 2; ++engine)
+            {
+                DeclarationWin[engine] = status.DeclarationWin[engine];
+            }
         }
     }
 }
