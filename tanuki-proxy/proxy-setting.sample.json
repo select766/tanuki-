@@ -30,7 +30,8 @@
             ],
             "arguments": "",
             "workingDirectory": "C:\\home\\develop\\tanuki-\\bin",
-            "fileName": "C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe"
+            "fileName": "C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
+			"timeKeeper": true
         },
         {
             "engineName": "nighthawk",

@@ -475,9 +475,19 @@ namespace tanuki_proxy
                     {
                         foreach (var engineBestmove in program.EngineBestmoves)
                         {
-                            engineBestmove.move = command[3];
+                            engineBestmove.ponder = command[3];
                         }
                     }
+                }
+                else if (program.EngineBestmoves[id].move == null)
+                {
+                    // Apery形式の定跡データベースを使用する場合はここに入る
+                    program.EngineBestmoves[id].move = command[1];
+                    if (command.Count == 4 && command[2] == "ponder")
+                    {
+                        program.EngineBestmoves[id].move = command[3];
+                    }
+
                 }
 
                 program.DecideMove();

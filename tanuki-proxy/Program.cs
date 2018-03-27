@@ -193,17 +193,22 @@ namespace tanuki_proxy
                         }
                     }
 
-                    // PVを出力する
-                    // npsは再計算する
-                    int sumNps = EngineBestmoves.Sum(x => x.nps);
-                    var commandWithNps = new List<string>(bestmove.command);
-                    int sumNpsIndex = commandWithNps.IndexOf("nps");
-                    if (sumNpsIndex != -1)
+                    // Apery定跡データベースを使用した場合、pv情報が不完全となる
+                    // Engineクラスではこのpv情報を処理しないため、bestmove.commandがnullとなる
+                    if (bestmove.command != null)
                     {
-                        commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
+                        // PVを出力する
+                        // npsは再計算する
+                        int sumNps = EngineBestmoves.Sum(x => x.nps);
+                        var commandWithNps = new List<string>(bestmove.command);
+                        int sumNpsIndex = commandWithNps.IndexOf("nps");
+                        if (sumNpsIndex != -1)
+                        {
+                            commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
+                        }
+                        Log("<P   {0}", Join(commandWithNps));
+                        WriteLineAndFlush(Console.Out, Join(commandWithNps));
                     }
-                    Log("<P   {0}", Join(commandWithNps));
-                    WriteLineAndFlush(Console.Out, Join(commandWithNps));
 
                     // bestmoveを出力する
                     string outputCommand = "bestmove " + bestmove.move;
