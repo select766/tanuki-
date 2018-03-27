@@ -13,7 +13,7 @@ using USI::Option;
 using USI::OptionsMap;
 
 namespace {
-constexpr int kBufferSize = 1 << 26;  // 64MB
+constexpr int kBufferSize = 1 << 30;  // 1GB
 }
 
 Learner::KifuReader::KifuReader(const std::string& folder_name, int num_loops)

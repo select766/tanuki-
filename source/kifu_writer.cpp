@@ -3,7 +3,7 @@
 #include "misc.h"
 
 namespace {
-constexpr int kBufferSize = 1 << 20;  // 1MB
+constexpr int kBufferSize = 1 << 25;  // 32MB
 }
 
 Learner::KifuWriter::KifuWriter(const std::string& output_file_path)
