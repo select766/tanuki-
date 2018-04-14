@@ -485,7 +485,7 @@ namespace tanuki_proxy
                     program.EngineBestmoves[id].move = command[1];
                     if (command.Count == 4 && command[2] == "ponder")
                     {
-                        program.EngineBestmoves[id].move = command[3];
+                        program.EngineBestmoves[id].ponder = command[3];
                     }
 
                 }
