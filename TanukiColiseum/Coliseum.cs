@@ -50,6 +50,7 @@ namespace TanukiColiseum
                     {"BookEvalDiff", options.BookEvalDiff1.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount1},
                     {"BookDepthLimit", "0"},
+                    {"MaxMovesToDraw", "256"},
                 };
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
@@ -71,6 +72,7 @@ namespace TanukiColiseum
                     {"BookEvalDiff", options.BookEvalDiff2.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount2},
                     {"BookDepthLimit", "0"},
+                    {"MaxMovesToDraw", "256"},
                 };
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
