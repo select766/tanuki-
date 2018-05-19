@@ -9,7 +9,8 @@
         public int[,] Win { get; } = { { 0, 0 }, { 0, 0 }, };
         // [エンジン][先手・後手]
         public int[,] DeclarationWin { get; } = { { 0, 0 }, { 0, 0 } };
-        public int NumDraw;
+        // NumDraw[i] = エンジンiが先手の時の引き分けの回数
+        public int[] NumDraw { get; } = { 0, 0 };
 
         public Status() { }
 
@@ -18,7 +19,6 @@
             NumGames = status.NumGames;
             NumThreads = status.NumThreads;
             TimeMs = status.TimeMs;
-            NumDraw = status.NumDraw;
             for (int engine = 0; engine < 2; ++engine)
             {
                 for (int blackWhite = 0; blackWhite < 2; ++blackWhite)
@@ -26,6 +26,7 @@
                     Win[engine, blackWhite] = status.Win[engine, blackWhite];
                     DeclarationWin[engine, blackWhite] = status.DeclarationWin[engine, blackWhite];
                 }
+                NumDraw[engine] = status.NumDraw[engine];
             }
         }
     }

@@ -178,7 +178,7 @@ namespace TanukiColiseum
                 // 次の対局を開始する
                 // 先にGame.OnGameFinished()を読んでゲームの状態を停止状態に移行する
                 game.OnGameFinished();
-                Coliseum.OnGameFinished(engineWin, blackWhiteWin, draw, declaration);
+                Coliseum.OnGameFinished(engineWin, blackWhiteWin, draw, declaration, game.InitialTurn);
             }
             else
             {

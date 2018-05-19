@@ -20,7 +20,9 @@ namespace TanukiColiseum
             int whiteWin = status.Win[0, 1] + status.Win[1, 1];
             int blackWinRatio = 100 * blackWin / (blackWin + whiteWin);
             int whiteWinRatio = 100 * whiteWin / (blackWin + whiteWin);
-            int numDraw = status.NumDraw;
+            int engine1DrawBlack = status.NumDraw[0];
+            int engine2DrawBlack = status.NumDraw[1];
+            int numDraw = engine1DrawBlack + engine2DrawBlack;
             int engine1Win = status.Win[0, 0] + status.Win[0, 1];
             int engine1BlackWin = status.Win[0, 0];
             int engine1WhiteWin = status.Win[0, 1];
@@ -51,9 +53,11 @@ namespace TanukiColiseum
 {6}
 勝ち{7}({8}% R{22:0.00}) 先手勝ち{9}({10}%) 後手勝ち{11}({12}%)
 宣言勝ち{20} 先手宣言勝ち{23} 後手宣言勝ち{24}
+先手引き分け{27} 後手引き分け{28}
 {13}
 勝ち{14}({15}%) 先手勝ち{16}({17}%) 後手勝ち{18}({19}%)
 宣言勝ち{21} 先手宣言勝ち{25} 後手宣言勝ち{26}
+先手引き分け{29} 後手引き分け{30}
 ",
                 // 0-5
                 numFinishedGames, blackWin, blackWinRatio, whiteWin, whiteWinRatio, numDraw,
@@ -70,7 +74,10 @@ namespace TanukiColiseum
                 // 22
                 rating,
                 // 23-26
-                engine1DeclarationWinBlack, engine1DeclarationWinWhite, engine2DeclarationWinBlack, engine2DeclarationWinWhite);
+                engine1DeclarationWinBlack, engine1DeclarationWinWhite, engine2DeclarationWinBlack, engine2DeclarationWinWhite,
+                // 27-30
+                engine1DrawBlack, engine2DrawBlack, engine2DrawBlack, engine1DrawBlack
+                );
             Console.Out.Flush();
         }
     }

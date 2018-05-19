@@ -167,7 +167,7 @@ namespace TanukiColiseum
             int whiteWin = status.Win[0, 1] + status.Win[1, 1];
             int blackWinRatio = 100 * blackWin / (blackWin + whiteWin);
             int whiteWinRatio = 100 * whiteWin / (blackWin + whiteWin);
-            int numDraw = status.NumDraw;
+            int numDraw = status.NumDraw[0] + status.NumDraw[1];
             int engine1Win = status.Win[0, 0] + status.Win[0, 1];
             int engine1BlackWin = status.Win[0, 0];
             int engine1WhiteWin = status.Win[0, 1];

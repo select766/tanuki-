@@ -125,7 +125,15 @@ namespace TanukiColiseum
             OnStatusChanged(new Status(Status));
         }
 
-        public void OnGameFinished(int engineWin, int blackWhiteWin, bool draw, bool declarationWin)
+        /// <summary>
+        /// ある対局が終了した際に呼ばれるコールバック
+        /// </summary>
+        /// <param name="engineWin">勝利した思考エンジン。engin1の場合は0、engine2の場合は1。</param>
+        /// <param name="blackWhiteWin">先後どちらが勝利したか。先手の場合は0、後手の場合は1</param>
+        /// <param name="draw">引き分けの場合はtrue、そうでない場合はfalse。</param>
+        /// <param name="declarationWin">宣言勝ちの場合はtrue、そうでない場合はfalse。</param>
+        /// <param name="initialTurn">どちらの思考エンジンが先手だったか。engine1の場合は0、engine2の場合は1。</param>
+        public void OnGameFinished(int engineWin, int blackWhiteWin, bool draw, bool declarationWin, int initialTurn)
         {
             if (!draw)
             {
@@ -133,7 +141,7 @@ namespace TanukiColiseum
             }
             else
             {
-                Interlocked.Increment(ref Status.NumDraw);
+                Interlocked.Increment(ref Status.NumDraw[initialTurn]);
             }
 
             if (declarationWin)
