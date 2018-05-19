@@ -138,7 +138,7 @@ namespace TanukiColiseum
 
             if (declarationWin)
             {
-                Interlocked.Increment(ref Status.DeclarationWin[engineWin]);
+                Interlocked.Increment(ref Status.DeclarationWin[engineWin, blackWhiteWin]);
             }
 
             if (LastOutput.AddMilliseconds(ProgressIntervalMs) <= DateTime.Now)

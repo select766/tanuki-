@@ -181,8 +181,8 @@ namespace TanukiColiseum
             int engine2BlackWinRatio = 100 * engine2BlackWin / (engine1Win + engine2Win);
             int engine2WhiteWinRatio = 100 * engine2WhiteWin / (engine1Win + engine2Win);
             int numFinishedGames = engine1Win + engine2Win + numDraw;
-            int engine1DeclarationWin = status.DeclarationWin[0];
-            int engine2DeclarationWin = status.DeclarationWin[1];
+            int engine1DeclarationWin = status.DeclarationWin[0, 0] + status.DeclarationWin[0, 1];
+            int engine2DeclarationWin = status.DeclarationWin[1, 0] + status.DeclarationWin[1, 1];
 
             string text = string.Format(
                 @"対局数{0} 先手勝ち{1}({2}%) 後手勝ち{3}({4}%) 引き分け{5}

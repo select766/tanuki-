@@ -7,7 +7,8 @@
         public int TimeMs { get; set; }
         // [エンジン][先手・後手]
         public int[,] Win { get; } = { { 0, 0 }, { 0, 0 }, };
-        public int[] DeclarationWin { get; } = { 0, 0 };
+        // [エンジン][先手・後手]
+        public int[,] DeclarationWin { get; } = { { 0, 0 }, { 0, 0 } };
         public int NumDraw;
 
         public Status() { }
@@ -23,11 +24,8 @@
                 for (int blackWhite = 0; blackWhite < 2; ++blackWhite)
                 {
                     Win[engine, blackWhite] = status.Win[engine, blackWhite];
+                    DeclarationWin[engine, blackWhite] = status.DeclarationWin[engine, blackWhite];
                 }
-            }
-            for (int engine = 0; engine < 2; ++engine)
-            {
-                DeclarationWin[engine] = status.DeclarationWin[engine];
             }
         }
     }
