@@ -45,7 +45,7 @@ def ToOptionValueString(b):
 
 def generate_kifu(args):
     print(locals(), flush=True)
-    os.makedirs(args.kifu_dir, exist_ok=True)
+    os.makedirs(args.kifu_folder_path, exist_ok=True)
     input = '''usi
 EvalDir {eval_dir}
 KifuDir {kifu_dir}
@@ -61,24 +61,24 @@ isready
 usinewgame
 generate_kifu
 quit
-'''.format(eval_dir=args.eval_dir,
-    kifu_dir=args.kifu_dir,
-    threads=args.threads_to_generate_kifu,
-    hash=args.hash_to_generate_kifu,
-    generator_num_positions=args.generator_num_positions,
-    generator_search_depth=args.generator_search_depth,
+'''.format(eval_dir=args.eval_folder_path,
+    kifu_dir=args.kifu_folder_path,
+    threads=str(args.threads_to_generate_kifu),
+    hash=str(args.hash_to_generate_kifu),
+    generator_num_positions=str(args.generator_num_positions),
+    generator_search_depth=str(args.generator_search_depth),
     generator_kifu_tag=args.generator_kifu_tag,
     generator_startpos_file_name=args.generator_startpos_file_name,
-    generator_value_threshold=args.generator_value_threshold,
-    generator_optimum_nodes_searched=args.generator_optimum_nodes_searched)
+    generator_value_threshold=str(args.generator_value_threshold),
+    generator_optimum_nodes_searched=str(args.generator_optimum_nodes_searched))
     print(input, flush=True)
     subprocess.run([args.generate_kifu_exe_file_path], input=input.encode('utf-8'), check=True)
 
 
-def shuffle_kifu(args, split=False):
+def shuffle_kifu(args, kifu_dir, shuffled_kifu_dir, split=False):
     print(locals(), flush=True)
-    shutil.rmtree(args.shuffled_kifu_dir, ignore_errors=True)
-    os.makedirs(args.shuffled_kifu_dir, exist_ok=True)
+    shutil.rmtree(shuffled_kifu_dir, ignore_errors=True)
+    os.makedirs(shuffled_kifu_dir, exist_ok=True)
     input = '''usi
 SkipLoadingEval true
 KifuDir {kifu_dir}
@@ -87,15 +87,15 @@ isready
 usinewgame
 shuffle_kifu
 quit
-'''.format(kifu_dir=args.kifu_dir,
-           shuffled_kifu_dir=args.shuffled_kifu_dir)
+'''.format(kifu_dir=kifu_dir,
+           shuffled_kifu_dir=shuffled_kifu_dir)
     print(input, flush=True)
     subprocess.run([args.shuffle_kifu_exe_file_path], input=input.encode('utf-8'), check=True)
 
     if not split:
         return
 
-    with open(os.path.join(args.shuffled_kifu_dir, SHUFFLED_BIN_FILE_NAME), 'wb') as output:
+    with open(os.path.join(shuffled_kifu_dir, SHUFFLED_BIN_FILE_NAME), 'wb') as output:
         remained = args.validation_set_file_size
         for file_name in os.listdir(shuffled_kifu_folder_path):
             with open(os.path.join(shuffled_kifu_folder_path, file_name), 'rb') as input:
@@ -110,28 +110,37 @@ def Learn(args):
 Threads {threads}
 Hash {hash}
 EvalSaveDir {eval_save_dir}
-learn targetdir {targetdir} loop {loop} batchsize {batchsize} lambda {lambda} eta {eta} newbob_decay {newbob_decay} eval_save_interval {eval_save_interval} loss_output_interval {loss_output_interval} mirror_percentage {%mirror_percentage%} validation_set_file_name {validation_set_file_name} nn_batch_size {nn_batch_size} eval_limit {eval_limit}
-'''.format(eval_dir=args.eval_dir,
-           threads=args.threads_to_learn,
-           hash=args.hash_to_learn,
-           EvalSaveDir=args.EvalSaveDir
-
-
-    )
+learn targetdir {targetdir} loop {loop} batchsize {batchsize} lambda {elmo_lambda} eta {eta} newbob_decay {newbob_decay} eval_save_interval {eval_save_interval} loss_output_interval {loss_output_interval} mirror_percentage {mirror_percentage} validation_set_file_name {validation_set_file_name} nn_batch_size {nn_batch_size} eval_limit {eval_limit}
+'''.format(eval_dir=args.eval_folder_path,
+           threads=str(args.threads_to_learn),
+           hash=str(args.hash_to_learn),
+           eval_save_dir=args.eval_save_folder_path,
+           targetdir=args.shuffled_kifu_folder_path,
+           loop=str(args.loop),
+           batchsize=str(args.batchsize),
+           elmo_lambda=str(args.elmo_lambda),
+           eta=str(args.eta),
+           newbob_decay=str(args.newbob_decay),
+           eval_save_interval=str(args.eval_save_interval),
+           loss_output_interval=str(args.loss_output_interval),
+           mirror_percentage=str(args.mirror_percentage),
+           validation_set_file_name=os.path.join(args.shuffled_kifu_for_test_folder_path, SHUFFLED_BIN_FILE_NAME),
+           nn_batch_size=str(args.nn_batch_size),
+           eval_limit=str(args.eval_limit))
     print(input, flush=True)
     subprocess.run([args.learner_exe_file_path], input=input.encode('utf-8'), check=True)
 
 
-def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
+def SelfPlay(args, engine1, eval1, engine2, eval2):
     print(locals(), flush=True)
     args = ['TanukiColiseum.exe',
-        '--engine1', args.selfplay_exe_file_path,
-        '--engine2', args.selfplay_exe_file_path,
-        '--eval1', new_eval_folder_path,
-        '--eval2', old_eval_folder_path,
-        '--num_concurrent_games', str(args.num_threads_to_selfplay),
+        '--engine1', engine1,
+        '--engine2', engine2,
+        '--eval1', eval1,
+        '--eval2', eval2,
+        '--num_concurrent_games', str(args.threads_to_selfplay),
         '--num_games', str(args.num_games_to_selfplay),
-        '--hash', str(args.self_play_hash_size),
+        '--hash', str(args.hash_to_selfplay),
         '--time', str(args.thinking_time_ms),
         '--num_numa_nodes', str(args.num_numa_nodes),
         '--num_book_moves1', '0',
@@ -140,7 +149,7 @@ def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
         '--book_file_name2', 'no_book',
         '--num_book_moves', '24',
         '--no_gui',
-        '--sfen_file_name', args.startpos_file_name_for_self_play,]
+        '--sfen_file_name', args.startpos_file_name_to_selfplay,]
     print(args, flush=True)
     if subprocess.run(args).returncode:
         sys.exit('Failed to calculate the winning rate...')
@@ -152,295 +161,229 @@ def GetSubfolders(folder_path):
 
 def main():
     parser = argparse.ArgumentParser(description='iteration')
-    parser.add_argument('--learner_output_folder_path_base',
-        action='store',
-        required=True,
-        help='Folder path baseof the output folders. ex) eval')
-    parser.add_argument('--kifu_output_folder_path_base',
-        action='store',
-        required=True,
-        help='Folder path baseof the output kifu. ex) kifu')
-    parser.add_argument('--kifu_for_test_output_folder_path_base',
-        action='store',
-        required=True,
-        help='Folder path baseof the output kifu for test. ex) kifu for test')
-    parser.add_argument('--initial_eval_folder_path',
-        action='store',
-        required=True,
-        help='Folder path of the inintial eval files. ex) eval')
-    parser.add_argument('--initial_kifu_folder_path',
-        action='store',
-        required=True,
-        help='Folder path of the inintial kifu files. ex) kifu/2017-05-25')
-    parser.add_argument('--initial_kifu_for_test_folder_path',
-        action='store',
-        required=True,
-        help='Folder path of the inintial kifu files for test. ex) kifu_for_test/2017-05-25')
-    parser.add_argument('--initial_shuffled_kifu_folder_path',
-        action='store',
-        required=True,
-        help='Folder path of the inintial shuffled kifu files. ex) kifu/2017-05-25-shuffled')
-    parser.add_argument('--initial_new_eval_folder_path',
-        action='store',
-        required=True,
-        help='Folder path base of the inintial new eval files. ex) eval')
-    parser.add_argument('--initial_state',
-        action='store',
-        required=True,
-        help='Initial state. [' + ', '.join([state.name for state in State]) + ']')
-    parser.add_argument('--final_state',
-        action='store',
-        required=True,
-        help='Final state. [' + ', '.join([state.name for state in State]) + ']')
     parser.add_argument('--generate_kifu_exe_file_path',
         action='store',
         required=True,
-        help='Exe file name of the kifu generator. ex) YaneuraOu.2016-08-05.generate_kifu.exe')
+        help='Exe file path to generate kifu.')
+    parser.add_argument('--shuffle_kifu_exe_file_path',
+        action='store',
+        required=True,
+        help='Exe file path to shuffle kifu.')
     parser.add_argument('--learner_exe_file_path',
         action='store',
         required=True,
-        help='Exe file name of the learner. ex) YaneuraOu.2016-08-05.learn.exe')
-    parser.add_argument('--num_threads_to_generate_kifu',
+        help='Exe file path to learn.')
+    parser.add_argument('--eval_folder_path',
+        action='store',
+        required=True,
+        help='Folder path containing evaluation function files.')
+    parser.add_argument('--kifu_folder_path',
+        action='store',
+        required=True,
+        help='Folder path to save kifu.')
+    parser.add_argument('--kifu_for_test_folder_path',
+        action='store',
+        required=True,
+        help='Folder path to save kifu for test.')
+    parser.add_argument('--threads_to_generate_kifu',
         action='store',
         type=int,
         required=True,
-        help='Number of the threads used for learning. ex) 8')
-    parser.add_argument('--num_threads_to_learn',
+        help='Number of threads to generate kifu.')
+    parser.add_argument('--hash_to_generate_kifu',
         action='store',
         type=int,
         required=True,
-        help='Number of the threads used for learning. ex) 8')
-    parser.add_argument('--num_threads_to_selfplay',
+        help='Hash size in mega bytes to generate kifu.')
+    parser.add_argument('--generator_num_positions',
         action='store',
         type=int,
         required=True,
-        help='Number of the threads used for selfplay. ex) 8')
-    parser.add_argument('--num_games_to_selfplay',
+        help='Number of positions to generate.')
+    parser.add_argument('--generator_search_depth',
         action='store',
         type=int,
         required=True,
-        help='Number of the games to play for selfplay. ex) 100')
-    parser.add_argument('--num_positions_to_generator_train',
+        help='Search depth to generate kifu.')
+    parser.add_argument('--generator_kifu_tag',
+        action='store',
+        required=True,
+        help='Kifu tag to generate kifu.')
+    parser.add_argument('--generator_startpos_file_name',
         action='store',
         type=int,
         required=True,
-        help='Number of the games to play for generator. ex) 100')
-    parser.add_argument('--num_positions_to_generator_test',
+        help='Start position file path to generate kifu.')
+    parser.add_argument('--generator_value_threshold',
         action='store',
         type=int,
         required=True,
-        help='Number of the games to play for generator. ex) 100')
-    parser.add_argument('--num_positions_to_learn',
+        help='Value threshold to generate kifu.')
+    parser.add_argument('--generator_optimum_nodes_searched',
         action='store',
         type=int,
         required=True,
-        help='Number of the positions for learning. ex) 10000')
-    parser.add_argument('--num_iterations',
+        help='Number of optimum nodes searched to generate kifu.')
+    parser.add_argument('--validation_set_file_size',
         action='store',
         type=int,
         required=True,
-        help='Number of the iterations. ex) 100')
-    parser.add_argument('--search_depth',
+        help='File size of the validation set.')
+    parser.add_argument('--threads_to_learn',
         action='store',
         type=int,
         required=True,
-        help='Search depth. ex) 8')
-    parser.add_argument('--min_learning_rate',
-        action='store',
-        type=float,
-        required=True,
-        help='Min learning rate. ex) 2.0')
-    parser.add_argument('--max_learning_rate',
-        action='store',
-        type=float,
-        required=True,
-        help='Max learning rate. ex) 2.0')
-    parser.add_argument('--num_learning_rate_cycles',
-        action='store',
-        type=float,
-        required=True,
-        help='Number of learning rate cycles. ex) 10')
-    parser.add_argument('--mini_batch_size',
+        help='Number of threads to learn')
+    parser.add_argument('--hash_to_learn',
         action='store',
         type=int,
         required=True,
-        help='Learning rate. ex) 1000000')
-    parser.add_argument('--fobos_l1_parameter',
+        help='Hash size in mega bytes to learn.')
+    parser.add_argument('--eval_save_folder_path',
         action='store',
-        type=float,
         required=True,
-        help='Learning rate. ex) 0.0')
-    parser.add_argument('--fobos_l2_parameter',
+        help='Folder path to save the output evaluation function files.')
+    parser.add_argument('--shuffled_kifu_folder_path',
         action='store',
-        type=float,
         required=True,
-        help='Learning rate. ex) 0.99989464503')
-    parser.add_argument('--num_numa_nodes',
+        help='Folder path to save shuffled kifu.')
+    parser.add_argument('--shuffled_kifu_for_test_folder_path',
         action='store',
-        type=int,
         required=True,
-        help='Number of the NUMA nodes. ex) 2')
-    parser.add_argument('--num_divisions_to_generator_train',
+        help='Folder path to save shuffled kifu for test.')
+    parser.add_argument('--loop',
         action='store',
         type=int,
         required=True,
-        help='Number of the divisions to generate train data. ex) 10')
-    parser.add_argument('--initial_division_to_generator_train',
+        help='loop parameter in the NNUE machine learning routine.')
+    parser.add_argument('--batchsize',
         action='store',
         type=int,
         required=True,
-        help='Initial division to generate train data. ex) 2')
-    parser.add_argument('--reference_eval_folder_paths',
-        action='store',
-        required=True,
-        help='Comma-separated folder paths for reference eval files. ex) eval/tanuki_wcsc27,eval/elmo_wcsc27')
-    parser.add_argument('--selfplay_exe_file_path',
-        action='store',
-        required=True,
-        help='Exe file name for the self plays. ex) tanuki-wcsc27-2017-05-07-1-avx2.exe')
-    parser.add_argument('--thinking_time_ms',
-        action='store',
-        type=int,
-        required=True,
-        help='Thinking time for self play in milliseconds. ex) 1000')
-    parser.add_argument('--self_play_hash_size',
-        action='store',
-        type=int,
-        required=True,
-        help='Hash size for self play. ex) 256')
+        help='batchsize parameter in the NNUE machine learning routine.')
     parser.add_argument('--elmo_lambda',
         action='store',
         type=float,
         required=True,
-        help='Elmo Lambda. ex) 1.0')
-    parser.add_argument('--value_threshold',
+        help='lambda parameter in the NNUE machine learning routine.')
+    parser.add_argument('--eta',
+        action='store',
+        type=float,
+        required=True,
+        help='eta parameter in the NNUE machine learning routine.')
+    parser.add_argument('--newbob_decay',
+        action='store',
+        type=float,
+        required=True,
+        help='newbob_decay parameter in the NNUE machine learning routine.')
+    parser.add_argument('--eval_save_interval',
         action='store',
         type=int,
         required=True,
-        help='Value threshold to include positions to the learning data. ex) 30000')
-    parser.add_argument('--value_to_winning_rate_coefficient',
+        help='eval_save_interval parameter in the NNUE machine learning routine.')
+    parser.add_argument('--loss_output_interval',
         action='store',
-        type=float,
+        type=int,
         required=True,
-        help='Coefficient to convert a value to the winning rate. ex) 600.0')
-    parser.add_argument('--adam_beta2',
+        help='loss_output_interval parameter in the NNUE machine learning routine.')
+    parser.add_argument('--mirror_percentage',
         action='store',
-        type=float,
+        type=int,
         required=True,
-        help='Adam beta2 coefficient. ex) 0.999')
-    parser.add_argument('--use_progress_as_elmo_lambda',
+        help='mirror_percentage parameter in the NNUE machine learning routine.')
+    parser.add_argument('--nn_batch_size',
         action='store',
-        type=str,
+        type=int,
         required=True,
-        help='"true" to use progress as elmo lambda. Otherwise, "false" ex) true')
-    parser.add_argument('--startpos_file_name_for_self_play',
+        help='nn_batch_size parameter in the NNUE machine learning routine.')
+    parser.add_argument('--eval_limit',
         action='store',
-        default='records_2017-05-19.sfen',
-        type=str,
-        help='')
-    parser.add_argument('--use_discount',
-        action='store',
-        type=str,
+        type=int,
         required=True,
-        help='"True" to use discount for shuffle. Otherwise, "False" ex) True')
-    parser.add_argument('--use_winning_rate_for_discount',
+        help='eval_limit parameter in the NNUE machine learning routine.')
+    parser.add_argument('--threads_to_selfplay',
         action='store',
-        type=str,
+        type=int,
         required=True,
-        help='"True" to winning rate for discount. Otherwise, "False" ex) True')
+        help='Number of threads to selfplay.')
+    parser.add_argument('--num_games_to_selfplay',
+        action='store',
+        type=int,
+        required=True,
+        help='Number of games to selfplay.')
+    parser.add_argument('--hash_to_selfplay',
+        action='store',
+        type=int,
+        required=True,
+        help='Hash size in mega bytes to selfplay.')
+    parser.add_argument('--thinking_time_ms',
+        action='store',
+        type=int,
+        required=True,
+        help='Thinking time in milliseconds to selfplay.')
+    parser.add_argument('--num_numa_nodes',
+        action='store',
+        type=int,
+        required=True,
+        help='Number of NUMA nodes to selfplay.')
+    parser.add_argument('--startpos_file_name_to_selfplay',
+        action='store',
+        required=True,
+        help='Start positions file path to selfplay.')
+    parser.add_argument('--reference_engine_file_path',
+        action='append',
+        required=True,
+        help='File path of a reference engine. User needs to specify the same number of the parameters to --reference_engine_file_path and --reference_eval_folder_path.')
+    parser.add_argument('--reference_eval_folder_path',
+        action='append',
+        required=True,
+        help='Folder path of an evaluation function files. User needs to specify the same number of the parameters to --reference_engine_file_path and --reference_eval_folder_path.')
+    parser.add_argument('--my_engine_file_path',
+        action='store',
+        required=True,
+        help='File path of the engine to work with the output evaluation function file.')
 
     args = parser.parse_args()
 
-    learner_output_folder_path_base = args.learner_output_folder_path_base
-    kifu_output_folder_path_base = args.kifu_output_folder_path_base
-    kifu_for_test_output_folder_path_base = args.kifu_for_test_output_folder_path_base
-    initial_eval_folder_path = args.initial_eval_folder_path
-    initial_kifu_folder_path = args.initial_kifu_folder_path
-    initial_kifu_for_test_folder_path = args.initial_kifu_for_test_folder_path
-    initial_shuffled_kifu_folder_path = args.initial_shuffled_kifu_folder_path
-    initial_new_eval_folder_path = args.initial_new_eval_folder_path
-    initial_state = State[args.initial_state]
-    if not initial_state:
-        sys.exit('Unknown initial state: %s' % args.initial_state)
-    final_state = State[args.final_state]
-    if not final_state:
-        sys.exit('Unknown final state: %s' % args.initial_state)
-    if args.reference_eval_folder_paths:
-        reference_eval_folder_paths = args.reference_eval_folder_paths.split(',')
-    else:
-        reference_eval_folder_paths = []
-    generate_kifu_exe_file_path = args.generate_kifu_exe_file_path
-    learner_exe_file_path = args.learner_exe_file_path
-    num_threads_to_generate_kifu = args.num_threads_to_generate_kifu
-    num_threads_to_learn = args.num_threads_to_learn
-    num_threads_to_selfplay = args.num_threads_to_selfplay
-    num_games_to_selfplay = args.num_games_to_selfplay
-    num_positions_to_generator_train = args.num_positions_to_generator_train
-    num_positions_to_generator_test = args.num_positions_to_generator_test
-    num_positions_to_learn = args.num_positions_to_learn
-    num_iterations = args.num_iterations
-    search_depth = args.search_depth
-    mini_batch_size = args.mini_batch_size
-    fobos_l1_parameter = args.fobos_l1_parameter
-    fobos_l2_parameter = args.fobos_l2_parameter
-    num_numa_nodes = args.num_numa_nodes
-    num_divisions_to_generator_train = args.num_divisions_to_generator_train
-    initial_division_to_generator_train = args.initial_division_to_generator_train
+    print('-' * 80)
+    print('- %s' % state)
+    print('-' * 80, flush=True)
 
-    kifu_folder_path = initial_kifu_folder_path
-    kifu_for_test_folder_path = initial_kifu_for_test_folder_path
-    shuffled_kifu_folder_path = initial_shuffled_kifu_folder_path
-    old_eval_folder_path = initial_eval_folder_path
-    new_eval_folder_path = initial_new_eval_folder_path
-    state = initial_state
+    stop_on_this_state = (state == final_state)
 
-    iteration = 0
-    while iteration < num_iterations:
-        print('-' * 80)
-        print('- %s' % state)
-        print('-' * 80, flush=True)
+    if state == State.generate_kifu:
+        kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
+        for division in range(initial_division_to_generator_train, num_divisions_to_generator_train):
+            GenerateKifu(args, old_eval_folder_path, kifu_folder_path,
+                        int(num_positions_to_generator_train / num_divisions_to_generator_train),
+                        'train.{0}'.format(division))
+        state = State.generate_kifu_for_test
 
-        stop_on_this_state = (state == final_state)
-
-        if state == State.generate_kifu:
-            kifu_folder_path = os.path.join(kifu_output_folder_path_base, GetDateTimeString())
-            for division in range(initial_division_to_generator_train, num_divisions_to_generator_train):
-                GenerateKifu(args, old_eval_folder_path, kifu_folder_path,
-                            int(num_positions_to_generator_train / num_divisions_to_generator_train),
-                            'train.{0}'.format(division))
-            state = State.generate_kifu_for_test
-
-        elif state == State.generate_kifu_for_test:
-            kifu_for_test_folder_path = os.path.join(kifu_for_test_output_folder_path_base,
-                                                    GetDateTimeString())
-            GenerateKifu(args, old_eval_folder_path, kifu_for_test_folder_path,
-                        num_positions_to_generator_test, 'test')
-            state = State.shuffle_kifu
-
-        elif state == State.shuffle_kifu:
-            shuffled_kifu_folder_path = kifu_folder_path + '-shuffled'
-            ShuffleKifu(args, kifu_folder_path, shuffled_kifu_folder_path)
-            state = State.learn
-
-        elif state == State.learn:
-            new_eval_folder_path = os.path.join(learner_output_folder_path_base,
+    if state == State.generate_kifu_for_test:
+        kifu_for_test_folder_path = os.path.join(kifu_for_test_output_folder_path_base,
                                                 GetDateTimeString())
-            Learn(args, old_eval_folder_path, shuffled_kifu_folder_path, kifu_for_test_folder_path,
-                new_eval_folder_path)
-            state = State.self_play
+        GenerateKifu(args, old_eval_folder_path, kifu_for_test_folder_path,
+                    num_positions_to_generator_test, 'test')
+        state = State.shuffle_kifu
 
-        elif state == State.self_play:
-            for reference_eval_folder_path in [old_eval_folder_path] + reference_eval_folder_paths:
-                SelfPlay(args, reference_eval_folder_path, new_eval_folder_path)
-                state = State.generate_kifu
-                iteration += 1
-                old_eval_folder_path = new_eval_folder_path
+    if state == State.shuffle_kifu:
+        shuffled_kifu_folder_path = kifu_folder_path + '-shuffled'
+        ShuffleKifu(args, kifu_folder_path, shuffled_kifu_folder_path)
+        state = State.learn
 
-        else:
-            sys.exit('Invalid state: state=%s' % state)
+    if state == State.learn:
+        new_eval_folder_path = os.path.join(learner_output_folder_path_base,
+                                            GetDateTimeString())
+        Learn(args, old_eval_folder_path, shuffled_kifu_folder_path, kifu_for_test_folder_path,
+            new_eval_folder_path)
+        state = State.self_play
 
-        if stop_on_this_state:
-            break
+    if state == State.self_play:
+        for reference_eval_folder_path in [old_eval_folder_path] + reference_eval_folder_paths:
+            SelfPlay(args, reference_eval_folder_path, new_eval_folder_path)
+            state = State.generate_kifu
+            iteration += 1
+            old_eval_folder_path = new_eval_folder_path
 
 
 if __name__ == '__main__':
