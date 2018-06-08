@@ -63,7 +63,7 @@ generate_kifu
 quit
 '''.format(eval_dir=args.eval_dir,
     kifu_dir=args.kifu_dir,
-    threads=args.num_threads_to_generate_kifu,
+    threads=args.threads_to_generate_kifu,
     hash=args.hash_to_generate_kifu,
     generator_num_positions=args.generator_num_positions,
     generator_search_depth=args.generator_search_depth,
@@ -106,41 +106,20 @@ quit
 
 def Learn(args):
     print(locals(), flush=True)
-    input = '''nnue\source\YaneuraOu-by-gcc.exe ^
-EvalDir %EvalDirNNUE% , ^
-SkipLoadingEval %SkipLoadingEval% , ^
-Threads %Threads% , ^
-EvalSaveDir %EvalSaveDir% , ^
-learn targetdir %ShuffledKifuDir% ^
-loop %loop% ^
-batchsize %batchsize% ^
-lambda %lambda% ^
-eta %eta% ^
-newbob_decay %newbob_decay% ^
-eval_save_interval %eval_save_interval% ^
-loss_output_interval %loss_output_interval% ^
-mirror_percentage %mirror_percentage% ^
-validation_set_file_name %ShuffledKifuDirForTest%\xaa ^
-nn_batch_size %nn_batch_size% ^
-eval_limit %eval_limit% || EXIT /B 1
-'''.format(num_threads_to_learn=args.num_threads_to_learn,
-    eval_folder_path=eval_folder_path,
-    kifu_folder_path=kifu_folder_path,
-    num_positions_to_learn=args.num_positions_to_learn,
-    kif_for_test_folder_path=kif_for_test_folder_path,
-    new_eval_folder_path=new_eval_folder_path,
-    min_learning_rate=args.min_learning_rate,
-    max_learning_rate=args.max_learning_rate,
-    num_learning_rate_cycles=args.num_learning_rate_cycles,
-    mini_batch_size=args.mini_batch_size,
-    fobos_l1_parameter=args.fobos_l1_parameter,
-    fobos_l2_parameter=args.fobos_l2_parameter,
-    elmo_lambda=args.elmo_lambda,
-    value_to_winning_rate_coefficient=args.value_to_winning_rate_coefficient,
-    adam_beta2=args.adam_beta2,
-    use_progress_as_elmo_lambda=args.use_progress_as_elmo_lambda).encode('utf-8')
-    print(input.decode('utf-8'), flush=True)
-    subprocess.run([args.learner_exe_file_path], input=input, check=True)
+    input = '''EvalDir {eval_dir}
+Threads {threads}
+Hash {hash}
+EvalSaveDir {eval_save_dir}
+learn targetdir {targetdir} loop {loop} batchsize {batchsize} lambda {lambda} eta {eta} newbob_decay {newbob_decay} eval_save_interval {eval_save_interval} loss_output_interval {loss_output_interval} mirror_percentage {%mirror_percentage%} validation_set_file_name {validation_set_file_name} nn_batch_size {nn_batch_size} eval_limit {eval_limit}
+'''.format(eval_dir=args.eval_dir,
+           threads=args.threads_to_learn,
+           hash=args.hash_to_learn,
+           EvalSaveDir=args.EvalSaveDir
+
+
+    )
+    print(input, flush=True)
+    subprocess.run([args.learner_exe_file_path], input=input.encode('utf-8'), check=True)
 
 
 def SelfPlay(args, old_eval_folder_path, new_eval_folder_path):
