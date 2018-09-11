@@ -23,7 +23,7 @@ namespace TanukiColiseum
         public string BookFileName2 { get; set; } = "no_book";
         public int NumBookMoves { get; set; } = 0;
         public string SfenFilePath { get; set; } = "records_2017-05-19.sfen";
-        public int TimeMs { get; set; } = 0;
+        public int Nodes { get; set; } = 0;
         public int NumNumaNodes { get; set; } = 1;
         public UserInterface Interface { get; set; } = UserInterface.Gui;
         public int ProgressIntervalMs { get; set; } = 60 * 1000;
@@ -63,8 +63,8 @@ namespace TanukiColiseum
                     case "--hash":
                         HashMb = int.Parse(args[++i]);
                         break;
-                    case "--time":
-                        TimeMs = int.Parse(args[++i]);
+                    case "--nodes":
+                        Nodes = int.Parse(args[++i]);
                         break;
                     case "--num_numa_nodes":
                         NumNumaNodes = int.Parse(args[++i]);
@@ -147,9 +147,9 @@ namespace TanukiColiseum
             {
                 throw new ArgumentException("--hash is not specified.");
             }
-            else if (TimeMs == 0)
+            else if (Nodes == 0)
             {
-                throw new ArgumentException("--time is not specified.");
+                throw new ArgumentException("--nodes is not specified.");
             }
         }
     }

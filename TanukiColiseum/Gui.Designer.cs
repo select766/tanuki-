@@ -49,7 +49,7 @@
             this.label8 = new System.Windows.Forms.Label();
             this.textBoxNumNumaNodes = new System.Windows.Forms.TextBox();
             this.label9 = new System.Windows.Forms.Label();
-            this.textBoxTimeMs = new System.Windows.Forms.TextBox();
+            this.textBoxNodes = new System.Windows.Forms.TextBox();
             this.label10 = new System.Windows.Forms.Label();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.buttonEval2FolderPath = new System.Windows.Forms.Button();
@@ -263,22 +263,22 @@
             this.label9.TabIndex = 11;
             this.label9.Text = "NUMAノード数";
             // 
-            // textBoxTimeMs
+            // textBoxNodes
             // 
-            this.textBoxTimeMs.Location = new System.Drawing.Point(489, 6);
-            this.textBoxTimeMs.Name = "textBoxTimeMs";
-            this.textBoxTimeMs.Size = new System.Drawing.Size(100, 19);
-            this.textBoxTimeMs.TabIndex = 10;
-            this.textBoxTimeMs.Text = "1000";
+            this.textBoxNodes.Location = new System.Drawing.Point(489, 6);
+            this.textBoxNodes.Name = "textBoxNodes";
+            this.textBoxNodes.Size = new System.Drawing.Size(100, 19);
+            this.textBoxNodes.TabIndex = 10;
+            this.textBoxNodes.Text = "2500000";
             // 
             // label10
             // 
             this.label10.AutoSize = true;
             this.label10.Location = new System.Drawing.Point(407, 9);
             this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(76, 12);
+            this.label10.Size = new System.Drawing.Size(68, 12);
             this.label10.TabIndex = 9;
-            this.label10.Text = "思考時間(ms)";
+            this.label10.Text = "思考ノード数";
             // 
             // groupBox2
             // 
@@ -444,7 +444,7 @@
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.textBoxNumNumaNodes);
             this.Controls.Add(this.label9);
-            this.Controls.Add(this.textBoxTimeMs);
+            this.Controls.Add(this.textBoxNodes);
             this.Controls.Add(this.label10);
             this.Controls.Add(this.textBoxSfenFilePath);
             this.Controls.Add(this.label5);
@@ -490,7 +490,7 @@
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.TextBox textBoxNumNumaNodes;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.TextBox textBoxTimeMs;
+        private System.Windows.Forms.TextBox textBoxNodes;
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.GroupBox groupBox2;
         private System.Windows.Forms.Button buttonEval2FolderPath;

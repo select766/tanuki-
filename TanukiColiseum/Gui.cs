@@ -94,11 +94,11 @@ namespace TanukiColiseum
 
             try
             {
-                options.TimeMs = int.Parse(textBoxTimeMs.Text);
+                options.Nodes = int.Parse(textBoxNodes.Text);
             }
             catch (Exception)
             {
-                textBoxOutput.Text = "思考時間(ms)に正しい数字を入力して下さい";
+                textBoxOutput.Text = "思考ノード数に正しい数字を入力して下さい";
                 return null;
             }
 
@@ -130,7 +130,7 @@ namespace TanukiColiseum
             yield return textBoxSfenFilePath;
             yield return textBoxHashMb;
             yield return textBoxNumNumaNodes;
-            yield return textBoxTimeMs;
+            yield return textBoxNodes;
             yield return buttonEval2FolderPath;
             yield return buttonEngine2FilePath;
             yield return textBoxBookFileName2;
