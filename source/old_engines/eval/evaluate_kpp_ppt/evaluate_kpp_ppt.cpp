@@ -7,7 +7,6 @@
 
 #include "../shogi.h"
 
-#include <direct.h>
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
@@ -112,34 +111,6 @@ namespace Eval
 		my_exit();
 	}
 
-	// 評価関数ファイルを保存する
-    // あらかじめEvalSaveDirオプションを設定しておかなければならない
-	void save_eval() {
-        std::string eval_save_directory_path = (string)Options["EvalSaveDir"];
-        _mkdir(eval_save_directory_path.c_str());
-        do {
-			// KK
-			std::ofstream ofsKK(eval_save_directory_path + "/" + KK_BIN, std::ios::binary);
-			if (ofsKK) ofsKK.write(reinterpret_cast<char*>(kk), sizeof(kk));
-			else goto Error;
-
-			// KKP
-			std::ofstream ofsKKP(eval_save_directory_path + "/" + KKP_BIN, std::ios::binary);
-			if (ofsKKP) ofsKKP.write(reinterpret_cast<char*>(kkp), sizeof(kkp));
-			else goto Error;
-
-			// KPP
-			std::ofstream ofsKPP(eval_save_directory_path + "/" + KPP_BIN, std::ios::binary);
-			if (ofsKPP) ofsKPP.write(reinterpret_cast<char*>(kpp), sizeof(kpp));
-			else goto Error;
-
-		} while (0);
-
-		return;
-
-	Error:;
-		std::cout << "\ninfo string save evaluation file failed.\n";
-	}
 
 	u64 calc_check_sum()
 	{

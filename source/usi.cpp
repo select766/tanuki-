@@ -8,11 +8,6 @@
 #include "tt.h"
 #include "misc.h"
 
-#include "experimental_book.h"
-#include "experimental_learner.h"
-#include "kifu_generator.h"
-#include "kifu_shuffler.h"
-
 using namespace std;
 
 // ユーザーの実験用に開放している関数。
@@ -64,6 +59,12 @@ namespace Learner
   // 開発中の教師局面の自動生成コマンド
   void gen_sfen2018(Position& pos, istringstream& is);
 #endif
+
+  // 読み筋と評価値のペア。Learner::search(),Learner::qsearch()が返す。
+  typedef std::pair<Value, std::vector<Move> > ValueAndPV;
+
+  ValueAndPV qsearch(Position& pos);
+  ValueAndPV search(Position& pos, int depth_, size_t multiPV /* = 1*/);
 
 }
 #endif
@@ -171,7 +172,7 @@ namespace USI
 				ss << endl;
 
 			ss  << "info"
-				<< " depth "    << d
+				<< " depth "    << d / ONE_PLY
 				<< " seldepth " << rootMoves[i].selDepth
 				<< " score "    << USI::score_to_usi(v);
 
@@ -301,13 +302,78 @@ namespace USI
 	//     USI::Option
 	// --------------------
 
-	  // この関数はUSI::init()から起動時に呼び出されるだけ。
+	// この関数はUSI::init()から起動時に呼び出されるだけ。
 	void Option::operator<<(const Option& o)
 	{
 		static size_t insert_order = 0;
 		*this = o;
 		idx = insert_order++; // idxは0から連番で番号を振る
 	}
+
+	// idxの値を書き換えないoperator "<<"
+	void Option::overwrite(const Option& o)
+	{
+		auto idx_ = idx; // backup
+		*this = o;
+		idx = idx_; // restore
+	}
+
+	// 思考エンジンがGUIからの"usi"に対して返す"option ..."文字列から
+	// Optionオブジェクトを構築して、それをOptions[]に突っ込む。
+	// "engine_options.txt"というファイルの各行からOptionオブジェクト構築して
+	// Options[]の値を上書きするためにこの関数が必要。
+	// "option name USI_Hash type spin default 256"
+	// のような文字列が引数として渡される。
+	void build_option(string line)
+	{
+		LineScanner scanner(line);
+		if (scanner.get_text() != "option") return;
+
+		string name, value, option_type;
+		int64_t min_value = 0, max_value = 1;
+		vector<string> combo_list;
+		while (!scanner.eof())
+		{
+			auto token = scanner.get_text();
+			if (token == "name") name = scanner.get_text();
+			else if (token == "type") option_type = scanner.get_text();
+			else if (token == "default") value = scanner.get_text();
+			else if (token == "min") min_value = stoll(scanner.get_text());
+			else if (token == "max") max_value = stoll(scanner.get_text());
+			else if (token == "var") {
+				auto varText = scanner.get_text();
+				combo_list.push_back(varText);
+			}
+			else {
+				cout << "Error : invalid command: " << token << endl;
+			}
+		}
+
+		if (Options.count(name) != 0)
+		{
+			// typeに応じたOptionの型を生成して代入する。このときに "<<"を用いるとidxが変わってしまうので overwriteで代入する。
+			if (option_type == "check") Options[name].overwrite(Option(value == "true"));
+			else if (option_type == "spin") Options[name].overwrite(Option(stoll(value), min_value, max_value));
+			else if (option_type == "string") Options[name].overwrite(Option(value.c_str()));
+			else if (option_type == "combo") Options[name].overwrite(Option(combo_list, value));
+		}
+		else
+			cout << "Error : option name not found : " << name << endl;
+
+	}
+
+	// カレントフォルダに"engine_option.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
+	void read_engine_options()
+	{
+		ifstream ifs("engine_options.txt");
+		if (!ifs.fail())
+		{
+			string str;
+			while (getline(ifs, str))
+				build_option(str);
+		}
+	}
+
 
 	// optionのdefault値を設定する。
 	void init(OptionsMap& o)
@@ -326,7 +392,11 @@ namespace USI
 		// ゆえにGUIでの対局設定は無視して、思考エンジンの設定ダイアログのところで
 		// 個別設定が出来るようにする。
 
+#if !defined(MATE_ENGINE)
 		o["Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
+#else
+		o["Hash"] << Option(4096, 1, MaxHashMB);
+#endif
 
 		// その局面での上位N個の候補手を調べる機能
 		o["MultiPV"] << Option(1, 1, 800);
@@ -386,7 +456,6 @@ namespace USI
 #endif
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
 		o["EvalDir"] << Option("eval", [](const USI::Option&o) { load_eval_finished = false; });
-		o["KifuDir"] << Option("kifu");
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
 	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_KPPPT) || defined(EVAL_KPPP_KKPT) || defined(EVAL_KKPP_KKPT) || \
@@ -411,21 +480,13 @@ namespace USI
 		o["SkipLoadingEval"] << Option(false);
 #endif
 
-#ifdef USE_KIFU_GENERATOR
-		Learner::InitializeGenerator(o);
-#endif
-#ifdef USE_EXPERIMENTAL_LEARNER
-		Learner::InitializeLearner(o);
-#endif
-		Learner::InitializeKifuShuffler(o);
-#ifdef USE_PROGRESS
-        Progress::Initialize(o);
-#endif
-		Book::Initialize(o);
-
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
+
+		// カレントフォルダに"engine_option.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
+		read_engine_options();
 	}
+
 
 	// USIプロトコル経由で値を設定されたときにそれをcurrentValueに反映させる。
 	Option& Option::operator=(const string& v) {
@@ -702,7 +763,7 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 			if (token == "infinite")
 				limits.mate = INT32_MAX;
 			else
-				is >> limits.mate;
+				limits.mate = stoi(token);
 		}
 
 		// 時間無制限。
@@ -726,7 +787,43 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	Threads.start_thinking(pos, states , limits , ponderMode);
 }
 
+// --------------------
+// テスト用にqsearch(),search()を直接呼ぶ
+// --------------------
 
+#if defined(EVAL_LEARN)
+void qsearch_cmd(Position& pos)
+{
+	cout << "qsearch : ";
+	auto pv = Learner::qsearch(pos);
+	cout << "Value = " << pv.first << " , PV = ";
+	for (auto m : pv.second)
+		cout << m << " ";
+	cout << endl;
+}
+
+void search_cmd(Position& pos, istringstream& is)
+{
+	string token;
+	int depth = 1;
+	int multi_pv = (int)Options["MultiPV"];
+	while (is >> token)
+	{
+		if (token == "depth")
+			is >> depth;
+		if (token == "multipv")
+			is >> multi_pv;
+	}
+
+	cout << "search depth = " << depth << " , multi_pv = " << multi_pv << " : ";
+	auto pv = Learner::search(pos , depth , multi_pv);
+	cout << "Value = " << pv.first << " , PV = ";
+	for (auto m : pv.second)
+		cout << m << " ";
+	cout << endl;
+}
+
+#endif
 
 // --------------------
 // 　　USI応答部
@@ -742,7 +839,7 @@ void USI::loop(int argc, char* argv[])
 
 	// 局面を遡るためのStateInfoのlist。
 	StateListPtr states(new StateList(1));
-	
+
 	// 先行入力されているコマンド
 	// コマンドは前から取り出すのでqueueを用いる。
 	queue<string> cmds;
@@ -867,6 +964,12 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "eval") cout << "eval = " << Eval::compute_eval(pos) << endl;
 		else if (token == "evalstat") Eval::print_eval_stat(pos);
 
+#if defined(EVAL_LEARN)
+		// テスト用にqsearch(),search()を直接呼ぶコマンド
+		else if (token == "qsearch") qsearch_cmd(pos);
+		else if (token == "search") search_cmd(pos,is);
+#endif
+
 		// この局面での指し手をすべて出力
 		else if (token == "moves") {
 			for (auto m : MoveList<LEGAL_ALL>(pos))
@@ -910,7 +1013,7 @@ void USI::loop(int argc, char* argv[])
 
 #if defined (EVAL_LEARN)
 		else if (token == "gensfen") Learner::gen_sfen(pos, is);
-		//else if (token == "learn") Learner::learn(pos, is);
+		else if (token == "learn") Learner::learn(pos, is);
 #if defined (USE_GENSFEN2018)
 		// 開発中の教師局面生成コマンド
 		else if (token == "gensfen2018") Learner::gen_sfen2018(pos, is);
@@ -920,50 +1023,7 @@ void USI::loop(int argc, char* argv[])
 		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
 		// 我々はこれに関知しないので単に無視すれば良い。
 		else if (token == "usinewgame") continue;
-#ifdef USE_KIFU_GENERATOR
-        else if (token == "generate_kifu") {
-            Learner::GenerateKifu();
-            break;
-        }
-        //else if (token == "measure_move_times") {
-        //    Learner::MeasureMoveTimes();
-        //    break;
-        //}
-        else if (token == "convert_sfen_to_learning_data") {
-            Learner::ConvertSfenToLearningData();
-            break;
-        }
-#endif
-#ifdef USE_EXPERIMENTAL_LEARNER
-        else if (token == "learn" || token == "l") {
-            Learner::Learn(is);
-            break;
-        }
-        else if (token == "calculate_test_data_entropy") {
-            Learner::CalculateTestDataEntropy(is);
-            break;
-        }
-        else if (token == "breed_eval") {
-            Learner::BreedEval(is);
-            break;
-        }
-        else if (token == "generate_initial_eval") {
-            Learner::GenerateInitialEval(is);
-            break;
-        }
-#endif
-		else if (token == "shuffle_kifu") {
-			Learner::ShuffleKifu();
-			break;
-		}
-		else if (token == "create_raw_book") {
-			Book::CreateRawBook();
-			break;
-		}
-        else if (token == "create_scored_book") {
-            Book::CreateScoredBook();
-            break;
-        }
+
 		else
 		{
 			//    簡略表現として、

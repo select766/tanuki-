@@ -104,7 +104,6 @@ namespace Eval
 		// 学習用配列の確保
 		u64 size = g_kpp.max_index();
 		weights.resize(size); // 確保できるかは知らん。確保できる環境で動かしてちょうだい。
-		memset(&weights[0], 0, sizeof(Weight2) * weights.size());
 
 		// 学習率の設定
 		Weight::init_eta(eta1, eta2, eta3, eta1_epoch, eta2_epoch);
@@ -356,10 +355,7 @@ namespace Eval
 	void save_eval(std::string dir_name)
 	{
 		{
-            std::string eval_dir = (std::string)Options["EvalSaveDir"];
-            if (dir_name.empty()) {
-                eval_dir = path_combine(eval_dir, dir_name);
-            }
+			auto eval_dir = path_combine((std::string)Options["EvalSaveDir"], dir_name);
 
 			std::cout << "save_eval() start. folder = " << eval_dir << std::endl;
 

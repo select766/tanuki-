@@ -15,6 +15,11 @@
 using namespace EvalLearningTools;
 #endif
 
+#if defined(EVAL_NNUE)
+#include "../eval/evaluate_common.h"
+#include "../eval/nnue/nnue_test_command.h"
+#endif
+
 // ----------------------------------
 //  USI拡張コマンド "perft"(パフォーマンステスト)
 // ----------------------------------
@@ -2110,6 +2115,9 @@ void test_cmd(Position& pos, istringstream& is)
 #ifdef USE_KIF_CONVERT_TOOLS
 	else if (param == "kifconvert") test_kif_convert_tools(pos, is); // 現局面からの全合法手を各種形式で出力チェック
 #endif
+#if defined(EVAL_NNUE)
+	else if (param == "nnue") Eval::NNUE::TestCommand(pos, is);
+#endif
 	else {
 		// --- usage
 
@@ -2192,12 +2200,9 @@ void test_mate_engine_cmd(Position& pos, istringstream& is) {
 	time.reset();
 
 	for (const char* sfen : TestMateEngineSfen) {
-		Search::StateStackPtr st;
-		auto states = Search::StateStackPtr(new aligned_stack<StateInfo>);
-		states->push(StateInfo());
-
 		Position pos;
-		pos.set(sfen, Threads.main());
+		StateListPtr st(new StateList(1));
+		pos.set(sfen, &st->back(), Threads.main());
 
 		sync_cout << "\nPosition: " << sfen << sync_endl;
 
