@@ -685,6 +685,12 @@
     <ClInclude Include="search.h" />
     <ClInclude Include="shogi.h" />
     <ClInclude Include="position.h" />
+    <ClInclude Include="tanuki_book.h" />
+    <ClInclude Include="tanuki_kifu_generator.h" />
+    <ClInclude Include="tanuki_kifu_reader.h" />
+    <ClInclude Include="tanuki_kifu_shuffler.h" />
+    <ClInclude Include="tanuki_kifu_writer.h" />
+    <ClInclude Include="tanuki_progress_report.h" />
     <ClInclude Include="thread.h" />
     <ClInclude Include="tt.h" />
   </ItemGroup>
@@ -742,6 +748,12 @@
     <ClCompile Include="move_picker.cpp" />
     <ClCompile Include="shogi.cpp" />
     <ClCompile Include="position.cpp" />
+    <ClCompile Include="tanuki_book.cpp" />
+    <ClCompile Include="tanuki_kifu_generator.cpp" />
+    <ClCompile Include="tanuki_kifu_reader.cpp" />
+    <ClCompile Include="tanuki_kifu_shuffler.cpp" />
+    <ClCompile Include="tanuki_kifu_writer.cpp" />
+    <ClCompile Include="tanuki_progress_report.cpp" />
     <ClCompile Include="thread.cpp" />
     <ClCompile Include="tt.cpp" />
     <ClCompile Include="usi.cpp" />
