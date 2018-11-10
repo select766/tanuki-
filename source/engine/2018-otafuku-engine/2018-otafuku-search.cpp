@@ -749,6 +749,10 @@ namespace YaneuraOu2018GOKU
 		return bestValue;
 	}
 
+	bool should_stop_search_thread(Thread* thread) {
+        return Limits.nodes_per_thread &&
+			Limits.nodes_per_thread < thread->nodes.load(std::memory_order_relaxed);
+    }
 
 	// -----------------------
 	//      通常探索
@@ -898,8 +902,10 @@ namespace YaneuraOu2018GOKU
 				return value_from_tt(draw_value(draw_type, pos.side_to_move()), ss->ply);
 
 			// 最大手数を超えている、もしくは停止命令が来ている。
-			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply))
-				return draw_value(REPETITION_DRAW, pos.side_to_move());
+            if (Threads.stop.load(std::memory_order_relaxed) ||
+                should_stop_search_thread(thisThread) ||
+                (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply))
+                return draw_value(REPETITION_DRAW, pos.side_to_move());
 
 			// -----------------------
 			// Step 3. Mate distance pruning.
@@ -1859,8 +1865,10 @@ namespace YaneuraOu2018GOKU
 			// 停止シグナルが来たときは、探索の結果の値は信頼できないので、
 			// best moveの更新をせず、PVや置換表を汚さずに終了する。
 
-			if (Threads.stop.load(std::memory_order_relaxed))
-				return VALUE_ZERO;
+			if (Threads.stop.load(std::memory_order_relaxed) ||
+                should_stop_search_thread(thisThread)) {
+                return VALUE_ZERO;
+            }
 
 			// -----------------------
 			//  root node用の特別な処理
@@ -3160,14 +3168,15 @@ namespace Learner
 		Value delta = -VALUE_INFINITE;
 		Value bestValue = -VALUE_INFINITE;
 
-		while ((rootDepth += ONE_PLY) <= depth)
+		while ((rootDepth += ONE_PLY) <= depth && !should_stop_search_thread(th))
 		{
 			for (RootMove& rm : rootMoves)
 				rm.previousScore = rm.score;
 
 			// MultiPV
-			for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
-			{
+            for (PVIdx = 0;
+                PVIdx < multiPV && !Threads.stop && !should_stop_search_thread(th);
+                ++PVIdx) {
 				// それぞれのdepthとPV lineに対するUSI infoで出力するselDepth
 				selDepth = 0;
 
@@ -3183,7 +3192,7 @@ namespace Learner
 				}
 
 				// aspiration search
-				while (true)
+                while (!should_stop_search_thread(th))
 				{
 					bestValue = YaneuraOu2018GOKU::search<PV>(pos, ss, alpha, beta, rootDepth, false , false);
 
