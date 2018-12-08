@@ -15,17 +15,17 @@ using Book::BookPos;
 using Book::MemoryBook;
 
 namespace {
-	constexpr char* kBookSfenFile = "BookSfenFile";
-	constexpr char* kBookMaxMoves = "BookMaxMoves";
-	constexpr char* kBookFile = "BookFile";
-	constexpr char* kBookSearchDepth = "BookSearchDepth";
-	constexpr char* kBookInputFile = "BookInputFile";
-	constexpr char* kBookOutputFile = "BookOutputFile";
-	constexpr char* kBookSavePerPositions = "BookSavePerPositions";
-	constexpr char* kThreads = "Threads";
-	constexpr char* kMultiPV = "MultiPV";
-	constexpr char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
-	constexpr char* kBookNarrowBook = "NarrowBook";
+	constexpr const char* kBookSfenFile = "BookSfenFile";
+	constexpr const char* kBookMaxMoves = "BookMaxMoves";
+	constexpr const char* kBookFile = "BookFile";
+	constexpr const char* kBookSearchDepth = "BookSearchDepth";
+	constexpr const char* kBookInputFile = "BookInputFile";
+	constexpr const char* kBookOutputFile = "BookOutputFile";
+	constexpr const char* kBookSavePerPositions = "BookSavePerPositions";
+	constexpr const char* kThreads = "Threads";
+	constexpr const char* kMultiPV = "MultiPV";
+	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
+	constexpr const char* kBookNarrowBook = "NarrowBook";
 	constexpr int kShowProgressAtMostSec = 10 * 60;
 }
 
@@ -64,7 +64,7 @@ bool Tanuki::CreateRawBook() {
 	}
 	std::string line;
 
-	StateInfo state_info[4096] = { 0 };
+	StateInfo state_info[4096] = {};
 	StateInfo* state = state_info + 8;
 	std::map<std::string, int> sfen_to_count;
 	int num_records = 0;
@@ -172,13 +172,16 @@ bool Tanuki::CreateScoredBook() {
 	time_t start_time = 0;
 	std::time(&start_time);
 
-	std::atomic_int global_position_index = 0;
+	std::atomic_int global_position_index;
+	global_position_index = 0;
 	std::mutex output_book_mutex;
 	ProgressReport progress_report(num_sfens, kShowProgressAtMostSec);
 
 	std::vector<std::thread> threads;
-	std::atomic_int global_pos_index = 0;
-	std::atomic_int global_num_processed_positions = 0;
+	std::atomic_int global_pos_index;
+	global_pos_index = 0;
+	std::atomic_int global_num_processed_positions;
+	global_num_processed_positions = 0;
 	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
 		threads.push_back(std::thread([thread_index, num_sfens, search_depth, multi_pv,
 			save_per_positions, &global_pos_index, &sfens, &output_book,
@@ -190,7 +193,7 @@ bool Tanuki::CreateScoredBook() {
 				position_index = global_pos_index++) {
 				const std::string& sfen = sfens[position_index];
 				Thread& thread = *Threads[thread_index];
-				StateInfo state_info = { 0 };
+				StateInfo state_info = {};
 				Position& pos = thread.rootPos;
 				pos.set(sfen, &state_info, &thread);
 

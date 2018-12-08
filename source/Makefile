@@ -1,18 +1,18 @@
 # > Select YaneuraOu edition below.
 
-YANEURAOU_EDITION = YANEURAOU_2018_OTAFUKU_ENGINE
+#YANEURAOU_EDITION = YANEURAOU_2018_OTAFUKU_ENGINE
 #YANEURAOU_EDITION = HELP_MATE_ENGINE
 #YANEURAOU_EDITION = MATE_ENGINE
 #YANEURAOU_EDITION = YANEURAOU_2018_GOKU_ENGINE
-#YANEURAOU_EDITION = YANEURAOU_2018_TNK_ENGINE
+YANEURAOU_EDITION = YANEURAOU_2018_TNK_ENGINE
 
 
 # clangでコンパイルしたほうがgccより数%速いっぽい。
-#COMPILER = g++
-COMPILER = clang++
+COMPILER = g++
+#COMPILER = clang++
 
 # 標準的なコンパイルオプション
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
+CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive -fopenmp
 WCFLAGS  =
 LDFLAGS  =
 LIBS     =
@@ -152,7 +152,13 @@ SOURCES  = shogi.cpp                                                           \
 	engine/2018-otafuku-engine/2018-otafuku-search.cpp                         \
 	learn/learner.cpp                                                          \
 	learn/learning_tools.cpp                                                   \
-	learn/multi_think.cpp
+	learn/multi_think.cpp                                                      \
+	tanuki_book.cpp                                                            \
+	tanuki_kifu_generator.cpp                                                  \
+	tanuki_kifu_shuffler.cpp                                                   \
+	tanuki_progress_report.cpp                                                 \
+	tanuki_kifu_writer.cpp                                                     \
+	tanuki_kifu_reader.cpp
 
 ifeq ($(YANEURAOU_EDITION),MATE_ENGINE)
 	SOURCES += engine/mate-engine/mate-search.cpp

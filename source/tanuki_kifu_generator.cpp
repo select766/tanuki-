@@ -188,9 +188,10 @@ void Tanuki::GenerateKifu() {
 	time_t start_time;
 	std::time(&start_time);
 	ASSERT_LV3(start_positions.size());
-	std::uniform_int<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
+	std::uniform_int_distribution<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
 	// スレッド間で共有する
-	std::atomic_int64_t global_position_index = 0;
+	std::atomic_int64_t global_position_index;
+	global_position_index = 0;
 	ProgressReport progress_report(num_positions, 10 * 60);
 #pragma omp parallel
 	{
@@ -345,7 +346,8 @@ void Tanuki::ConvertSfenToLearningData() {
 	}
 
 	// スレッド間で共有する
-	std::atomic_int64_t global_sfen_index = 0;
+	std::atomic_int64_t global_sfen_index;
+	global_sfen_index = 0;
 	int64_t num_sfens = sfens.size();
 	ProgressReport progress_report(num_sfens, 60);
 	std::unique_ptr<KifuWriter> kifu_writer =
