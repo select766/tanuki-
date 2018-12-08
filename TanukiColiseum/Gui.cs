@@ -202,6 +202,11 @@ namespace TanukiColiseum
             progressBar1.Value = numFinishedGames;
         }
 
+        private void ShowError(string errorMessage)
+        {
+            textBoxOutput.Text = errorMessage;
+        }
+
         private async void buttonStart_Click(object sender, EventArgs e)
         {
             var options = ParseOptions();
@@ -212,6 +217,7 @@ namespace TanukiColiseum
 
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowProgress;
+            coliseum.OnError += ShowError;
             EnableControls(false);
             progressBar1.Value = 0;
             textBoxOutput.Text = "(対局準備中です。しばらくお待ちください。)";

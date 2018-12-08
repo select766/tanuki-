@@ -16,10 +16,34 @@ namespace TanukiColiseum
         private int ProgressIntervalMs;
         private Status Status { get; } = new Status();
         public delegate void StatusHandler(Status status);
+        public delegate void ErrorHandler(string errorMessage);
         public event StatusHandler OnStatusChanged;
+        public event ErrorHandler OnError;
 
         public void Run(Options options)
         {
+            // 評価関数フォルダと思考エンジンの存在確認を行う
+            if (!File.Exists(options.Engine1FilePath))
+            {
+                OnError("思考エンジン1が見つかりませんでした。正しいexeファイルを指定してください。");
+                return;
+            }
+            else if (!File.Exists(options.Engine2FilePath))
+            {
+                OnError("思考エンジン2が見つかりませんでした。正しいexeファイルを指定してください。");
+                return;
+            }
+            else if (!Directory.Exists(options.Eval1FolderPath))
+            {
+                OnError("評価関数フォルダ1が見つかりませんでした。正しい評価関数フォルダを指定してください");
+                return;
+            }
+            else if (!Directory.Exists(options.Eval2FolderPath))
+            {
+                OnError("評価関数フォルダ2が見つかりませんでした。正しい評価関数フォルダを指定してください");
+                return;
+            }
+
             Status.NumGames = options.NumGames;
             Status.Nodes = options.Nodes;
             ProgressIntervalMs = options.ProgressIntervalMs;

@@ -8,6 +8,7 @@ namespace TanukiColiseum
         {
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowResult;
+            coliseum.OnError += OnError;
             coliseum.Run(options);
         }
 
@@ -78,6 +79,12 @@ namespace TanukiColiseum
                 // 27-30
                 engine1DrawBlack, engine2DrawBlack, engine2DrawBlack, engine1DrawBlack
                 );
+            Console.Out.Flush();
+        }
+
+        public void OnError(string errorMessage)
+        {
+            Console.Out.WriteLine(errorMessage);
             Console.Out.Flush();
         }
     }
