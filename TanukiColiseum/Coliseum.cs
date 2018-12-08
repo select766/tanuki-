@@ -45,7 +45,7 @@ namespace TanukiColiseum
             }
 
             Status.NumGames = options.NumGames;
-            Status.Nodes = options.Nodes;
+            Status.Nodes = new int[] { options.Nodes1, options.Nodes2 };
             ProgressIntervalMs = options.ProgressIntervalMs;
 
             // 開始局面集を読み込む
@@ -105,7 +105,7 @@ namespace TanukiColiseum
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手
-                Games.Add(new Game(gameIndex & 1, options.Nodes, engine1, engine2,
+                Games.Add(new Game(gameIndex & 1, options.Nodes1, options.Nodes2, engine1, engine2,
                     options.NumBookMoves, openings));
             }
 
