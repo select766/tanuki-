@@ -78,7 +78,7 @@ ifeq ($(findstring g++,$(COMPILER)),g++)
 	OPENMP   = -fopenmp
 	OPENMP_LDFLAGS =
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS
+		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
 		BLAS_LDFLAGS = -lopenblas
 		ifeq ($(MSYSTEM),MINGW64)
 			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
@@ -89,7 +89,7 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 	OPENMP   = -fopenmp
 	OPENMP_LDFLAGS = -lomp
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS
+		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
 		BLAS_LDFLAGS = -lopenblas
 		ifeq ($(MSYSTEM),MINGW64)
 			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
