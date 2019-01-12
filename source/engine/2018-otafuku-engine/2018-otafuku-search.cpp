@@ -3051,6 +3051,7 @@ namespace Learner
 			th->completedDepth = DEPTH_ZERO;
 			th->selDepth = 0;
 			th->rootDepth = DEPTH_ZERO;
+			th->nodes = 0;
 
 			// history類を全部クリアする。この初期化は少し時間がかかるし、探索の精度はむしろ下がるので善悪はよくわからない。
 			// th->clear();
@@ -3168,14 +3169,14 @@ namespace Learner
 		Value delta = -VALUE_INFINITE;
 		Value bestValue = -VALUE_INFINITE;
 
-		while ((rootDepth += ONE_PLY) <= depth && !should_stop_search_thread(th))
+		while (!should_stop_search_thread(th) && (rootDepth += ONE_PLY) <= depth)
 		{
 			for (RootMove& rm : rootMoves)
 				rm.previousScore = rm.score;
 
 			// MultiPV
             for (PVIdx = 0;
-                PVIdx < multiPV && !Threads.stop && !should_stop_search_thread(th);
+				!should_stop_search_thread(th) && PVIdx < multiPV && !Threads.stop;
                 ++PVIdx) {
 				// それぞれのdepthとPV lineに対するUSI infoで出力するselDepth
 				selDepth = 0;

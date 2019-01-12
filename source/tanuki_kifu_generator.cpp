@@ -46,6 +46,7 @@ namespace {
 	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
 	constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -126,6 +127,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorKifuTag] << Option("default_tag");
 	o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
+	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
@@ -160,17 +162,9 @@ void Tanuki::GenerateKifu() {
 		return;
 	}
 
-	Eval::load_eval();
-
 	omp_set_num_threads((int)Options["Threads"]);
 
-	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚ÌŽè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ð–h‚®‚½‚ß1 << 16‚É‚·‚é
-	limits.max_game_ply = 1 << 16;
-	limits.depth = MAX_PLY;
-	limits.silent = true;
-	limits.enteringKingRule = EKR_27_POINT;
-	Search::Limits = limits;
+	Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
 	_mkdir(kifu_directory.c_str());
@@ -179,11 +173,23 @@ void Tanuki::GenerateKifu() {
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
 	int value_threshold = Options[kOptionGeneratorValueThreshold];
 	std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
+	uint64_t optimum_nodes_searched =
+		ParseOptionOrDie<uint64_t>(kOptionGeneratorOptimumNodesSearched);
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
 	std::cout << "value_threshold=" << value_threshold << std::endl;
 	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
+	std::cout << "optimum_nodes_searched=" << optimum_nodes_searched << std::endl;
+
+	Search::LimitsType limits;
+	// ˆø‚«•ª‚¯‚ÌŽè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ð–h‚®‚½‚ß1 << 16‚É‚·‚é
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	limits.nodes_per_thread = optimum_nodes_searched;
+	Search::Limits = limits;
 
 	time_t start_time;
 	std::time(&start_time);
