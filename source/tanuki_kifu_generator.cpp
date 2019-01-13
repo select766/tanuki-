@@ -47,6 +47,7 @@ namespace {
 	constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
 	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
+	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -128,6 +129,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
+	o[kOptionGeneratorMeasureDepth] << Option(false);
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
@@ -175,12 +177,14 @@ void Tanuki::GenerateKifu() {
 	std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
 	uint64_t optimum_nodes_searched =
 		ParseOptionOrDie<uint64_t>(kOptionGeneratorOptimumNodesSearched);
+	bool measure_depth = Options[kOptionGeneratorMeasureDepth];
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
 	std::cout << "value_threshold=" << value_threshold << std::endl;
 	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
 	std::cout << "optimum_nodes_searched=" << optimum_nodes_searched << std::endl;
+	std::cout << "measure_depth=" << measure_depth << std::endl;
 
 	Search::LimitsType limits;
 	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
@@ -190,6 +194,9 @@ void Tanuki::GenerateKifu() {
 	limits.enteringKingRule = EKR_27_POINT;
 	limits.nodes_per_thread = optimum_nodes_searched;
 	Search::Limits = limits;
+
+	// ‰½è–Ú -> ’Tõ[‚³
+	std::vector<std::vector<int> > game_play_to_depths(kMaxGamePlay + 1);
 
 	time_t start_time;
 	std::time(&start_time);
@@ -261,6 +268,16 @@ void Tanuki::GenerateKifu() {
 				pos.do_move(pv_move, state[pos.game_ply()]);
 				// ·•ªŒvZ‚Ì‚½‚ßevaluate()‚ğŒÄ‚Ño‚·
 				Eval::evaluate(pos);
+
+				// è”–ˆ‚Ì’Tõ‚Ì[‚³‚ğ‹L˜^‚µ‚Ä‚¨‚­
+				// ‰½‚ç‚©‚ÌŒ`‚ÅŸ‚¿‚ªŒˆ‚Ü‚Á‚Ä‚¢‚é‹Ç–Ê‚Í
+				// ’Tõ[‚³‚ª‹É’[‚É[‚­‚È‚é‚½‚ßœŠO‚·‚é
+				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
+#pragma omp critical
+					{
+						game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
+					}
+				}
 			}
 
 			int game_result = GameResultDraw;
@@ -314,6 +331,34 @@ void Tanuki::GenerateKifu() {
 		// •K—v‹Ç–Ê”¶¬‚µ‚½‚ç‘SƒXƒŒƒbƒh‚Ì’Tõ‚ğ’â~‚·‚é
 		// ‚±‚¤‚µ‚È‚¢‚Æ‘Š“ü‹Ê“™‡–@è‚Ì‘½‚¢‹Ç–Ê‚Å~‚Ü‚é‚Ü‚Å‚ÉŠÔ‚ª‚©‚©‚é
 		Threads.stop = true;
+	}
+
+	if (measure_depth) {
+		char output_file_path[1024];
+		std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%I64d.search_depth.csv", kifu_directory.c_str(),
+			output_file_name_tag.c_str(), search_depth, num_positions, start_time);
+
+		FILE* file = std::fopen(output_file_path, "wt");
+		fprintf(file, "game_play,N,average,sd\n");
+
+		for (int game_play = 0; game_play <= kMaxGamePlay; ++game_play) {
+			double sum = 0.0;
+			double sum2 = 0.0;
+			int N = static_cast<int>(game_play_to_depths[game_play].size());
+			for (auto search_depth : game_play_to_depths[game_play]) {
+				sum += search_depth;
+				sum2 += search_depth * search_depth;
+			}
+
+			if (N) {
+				double average = sum / N;
+				double sd = sum2 / N - average * average;
+				fprintf(file, "%d,%d,%f,%f\n", game_play, N, average, sd);
+			}
+			else {
+				fprintf(file, "%d,%d,%f,%f\n", game_play, N, 0.0, 0.0);
+			}
+		}
 	}
 }
 

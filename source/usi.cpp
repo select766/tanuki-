@@ -460,6 +460,7 @@ namespace USI
 #endif
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
 		o["EvalDir"] << Option("eval", [](const USI::Option&o) { load_eval_finished = false; });
+		o["KifuDir"] << Option("kifu");
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
 	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_KPPPT) || defined(EVAL_KPPP_KKPT) || defined(EVAL_KKPP_KKPT) || \
