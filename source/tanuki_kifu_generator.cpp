@@ -145,6 +145,21 @@ namespace {
 			root_moves.push_back(Search::RootMove(m));
 		}
 
+		// 50%ÇÃämó¶Ç≈ã ÇÃà⁄ìÆÇÃÇ›ÇçsÇ§
+		if (mt() & 1) {
+			root_moves.erase(std::remove_if(root_moves.begin(), root_moves.end(),
+				[&pos](const auto& root_move) {
+				Move move = root_move.pv.front();
+				if (is_drop(move)) {
+					return true;
+				}
+				Square sq = from_sq(move);
+				return pos.king_square(BLACK) != sq &&
+					pos.king_square(WHITE) != sq;
+			}),
+				root_moves.end());
+		}
+
 		if (root_moves.empty()) {
 			return;
 		}
