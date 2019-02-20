@@ -1037,6 +1037,11 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
 
+		else if (token == "extend_book") {
+			Tanuki::ExtendBook();
+			break;
+		}
+
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();
