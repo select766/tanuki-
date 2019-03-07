@@ -8,7 +8,7 @@ namespace TanukiColiseum
 {
     class Engine
     {
-        private const int MaxMoves = 256;
+        private const int MaxMoves = 320;
         private Process Process = new Process();
         private Coliseum Coliseum;
         private SemaphoreSlim ReadyokSemaphoreSlim = new SemaphoreSlim(0);
