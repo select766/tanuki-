@@ -8,15 +8,15 @@
     <StartupFile>analyze_optimizer_log.py</StartupFile>
     <SearchPath>
     </SearchPath>
-    <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
+    <WorkingDirectory>C:\home\nodchip\nnue\source</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>tanuki-optimizer</Name>
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>param\parameters.ending.csv optimize_parameters.hyperopt_state.20170401_170936_b10000_2ndpart.pickle</CommandLineArguments>
+    <CommandLineArguments>parameters.csv optimize_parameters.hyperopt_state.20180603_145939.pickle</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
-    <InterpreterId>Global|PythonCore|2.7</InterpreterId>
+    <InterpreterId>Global|PythonCore|3.6</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,7 +36,7 @@
     <Compile Include="parameters_generator.py" />
   </ItemGroup>
   <ItemGroup>
-    <InterpreterReference Include="Global|PythonCore|2.7" />
+    <InterpreterReference Include="Global|PythonCore|3.6" />
   </ItemGroup>
   <!-- Uncomment the CoreCompile target to enable the Build command in
        Visual Studio and specify your pre- and post-build commands in

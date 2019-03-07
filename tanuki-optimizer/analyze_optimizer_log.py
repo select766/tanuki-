@@ -22,8 +22,8 @@ import pickle
 from hyperopt_state import HyperoptState
 
 def score_from_game_result(game_result):
-    u'''calculate score (lower is better, [0.0, 1.0] or None (ignore)) from game_result'''
-    lose, draw, win = map(int, game_result)
+    '''calculate score (lower is better, [0.0, 1.0] or None (ignore)) from game_result'''
+    lose, draw, win = list(map(int, game_result))
     n_games = lose + draw + win
 
     # if an error occured during matches, n_games might be zero.
@@ -33,20 +33,20 @@ def score_from_game_result(game_result):
     return (win * (0.0) + draw * (0.5) + lose * (1.0)) / float(n_games)
 
 def winning_rate_from_score(score, n_matches):
-    u'''do inverse of score_from_game_result()'''
+    '''do inverse of score_from_game_result()'''
     wins = (1.0 - score) * n_matches
     return wins / n_matches
 
 def transform_score_to_target(ys):
-    u'''score [0, 1] -> [-4, 4] (logit)'''
+    '''score [0, 1] -> [-4, 4] (logit)'''
     return np.maximum(-4.0, np.minimum(4.0, np.log(ys) - np.log(1.0 - ys)))
 
 def transform_target_to_score(ys):
-    u'''[-inf, inf] -> score [0, 1] (logistic)'''
+    '''[-inf, inf] -> score [0, 1] (logistic)'''
     return 1.0 / (1.0 + np.exp(-ys))
 
 def stringify_value_in_bounds(value, default_value, min_value, max_value, n_chars=20):
-    u'''create a string like |---+---@----| for visualization. +: default'''
+    '''create a string like |---+---@----| for visualization. +: default'''
     n_chars = max(1, n_chars - 2)
     res = ['-'] * n_chars
     vidx = max(0, min(n_chars - 1, int((n_chars - 1) * (value - min_value) / (max_value - min_value))))
@@ -56,8 +56,8 @@ def stringify_value_in_bounds(value, default_value, min_value, max_value, n_char
     return '|{}|'.format(''.join(res))
 
 def create_header_file(file_path, analyzer, x_opt, additional_dict={}):
-    u'''create a C++ header to define (optimal) parameter x_opt'''
-    with open(file_path, 'wb') as fo:
+    '''create a C++ header to define (optimal) parameter x_opt'''
+    with open(file_path, 'wt') as fo:
         guard = os.path.basename(file_path).replace('.', '_').upper()
         now = datetime.datetime.now()
         fo.write('#ifndef __{}__\n'.format(guard))
@@ -65,7 +65,7 @@ def create_header_file(file_path, analyzer, x_opt, additional_dict={}):
         fo.write('// Created at: {}\n'.format(now.strftime('%Y-%m-%d %H:%M:%S')))
         fo.write('// Log: {}\n'.format(analyzer.log_path))
         fo.write('// Parameters CSV: {}\n'.format(analyzer.parameters_csv_path))
-        for k, v in additional_dict.items():
+        for k, v in list(additional_dict.items()):
             fo.write('// {} = {}\n'.format(k, v))
         fo.write('\n')
         for index, (name, (default_value, min_value, max_value), best_value) in enumerate(zip(analyzer.index2name, analyzer.index2bounds, x_opt)):
@@ -102,7 +102,7 @@ class LogAnalyzer(object):
         for name in self.index2name:
             values.append(state.trials.vals[name])
             sys.stdout.write('.')
-        print ''
+        print('')
         print('Generating log entries...')
         for index, result in enumerate(state.trials.results):
             if result['status'] != 'ok':
@@ -125,12 +125,12 @@ class LogAnalyzer(object):
     def parse_parameters_csv(self, csv_path):
         index2name = []
         index2bounds = []
-        with open(csv_path, 'rb') as fi:
+        with open(csv_path, 'rt') as fi:
             reader = csv.reader(fi)
             for index, row in enumerate(reader):
                 name, default_value, min_value, max_value = row
                 index2name.append(name)
-                index2bounds.append(map(int, (default_value, min_value, max_value))) # all parameters are integer.
+                index2bounds.append(list(map(int, (default_value, min_value, max_value)))) # all parameters are integer.
 
         self.parameters_csv_path = csv_path
         self.index2name = index2name
@@ -273,7 +273,7 @@ def analyze_correlation_20160315(analyzer):
         index2correlation[i] = R
 
     # descending order of absolute R.
-    index2correlation_sorted = sorted(index2correlation.items(), key=lambda(i,R): -np.abs(R))
+    index2correlation_sorted = sorted(list(index2correlation.items()), key=lambda i_R: -np.abs(i_R[1]))
 
     for i, R in index2correlation_sorted:
         print('Param #{:3d} : R = {:.10f} ({})'.format(i, R, analyzer.index2name[i]))
