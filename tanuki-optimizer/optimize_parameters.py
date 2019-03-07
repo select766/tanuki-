@@ -117,10 +117,11 @@ EVAL_DIR2 = r'F:\hnoda\hakubishin\exe\eval\qqr_rel'
 ENGINE1 = r'F:\hnoda\nnue.git\source\YaneuraOu-by-gcc.exe'
 ENGINE2 = r'F:\hnoda\YaneuraOu-2018-Otafuku-KPPT_V482\YaneuraOu-2018-Otafuku.exe'
 NUM_THREADS = 24
-THINKING_TIME_MS = 10000
+NUM_SEARCH_NODES = 5000000
 NUM_NUMA_NODES = 2
 HASH = 256
 HISTOGRAM_WIDTH = 80
+DEFAULT_N_STARTUP_JOBS = 200
 
 
 class YaneuraouBuilder(object):
@@ -188,7 +189,8 @@ def function(args):
         '--num_concurrent_games', str(NUM_THREADS),
         '--num_games', str(NUM_THREADS),
         '--hash', str(HASH),
-        '--time', str(THINKING_TIME_MS),
+        '--nodes1', str(NUM_SEARCH_NODES),
+        '--nodes2', str(NUM_SEARCH_NODES),
         '--num_numa_nodes', str(NUM_NUMA_NODES),
         '--num_book_moves1', '0',
         '--num_book_moves2', '0',
@@ -274,27 +276,30 @@ def function(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('optimize_parameters.py')
     parser.add_argument('--store-interval', type=int, default=1,
-            help='store internal state of hyper-parameter search after every <store_interval> iterations. set 0 to disable storing.')
+                        help='store internal state of hyper-parameter search after every <store_interval> iterations. set 0 to disable storing.')
     parser.add_argument('--resume', type=str, default=None,
-            help='resume hyper-parameter search from a file.')
+                        help='resume hyper-parameter search from a file.')
     parser.add_argument('--dump-log', type=str, default=None,
-            help='open a hyper-parameter search file and dump its log.')
+                        help='open a hyper-parameter search file and dump its log.')
     parser.add_argument('--max-evals', type=int, default=MAX_EVALS,
-            help='max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
+                        help='max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
     parser.add_argument('--num_threads', type=int, default=NUM_THREADS,
-            help='number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
-    parser.add_argument('--thinking_time_ms', type=int, default=THINKING_TIME_MS,
-            help='thinking time. (default: use THINKING_TIME_MS={})'.format(THINKING_TIME_MS))
+                        help='number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
+    parser.add_argument('--num_searched_nodes', type=int, default=NUM_SEARCH_NODES,
+                        help='thinking time. (default: use NUM_SEARCH_NODES={})'.format(NUM_SEARCH_NODES))
     parser.add_argument('--num_numa_nodes', type=int, default=NUM_NUMA_NODES,
-            help='Number of the NUMA nodes. (default: use NUM_NUMA_NODES={})'.format(NUM_NUMA_NODES))
+                        help='Number of the NUMA nodes. (default: use NUM_NUMA_NODES={})'.format(NUM_NUMA_NODES))
     parser.add_argument('--hash', type=int, default=HASH,
-            help='Transposition table hash size. (default: use HASH={})'.format(HASH))
+                        help='Transposition table hash size. (default: use HASH={})'.format(HASH))
+    parser.add_argument('--default_n_startup_jobs', type=int, default=DEFAULT_N_STARTUP_JOBS,
+                        help='Number of the trials to sample on random distribution.')
     commandline_args = parser.parse_args()
     MAX_EVALS = commandline_args.max_evals
     NUM_THREADS = commandline_args.num_threads
-    THINKING_TIME_MS = commandline_args.thinking_time_ms
+    NUM_SEARCH_NODES = commandline_args.num_searched_nodes
     NUM_NUMA_NODES = commandline_args.num_numa_nodes
     HASH = commandline_args.hash
+    DEFAULT_N_STARTUP_JOBS = commandline_args.default_n_startup_jobs
 
     state = HyperoptState()
     state_store_path = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
@@ -311,6 +316,7 @@ if __name__ == '__main__':
     # build environment.
     builder = YaneuraouBuilder()
 
+    tpe._default_n_startup_jobs = DEFAULT_N_STARTUP_JOBS
     best = fmin(function, space, algo=tpe.suggest, max_evals=state.calc_max_evals(MAX_EVALS), trials=state.get_trials())
     print("best estimate parameters", best)
     for key in sorted(best.keys()):
