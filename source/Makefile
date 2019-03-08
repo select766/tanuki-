@@ -101,6 +101,8 @@ CFLAGS += -DNO_EXCEPTIONS
 LDFLAGS += -lpthread
 LDFLAGS += -v
 
+CFLAGS += -DUSE_AUTO_TUNE_PARAMETERS
+
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
 	OBJDIR = ..
