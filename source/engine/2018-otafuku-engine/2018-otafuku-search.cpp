@@ -8,7 +8,7 @@
 
 // パラメーターを自動調整するのか
 // 自動調整が終われば、ファイルを固定してincludeしたほうが良い。
-//#define USE_AUTO_TUNE_PARAMETERS
+#define USE_AUTO_TUNE_PARAMETERS
 
 // 探索パラメーターにstep分のランダム値を加えて対戦させるとき用。
 // 試合が終わったときに勝敗と、そのときに用いたパラメーター一覧をファイルに出力する。
@@ -2132,7 +2132,7 @@ void init_param()
 			"PARAM_EVAL_TEMPO",
 		};
 
-#if defined(ENABLE_OUTPUT_GAME_RESULT) || defined(USE_RANDOM_PARAMETERS)
+#if defined(ENABLE_OUTPUT_GAME_RESULT) || defined(USE_RANDOM_PARAMETERS) || defined(USE_AUTO_TUNE_PARAMETERS)
 		std::vector<int*> param_vars = {
 #else
 		std::vector<const int*> param_vars = {
