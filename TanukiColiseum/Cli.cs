@@ -59,6 +59,7 @@ namespace TanukiColiseum
 勝ち{14}({15}%) 先手勝ち{16}({17}%) 後手勝ち{18}({19}%)
 宣言勝ち{21} 先手宣言勝ち{25} 後手宣言勝ち{26}
 先手引き分け{29} 後手引き分け{30}
+{7},{5},{14}
 ",
                 // 0-5
                 numFinishedGames, blackWin, blackWinRatio, whiteWin, whiteWinRatio, numDraw,

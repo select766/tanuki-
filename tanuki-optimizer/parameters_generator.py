@@ -14,15 +14,15 @@ def print_value(min_value, max_value, name, default_value):
     #    name=name, min_value=min_value, max_value=max_value))
 
     # 'PARAM_FUTILITY_MARGIN_ALPHA_ENDING',
-    #print("    '{name}',".format(name=name))
+    print("    '{name}',".format(name=name))
 
     # name,default_value,min_value,max_value
-    print("{name},{default_value},{min_value},{max_value}".format(
-        name=name, default_value=default_value, min_value=min_value, max_value=max_value))
+    #print("{name},{default_value},{min_value},{max_value}".format(
+    #    name=name, default_value=default_value, min_value=min_value, max_value=max_value))
 
 
 def main():
-    with codecs.open('param/2018-otafuku-param.original.h', 'r', 'utf-8') as f:
+    with codecs.open(r'C:\home\nodchip\hakubishin-private\exe\param\2018-otafuku-param.original.h', 'r', 'utf-8') as f:
         min_value = None
         max_value = None
         name = None
