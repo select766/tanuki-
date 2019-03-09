@@ -253,5 +253,16 @@ PARAM_DEFINE PARAM_ASPIRATION_SEARCH_DELTA = 16;
 // [PARAM] min:10,max:50,step:5,interval:2,time_rate:1,fixed
 PARAM_DEFINE PARAM_EVAL_TEMPO = 20;
 
+// [PARAM] min:0,max:32,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE STAT_BONUS_DEPTH = 17;
+
+// [PARAM] min:0,max:64,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE STAT_BONUS_COEFFICIENT2 = 32;
+
+// [PARAM] min:0,max:128,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE STAT_BONUS_COEFFICIENT1 = 64;
+
+// [PARAM] min:0,max:128,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE STAT_BONUS_COEFFICIENT0 = 64;
 
 #endif

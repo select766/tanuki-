@@ -192,7 +192,7 @@ namespace YaneuraOu2018GOKU
 		int d = depth / ONE_PLY;
 		// Stockfish 9になって、move_picker.hのupdateで32倍していたのをやめたので、
 		// ここでbonusの計算のときに32倍しておくことになった。
-		return d > 17 ? 0 : 32 * d * d + 64 * d - 64;
+		return d > STAT_BONUS_DEPTH ? 0 : STAT_BONUS_COEFFICIENT2 * d * d + STAT_BONUS_COEFFICIENT1 * d - STAT_BONUS_COEFFICIENT0;
 
 		// depth 17超えだとstat_bonusが0になるのたが、これが本当に良いのかどうかはよくわからない。
 		// TODO : 調整すべき
