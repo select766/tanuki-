@@ -8,7 +8,7 @@
     <StartupFile>optimize_parameters.py</StartupFile>
     <SearchPath>
     </SearchPath>
-    <WorkingDirectory>C:\home\nodchip\hakubishin-private\exe</WorkingDirectory>
+    <WorkingDirectory>C:\home\nodchip\nnue\source</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>tanuki-optimizer</Name>
     <RootNamespace>tanuki-optimizer</RootNamespace>

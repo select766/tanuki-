@@ -44,8 +44,11 @@ Parameter = collections.namedtuple('Parameter', ('name', 'min', 'max'))
 
 BUILDER = None
 COMMANDLINE_ARGS = None
+CURRENT_COUNTER = 0
 HISTOGRAM_WIDTH = 80
 PARAMETERS = None
+START_COUNTER = 0
+START_TIME_SEC = time.time()
 STATE = None
 STATE_STORE_PATH = None
 
@@ -115,10 +118,21 @@ class YaneuraouBuilder(object):
 def function(args):
     global BUILDER
     global COMMANDLINE_ARGS
+    global CURRENT_COUNTER
+    global START_COUNTER
+    global START_TIME_SEC
 
     print('-' * 78, flush=True)
     print(datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), flush=True)
     print(args, flush=True)
+
+    if START_COUNTER < CURRENT_COUNTER:
+        current_time_sec = time.time()
+        delta = current_time_sec - START_TIME_SEC
+        sec_per_one = delta / (CURRENT_COUNTER - START_COUNTER)
+        remaining = datetime.timedelta(seconds=sec_per_one * (COMMANDLINE_ARGS.max_evals - CURRENT_COUNTER))
+        print(CURRENT_COUNTER, '/', COMMANDLINE_ARGS.max_evals, str(remaining), flush=True)
+    CURRENT_COUNTER += 1
 
     BUILDER.clean()
     BUILDER.build(args)
