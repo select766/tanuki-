@@ -5,16 +5,16 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>2944d269-829b-4b9d-ab0e-f90a50204a21</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>optimize_parameters.py</StartupFile>
+    <StartupFile>analyze_optimizer_log.py</StartupFile>
     <SearchPath>
     </SearchPath>
-    <WorkingDirectory>C:\home\nodchip\nnue\source</WorkingDirectory>
+    <WorkingDirectory>D:\data\git\hakubishin-private\exe</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>tanuki-optimizer</Name>
     <RootNamespace>tanuki-optimizer</RootNamespace>
     <IsWindowsApplication>False</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>--store_interval 1 --max_evals 1000 --num_threads 4 --num_searched_nodes 50000 --num_numa_nodes 1 --hash 2048 --default_n_startup_jobs 200 --eval_dir1 C:\home\nodchip\hakubishin-private\exe\eval --eval_dir2 C:\home\nodchip\hakubishin-private\exe\eval --engine1 C:\home\nodchip\hakubishin-private\exe\YaneuraOu-by-gcc.exe --engine2 C:\home\nodchip\hakubishin-private\exe\YaneuraOu-by-gcc.original.exe --temporary_parameter_file_path C:\home\nodchip\hakubishin-private\exe\param\2018-otafuku-param.h --original_parameter_file_path C:\home\nodchip\hakubishin-private\exe\param\2018-otafuku-param.original.h --tanuki_coliseum_file_path C:\home\nodchip\hakubishin-private\TanukiColiseum\bin\release\TanukiColiseum.exe --sfen_file_path C:\home\nodchip\hakubishin-private\exe\records2016_10818.sfen</CommandLineArguments>
+    <CommandLineArguments>param\2018-otafuku-param.original.h optimize_parameters.hyperopt_state.20190313_103328.pickle</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterId>Global|PythonCore|3.6</InterpreterId>
   </PropertyGroup>

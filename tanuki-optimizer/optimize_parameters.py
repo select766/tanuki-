@@ -39,7 +39,7 @@ import sys
 import time
 
 
-Parameter = collections.namedtuple('Parameter', ('name', 'min', 'max'))
+Parameter = collections.namedtuple('Parameter', ('name', 'min', 'max', 'default_value'))
 
 
 BUILDER = None
@@ -53,10 +53,9 @@ STATE = None
 STATE_STORE_PATH = None
 
 
-def parse_parameters():
-    global COMMANDLINE_ARGS
+def parse_parameters(original_parameter_file_path):
     parameters = list()
-    with codecs.open(COMMANDLINE_ARGS.original_parameter_file_path, 'r', 'utf-8') as f:
+    with codecs.open(original_parameter_file_path, 'r', 'utf-8') as f:
         min_value = None
         max_value = None
         name = None
@@ -78,7 +77,7 @@ def parse_parameters():
 
             if (min_value or max_value) and name:
                 if name not in ['PARAM_RAZORING_MARGIN1', 'PARAM_QSEARCH_MATE1', 'PARAM_SEARCH_MATE1', 'PARAM_WEAK_MATE_PLY']:
-                    parameters.append(Parameter(name, int(eval(min_value)), int(eval(max_value))))
+                    parameters.append(Parameter(name, int(eval(min_value)), int(eval(max_value)), int(eval(default_value))))
                 min_value = None
                 max_value = None
                 name = None
@@ -263,7 +262,7 @@ def main():
 
     COMMANDLINE_ARGS = parser.parse_args()
 
-    PARAMETERS = parse_parameters()
+    PARAMETERS = parse_parameters(COMMANDLINE_ARGS.original_parameter_file_path)
     space = [hp.quniform(parameter.name, parameter.min, parameter.max, 1)
              for parameter in PARAMETERS]
 
