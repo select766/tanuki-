@@ -21,6 +21,7 @@ namespace {
 	constexpr const char* kBookMaxMoves = "BookMaxMoves";
 	constexpr const char* kBookFile = "BookFile";
 	constexpr const char* kBookSearchDepth = "BookSearchDepth";
+	constexpr const char* kBookSearchNodes = "BookSearchNodes";
 	constexpr const char* kBookInputFile = "BookInputFile";
 	constexpr const char* kBookOutputFile = "BookOutputFile";
 	constexpr const char* kBookSavePerPositions = "BookSavePerPositions";
@@ -39,7 +40,8 @@ namespace Learner {
 bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookSfenFile] << Option("merged.sfen");
 	o[kBookMaxMoves] << Option(32, 0, 256);
-	o[kBookSearchDepth] << Option(24, 0, 256);
+	o[kBookSearchDepth] << Option(64, 0, 256);
+	o[kBookSearchNodes] << Option(500000 * 60, 0, INT_MAX);
 	o[kBookInputFile] << Option("user_book1.db");
 	o[kBookOutputFile] << Option("user_book2.db");
 	o[kBookSavePerPositions] << Option(1000, 1, std::numeric_limits<int>::max());
@@ -133,6 +135,7 @@ bool Tanuki::CreateScoredBook() {
 	int num_threads = (int)Options[kThreads];
 	std::string input_book_file = Options[kBookInputFile];
 	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
 	int multi_pv = (int)Options[kMultiPV];
 	std::string output_book_file = Options[kBookOutputFile];
 	int save_per_positions = (int)Options[kBookSavePerPositions];
@@ -141,11 +144,14 @@ bool Tanuki::CreateScoredBook() {
 	sync_cout << "info string num_threads=" << num_threads << sync_endl;
 	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
 	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
 	sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
 	sync_cout << "info string overwrite_existing_positions=" << overwrite_existing_positions
 		<< sync_endl;
+
+	limits.nodes_per_thread = search_nodes;
 
 	MemoryBook input_book;
 	input_book_file = "book/" + input_book_file;
@@ -262,6 +268,7 @@ bool Tanuki::ExtendBook() {
 	std::string input_file = Options[kBookInputFile];
 	std::string output_file = Options[kBookOutputFile];
 	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
 	int save_per_positions = (int)Options[kBookSavePerPositions];
 
 	// スレッド0版を未展開のノードを探すために、
@@ -273,7 +280,10 @@ bool Tanuki::ExtendBook() {
 	sync_cout << "info string input_file=" << input_file << sync_endl;
 	sync_cout << "info string output_file=" << output_file << sync_endl;
 	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
 	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
+
+	limits.nodes_per_thread = search_nodes;
 
 	BookMoveSelector input_book;
 	sync_cout << "Reading input book file: " << input_file << sync_endl;
