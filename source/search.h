@@ -58,7 +58,7 @@ namespace Search {
 			nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = byoyomi[WHITE] =
 				byoyomi[BLACK] = npmsec = depth = movetime = mate = infinite = rtime =
 					nodes_per_thread = 0;
-			silent = bench = consideration_mode = outout_fail_lh_pv = false;
+			silent = bench = consideration_mode = outout_fail_lh_pv = send_ttentries = false;
 			max_game_ply = 100000;
 			enteringKingRule = EKR_NONE;
 		}
@@ -128,6 +128,9 @@ namespace Search {
 
         // スレッド毎の探索ノード数
         uint64_t nodes_per_thread;
+
+        // プロセス間でTTEntryをやり取りするかどうか
+        bool send_ttentries;
     };
 
 	extern LimitsType Limits;

@@ -27,6 +27,23 @@ struct TTEntry {
 	uint8_t generation() const { return genBound8 & 0xfc; }
 	void set_generation(uint8_t g) { genBound8 = bound() | g; }
 
+    // 送受信済みビット操作。Clusterのパディングの最初の1バイトのうちの3ビットを送受信済みビットとして使う。
+    bool get_bit_passed() const {
+        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
+        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
+        return *reinterpret_cast<const uint8_t *>(((ptte & ~31uLL) + 30)) & uint8_t(1) << idx;
+    }
+    void set_bit_passed() const {
+        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
+        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
+        *reinterpret_cast<uint8_t *>(((ptte & ~31uLL) + 30)) |= uint8_t(1) << idx;
+    }
+    void reset_bit_passed() const {
+        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
+        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
+        *reinterpret_cast<uint8_t *>(((ptte & ~31uLL) + 30)) &= ~(uint8_t(1) << idx);
+    }
+
 	// 置換表のエントリーに対して与えられたデータを保存する。上書き動作
 	//   v    : 探索のスコア
 	//   eval : 評価関数 or 静止探索の値
@@ -91,6 +108,7 @@ struct TTEntry {
 			genBound8 = (uint8_t)(gen | b);
 			depth8 = (int8_t)(d / ONE_PLY);
 		}
+        reset_bit_passed();
 	}
 
 private:
@@ -127,106 +145,116 @@ private:
 // このクラスターが、clusterCount個だけ確保されている。
 struct TranspositionTable {
 
-	// 置換表のなかから与えられたkeyに対応するentryを探す。
-	// 見つかったならfound == trueにしてそのTT_ENTRY*を返す。
-	// 見つからなかったらfound == falseで、このとき置換表に書き戻すときに使うと良いTT_ENTRY*を返す。
-	// GlobalOptions.use_per_thread_tt == trueのときはスレッドごとに置換表の異なるエリアに属するTTEntryを
-	// 渡す必要があるので、引数としてthread_idを渡す。
-	TTEntry* probe(const Key key, bool& found
+    // 置換表のなかから与えられたkeyに対応するentryを探す。
+    // 見つかったならfound == trueにしてそのTT_ENTRY*を返す。
+    // 見つからなかったらfound == falseで、このとき置換表に書き戻すときに使うと良いTT_ENTRY*を返す。
+    // GlobalOptions.use_per_thread_tt == trueのときはスレッドごとに置換表の異なるエリアに属するTTEntryを
+    // 渡す必要があるので、引数としてthread_idを渡す。
+    TTEntry* probe(const Key key, bool& found
 #if defined(USE_GLOBAL_OPTIONS)
-		, size_t thread_id = -1
+                   , size_t thread_id = -1
 #endif
-		) const;
+    ) const;
 
-	// keyの下位bitをClusterのindexにしてその最初のTTEntry*を返す。
-	TTEntry* first_entry(const Key key) const {
-		// 下位32bit × clusterCount / 2^32 なので、この値は 0 ～ clusterCount - 1 である。
-		// 掛け算が必要にはなるが、こうすることで custerCountを2^Nで確保しないといけないという制約が外れる。
-		// cf. Allow for general transposition table sizes. : https://github.com/official-stockfish/Stockfish/commit/2198cd0524574f0d9df8c0ec9aaf14ad8c94402b
+    // keyの下位bitをClusterのindexにしてその最初のTTEntry*を返す。
+    TTEntry* first_entry(const Key key) const {
+        // 下位32bit × clusterCount / 2^32 なので、この値は 0 ～ clusterCount - 1 である。
+        // 掛け算が必要にはなるが、こうすることで custerCountを2^Nで確保しないといけないという制約が外れる。
+        // cf. Allow for general transposition table sizes. : https://github.com/official-stockfish/Stockfish/commit/2198cd0524574f0d9df8c0ec9aaf14ad8c94402b
 
-		// return &table[(uint32_t(key) * uint64_t(clusterCount)) >> 32].entry[0];
-		// →　(key & 1)が保存される必要性があるので(ここが先後フラグなので)、もうちょい工夫する。
-		// このときclusterCountが奇数だと、最後の(clusterCount & ~1) | (key & 1) の値が、
-		// (clusterCount - 1)が上限であるべきなのにclusterCountになりかねない。
-		// そこでclusterCountは偶数であるという制約を課す。
-		ASSERT_LV3((clusterCount & 1) == 0);
+        // return &table[(uint32_t(key) * uint64_t(clusterCount)) >> 32].entry[0];
+        // →　(key & 1)が保存される必要性があるので(ここが先後フラグなので)、もうちょい工夫する。
+        // このときclusterCountが奇数だと、最後の(clusterCount & ~1) | (key & 1) の値が、
+        // (clusterCount - 1)が上限であるべきなのにclusterCountになりかねない。
+        // そこでclusterCountは偶数であるという制約を課す。
+        ASSERT_LV3((clusterCount & 1) == 0);
 
-		// cf. 置換表の128GB制限を取っ払う冴えない方法 : http://yaneuraou.yaneu.com/2018/05/03/%E7%BD%AE%E6%8F%9B%E8%A1%A8%E3%81%AE128gb%E5%88%B6%E9%99%90%E3%82%92%E5%8F%96%E3%81%A3%E6%89%95%E3%81%86%E5%86%B4%E3%81%88%E3%81%AA%E3%81%84%E6%96%B9%E6%B3%95/
-		// Stockfish公式で対応されるまでデフォルトでは無効にしておく。
+        // cf. 置換表の128GB制限を取っ払う冴えない方法 : http://yaneuraou.yaneu.com/2018/05/03/%E7%BD%AE%E6%8F%9B%E8%A1%A8%E3%81%AE128gb%E5%88%B6%E9%99%90%E3%82%92%E5%8F%96%E3%81%A3%E6%89%95%E3%81%86%E5%86%B4%E3%81%88%E3%81%AA%E3%81%84%E6%96%B9%E6%B3%95/
+        // Stockfish公式で対応されるまでデフォルトでは無効にしておく。
 #if defined (IS_64BIT) && defined(USE_SSE2) && defined(USE_HUGE_HASH)
 
-		// cf. 128 GB TT size limitation : https://github.com/official-stockfish/Stockfish/issues/1349
-		uint64_t highProduct;
-//		_umul128(key + (key << 32) , clusterCount, &highProduct);
-		_umul128(key << 16, clusterCount, &highProduct);
+        // cf. 128 GB TT size limitation : https://github.com/official-stockfish/Stockfish/issues/1349
+        uint64_t highProduct;
+        //		_umul128(key + (key << 32) , clusterCount, &highProduct);
+        _umul128(key << 16, clusterCount, &highProduct);
 
-		// この計算ではhighProductに第1パラメーターの上位bit周辺が色濃く反映されることに注意。
-		// 上のStockfishのissuesに書かれている修正案は、あまりよろしくない。
-		// TTEntry::key16はKeyの上位16bitの一致を見ているので、この16bitを計算に用いないか何らかの工夫が必要。
-		// また、第1パラメーターをkeyにすると著しく勝率が落ちる。singular用のhash keyの性質が悪いのだと思う。
-		// singluar用のhash keyは、bit16...31にexcludedMoveをxorしてあるのでこのbitを第1パラメーターの上位bit付近に
-		// 反映させないとhash key衝突してしまう。そこで、お行儀はあまりよくないが、(key + (key << 32))を用いることにする。
-		return &table[(highProduct & ~1) | (key & 1)].entry[0];
+        // この計算ではhighProductに第1パラメーターの上位bit周辺が色濃く反映されることに注意。
+        // 上のStockfishのissuesに書かれている修正案は、あまりよろしくない。
+        // TTEntry::key16はKeyの上位16bitの一致を見ているので、この16bitを計算に用いないか何らかの工夫が必要。
+        // また、第1パラメーターをkeyにすると著しく勝率が落ちる。singular用のhash keyの性質が悪いのだと思う。
+        // singluar用のhash keyは、bit16...31にexcludedMoveをxorしてあるのでこのbitを第1パラメーターの上位bit付近に
+        // 反映させないとhash key衝突してしまう。そこで、お行儀はあまりよくないが、(key + (key << 32))を用いることにする。
+        return &table[(highProduct & ~1) | (key & 1)].entry[0];
 #else
-		// また、(uint32_t(key) * uint64_t(clusterCount)だとkeyのbit0を使ってしまうので(31bitしか
-		// indexを求めるのに使っていなくて精度がやや落ちるので)、(key >> 1)を使う。
-		// ただ、Hashが小さいときにkeyの下位から取ると、singularのときのkeyとして
-		// excludedMoveはbit16..31にしか反映させないので、あまりいい性質でもないような…。
-		return &table[(((uint32_t(key >> 1) * uint64_t(clusterCount)) >> 32) & ~1) | (key & 1)].entry[0];
+        // また、(uint32_t(key) * uint64_t(clusterCount)だとkeyのbit0を使ってしまうので(31bitしか
+        // indexを求めるのに使っていなくて精度がやや落ちるので)、(key >> 1)を使う。
+        // ただ、Hashが小さいときにkeyの下位から取ると、singularのときのkeyとして
+        // excludedMoveはbit16..31にしか反映させないので、あまりいい性質でもないような…。
+        return &table[(((uint32_t(key >> 1) * uint64_t(clusterCount)) >> 32) & ~1) | (key & 1)].entry[0];
 #endif
-	}
+    }
 
-	// 置換表のサイズを変更する。mbSize == 確保するメモリサイズ。MB単位。
-	void resize(size_t mbSize);
+    // 置換表のサイズを変更する。mbSize == 確保するメモリサイズ。MB単位。
+    void resize(size_t mbSize);
 
-	// 置換表のエントリーの全クリア
-	void clear() { memset(table, 0, clusterCount * sizeof(Cluster)); }
+    // 置換表のエントリーの全クリア
+    void clear() { memset(table, 0, clusterCount * sizeof(Cluster)); }
 
-	// 新しい探索ごとにこの関数を呼び出す。(generationを加算する。)
-	// USE_GLOBAL_OPTIONSが有効のときは、このタイミングで、Options["Threads"]の値を
-	// キャプチャして、探索スレッドごとの置換表と世代カウンターを用意する。
-	void new_search() {
-		generation8 += 4;
+    // 新しい探索ごとにこの関数を呼び出す。(generationを加算する。)
+    // USE_GLOBAL_OPTIONSが有効のときは、このタイミングで、Options["Threads"]の値を
+    // キャプチャして、探索スレッドごとの置換表と世代カウンターを用意する。
+    void new_search() {
+        generation8 += 4;
 
 #if defined(USE_GLOBAL_OPTIONS)
-		size_t m = Options["Threads"];
-		if (m != max_thread)
-		{
-			max_thread = m;
-			// スレッドごとの世代カウンター用の配列もこのタイミングで確保。
-			a_generation8.resize(m);
-		}
+        size_t m = Options["Threads"];
+        if (m != max_thread)
+        {
+            max_thread = m;
+            // スレッドごとの世代カウンター用の配列もこのタイミングで確保。
+            a_generation8.resize(m);
+        }
 #endif
-	} // 下位2bitはTTEntryでBoundに使っているので4ずつ加算。
+    } // 下位2bitはTTEntryでBoundに使っているので4ずつ加算。
 
-	// 世代を返す。これはTTEntry.save()のときに使う。
-	uint8_t generation() const { return generation8; }
+    // 世代を返す。これはTTEntry.save()のときに使う。
+    uint8_t generation() const { return generation8; }
 
 #if defined(USE_GLOBAL_OPTIONS)
 
-	// --- スレッドIDごとにgenerationを持っているとき用の処理。
+    // --- スレッドIDごとにgenerationを持っているとき用の処理。
 
-	uint8_t generation(size_t thread_id) const {
-		if (GlobalOptions.use_per_thread_tt)
-			return a_generation8[thread_id];
-		else
-			return generation8;
-	}
+    uint8_t generation(size_t thread_id) const {
+        if (GlobalOptions.use_per_thread_tt)
+            return a_generation8[thread_id];
+        else
+            return generation8;
+    }
 
-	void new_search(size_t thread_id) {
-		if (GlobalOptions.use_per_thread_tt)
-			a_generation8[thread_id] += 4;
-		else
-			generation8 += 4;
-	}
+    void new_search(size_t thread_id) {
+        if (GlobalOptions.use_per_thread_tt)
+            a_generation8[thread_id] += 4;
+        else
+            generation8 += 4;
+    }
 
 #endif
 
-	// 置換表の使用率を1000分率で返す。(USIプロトコルで統計情報として出力するのに使う)
-	int hashfull() const;
+    // 置換表の使用率を1000分率で返す。(USIプロトコルで統計情報として出力するのに使う)
+    int hashfull() const;
 
-	TranspositionTable() { mem = nullptr; clusterCount = 0; }
-	~TranspositionTable() { free(mem); }
+    TranspositionTable() { mem = nullptr; clusterCount = 0; }
+    ~TranspositionTable() { free(mem); }
+
+    // keyとインスタンスの中身を文字列としてcstrに追加する。
+    // 戻り値は文字列の末尾（'\0'が入るべき場所）。
+    // 送信済みなら何もしない。
+    char *serialize_ttentry(char *cstr, const TTEntry *tte, Key key) const;
+
+    // 文字列からインスタンスの中身を復元し、TranspositionTableに入れる。
+    // 文字列は'\0'終端されている必要はない。
+    // 戻り値は処理された文字列の末尾。
+    const char *deserialize_ttentry(const char *cstr);
 
 private:
 
@@ -307,6 +335,57 @@ inline void update_pv(Move* pv, Move move, Move* childPv) {
 	*pv = MOVE_NONE;
 }
 
+
 extern TranspositionTable TT;
+
+inline char *TranspositionTable::serialize_ttentry(char *cstr, const TTEntry *tte, Key key) const {
+    if (tte->get_bit_passed()) return cstr;
+    tte->set_bit_passed();
+    // '0'(0x30)から'o'(0x6f)を用いた軽量base64を用いる。
+    uint8_t buf[15];
+    buf[14] = tte->depth8;
+    // keyを詰める。
+    *reinterpret_cast<uint64_t *>(buf) = key;
+    // key16, move16, value16, eval16を詰める。（key16はkeyの上位16ビットと同一）
+    *reinterpret_cast<uint64_t *>(buf + 6) = *reinterpret_cast<const uint64_t *>(tte);
+    alignas(uint32_t) uint8_t j[4];
+    for (int i = 0; i < 15; i += 3) {
+        uint8_t i0 = buf[i], i1 = buf[i + 1], i2 = buf[i + 2];
+        j[0] = i0 >> 2;
+        j[1] = (i0 & 0x3) << 4 | i1 >> 4;
+        j[2] = (i1 & 0xf) << 2 | i2 >> 6;
+        j[3] = i2;
+        *reinterpret_cast<uint32_t *>(cstr) =
+            (*reinterpret_cast<const uint32_t *>(j) & 0x3f3f3f3f) + 0x30303030;
+        cstr += 4;
+    }
+    // genBound8の下位2ビットを"pqrs"のうちの一文字で表す。
+    *cstr++ = 'p' + (tte->genBound8 & 3);
+    return cstr;
+}
+
+inline const char *TranspositionTable::deserialize_ttentry(const char *cstr) {
+    // '0'(0x30)から'o'(0x6f)を用いた軽量base64を用いる。
+    uint8_t buf[15];
+    alignas(uint32_t) uint8_t j[4];
+    for (int i = 0; i < 15; i += 3) {
+        *reinterpret_cast<uint32_t *>(j) = *reinterpret_cast<const uint32_t *>(cstr) - 0x30303030;
+        cstr += 4;
+        buf[i] = j[0] << 2 | j[1] >> 4;
+        buf[i + 1] = j[1] << 4 | j[2] >> 2;
+        buf[i + 2] = j[2] << 6 | j[3];
+    }
+    const uint8_t bound = *cstr++ - 'p';
+    Key key = *reinterpret_cast<const uint64_t *>(buf);
+    bool found;
+    TTEntry* tte = TT.probe(key, found);
+    if (!found) {
+        tte->set_bit_passed();
+        *reinterpret_cast<uint64_t *>(tte) = *reinterpret_cast<const uint64_t *>(buf + 6);
+        tte->depth8 = buf[14];
+        tte->genBound8 = bound;
+    }
+    return cstr;
+}
 
 #endif // _TT_H_

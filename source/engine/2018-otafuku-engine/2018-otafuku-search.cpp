@@ -69,6 +69,13 @@ static std::fstream result_log;
 #define TT_GEN(POS) (TT.generation((POS).this_thread()->thread_id()))
 #endif
 
+void send_tt_entry(TTEntry *tte, Key key) {
+    char buf[23];
+    char *p = TT.serialize_ttentry(buf, tte, key);
+    *p = '\0';
+    sync_cout << "tt " << buf << sync_endl;
+}
+
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
@@ -124,6 +131,9 @@ void USI::extra_option(USI::OptionsMap & o)
 
 	// fail low/highのときにPVを出力するかどうか。
 	o["OutputFailLHPV"] << Option(true);
+
+    // プロセス間でTTEntryをやり取りするかどうか
+    o["SendTTEnties"] << Option(false);
 }
 
 // -----------------------
@@ -2026,11 +2036,12 @@ namespace YaneuraOu2018GOKU
 		// ただし、指し手がない場合は、詰まされているスコアなので、これより短い/長い手順の詰みがあるかも知れないから、
 		// すなわち、スコアは変動するかも知れないので、BOUND_UPPERという扱いをする。
 
-		if (!excludedMove)
-			tte->save(posKey, value_to_tt(bestValue, ss->ply),
-				bestValue >= beta ? BOUND_LOWER :
-				PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-				depth, bestMove, ss->staticEval, TT_GEN(pos) );
+        if (!excludedMove) {
+            tte->save(posKey, value_to_tt(bestValue, ss->ply),
+                      bestValue >= beta ? BOUND_LOWER :
+                      PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+                      depth, bestMove, ss->staticEval, TT_GEN(pos));
+        }
 
 		// qsearch()内の末尾にあるassertの文の説明を読むこと。
 		ASSERT_LV3(-VALUE_INFINITE < bestValue && bestValue < VALUE_INFINITE);
@@ -2365,6 +2376,9 @@ void Thread::search()
 	// fail low/highのときにPVを出力するかどうか。
 	Limits.outout_fail_lh_pv = Options["OutputFailLHPV"];
 
+    // プロセス間でTTEntryをやり取りするかどうか
+    Limits.send_ttentries = Options["SendTTEnties"];
+
 	// PVの出力間隔[ms]
 	// go infiniteはShogiGUIなどの検討モードで動作させていると考えられるので
 	// この場合は、PVを毎回出力しないと読み筋が出力されないことがある。
@@ -2397,7 +2411,7 @@ void Thread::search()
 
 	// 反復深化のiterationが浅いうちはaspiration searchを使わない。
 	// 探索窓を (-VALUE_INFINITE , +VALUE_INFINITE)とする。
-	bestValue = delta = alpha = -VALUE_INFINITE;
+	bestValue = delta = alpha = -VALUE_INFINITE; 
 	beta = VALUE_INFINITE;
 
 	// この初期化は、Thread::MainThread()のほうで行なっている。
@@ -2608,6 +2622,18 @@ void Thread::search()
 
 		if (!mainThread)
 			continue;
+
+        // PVのTTEntryを送る。
+        {
+            StateInfo st;
+            rootPos.do_move(rootMoves[0].pv[0], st);
+            Key key = rootPos.key();
+            bool found;
+            auto* tte = TT.probe(key, found);
+            if (found) {
+                send_tt_entry(tte, key);
+            }
+        }
 
 		// ponder用の指し手として、2手目の指し手を保存しておく。
 		// これがmain threadのものだけでいいかどうかはよくわからないが。

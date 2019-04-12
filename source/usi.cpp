@@ -796,6 +796,14 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	Threads.start_thinking(pos, states , limits , ponderMode);
 }
 
+// TTEntryを受け取り、TTに入れる。
+void recieve_tt_entries(istringstream& is)
+{
+    string ttstr;
+    is >> ttstr;
+    TT.deserialize_ttentry(ttstr.c_str());
+}
+
 // --------------------
 // テスト用にqsearch(),search()を直接呼ぶ
 // --------------------
@@ -909,8 +917,8 @@ void USI::loop(int argc, char* argv[])
 
 		token = "";
 		is >> skipws >> token;
-
-		if (token == "quit" || token == "stop" || token == "gameover")
+        if (token == "tt") recieve_tt_entries(is);
+        else if (token == "quit" || token == "stop" || token == "gameover")
 		{
 			// USIプロトコルにはUCIプロトコルから、
 			// gameover win | lose | draw
@@ -939,8 +947,11 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "go") go_cmd(pos, is , states);
 
 		// (思考などに使うための)開始局面(root)を設定する
-		else if (token == "position") position_cmd(pos, is , states);
-
+        else if (token == "position") {
+            POSITION_STRING = cmd;
+            //sync_cout << "info string" << POSITION_STRING << sync_endl;
+            position_cmd(pos, is, states);
+        }
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
 		else if (token == "usi")
 			sync_cout << engine_info() << Options << "usiok" << sync_endl;

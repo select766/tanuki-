@@ -177,6 +177,10 @@ namespace tanuki_proxy
             else
             {
                 string output = "go infinite";
+                if (command.Count > 1)
+                {
+                    output += " " + Join(command.Skip(1));
+                }
                 Log("  P> [{0}] {1}", id, output);
                 WriteLineAndFlush(process.StandardInput, output);
             }
@@ -212,7 +216,10 @@ namespace tanuki_proxy
 
             var command = Split(e.Data);
 
-            if (command.Contains("readyok"))
+            if (command[0] == "tt")
+            {
+                program.WriteToOtherEngines(e.Data, this);
+            } else if (command.Contains("readyok"))
             {
                 HandleReadyok(command);
             }

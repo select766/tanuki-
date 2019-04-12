@@ -19,6 +19,8 @@ class Thread;
 
 // 平手の開始局面
 extern std::string SFEN_HIRATE;
+// 受け取ったposition文字列
+extern std::string POSITION_STRING;
 
 // --------------------
 //     局面の情報

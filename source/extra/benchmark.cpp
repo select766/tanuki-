@@ -43,10 +43,10 @@ void bench_cmd(Position& current, istringstream& is)
 	std::string ttSize = (is >> token) ? token : "1024";
 
 	string threads = (is >> token) ? token : "1";
-	string limit = (is >> token) ? token : "17";
+	string limit = (is >> token) ? token : "60";
 
 	string fenFile = (is >> token) ? token : "default";
-	string limitType = (is >> token) ? token : "depth";
+	string limitType = (is >> token) ? token : "time";
 
 	if (ttSize == "d")
 	{

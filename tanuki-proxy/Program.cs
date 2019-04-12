@@ -302,7 +302,7 @@ namespace tanuki_proxy
                         int winc = ParseCommandParameter(command, "winc");
                         inc = IsBlack() ? binc : winc;
 
-                        if (!command.Contains("ponder"))
+                        if (!command.Contains("ponder") && !command.Contains("nodes"))
                         {
                             int maximumTime = CalculateMaximumTime(networkDelay, networkDelay2,
                                 minimumThinkingTime, maxGamePly, time, byoyomi, inc, Ply());
@@ -513,6 +513,21 @@ namespace tanuki_proxy
                 }
             }
         }
+
+        /// <summary>
+        /// 特定のエンジンを除くすべてのエンジンに対して出力する
+        /// </summary>
+        public void WriteToOtherEngines(string input, Engine own)
+        {
+            foreach (var engine in engines)
+            {
+                if (!engines.Equals(own))
+                {
+                    engine.Write(input);
+                }
+            }
+        }
+
 
         private bool IsBlack()
         {
