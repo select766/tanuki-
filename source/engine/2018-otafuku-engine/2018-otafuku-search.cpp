@@ -2624,12 +2624,12 @@ void Thread::search()
 			continue;
 
         // PVのTTEntryを送る。
-        {
+        if (Limits.send_ttentries) {
             StateInfo st;
             rootPos.do_move(rootMoves[0].pv[0], st);
             Key key = rootPos.key();
             bool found;
-            auto* tte = TT.probe(key, found);
+            TTEntry *tte = TT.probe(key, found);
             if (found) {
                 send_tt_entry(tte, key);
             }
