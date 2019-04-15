@@ -127,7 +127,6 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 {
 	// 思考中であれば停止するまで待つ。
 	main()->wait_for_search_finished();
-    sync_cout << "info string " << POSITION_STRING << sync_endl;
 
 	// ponderに関して、StockfishではstopOnPonderhitというのがあるが、やねうら王にはこのフラグはない。
 	/* stopOnPonderhit = */ stop = false;

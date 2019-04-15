@@ -66,7 +66,7 @@ namespace tanuki_proxy
         private static void writeSampleSetting()
         {
             ProxySetting setting = new ProxySetting();
-            setting.logDirectory = "F:\\private\\hak\\hakubishin-private-master\\log";
+            setting.logDirectory = "C:\\home\\develop\\tanuki-";
             setting.engines = new EngineOption[]
             {
             new EngineOption(

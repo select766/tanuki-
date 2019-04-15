@@ -2036,12 +2036,11 @@ namespace YaneuraOu2018GOKU
 		// ただし、指し手がない場合は、詰まされているスコアなので、これより短い/長い手順の詰みがあるかも知れないから、
 		// すなわち、スコアは変動するかも知れないので、BOUND_UPPERという扱いをする。
 
-        if (!excludedMove) {
-            tte->save(posKey, value_to_tt(bestValue, ss->ply),
-                      bestValue >= beta ? BOUND_LOWER :
-                      PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-                      depth, bestMove, ss->staticEval, TT_GEN(pos));
-        }
+		if (!excludedMove)
+			tte->save(posKey, value_to_tt(bestValue, ss->ply),
+				bestValue >= beta ? BOUND_LOWER :
+				PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+				depth, bestMove, ss->staticEval, TT_GEN(pos) );
 
 		// qsearch()内の末尾にあるassertの文の説明を読むこと。
 		ASSERT_LV3(-VALUE_INFINITE < bestValue && bestValue < VALUE_INFINITE);
@@ -2411,7 +2410,7 @@ void Thread::search()
 
 	// 反復深化のiterationが浅いうちはaspiration searchを使わない。
 	// 探索窓を (-VALUE_INFINITE , +VALUE_INFINITE)とする。
-	bestValue = delta = alpha = -VALUE_INFINITE; 
+	bestValue = delta = alpha = -VALUE_INFINITE;
 	beta = VALUE_INFINITE;
 
 	// この初期化は、Thread::MainThread()のほうで行なっている。

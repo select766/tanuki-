@@ -188,7 +188,7 @@
             this.textBoxEval1FolderPath.Name = "textBoxEval1FolderPath";
             this.textBoxEval1FolderPath.Size = new System.Drawing.Size(100, 19);
             this.textBoxEval1FolderPath.TabIndex = 3;
-            this.textBoxEval1FolderPath.Text = "F:\\private\\hak2\\hakubishin-private\\tnk-wcsc28-2018-05-05\\eval";
+            this.textBoxEval1FolderPath.Text = "eval";
             // 
             // label4
             // 
@@ -205,7 +205,7 @@
             this.textBoxEngine1FilePath.Name = "textBoxEngine1FilePath";
             this.textBoxEngine1FilePath.Size = new System.Drawing.Size(100, 19);
             this.textBoxEngine1FilePath.TabIndex = 1;
-            this.textBoxEngine1FilePath.Text = "F:\\private\\hak2\\hakubishin-private\\tanuki-proxy\\bin\\Release\\tanuki-proxy.exe";
+            this.textBoxEngine1FilePath.Text = "YaneuraOu-2017-early.exe";
             // 
             // label3
             // 
@@ -222,7 +222,7 @@
             this.textBoxSfenFilePath.Name = "textBoxSfenFilePath";
             this.textBoxSfenFilePath.Size = new System.Drawing.Size(100, 19);
             this.textBoxSfenFilePath.TabIndex = 8;
-            this.textBoxSfenFilePath.Text = "F:\\private\\hak2\\hakubishin-private\\exe\\records2016_10818.sfen";
+            this.textBoxSfenFilePath.Text = "records_2017-05-19.sfen";
             // 
             // label5
             // 
@@ -348,7 +348,7 @@
             this.textBoxEval2FolderPath.Name = "textBoxEval2FolderPath";
             this.textBoxEval2FolderPath.Size = new System.Drawing.Size(100, 19);
             this.textBoxEval2FolderPath.TabIndex = 3;
-            this.textBoxEval2FolderPath.Text = "F:\\private\\hak2\\hakubishin-private\\tnk-wcsc28-2018-05-05\\eval";
+            this.textBoxEval2FolderPath.Text = "eval";
             // 
             // label13
             // 
@@ -365,7 +365,7 @@
             this.textBoxEngine2FilePath.Name = "textBoxEngine2FilePath";
             this.textBoxEngine2FilePath.Size = new System.Drawing.Size(100, 19);
             this.textBoxEngine2FilePath.TabIndex = 1;
-            this.textBoxEngine2FilePath.Text = "F:\\private\\hak2\\hakubishin-private\\tanuki-proxy\\bin\\Release\\tanuki-proxy.exe";
+            this.textBoxEngine2FilePath.Text = "YaneuraOu-2017-early.exe";
             // 
             // label14
             // 
