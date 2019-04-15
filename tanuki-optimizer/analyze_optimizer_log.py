@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # analyze a log file produced by optimize_parameters.py to calculate posterior of the fitness ~ hyperparameter model.
 # usage:
-#  analyze_optimizer_log.py parameters_reordered.csv parameters-xxxx.txt 
+#  analyze_optimizer_log.py parameters_header.h parameters-xxxx.txt 
 
 import os
 import sys
@@ -20,10 +20,11 @@ matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 import pickle
 from hyperopt_state import HyperoptState
+import optimize_parameters
 
 def score_from_game_result(game_result):
-    u'''calculate score (lower is better, [0.0, 1.0] or None (ignore)) from game_result'''
-    lose, draw, win = map(int, game_result)
+    '''calculate score (lower is better, [0.0, 1.0] or None (ignore)) from game_result'''
+    lose, draw, win = list(map(int, game_result))
     n_games = lose + draw + win
 
     # if an error occured during matches, n_games might be zero.
@@ -33,20 +34,20 @@ def score_from_game_result(game_result):
     return (win * (0.0) + draw * (0.5) + lose * (1.0)) / float(n_games)
 
 def winning_rate_from_score(score, n_matches):
-    u'''do inverse of score_from_game_result()'''
+    '''do inverse of score_from_game_result()'''
     wins = (1.0 - score) * n_matches
     return wins / n_matches
 
 def transform_score_to_target(ys):
-    u'''score [0, 1] -> [-4, 4] (logit)'''
+    '''score [0, 1] -> [-4, 4] (logit)'''
     return np.maximum(-4.0, np.minimum(4.0, np.log(ys) - np.log(1.0 - ys)))
 
 def transform_target_to_score(ys):
-    u'''[-inf, inf] -> score [0, 1] (logistic)'''
+    '''[-inf, inf] -> score [0, 1] (logistic)'''
     return 1.0 / (1.0 + np.exp(-ys))
 
 def stringify_value_in_bounds(value, default_value, min_value, max_value, n_chars=20):
-    u'''create a string like |---+---@----| for visualization. +: default'''
+    '''create a string like |---+---@----| for visualization. +: default'''
     n_chars = max(1, n_chars - 2)
     res = ['-'] * n_chars
     vidx = max(0, min(n_chars - 1, int((n_chars - 1) * (value - min_value) / (max_value - min_value))))
@@ -56,16 +57,16 @@ def stringify_value_in_bounds(value, default_value, min_value, max_value, n_char
     return '|{}|'.format(''.join(res))
 
 def create_header_file(file_path, analyzer, x_opt, additional_dict={}):
-    u'''create a C++ header to define (optimal) parameter x_opt'''
-    with open(file_path, 'wb') as fo:
+    '''create a C++ header to define (optimal) parameter x_opt'''
+    with open(file_path, 'wt') as fo:
         guard = os.path.basename(file_path).replace('.', '_').upper()
         now = datetime.datetime.now()
         fo.write('#ifndef __{}__\n'.format(guard))
         fo.write('#define __{}__\n'.format(guard))
         fo.write('// Created at: {}\n'.format(now.strftime('%Y-%m-%d %H:%M:%S')))
         fo.write('// Log: {}\n'.format(analyzer.log_path))
-        fo.write('// Parameters CSV: {}\n'.format(analyzer.parameters_csv_path))
-        for k, v in additional_dict.items():
+        fo.write('// Parameters CSV: {}\n'.format(analyzer.parameters_header_file_path))
+        for k, v in list(additional_dict.items()):
             fo.write('// {} = {}\n'.format(k, v))
         fo.write('\n')
         for index, (name, (default_value, min_value, max_value), best_value) in enumerate(zip(analyzer.index2name, analyzer.index2bounds, x_opt)):
@@ -81,11 +82,11 @@ def create_header_file(file_path, analyzer, x_opt, additional_dict={}):
     print('Wrote header file to: {}'.format(file_path))
 
 class LogAnalyzer(object):
-    def __init__(self, log_file_path, parameters_csv_file_path):
+    def __init__(self, log_file_path, parameters_header_file_path):
         self.log_path = None
-        self.parameters_csv_path = None
+        self.parameters_header_file_path = None
 
-        self.parse_parameters_csv(parameters_csv_file_path)
+        self.parse_parameters_header(parameters_header_file_path)
         self.parse_file(log_file_path)
 
     def parse_file(self, path):
@@ -102,7 +103,7 @@ class LogAnalyzer(object):
         for name in self.index2name:
             values.append(state.trials.vals[name])
             sys.stdout.write('.')
-        print ''
+        print('')
         print('Generating log entries...')
         for index, result in enumerate(state.trials.results):
             if result['status'] != 'ok':
@@ -122,19 +123,11 @@ class LogAnalyzer(object):
         self.log_entries = log_entries
         return log_entries
 
-    def parse_parameters_csv(self, csv_path):
-        index2name = []
-        index2bounds = []
-        with open(csv_path, 'rb') as fi:
-            reader = csv.reader(fi)
-            for index, row in enumerate(reader):
-                name, default_value, min_value, max_value = row
-                index2name.append(name)
-                index2bounds.append(map(int, (default_value, min_value, max_value))) # all parameters are integer.
-
-        self.parameters_csv_path = csv_path
-        self.index2name = index2name
-        self.index2bounds = index2bounds
+    def parse_parameters_header(self, parameters_header_file_path):
+        parameters = optimize_parameters.parse_parameters(parameters_header_file_path)
+        self.parameters_header_file_path = parameters_header_file_path
+        self.index2name = [p.name for p in parameters]
+        self.index2bounds = [[p.default_value, p.min, p.max] for p in parameters]
 
     def all_entries(self):
         return list(self.log_entries)
@@ -226,10 +219,10 @@ class LogAnalyzer(object):
         if len(self.effective_entries()) > 0:
             params, result, score = self.effective_entries()[0]
             print('Parameters in log: {}'.format(len(params)))
-        if self.parameters_csv_path:
-            print('Parameter file path: {}'.format(self.parameters_csv_path))
+        if self.parameters_header_file_path:
+            print('Parameter file path: {}'.format(self.parameters_header_file_path))
             print('Parameters in CSV: {}'.format(len(self.index2name)))
-        if self.parameters_csv_path:
+        if self.parameters_header_file_path:
             xs, ys = self.numpy_objects()
             for i in range(len(self.index2name)):
                 default_value, min_value, max_value = self.index2bounds[i]
@@ -273,7 +266,7 @@ def analyze_correlation_20160315(analyzer):
         index2correlation[i] = R
 
     # descending order of absolute R.
-    index2correlation_sorted = sorted(index2correlation.items(), key=lambda(i,R): -np.abs(R))
+    index2correlation_sorted = sorted(list(index2correlation.items()), key=lambda i_R: -np.abs(i_R[1]))
 
     for i, R in index2correlation_sorted:
         print('Param #{:3d} : R = {:.10f} ({})'.format(i, R, analyzer.index2name[i]))
@@ -318,16 +311,7 @@ def calc_optimal_parameters_20160315(analyzer, n_iterations_to_use=-1):
     #regr_method = 'KernelRidge'
 
     if regr_method == 'GP':
-        seed = np.random.RandomState(1)
-        regr = sklearn.gaussian_process.GaussianProcess(
-                regr='constant', corr='absolute_exponential',
-                verbose=True,
-                optimizer='Welch',
-                random_state=seed,
-                random_start=4,
-                nugget=2.0,
-                #nugget=(0.25/(1.0e-3 + ys))**2,
-                theta0=1e-1, thetaL=1e-3, thetaU=1e3)
+        regr = sklearn.gaussian_process.GaussianProcessRegressor()
         regr.fit(xs_norm, ys)
 
     elif regr_method == 'KernelRidge':
@@ -429,12 +413,12 @@ def calc_optimal_parameters_20160315(analyzer, n_iterations_to_use=-1):
 def main():
     # SETUP
     if len(sys.argv) < 3:
-        print('usage: analyze_optimizer_log.py parameters_reordered.csv parameters-xxxx.pickle')
+        print('usage: analyze_optimizer_log.py parameters.h parameters-xxxx.pickle')
         return
     log_file = sys.argv[2]
-    param_file = sys.argv[1]
+    parameters_header_file_path = sys.argv[1]
 
-    analyzer = LogAnalyzer(log_file, param_file)
+    analyzer = LogAnalyzer(log_file, parameters_header_file_path)
     analyzer.summarize()
     #analyzer.save_log_as_csv('log.csv')
 

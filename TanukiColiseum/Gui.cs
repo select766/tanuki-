@@ -94,11 +94,21 @@ namespace TanukiColiseum
 
             try
             {
-                options.Nodes = int.Parse(textBoxNodes.Text);
+                options.Nodes1 = int.Parse(textBoxNodes1.Text);
             }
             catch (Exception)
             {
-                textBoxOutput.Text = "思考ノード数に正しい数字を入力して下さい";
+                textBoxOutput.Text = "思考ノード数1に正しい数字を入力して下さい";
+                return null;
+            }
+
+            try
+            {
+                options.Nodes2 = int.Parse(textBoxNodes2.Text);
+            }
+            catch (Exception)
+            {
+                textBoxOutput.Text = "思考ノード数2に正しい数字を入力して下さい";
                 return null;
             }
 
@@ -130,7 +140,7 @@ namespace TanukiColiseum
             yield return textBoxSfenFilePath;
             yield return textBoxHashMb;
             yield return textBoxNumNumaNodes;
-            yield return textBoxNodes;
+            yield return textBoxNodes1;
             yield return buttonEval2FolderPath;
             yield return buttonEngine2FilePath;
             yield return textBoxBookFileName2;
@@ -202,6 +212,11 @@ namespace TanukiColiseum
             progressBar1.Value = numFinishedGames;
         }
 
+        private void ShowError(string errorMessage)
+        {
+            textBoxOutput.Text = errorMessage;
+        }
+
         private async void buttonStart_Click(object sender, EventArgs e)
         {
             var options = ParseOptions();
@@ -212,6 +227,7 @@ namespace TanukiColiseum
 
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowProgress;
+            coliseum.OnError += ShowError;
             EnableControls(false);
             progressBar1.Value = 0;
             textBoxOutput.Text = "(対局準備中です。しばらくお待ちください。)";

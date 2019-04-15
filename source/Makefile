@@ -12,7 +12,7 @@ COMPILER = g++
 #COMPILER = clang++
 
 # 標準的なコンパイルオプション
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
+CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive -fopenmp
 WCFLAGS  =
 LDFLAGS  =
 LIBS     =
@@ -78,7 +78,7 @@ ifeq ($(findstring g++,$(COMPILER)),g++)
 	OPENMP   = -fopenmp
 	OPENMP_LDFLAGS =
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS
+		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
 		BLAS_LDFLAGS = -lopenblas
 		ifeq ($(MSYSTEM),MINGW64)
 			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
@@ -89,7 +89,7 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 	OPENMP   = -fopenmp
 	OPENMP_LDFLAGS = -lomp
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS
+		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
 		BLAS_LDFLAGS = -lopenblas
 		ifeq ($(MSYSTEM),MINGW64)
 			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
@@ -152,7 +152,13 @@ SOURCES  = shogi.cpp                                                           \
 	engine/2018-otafuku-engine/2018-otafuku-search.cpp                         \
 	learn/learner.cpp                                                          \
 	learn/learning_tools.cpp                                                   \
-	learn/multi_think.cpp
+	learn/multi_think.cpp                                                      \
+	tanuki_book.cpp                                                            \
+	tanuki_kifu_generator.cpp                                                  \
+	tanuki_kifu_shuffler.cpp                                                   \
+	tanuki_progress_report.cpp                                                 \
+	tanuki_kifu_writer.cpp                                                     \
+	tanuki_kifu_reader.cpp
 
 ifeq ($(YANEURAOU_EDITION),MATE_ENGINE)
 	SOURCES += engine/mate-engine/mate-search.cpp

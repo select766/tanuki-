@@ -467,6 +467,7 @@ namespace USI
 #endif
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
 		o["EvalDir"] << Option("eval", [](const USI::Option&o) { load_eval_finished = false; });
+		o["KifuDir"] << Option("kifu");
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
 	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_KPPPT) || defined(EVAL_KPPP_KKPT) || defined(EVAL_KKPP_KKPT) || \
@@ -838,6 +839,13 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	Threads.start_thinking(pos, states , limits , ponderMode);
 }
 
+// TTEntryを受け取り、TTに入れる。
+void recieve_tt_entries(istringstream& is)
+{
+	while (TT.deserialize_ttentry(is))
+		;
+}
+
 // --------------------
 // テスト用にqsearch(),search()を直接呼ぶ
 // --------------------
@@ -951,8 +959,8 @@ void USI::loop(int argc, char* argv[])
 
 		token = "";
 		is >> skipws >> token;
-
-		if (token == "quit" || token == "stop" || token == "gameover")
+		if (token == "tt") recieve_tt_entries(is);
+		else if (token == "quit" || token == "stop" || token == "gameover")
 		{
 			// USIプロトコルにはUCIプロトコルから、
 			// gameover win | lose | draw
@@ -981,10 +989,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "go") go_cmd(pos, is , states);
 
 		// (思考などに使うための)開始局面(root)を設定する
-    else if (token == "position") {
-      last_position_cmd = cmd;
-      position_cmd(pos, is, states);
-    }
+		else if (token == "position") {
+			last_position_cmd = cmd;
+			position_cmd(pos, is, states);
+		}
 
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
 		else if (token == "usi")
@@ -1081,6 +1089,11 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
 
 		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
+
+		else if (token == "extend_book") {
+			Tanuki::ExtendBook();
+			break;
+		}
 
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 

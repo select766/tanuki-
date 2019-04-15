@@ -8,6 +8,7 @@ namespace TanukiColiseum
         {
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowResult;
+            coliseum.OnError += OnError;
             coliseum.Run(options);
         }
 
@@ -58,6 +59,7 @@ namespace TanukiColiseum
 勝ち{14}({15}%) 先手勝ち{16}({17}%) 後手勝ち{18}({19}%)
 宣言勝ち{21} 先手宣言勝ち{25} 後手宣言勝ち{26}
 先手引き分け{29} 後手引き分け{30}
+{7},{5},{14}
 ",
                 // 0-5
                 numFinishedGames, blackWin, blackWinRatio, whiteWin, whiteWinRatio, numDraw,
@@ -78,6 +80,12 @@ namespace TanukiColiseum
                 // 27-30
                 engine1DrawBlack, engine2DrawBlack, engine2DrawBlack, engine1DrawBlack
                 );
+            Console.Out.Flush();
+        }
+
+        public void OnError(string errorMessage)
+        {
+            Console.Out.WriteLine(errorMessage);
             Console.Out.Flush();
         }
     }

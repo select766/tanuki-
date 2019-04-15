@@ -55,9 +55,10 @@ namespace Search {
 
 		// PODでない型をmemsetでゼロクリアすると破壊してしまうので明示的に初期化する。
 		LimitsType() {
-			nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = byoyomi[WHITE] = byoyomi[BLACK] = npmsec
-				= depth = movetime = mate = infinite = rtime = 0;
-			silent = bench = consideration_mode = outout_fail_lh_pv = false;
+			nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = byoyomi[WHITE] =
+				byoyomi[BLACK] = npmsec = depth = movetime = mate = infinite = rtime =
+					nodes_per_thread = 0;
+			silent = bench = consideration_mode = outout_fail_lh_pv = send_ttentries = false;
 			max_game_ply = 100000;
 			enteringKingRule = EKR_NONE;
 
@@ -135,7 +136,13 @@ namespace Search {
 		// 全合法手を生成するのか
 		bool generate_all_legal_moves;
 #endif
-	};
+
+        // スレッド毎の探索ノード数
+        uint64_t nodes_per_thread;
+
+        // プロセス間でTTEntryをやり取りするかどうか
+        bool send_ttentries;
+    };
 
 	extern LimitsType Limits;
 

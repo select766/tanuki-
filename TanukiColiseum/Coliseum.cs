@@ -16,12 +16,36 @@ namespace TanukiColiseum
         private int ProgressIntervalMs;
         private Status Status { get; } = new Status();
         public delegate void StatusHandler(Status status);
+        public delegate void ErrorHandler(string errorMessage);
         public event StatusHandler OnStatusChanged;
+        public event ErrorHandler OnError;
 
         public void Run(Options options)
         {
+            // 評価関数フォルダと思考エンジンの存在確認を行う
+            if (!File.Exists(options.Engine1FilePath))
+            {
+                OnError("思考エンジン1が見つかりませんでした。正しいexeファイルを指定してください。");
+                return;
+            }
+            else if (!File.Exists(options.Engine2FilePath))
+            {
+                OnError("思考エンジン2が見つかりませんでした。正しいexeファイルを指定してください。");
+                return;
+            }
+            else if (!Directory.Exists(options.Eval1FolderPath))
+            {
+                OnError("評価関数フォルダ1が見つかりませんでした。正しい評価関数フォルダを指定してください");
+                return;
+            }
+            else if (!Directory.Exists(options.Eval2FolderPath))
+            {
+                OnError("評価関数フォルダ2が見つかりませんでした。正しい評価関数フォルダを指定してください");
+                return;
+            }
+
             Status.NumGames = options.NumGames;
-            Status.Nodes = options.Nodes;
+            Status.Nodes = new int[] { options.Nodes1, options.Nodes2 };
             ProgressIntervalMs = options.ProgressIntervalMs;
 
             // 開始局面集を読み込む
@@ -81,7 +105,7 @@ namespace TanukiColiseum
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手
-                Games.Add(new Game(gameIndex & 1, options.Nodes, engine1, engine2,
+                Games.Add(new Game(gameIndex & 1, options.Nodes1, options.Nodes2, engine1, engine2,
                     options.NumBookMoves, openings));
             }
 

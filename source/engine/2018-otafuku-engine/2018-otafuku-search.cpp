@@ -122,6 +122,9 @@ void USI::extra_option(USI::OptionsMap & o)
 
 	// fail low/highのときにPVを出力するかどうか。
 	o["OutputFailLHPV"] << Option(true);
+
+    // プロセス間でTTEntryをやり取りするかどうか
+    o["SendTTEnties"] << Option(false);
 }
 
 // -----------------------
@@ -803,6 +806,10 @@ namespace YaneuraOu2018GOKU
 		return bestValue;
 	}
 
+	bool should_stop_search_thread(Thread* thread) {
+        return Limits.nodes_per_thread &&
+			Limits.nodes_per_thread < thread->nodes.load(std::memory_order_relaxed);
+    }
 
 	// -----------------------
 	//      通常探索
@@ -952,8 +959,10 @@ namespace YaneuraOu2018GOKU
 				return value_from_tt(draw_value(draw_type, pos.side_to_move()), ss->ply);
 
 			// 最大手数を超えている、もしくは停止命令が来ている。
-			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply))
-				return draw_value(REPETITION_DRAW, pos.side_to_move());
+            if (Threads.stop.load(std::memory_order_relaxed) ||
+                should_stop_search_thread(thisThread) ||
+                (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply))
+                return draw_value(REPETITION_DRAW, pos.side_to_move());
 
 			// -----------------------
 			// Step 3. Mate distance pruning.
@@ -1913,8 +1922,10 @@ namespace YaneuraOu2018GOKU
 			// 停止シグナルが来たときは、探索の結果の値は信頼できないので、
 			// best moveの更新をせず、PVや置換表を汚さずに終了する。
 
-			if (Threads.stop.load(std::memory_order_relaxed))
-				return VALUE_ZERO;
+			if (Threads.stop.load(std::memory_order_relaxed) ||
+                should_stop_search_thread(thisThread)) {
+                return VALUE_ZERO;
+            }
 
 			// -----------------------
 			//  root node用の特別な処理
@@ -2411,6 +2422,9 @@ void Thread::search()
 	// fail low/highのときにPVを出力するかどうか。
 	Limits.outout_fail_lh_pv = Options["OutputFailLHPV"];
 
+    // プロセス間でTTEntryをやり取りするかどうか
+    Limits.send_ttentries = Options["SendTTEnties"];
+
 	// PVの出力間隔[ms]
 	// go infiniteはShogiGUIなどの検討モードで動作させていると考えられるので
 	// この場合は、PVを毎回出力しないと読み筋が出力されないことがある。
@@ -2662,6 +2676,24 @@ void Thread::search()
 
 		if (!mainThread)
 			continue;
+
+        // PVのTTEntryを送る。
+        if (Limits.send_ttentries) {
+			std::ostringstream oss;
+			for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
+				StateInfo state_info[MAX_PLY] = {};
+				TT.serialize_ttentry(rootPos.key(), oss);
+				int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
+				for (int move_index = 0; move_index < num_moves; ++move_index) {
+					rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
+					TT.serialize_ttentry(rootPos.key(), oss);
+				}
+				for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
+					rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
+				}
+			}
+			sync_cout << "tt" << oss.str() << sync_endl;
+        }
 
 		// ponder用の指し手として、2手目の指し手を保存しておく。
 		// これがmain threadのものだけでいいかどうかはよくわからないが。
@@ -3114,6 +3146,7 @@ namespace Learner
 			th->completedDepth = DEPTH_ZERO;
 			th->selDepth = 0;
 			th->rootDepth = DEPTH_ZERO;
+			th->nodes = 0;
 
 			// history類を全部クリアする。この初期化は少し時間がかかるし、探索の精度はむしろ下がるので善悪はよくわからない。
 			// th->clear();
@@ -3231,14 +3264,15 @@ namespace Learner
 		Value delta = -VALUE_INFINITE;
 		Value bestValue = -VALUE_INFINITE;
 
-		while ((rootDepth += ONE_PLY) <= depth)
+		while (!should_stop_search_thread(th) && (rootDepth += ONE_PLY) <= depth)
 		{
 			for (RootMove& rm : rootMoves)
 				rm.previousScore = rm.score;
 
 			// MultiPV
-			for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
-			{
+            for (PVIdx = 0;
+				!should_stop_search_thread(th) && PVIdx < multiPV && !Threads.stop;
+                ++PVIdx) {
 				// それぞれのdepthとPV lineに対するUSI infoで出力するselDepth
 				selDepth = 0;
 
@@ -3254,7 +3288,7 @@ namespace Learner
 				}
 
 				// aspiration search
-				while (true)
+                while (!should_stop_search_thread(th))
 				{
 					bestValue = YaneuraOu2018GOKU::search<PV>(pos, ss, alpha, beta, rootDepth, false , false);
 

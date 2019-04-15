@@ -180,6 +180,13 @@ struct TranspositionTable {
 	TranspositionTable() { mem = nullptr; clusterCount = 0; }
 	~TranspositionTable() { free(mem); }
 
+	// keyに対応するTTEntryをエンコードしてストリームに追加する
+    void serialize_ttentry(Key key, std::ostream& is) const;
+
+	// ストリームからTTEntryをデコードしてTTに追加する
+	// デコードできた場合はtrue、そうでない場合はfalseを返す
+    bool deserialize_ttentry(std::istream& is);
+
 private:
 
 	// TTEntryはこのサイズでalignされたメモリに配置する。(される)
@@ -258,6 +265,7 @@ inline void update_pv(Move* pv, Move move, Move* childPv) {
 		*pv++ = *childPv++;
 	*pv = MOVE_NONE;
 }
+
 
 extern TranspositionTable TT;
 

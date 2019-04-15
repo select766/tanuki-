@@ -53,4 +53,4 @@ class HyperoptState(object):
       ratio = 0.0
       if lose + draw + win > 0.1:
        ratio = win / (lose + draw + win)
-      print ratio
+      print(ratio)

@@ -46,6 +46,8 @@ namespace {
 	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
 	constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
+	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -126,6 +128,8 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorKifuTag] << Option("default_tag");
 	o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
+	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
+	o[kOptionGeneratorMeasureDepth] << Option(false);
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
@@ -139,6 +143,21 @@ namespace {
 		root_moves.clear();
 		for (auto m : MoveList<LEGAL>(pos)) {
 			root_moves.push_back(Search::RootMove(m));
+		}
+
+		// 50%の確率で玉の移動のみを行う
+		if (mt() & 1) {
+			root_moves.erase(std::remove_if(root_moves.begin(), root_moves.end(),
+				[&pos](const auto& root_move) {
+				Move move = root_move.pv.front();
+				if (is_drop(move)) {
+					return true;
+				}
+				Square sq = from_sq(move);
+				return pos.king_square(BLACK) != sq &&
+					pos.king_square(WHITE) != sq;
+			}),
+				root_moves.end());
 		}
 
 		if (root_moves.empty()) {
@@ -160,17 +179,9 @@ void Tanuki::GenerateKifu() {
 		return;
 	}
 
-	Eval::load_eval();
-
 	omp_set_num_threads((int)Options["Threads"]);
 
-	Search::LimitsType limits;
-	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
-	limits.max_game_ply = 1 << 16;
-	limits.depth = MAX_PLY;
-	limits.silent = true;
-	limits.enteringKingRule = EKR_27_POINT;
-	Search::Limits = limits;
+	Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
 	_mkdir(kifu_directory.c_str());
@@ -179,18 +190,36 @@ void Tanuki::GenerateKifu() {
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
 	int value_threshold = Options[kOptionGeneratorValueThreshold];
 	std::string output_file_name_tag = Options[kOptionGeneratorKifuTag];
+	uint64_t optimum_nodes_searched =
+		ParseOptionOrDie<uint64_t>(kOptionGeneratorOptimumNodesSearched);
+	bool measure_depth = Options[kOptionGeneratorMeasureDepth];
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
 	std::cout << "value_threshold=" << value_threshold << std::endl;
 	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
+	std::cout << "optimum_nodes_searched=" << optimum_nodes_searched << std::endl;
+	std::cout << "measure_depth=" << measure_depth << std::endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	limits.nodes_per_thread = optimum_nodes_searched;
+	Search::Limits = limits;
+
+	// 何手目 -> 探索深さ
+	std::vector<std::vector<int> > game_play_to_depths(kMaxGamePlay + 1);
 
 	time_t start_time;
 	std::time(&start_time);
 	ASSERT_LV3(start_positions.size());
-	std::uniform_int<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
+	std::uniform_int_distribution<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
 	// スレッド間で共有する
-	std::atomic_int64_t global_position_index = 0;
+	std::atomic_int64_t global_position_index;
+	global_position_index = 0;
 	ProgressReport progress_report(num_positions, 10 * 60);
 #pragma omp parallel
 	{
@@ -254,6 +283,16 @@ void Tanuki::GenerateKifu() {
 				pos.do_move(pv_move, state[pos.game_ply()]);
 				// 差分計算のためevaluate()を呼び出す
 				Eval::evaluate(pos);
+
+				// 手数毎の探索の深さを記録しておく
+				// 何らかの形で勝ちが決まっている局面は
+				// 探索深さが極端に深くなるため除外する
+				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
+#pragma omp critical
+					{
+						game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
+					}
+				}
 			}
 
 			int game_result = GameResultDraw;
@@ -308,6 +347,34 @@ void Tanuki::GenerateKifu() {
 		// こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
 		Threads.stop = true;
 	}
+
+	if (measure_depth) {
+		char output_file_path[1024];
+		std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%I64d.search_depth.csv", kifu_directory.c_str(),
+			output_file_name_tag.c_str(), search_depth, num_positions, start_time);
+
+		FILE* file = std::fopen(output_file_path, "wt");
+		fprintf(file, "game_play,N,average,sd\n");
+
+		for (int game_play = 0; game_play <= kMaxGamePlay; ++game_play) {
+			double sum = 0.0;
+			double sum2 = 0.0;
+			int N = static_cast<int>(game_play_to_depths[game_play].size());
+			for (auto search_depth : game_play_to_depths[game_play]) {
+				sum += search_depth;
+				sum2 += search_depth * search_depth;
+			}
+
+			if (N) {
+				double average = sum / N;
+				double sd = sum2 / N - average * average;
+				fprintf(file, "%d,%d,%f,%f\n", game_play, N, average, sd);
+			}
+			else {
+				fprintf(file, "%d,%d,%f,%f\n", game_play, N, 0.0, 0.0);
+			}
+		}
+	}
 }
 
 void Tanuki::ConvertSfenToLearningData() {
@@ -345,7 +412,8 @@ void Tanuki::ConvertSfenToLearningData() {
 	}
 
 	// スレッド間で共有する
-	std::atomic_int64_t global_sfen_index = 0;
+	std::atomic_int64_t global_sfen_index;
+	global_sfen_index = 0;
 	int64_t num_sfens = sfens.size();
 	ProgressReport progress_report(num_sfens, 60);
 	std::unique_ptr<KifuWriter> kifu_writer =

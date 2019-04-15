@@ -144,6 +144,10 @@ namespace Book
 		//   on_the_fly == falseでなければ、非同期にこの関数を呼び出してはならない。
 		Move probe(Position& pos);
 
+		MemoryBook& GetMemoryBook() {
+			return memory_book;
+		}
+
 	protected:
 		// メモリに読み込んだ定跡ファイル
 		MemoryBook memory_book;

@@ -4,7 +4,7 @@
     {
         public int NumGames { get; set; }
         public int NumThreads { get; set; }
-        public int Nodes { get; set; }
+        public int[] Nodes { get; set; }
         // [エンジン][先手・後手]
         public int[,] Win { get; } = { { 0, 0 }, { 0, 0 }, };
         // [エンジン][先手・後手]

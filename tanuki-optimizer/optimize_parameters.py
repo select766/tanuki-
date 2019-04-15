@@ -3,19 +3,19 @@
 #
 # Preparation
 #
-# 1. Install Python 2.7.* 64-bit ver
-# - Python 2.7.* 64bit
+# 1. Install Python 3.6.* 64-bit ver
+# - Python 3.6.* 64bit
 # -- http://www.python.org
 #
 # 2. Download the following libraries.
-# - numpy-*.*.*+mkl-cp27-cp27m-win_amd64.whl
+# - numpy-*.*.*+mkl-cp36-cp36m-win_amd64.whl
 # -- http://www.lfd.uci.edu/~gohlke/pythonlibs/
-# - scipy-*.*.*-cp27-none-win_amd64.whl
+# - scipy-*.*.*-cp36-none-win_amd64.whl
 # -- http://www.lfd.uci.edu/~gohlke/pythonlibs/
 #
 # 3. Execute the following command.
 # - python -m pip install --upgrade pip
-# - pip install numpy-*.*.*+mkl-cp27-cp27m-win_amd64.whl scipy-*.*.*-cp27-none-win_amd64.whl hyperopt pymongo networkx pandas sklearn matplotlib
+# - pip install numpy-*.*.*+mkl-cp36-cp36m-win_amd64.whl scipy-*.*.*-cp36-none-win_amd64.whl hyperopt pymongo networkx pandas sklearn matplotlib
 #
 # 4. If using MSVC instead of MSYS (Windows)
 # - install MSVC14 (Visual Studio 2015)
@@ -24,382 +24,270 @@
 # - move in src directory
 # - run this script
 from hyperopt import fmin, tpe, hp, rand, Trials
+from hyperopt_state import HyperoptState
 from math import log
-import os
-import sys
+import argparse
+import codecs
+import collections
 import datetime
+import os
+import pickle as pickle
 import re
 import shutil
 import subprocess
+import sys
 import time
-import argparse
-import cPickle as pickle
-from hyperopt_state import HyperoptState
 
-space = [
-  hp.quniform('PARAM_FUTILITY_MARGIN_ALPHA_ENDING', 112, 188, 1),
-  hp.quniform('PARAM_FUTILITY_MARGIN_BETA_ENDING', 150, 240, 1),
-  hp.quniform('PARAM_FUTILITY_MARGIN_QUIET_ENDING', 96, 160, 1),
-  hp.quniform('PARAM_FUTILITY_RETURN_DEPTH_ENDING', 5, 9, 1),
-  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_ENDING', 5, 9, 1),
-  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_ENDING', 192, 300, 1),
-  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_ENDING', 150, 250, 1),
-  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_ENDING', 26, 44, 1),
-  hp.quniform('PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_ENDING', 26, 44, 1),
-  hp.quniform('PARAM_NULL_MOVE_DYNAMIC_ALPHA_ENDING', 617, 1029, 1),
-  hp.quniform('PARAM_NULL_MOVE_DYNAMIC_BETA_ENDING', 50, 84, 1),
-  hp.quniform('PARAM_NULL_MOVE_MARGIN_ENDING', 26, 44, 1),
-  hp.quniform('PARAM_NULL_MOVE_RETURN_DEPTH_ENDING', 9, 15, 1),
-  hp.quniform('PARAM_PROBCUT_DEPTH_ENDING', 3, 7, 1),
-  hp.quniform('PARAM_PROBCUT_MARGIN_ENDING', 150, 250, 1),
-  hp.quniform('PARAM_SINGULAR_EXTENSION_DEPTH_ENDING', 6, 10, 1),
-  hp.quniform('PARAM_SINGULAR_MARGIN_ENDING', 192, 320, 1),
-  hp.quniform('PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_ENDING', 12, 20, 1),
-  hp.quniform('PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_ENDING', 12, 20, 1),
-  hp.quniform('PARAM_PRUNING_BY_HISTORY_DEPTH_ENDING', 2, 4, 1),
-  hp.quniform('PARAM_REDUCTION_BY_HISTORY_ENDING', 6000, 10000, 1),
-  hp.quniform('PARAM_IID_MARGIN_ALPHA_ENDING', 192, 320, 1),
-  hp.quniform('PARAM_RAZORING_MARGIN1_ENDING', 400, 604, 1),
-  hp.quniform('PARAM_RAZORING_MARGIN2_ENDING', 427, 700, 1),
-  hp.quniform('PARAM_RAZORING_MARGIN3_ENDING', 452, 700, 1),
-  hp.quniform('PARAM_RAZORING_MARGIN4_ENDING', 415, 693, 1),
-  hp.quniform('PARAM_REDUCTION_ALPHA_ENDING', 96, 160, 1),
-  hp.quniform('PARAM_FUTILITY_MOVE_COUNT_ALPHA0_ENDING', 180, 300, 1),
-  hp.quniform('PARAM_FUTILITY_MOVE_COUNT_ALPHA1_ENDING', 217, 363, 1),
-  hp.quniform('PARAM_FUTILITY_MOVE_COUNT_BETA0_ENDING', 579, 967, 1),
-  hp.quniform('PARAM_FUTILITY_MOVE_COUNT_BETA1_ENDING', 783, 1307, 1),
-  hp.quniform('PARAM_QUIET_SEARCH_COUNT_ENDING', 48, 80, 1),
-  ]
 
-build_argument_names = ['PARAM_FUTILITY_MARGIN_ALPHA_ENDING',
-  'PARAM_FUTILITY_MARGIN_BETA_ENDING',
-  'PARAM_FUTILITY_MARGIN_QUIET_ENDING',
-  'PARAM_FUTILITY_RETURN_DEPTH_ENDING',
-  'PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_ENDING',
-  'PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_ENDING',
-  'PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_ENDING',
-  'PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_ENDING',
-  'PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_ENDING',
-  'PARAM_NULL_MOVE_DYNAMIC_ALPHA_ENDING',
-  'PARAM_NULL_MOVE_DYNAMIC_BETA_ENDING',
-  'PARAM_NULL_MOVE_MARGIN_ENDING',
-  'PARAM_NULL_MOVE_RETURN_DEPTH_ENDING',
-  'PARAM_PROBCUT_DEPTH_ENDING',
-  'PARAM_PROBCUT_MARGIN_ENDING',
-  'PARAM_SINGULAR_EXTENSION_DEPTH_ENDING',
-  'PARAM_SINGULAR_MARGIN_ENDING',
-  'PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_ENDING',
-  'PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_ENDING',
-  'PARAM_PRUNING_BY_HISTORY_DEPTH_ENDING',
-  'PARAM_REDUCTION_BY_HISTORY_ENDING',
-  'PARAM_IID_MARGIN_ALPHA_ENDING',
-  'PARAM_RAZORING_MARGIN1_ENDING',
-  'PARAM_RAZORING_MARGIN2_ENDING',
-  'PARAM_RAZORING_MARGIN3_ENDING',
-  'PARAM_RAZORING_MARGIN4_ENDING',
-  'PARAM_REDUCTION_ALPHA_ENDING',
-  'PARAM_FUTILITY_MOVE_COUNT_ALPHA0_ENDING',
-  'PARAM_FUTILITY_MOVE_COUNT_ALPHA1_ENDING',
-  'PARAM_FUTILITY_MOVE_COUNT_BETA0_ENDING',
-  'PARAM_FUTILITY_MOVE_COUNT_BETA1_ENDING',
-  'PARAM_QUIET_SEARCH_COUNT_ENDING',]
+Parameter = collections.namedtuple('Parameter', ('name', 'min', 'max', 'default_value'))
 
-START_COUNTER = 0
+
+BUILDER = None
+COMMANDLINE_ARGS = None
 CURRENT_COUNTER = 0
-MAX_EVALS = 10000
-START_TIME_SEC = time.time()
-EVAL_DIR = r'eval\2017-01-24-19-49-24\500000000'
-ENGINE1 = r'YaneuraOu-2017-early-master.exe'
-ENGINE2 = r'YaneuraOu-2017-early-slave.exe'
-NUM_THREADS = 24
-THINKING_TIME_MS = 10000
-NUM_NUMA_NODES = 1
-HASH = 256
 HISTOGRAM_WIDTH = 80
+PARAMETERS = None
+START_COUNTER = 0
+START_TIME_SEC = time.time()
+STATE = None
+STATE_STORE_PATH = None
+
+
+def parse_parameters(original_parameter_file_path):
+    parameters = list()
+    with codecs.open(original_parameter_file_path, 'r', 'utf-8') as f:
+        min_value = None
+        max_value = None
+        name = None
+        default_value = None
+        for line in f:
+            for m in re.finditer('min:(.+?),max:(.+?),', line):
+                if min_value or max_value:
+                    raise Exception('multiple min_value and max_value were found...')
+                min_value = m.group(1)
+                max_value = m.group(2)
+
+            for m in re.finditer('PARAM_DEFINE (.+?) = (.+?);', line):
+                if not min_value and not_max_value:
+                    raise Exception('min_value and max_value were not found...')
+                if name and default_value:
+                    raise Exception('multiple name and default_value were found...')
+                name = m.group(1)
+                default_value = m.group(2)
+
+            if (min_value or max_value) and name:
+                if name not in ['PARAM_RAZORING_MARGIN1', 'PARAM_QSEARCH_MATE1', 'PARAM_SEARCH_MATE1', 'PARAM_WEAK_MATE_PLY']:
+                    parameters.append(Parameter(name, int(eval(min_value)), int(eval(max_value)), int(eval(default_value))))
+                min_value = None
+                max_value = None
+                name = None
+                default_value = None
+    return parameters
 
 
 class YaneuraouBuilder(object):
-  FILENAME = 'param/2017-early-param-master.h'
-  def __init__(self):
-    pass
+    def __init__(self):
+        pass
 
-  def clean(self):
-    try:
-      os.remove(self.FILENAME)
-    except WindowsError:
-      pass
+    def clean(self):
+        global COMMANDLINE_ARGS
+        try:
+            os.remove(COMMANDLINE_ARGS.temporary_parameter_file_path)
+        except WindowsError:
+            pass
 
-  def build(self, args):
-    with open(self.FILENAME, 'w') as f:
-      f.write('#ifndef _2017_EARLY_PARAMETERS_\n')
-      f.write('#define _2017_EARLY_PARAMETERS_\n')
-      for key, val in zip(build_argument_names, args):
-        f.write('PARAM_DEFINE {0} = {1};\n'.format(key, str(int(val))))
-      f.write('''
-// Created at: 2017-03-31 11:17:05
-// Log: optimize_parameters.hyperopt_state.20170324_105241.b10000.pickle
-// Parameters CSV: param\parameters.opening.csv
-// n_iterations_to_use = 1000
-// minima_method = Data
+    def build(self, args):
+        global COMMANDLINE_ARGS
+        global PARAMETERS
+        with open(COMMANDLINE_ARGS.temporary_parameter_file_path, 'w') as f:
+            f.write('#ifndef _2018_OTAFUKU_PARAMETERS_\n')
+            f.write('#define _2018_OTAFUKU_PARAMETERS_\n')
+            for key, val in zip(PARAMETERS, args):
+                f.write('PARAM_DEFINE {0} = {1};\n'.format(key.name, str(int(val))))
+            f.write('PARAM_DEFINE PARAM_RAZORING_MARGIN1 = 0;\n')
+            f.write('PARAM_DEFINE PARAM_QSEARCH_MATE1 = 1;\n')
+            f.write('PARAM_DEFINE PARAM_SEARCH_MATE1 = 1;\n')
+            f.write('PARAM_DEFINE PARAM_WEAK_MATE_PLY = 1;\n')
+            f.write('#endif\n')
 
-// |--@---+-----------| raw=122.999999999, min=100, max=240 default=150
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA_OPENING = 123;
-
-// |---------@--+-----| raw=179.999999997, min=100, max=240 default=200
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA_OPENING = 180;
-
-// |--------@---+-----| raw=106.999999998, min=50, max=160 default=128
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET_OPENING = 107;
-
-// |----@-------------| raw=6.999999995, min=5, max=13 default=7
-PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH_OPENING = 7;
-
-// |----@-------------| raw=6.999999995, min=5, max=13 default=7
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH_OPENING = 7;
-
-// |----------@--+----| raw=218.999999998, min=100, max=300 default=256
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1_OPENING = 219;
-
-// |-----------+-@----| raw=244.99999999, min=0, max=300 default=200
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2_OPENING = 245;
-
-// |--------+@--------| raw=36.9999999939, min=20, max=50 default=35
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1_OPENING = 37;
-
-// |---@--+-----------| raw=27.9999999989, min=20, max=60 default=35
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2_OPENING = 28;
-
-// |---@-+------------| raw=677.999999999, min=500, max=1500 default=823
-PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA_OPENING = 678;
-
-// |-----@------------| raw=65.9999999952, min=50, max=100 default=67
-PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA_OPENING = 66;
-
-// |--------+--@------| raw=42.9999999906, min=10, max=60 default=35
-PARAM_DEFINE PARAM_NULL_MOVE_MARGIN_OPENING = 43;
-
-// |------------+--@--| raw=13.9999999917, min=4, max=15 default=12
-PARAM_DEFINE PARAM_NULL_MOVE_RETURN_DEPTH_OPENING = 14;
-
-// |----+--@----------| raw=5.9999999925, min=3, max=10 default=5
-PARAM_DEFINE PARAM_PROBCUT_DEPTH_OPENING = 6;
-
-// |-----@--+---------| raw=166.999999998, min=100, max=300 default=200
-PARAM_DEFINE PARAM_PROBCUT_MARGIN_OPENING = 167;
-
-// |-------@----------| raw=7.999999995, min=4, max=13 default=8
-PARAM_DEFINE PARAM_SINGULAR_EXTENSION_DEPTH_OPENING = 8;
-
-// |--------+--@------| raw=303.999999991, min=128, max=400 default=256
-PARAM_DEFINE PARAM_SINGULAR_MARGIN_OPENING = 304;
-
-// |-----+-@----------| raw=18.9999999913, min=8, max=32 default=16
-PARAM_DEFINE PARAM_SINGULAR_SEARCH_DEPTH_ALPHA_OPENING = 19;
-
-// |-----+-@----------| raw=18.9999999913, min=8, max=32 default=16
-PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH_OPENING = 19;
-
-// |+@----------------| raw=3.99999999, min=2, max=32 default=3
-PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH_OPENING = 4;
-
-// |-----@+-----------| raw=7792.0, min=4000, max=15000 default=8000
-PARAM_DEFINE PARAM_REDUCTION_BY_HISTORY_OPENING = 7792;
-
-// |--------+-@-------| raw=279.999999993, min=128, max=384 default=256
-PARAM_DEFINE PARAM_IID_MARGIN_ALPHA_OPENING = 280;
-
-// |@---+-------------| raw=413.999999999, min=400, max=700 default=483
-PARAM_DEFINE PARAM_RAZORING_MARGIN1_OPENING = 414;
-
-// |--@------+--------| raw=448.999999999, min=400, max=700 default=570
-PARAM_DEFINE PARAM_RAZORING_MARGIN2_OPENING = 449;
-
-// |-----@-----+------| raw=488.999999999, min=400, max=700 default=603
-PARAM_DEFINE PARAM_RAZORING_MARGIN3_OPENING = 489;
-
-// |--------+@--------| raw=566.999999995, min=400, max=700 default=554
-PARAM_DEFINE PARAM_RAZORING_MARGIN4_OPENING = 567;
-
-// |-----+-@----------| raw=149.999999991, min=64, max=256 default=128
-PARAM_DEFINE PARAM_REDUCTION_ALPHA_OPENING = 150;
-
-// |------@-----------| raw=242.999999995, min=150, max=400 default=240
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA0_OPENING = 243;
-
-// |------@--+--------| raw=239.999999998, min=150, max=400 default=290
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_ALPHA1_OPENING = 240;
-
-// |--@+--------------| raw=735.999999996, min=500, max=2000 default=773
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA0_OPENING = 736;
-
-// |-----@+-----------| raw=995.999999996, min=500, max=2000 default=1045
-PARAM_DEFINE PARAM_FUTILITY_MOVE_COUNT_BETA1_OPENING = 996;
-
-// |-----+@-----------| raw=70.9999999928, min=32, max=128 default=64
-PARAM_DEFINE PARAM_QUIET_SEARCH_COUNT_OPENING = 71;
-
-PARAM_DEFINE PARAM_QSEARCH_MATE1_OPENING = 1;
-PARAM_DEFINE PARAM_QSEARCH_MATE1_ENDING = 1;
-PARAM_DEFINE PARAM_SEARCH_MATE1_OPENING = 1;
-PARAM_DEFINE PARAM_SEARCH_MATE1_ENDING = 1;
-PARAM_DEFINE PARAM_WEAK_MATE_PLY_OPENING = 2;
-PARAM_DEFINE PARAM_WEAK_MATE_PLY_ENDING = 1;
-''')
-      f.write('#endif\n')
-
-  def kill(self, process_name):
-    subprocess.call(['taskkill', '/T', '/F', '/IM', process_name])
+    def kill(self, process_name):
+        subprocess.run(['taskkill', '/T', '/F', '/IM', process_name])
 
 
 def function(args):
-  print('-' * 78)
+    global BUILDER
+    global COMMANDLINE_ARGS
+    global CURRENT_COUNTER
+    global START_COUNTER
+    global START_TIME_SEC
 
-  print(datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"))
+    print('-' * 78, flush=True)
+    print(datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S"), flush=True)
+    print(args, flush=True)
 
-  global START_COUNTER
-  global CURRENT_COUNTER
-  global MAX_EVALS
-  global START_TIME_SEC
-  global EVAL_DIR
-  global ENGINE1
-  global ENGINE2
-  global NUM_THREADS
-  global THINKING_TIME_MS
-  global NUM_NUMA_NODES
-  global HASH
-  print(args)
-  sys.stdout.flush()
+    if START_COUNTER < CURRENT_COUNTER:
+        current_time_sec = time.time()
+        delta = current_time_sec - START_TIME_SEC
+        sec_per_one = delta / (CURRENT_COUNTER - START_COUNTER)
+        remaining = datetime.timedelta(seconds=sec_per_one * (COMMANDLINE_ARGS.max_evals - CURRENT_COUNTER))
+        print(CURRENT_COUNTER, '/', COMMANDLINE_ARGS.max_evals, str(remaining), flush=True)
+    CURRENT_COUNTER += 1
 
-  if START_COUNTER < CURRENT_COUNTER:
-    current_time_sec = time.time()
-    delta = current_time_sec - START_TIME_SEC
-    sec_per_one = delta / (CURRENT_COUNTER - START_COUNTER)
-    remaining = datetime.timedelta(seconds=sec_per_one * (MAX_EVALS - CURRENT_COUNTER))
-    print(CURRENT_COUNTER, '/', MAX_EVALS, str(remaining))
-    sys.stdout.flush()
-  CURRENT_COUNTER += 1
+    BUILDER.clean()
+    BUILDER.build(args)
 
-  builder.clean()
-  builder.build(args)
+    engine_invoker_args = [
+        COMMANDLINE_ARGS.tanuki_coliseum_file_path,
+        '--engine1', COMMANDLINE_ARGS.engine1,
+        '--engine2', COMMANDLINE_ARGS.engine2,
+        '--eval1', COMMANDLINE_ARGS.eval_dir1,
+        '--eval2', COMMANDLINE_ARGS.eval_dir2,
+        '--num_concurrent_games', str(COMMANDLINE_ARGS.num_threads),
+        '--num_games', str(COMMANDLINE_ARGS.num_threads),
+        '--hash', str(COMMANDLINE_ARGS.hash),
+        '--nodes1', str(COMMANDLINE_ARGS.num_searched_nodes),
+        '--nodes2', str(COMMANDLINE_ARGS.num_searched_nodes),
+        '--num_numa_nodes', str(COMMANDLINE_ARGS.num_numa_nodes),
+        '--num_book_moves1', '0',
+        '--num_book_moves2', '0',
+        '--book_file_name1', 'no_book',
+        '--book_file_name2', 'no_book',
+        '--num_book_moves', '24',
+        '--sfen_file_name', COMMANDLINE_ARGS.sfen_file_path,
+        '--no_gui',
+        '--progress_interval_ms', str(60 * 60 * 1000),
+        '--num_threads1', '1',
+        '--num_threads2', '1',
+        '--book_eval_diff1', '10000',
+        '--book_eval_diff2', '10000',
+        '--consider_book_move_count1', 'true',
+        '--consider_book_move_count2', 'true',
+        ]
 
-  engine_invoker_args = [
-    'TanukiColiseum.exe',
-    '--engine1', ENGINE1,
-    '--engine2', ENGINE2,
-    '--eval1', EVAL_DIR,
-    '--eval2', EVAL_DIR,
-    '--num_concurrent_games', str(NUM_THREADS),
-    '--num_games', str(NUM_THREADS),
-    '--hash', str(HASH),
-    '--time', str(THINKING_TIME_MS),
-    '--num_numa_nodes', str(NUM_NUMA_NODES)]
+    print(engine_invoker_args, flush=True)
 
-  print(engine_invoker_args)
-  sys.stdout.flush()
+    completed_process = subprocess.run(engine_invoker_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    if completed_process.stdout:
+        print('-' * 10 + ' stdout ' + '-' * 10, flush=True)
+        print(completed_process.stdout, flush=True)
+    if completed_process.stderr:
+        print('-' * 10 + ' stderr ' + '-' * 10, flush=True)
+        print(completed_process.stderr, flush=True)
+    if completed_process.returncode:
+        sys.exit('Failed to execute engine_invoker...')
 
-  process = subprocess.Popen(engine_invoker_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-  stdoutdata, stderrdata = process.communicate()
-  if stdoutdata:
-    print('-' * 78)
-    print('- stdout')
-    print('-' * 78)
-    print('')
-    print(stdoutdata)
-    print('')
-  if stderrdata:
-    print('-' * 78)
-    print('- sterr')
-    print('-' * 78)
-    print('')
-    print(stderrdata)
-    print('')
-  sys.stdout.flush()
+    win = 0
+    draw = 0
+    lose = 0
+    for match in re.compile(r'(\d+),(\d+),(\d+)').finditer(completed_process.stdout):
+        win = float(match.group(1))
+        draw = float(match.group(2))
+        lose = float(match.group(3))
 
-  if process.returncode:
-    sys.exit('Failed to execute engine_invoker...')
+    ratio = 0.0
+    if lose + draw + win > 0.1:
+     ratio = (win * 1.0 + draw * 0.5 + lose * 0.0) / (lose + draw + win)
+    print('ratio={0}'.format(ratio), flush=True)
 
-  win = 0
-  draw = 0
-  lose = 0
-  for match in re.compile(',(\\d+) - (\\d+) - (\\d+)\\(').finditer(stdoutdata):
-    win = float(match.group(1))
-    draw = float(match.group(2))
-    lose = float(match.group(3))
+    BUILDER.kill(os.path.split(COMMANDLINE_ARGS.engine1)[1])
+    BUILDER.kill(os.path.split(COMMANDLINE_ARGS.engine2)[1])
 
-  ratio = 0.0
-  if lose + draw + win > 0.1:
-   ratio = (win * 1.0 + draw * 0.5 + lose * 0.0) / (lose + draw + win)
-  print('ratio={0}'.format(ratio))
-  sys.stdout.flush()
+    global STATE
+    STATE.record_iteration(args=args,
+            output=completed_process.stdout,
+            lose=lose,
+            draw=draw,
+            win=win,)
+    if COMMANDLINE_ARGS.store_interval > 0 and STATE.get_n_accumulated_iterations() % COMMANDLINE_ARGS.store_interval == 0:
+        print('Saveing state...', flush=True)
+        STATE.save(STATE_STORE_PATH)
+        print('Saved state...', flush=True)
 
-  builder.kill(ENGINE1)
-  builder.kill(ENGINE2)
+    # Show the histogram.
+    hist = [0] * (COMMANDLINE_ARGS.num_threads + 1)
+    max_win = 0
+    for record in STATE.iteration_logs:
+        win = int(record['win'])
+        hist[win] += 1
+        max_win = max(max_win, hist[win])
 
-  global state
-  state.record_iteration(args=args,
-      output=stdoutdata,
-      lose=lose,
-      draw=draw,
-      win=win,)
-  if commandline_args.store_interval > 0 and state.get_n_accumulated_iterations() % commandline_args.store_interval == 0:
-    state.save(state_store_path)
+    for win, count in enumerate(hist):
+        print('{0:4d} '.format(win) + '*' * int(count * HISTOGRAM_WIDTH / max_win), flush=True)
 
-  # Show the histogram.
-  hist = [0] * (NUM_THREADS + 1)
-  max_win = 0
-  for record in state.iteration_logs:
-    win = int(record['win'])
-    hist[win] += 1
-    max_win = max(max_win, hist[win])
+    return -ratio
 
-  for win, count in enumerate(hist):
-    print('{0:4d} '.format(win) + '*' * (count * HISTOGRAM_WIDTH / max_win))
-  sys.stdout.flush()
 
-  return -ratio
+def main():
+    global BUILDER
+    global COMMANDLINE_ARGS
+    global PARAMETERS
+    global STATE
+    global STATE_STORE_PATH
+
+    parser = argparse.ArgumentParser('optimize_parameters.py')
+    parser.add_argument('--store_interval', type=int, default=1,
+                        help='store internal state of hyper-parameter search after every <store_interval> iterations. set 0 to disable storing.')
+    parser.add_argument('--resume', type=str, default=None,
+                        help='resume hyper-parameter search from a file.')
+    parser.add_argument('--dump_log', type=str, default=None,
+                        help='open a hyper-parameter search file and dump its log.')
+    parser.add_argument('--max_evals', type=int, default=1000,
+                        help='max evaluation for hyperopt.')
+    parser.add_argument('--num_threads', type=int, default=48,
+                        help='number of threads.')
+    parser.add_argument('--num_searched_nodes', type=int, default=5000000,
+                        help='Number of searched nodes.')
+    parser.add_argument('--num_numa_nodes', type=int, default=2,
+                        help='Number of the NUMA nodes.')
+    parser.add_argument('--hash', type=int, default=1024,
+                        help='Transposition table hash size.')
+    parser.add_argument('--default_n_startup_jobs', type=int, default=200,
+                        help='Number of the trials to sample on random distribution.')
+    parser.add_argument('--eval_dir1', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\eval',
+                        help='Eval directory path for the engine 1.')
+    parser.add_argument('--eval_dir2', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\eval',
+                        help='Eval directory path for the engine 2.')
+    parser.add_argument('--engine1', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\YaneuraOu-by-gcc.exe',
+                        help='Engine binary path for the engine 1.')
+    parser.add_argument('--engine2', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\YaneuraOu-by-gcc.original.exe',
+                        help='Engine binary path for the engine 2.')
+    parser.add_argument('--temporary_parameter_file_path', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\param\2018-otafuku-param.h',
+                        help='Temporary parameter file path.')
+    parser.add_argument('--original_parameter_file_path', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\param\2018-otafuku-param.original.h',
+                        help='Original parameter file path.')
+    parser.add_argument('--tanuki_coliseum_file_path', type=str, default=r'C:\home\nodchip\hakubishin-private\TanukiColiseum\bin\release\TanukiColiseum.exe',
+                        help='TanukiColiseum file path.')
+    parser.add_argument('--sfen_file_path', type=str, default=r'C:\home\nodchip\hakubishin-private\exe\records2016_10818.sfen',
+                        help='Sfen file path.')
+
+    COMMANDLINE_ARGS = parser.parse_args()
+
+    PARAMETERS = parse_parameters(COMMANDLINE_ARGS.original_parameter_file_path)
+    space = [hp.quniform(parameter.name, parameter.min, parameter.max, 1)
+             for parameter in PARAMETERS]
+
+    STATE = HyperoptState()
+    STATE_STORE_PATH = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+    if COMMANDLINE_ARGS.dump_log is not None:
+        STATE = HyperoptState.load(commandline_args.dump_log)
+        STATE.dump_log()
+        sys.exit(0)
+
+    if COMMANDLINE_ARGS.resume is not None:
+        STATE = HyperoptState.load(commandline_args.resume)
+        START_COUNTER = STATE.get_n_accumulated_iterations()
+        CURRENT_COUNTER = START_COUNTER
+
+    # build environment.
+    BUILDER = YaneuraouBuilder()
+
+    tpe._default_n_startup_jobs = COMMANDLINE_ARGS.default_n_startup_jobs
+    best = fmin(function, space, algo=tpe.suggest, max_evals=STATE.calc_max_evals(COMMANDLINE_ARGS.max_evals), trials=STATE.get_trials())
+    print("best estimate parameters", best, flush=True)
+    for key in sorted(best.keys()):
+        print("{0}={1}".format(key, str(int(best[key]))), flush=True)
+
 
 # arguments
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser('optimize_parameters.py')
-  parser.add_argument('--store-interval', type=int, default=1,
-      help=u'store internal state of hyper-parameter search after every <store_interval> iterations. set 0 to disable storing.')
-  parser.add_argument('--resume', type=str, default=None,
-      help=u'resume hyper-parameter search from a file.')
-  parser.add_argument('--dump-log', type=str, default=None,
-      help=u'open a hyper-parameter search file and dump its log.')
-  parser.add_argument('--max-evals', type=int, default=MAX_EVALS,
-      help=u'max evaluation for hyperopt. (default: use MAX_EVALS={})'.format(MAX_EVALS))
-  parser.add_argument('--num_threads', type=int, default=NUM_THREADS,
-      help=u'number of threads. (default: use NUM_THREADS={})'.format(NUM_THREADS))
-  parser.add_argument('--thinking_time_ms', type=int, default=THINKING_TIME_MS,
-      help=u'thinking time. (default: use THINKING_TIME_MS={})'.format(THINKING_TIME_MS))
-  parser.add_argument('--num_numa_nodes', type=int, default=NUM_NUMA_NODES,
-      help=u'Number of the NUMA nodes. (default: use NUM_NUMA_NODES={})'.format(NUM_NUMA_NODES))
-  parser.add_argument('--hash', type=int, default=HASH,
-      help=u'Transposition table hash size. (default: use HASH={})'.format(HASH))
-  commandline_args = parser.parse_args()
-  MAX_EVALS = commandline_args.max_evals
-  NUM_THREADS = commandline_args.num_threads
-  THINKING_TIME_MS = commandline_args.thinking_time_ms
-  NUM_NUMA_NODES = commandline_args.num_numa_nodes
-  HASH = commandline_args.hash
-
-  state = HyperoptState()
-  state_store_path = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-  if commandline_args.dump_log is not None:
-    state = HyperoptState.load(commandline_args.dump_log)
-    state.dump_log()
-    sys.exit(0)
-
-  if commandline_args.resume is not None:
-    state = HyperoptState.load(commandline_args.resume)
-    START_COUNTER = state.get_n_accumulated_iterations()
-    CURRENT_COUNTER = START_COUNTER
-
-  # build environment.
-  builder = YaneuraouBuilder()
-
-  best = fmin(function, space, algo=tpe.suggest, max_evals=state.calc_max_evals(MAX_EVALS), trials=state.get_trials())
-  print("best estimate parameters", best)
-  for key in sorted(best.keys()):
-    print("{0}={1}".format(key, str(int(best[key]))))
+    main()

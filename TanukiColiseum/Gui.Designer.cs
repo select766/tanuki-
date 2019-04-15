@@ -49,8 +49,6 @@
             this.label8 = new System.Windows.Forms.Label();
             this.textBoxNumNumaNodes = new System.Windows.Forms.TextBox();
             this.label9 = new System.Windows.Forms.Label();
-            this.textBoxNodes = new System.Windows.Forms.TextBox();
-            this.label10 = new System.Windows.Forms.Label();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
             this.buttonEval2FolderPath = new System.Windows.Forms.Button();
             this.buttonEngine2FilePath = new System.Windows.Forms.Button();
@@ -67,6 +65,10 @@
             this.progressBar1 = new System.Windows.Forms.ProgressBar();
             this.buttonStart = new System.Windows.Forms.Button();
             this.textBoxOutput = new System.Windows.Forms.TextBox();
+            this.textBoxNodes1 = new System.Windows.Forms.TextBox();
+            this.label10 = new System.Windows.Forms.Label();
+            this.textBoxNodes2 = new System.Windows.Forms.TextBox();
+            this.label16 = new System.Windows.Forms.Label();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.SuspendLayout();
@@ -107,6 +109,8 @@
             // 
             // groupBox1
             // 
+            this.groupBox1.Controls.Add(this.textBoxNodes1);
+            this.groupBox1.Controls.Add(this.label10);
             this.groupBox1.Controls.Add(this.buttonEval1FolderPath);
             this.groupBox1.Controls.Add(this.buttonEngine1FilePath);
             this.groupBox1.Controls.Add(this.label7);
@@ -119,7 +123,7 @@
             this.groupBox1.Controls.Add(this.label3);
             this.groupBox1.Location = new System.Drawing.Point(10, 81);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Size = new System.Drawing.Size(249, 120);
+            this.groupBox1.Size = new System.Drawing.Size(249, 147);
             this.groupBox1.TabIndex = 4;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "思考エンジン1";
@@ -248,7 +252,7 @@
             // 
             // textBoxNumNumaNodes
             // 
-            this.textBoxNumNumaNodes.Location = new System.Drawing.Point(490, 31);
+            this.textBoxNumNumaNodes.Location = new System.Drawing.Point(301, 56);
             this.textBoxNumNumaNodes.Name = "textBoxNumNumaNodes";
             this.textBoxNumNumaNodes.Size = new System.Drawing.Size(100, 19);
             this.textBoxNumNumaNodes.TabIndex = 12;
@@ -257,31 +261,16 @@
             // label9
             // 
             this.label9.AutoSize = true;
-            this.label9.Location = new System.Drawing.Point(407, 34);
+            this.label9.Location = new System.Drawing.Point(189, 59);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(77, 12);
             this.label9.TabIndex = 11;
             this.label9.Text = "NUMAノード数";
             // 
-            // textBoxNodes
-            // 
-            this.textBoxNodes.Location = new System.Drawing.Point(489, 6);
-            this.textBoxNodes.Name = "textBoxNodes";
-            this.textBoxNodes.Size = new System.Drawing.Size(100, 19);
-            this.textBoxNodes.TabIndex = 10;
-            this.textBoxNodes.Text = "2500000";
-            // 
-            // label10
-            // 
-            this.label10.AutoSize = true;
-            this.label10.Location = new System.Drawing.Point(407, 9);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(68, 12);
-            this.label10.TabIndex = 9;
-            this.label10.Text = "思考ノード数";
-            // 
             // groupBox2
             // 
+            this.groupBox2.Controls.Add(this.textBoxNodes2);
+            this.groupBox2.Controls.Add(this.label16);
             this.groupBox2.Controls.Add(this.buttonEval2FolderPath);
             this.groupBox2.Controls.Add(this.buttonEngine2FilePath);
             this.groupBox2.Controls.Add(this.label11);
@@ -294,7 +283,7 @@
             this.groupBox2.Controls.Add(this.label14);
             this.groupBox2.Location = new System.Drawing.Point(265, 81);
             this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(249, 120);
+            this.groupBox2.Size = new System.Drawing.Size(249, 147);
             this.groupBox2.TabIndex = 12;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "思考エンジン2";
@@ -406,7 +395,7 @@
             // 
             // progressBar1
             // 
-            this.progressBar1.Location = new System.Drawing.Point(10, 207);
+            this.progressBar1.Location = new System.Drawing.Point(10, 234);
             this.progressBar1.Name = "progressBar1";
             this.progressBar1.Size = new System.Drawing.Size(574, 23);
             this.progressBar1.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
@@ -414,7 +403,7 @@
             // 
             // buttonStart
             // 
-            this.buttonStart.Location = new System.Drawing.Point(509, 238);
+            this.buttonStart.Location = new System.Drawing.Point(509, 265);
             this.buttonStart.Name = "buttonStart";
             this.buttonStart.Size = new System.Drawing.Size(75, 23);
             this.buttonStart.TabIndex = 16;
@@ -424,18 +413,52 @@
             // 
             // textBoxOutput
             // 
-            this.textBoxOutput.Location = new System.Drawing.Point(10, 238);
+            this.textBoxOutput.Location = new System.Drawing.Point(10, 265);
             this.textBoxOutput.Multiline = true;
             this.textBoxOutput.Name = "textBoxOutput";
             this.textBoxOutput.Size = new System.Drawing.Size(493, 80);
             this.textBoxOutput.TabIndex = 18;
             this.textBoxOutput.Text = "(ここに結果が表示されます)";
             // 
+            // textBoxNodes1
+            // 
+            this.textBoxNodes1.Location = new System.Drawing.Point(119, 115);
+            this.textBoxNodes1.Name = "textBoxNodes1";
+            this.textBoxNodes1.Size = new System.Drawing.Size(100, 19);
+            this.textBoxNodes1.TabIndex = 13;
+            this.textBoxNodes1.Text = "2000000";
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Location = new System.Drawing.Point(6, 118);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(68, 12);
+            this.label10.TabIndex = 12;
+            this.label10.Text = "思考ノード数";
+            // 
+            // textBoxNodes2
+            // 
+            this.textBoxNodes2.Location = new System.Drawing.Point(119, 118);
+            this.textBoxNodes2.Name = "textBoxNodes2";
+            this.textBoxNodes2.Size = new System.Drawing.Size(100, 19);
+            this.textBoxNodes2.TabIndex = 15;
+            this.textBoxNodes2.Text = "2000000";
+            // 
+            // label16
+            // 
+            this.label16.AutoSize = true;
+            this.label16.Location = new System.Drawing.Point(6, 121);
+            this.label16.Name = "label16";
+            this.label16.Size = new System.Drawing.Size(68, 12);
+            this.label16.TabIndex = 14;
+            this.label16.Text = "思考ノード数";
+            // 
             // Gui
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(596, 327);
+            this.ClientSize = new System.Drawing.Size(596, 353);
             this.Controls.Add(this.textBoxOutput);
             this.Controls.Add(this.buttonStart);
             this.Controls.Add(this.progressBar1);
@@ -444,8 +467,6 @@
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.textBoxNumNumaNodes);
             this.Controls.Add(this.label9);
-            this.Controls.Add(this.textBoxNodes);
-            this.Controls.Add(this.label10);
             this.Controls.Add(this.textBoxSfenFilePath);
             this.Controls.Add(this.label5);
             this.Controls.Add(this.textBoxHashMb);
@@ -490,8 +511,6 @@
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.TextBox textBoxNumNumaNodes;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.TextBox textBoxNodes;
-        private System.Windows.Forms.Label label10;
         private System.Windows.Forms.GroupBox groupBox2;
         private System.Windows.Forms.Button buttonEval2FolderPath;
         private System.Windows.Forms.Button buttonEngine2FilePath;
@@ -508,5 +527,9 @@
         private System.Windows.Forms.ProgressBar progressBar1;
         private System.Windows.Forms.Button buttonStart;
         private System.Windows.Forms.TextBox textBoxOutput;
+        private System.Windows.Forms.TextBox textBoxNodes1;
+        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.TextBox textBoxNodes2;
+        private System.Windows.Forms.Label label16;
     }
 }
