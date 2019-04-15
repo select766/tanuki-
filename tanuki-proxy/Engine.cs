@@ -99,6 +99,11 @@ namespace tanuki_proxy
                 {
                     HandlePonderhit(command);
                 }
+                else if (command.Contains("tt"))
+                {
+                    // ttコマンドは量が多いためログに出力しないようにする
+                    WriteLineAndFlush(process.StandardInput, Join(command));
+                }
                 else
                 {
                     Log("  P> [{0}] {1}", id, Join(command));
@@ -212,14 +217,19 @@ namespace tanuki_proxy
                 return;
             }
 
-            Log("  <D [{0}] {1}", id, e.Data);
-
             var command = Split(e.Data);
 
-            if (command[0] == "tt")
+            if (!command.Contains("tt"))
+            {
+                // ttコマンドは量が多いのでログに出力しないようにする
+                Log("  <D [{0}] {1}", id, e.Data);
+            }
+
+            if (command.Contains("tt"))
             {
                 program.WriteToOtherEngines(e.Data, this);
-            } else if (command.Contains("readyok"))
+            }
+            else if (command.Contains("readyok"))
             {
                 HandleReadyok(command);
             }
