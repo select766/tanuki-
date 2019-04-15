@@ -521,7 +521,7 @@ namespace tanuki_proxy
         {
             foreach (var engine in engines)
             {
-                if (!engines.Equals(own))
+                if (engine != own)
                 {
                     engine.Write(input);
                 }

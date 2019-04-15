@@ -5,6 +5,10 @@ ThreadPool Threads;		// Global object
 void* Thread::operator new(size_t s) { return aligned_malloc(s, alignof(Thread)); }
 void Thread::operator delete(void*p) noexcept { aligned_free(p); }
 
+namespace USI {
+  extern std::string last_position_cmd;
+}
+
 Thread::Thread(size_t n) : idx(n) , stdThread(&Thread::idle_loop, this)
 {
 	// スレッドはsearching == trueで開始するので、このままworkerのほう待機状態にさせておく
@@ -146,10 +150,21 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 		rootMoves.emplace_back(MOVE_WIN);
 #endif
 
-	for (auto m : MoveList<LEGAL>(pos))
-		if (limits.searchmoves.empty()
-			|| std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
-			rootMoves.emplace_back(m);
+#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
+	if (limits.generate_all_legal_moves)
+	{
+		for (auto m : MoveList<LEGAL_ALL>(pos))
+			if (limits.searchmoves.empty()
+				|| std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
+				rootMoves.emplace_back(m);
+	} else
+#endif
+	{   // トーナメントモードなら、歩の不成は生成しない。
+		for (auto m : MoveList<LEGAL>(pos))
+			if (limits.searchmoves.empty()
+				|| std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
+				rootMoves.emplace_back(m);
+	}
 
 	// 所有権の移動後、statesが空になるので、探索を停止させ、
 	// "go"をstate.get() == NULLである新しいpositionをセットせずに再度呼び出す。
@@ -184,6 +199,8 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 
 	// Position::set()によってクリアされていた、st->previousを復元する。
 	setupStates->back() = tmp;
+
+  sync_cout << "info string " << USI::last_position_cmd << sync_endl;
 
 	main()->start_searching();
 }
