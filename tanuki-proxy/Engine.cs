@@ -13,6 +13,15 @@ namespace tanuki_proxy
 {
     public class Engine : IDisposable
     {
+        public class EngineBestmove
+        {
+            public string move { get; set; }
+            public string ponder { get; set; }
+            public int score { get; set; }
+            public List<string> command { get; set; }
+            public int nps { get; set; }
+        }
+
         private const double showPvSupressionMs = 200.0;
         private const int mateScore = 32000;
 
@@ -28,6 +37,7 @@ namespace tanuki_proxy
         private readonly int id;
         private readonly bool timeKeeper;
         public bool ProcessHasExited { get { return process.HasExited; } }
+        public EngineBestmove Bestmove { get; set; }
 
         public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool timeKeeper)
         {
@@ -334,52 +344,52 @@ namespace tanuki_proxy
                     return;
                 }
 
-                program.EngineBestmoves[id].command = command;
+                Bestmove.command = command;
 
                 int tempDepth = int.Parse(command[depthIndex + 1]);
 
                 // 詰まされた場合
                 if (tempDepth == 0)
                 {
-                    program.EngineBestmoves[id].move = "resign";
-                    program.EngineBestmoves[id].ponder = null;
+                    Bestmove.move = "resign";
+                    Bestmove.ponder = null;
                     return;
                 }
 
                 Debug.Assert(pvIndex + 1 < command.Count);
-                program.EngineBestmoves[id].move = command[pvIndex + 1];
+                Bestmove.move = command[pvIndex + 1];
                 if (pvIndex + 2 < command.Count && command[pvIndex + 2] != "score")
                 {
-                    program.EngineBestmoves[id].ponder = command[pvIndex + 2];
+                    Bestmove.ponder = command[pvIndex + 2];
                 }
 
                 int cpIndex = command.IndexOf("cp");
                 if (cpIndex != -1)
                 {
                     int score = int.Parse(command[cpIndex + 1]);
-                    program.EngineBestmoves[id].score = score;
+                    Bestmove.score = score;
                 }
 
                 if (mateIndex != -1)
                 {
                     if (command[mateIndex + 1] == "+")
                     {
-                        program.EngineBestmoves[id].score = 31500;
+                        Bestmove.score = 31500;
                     }
                     else if (command[mateIndex + 1] == "-")
                     {
-                        program.EngineBestmoves[id].score = -31500;
+                        Bestmove.score = -31500;
                     }
                     else
                     {
                         int mate = int.Parse(command[mateIndex + 1]);
                         if (mate > 0)
                         {
-                            program.EngineBestmoves[id].score = mateScore - mate;
+                            Bestmove.score = mateScore - mate;
                         }
                         else
                         {
-                            program.EngineBestmoves[id].score = -mateScore - mate;
+                            Bestmove.score = -mateScore - mate;
                         }
                     }
                 }
@@ -388,7 +398,7 @@ namespace tanuki_proxy
                 if (npsIndex != -1)
                 {
                     int nps = int.Parse(command[npsIndex + 1]);
-                    program.EngineBestmoves[id].nps = nps;
+                    Bestmove.nps = nps;
                 }
 
                 // Fail-low/Fail-highした探索結果は表示しない
@@ -402,18 +412,18 @@ namespace tanuki_proxy
                     {
                         // voteの表示
                         Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        foreach (var engineBestmove in program.EngineBestmoves)
+                        foreach (var engine in program.engines)
                         {
-                            if (engineBestmove.move == null)
+                            if (engine.Bestmove.move == null)
                             {
                                 continue;
                             }
 
-                            if (!bestmoveToCount.ContainsKey(engineBestmove.move))
+                            if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
                             {
-                                bestmoveToCount.Add(engineBestmove.move, 0);
+                                bestmoveToCount.Add(engine.Bestmove.move, 0);
                             }
-                            ++bestmoveToCount[engineBestmove.move];
+                            ++bestmoveToCount[engine.Bestmove.move];
                         }
                         List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
                         bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
@@ -430,7 +440,9 @@ namespace tanuki_proxy
                         WriteLineAndFlush(Console.Out, vote);
 
                         // info pvの表示
-                        int sumNps = program.EngineBestmoves.Sum(x => x.nps);
+                        int sumNps = program.engines
+                            .Select(x=>x.Bestmove)
+                            .Sum(x => x.nps);
                         var commandWithNps = new List<string>(command);
                         int sumNpsIndex = commandWithNps.IndexOf("nps");
                         if (sumNpsIndex != -1)
@@ -474,35 +486,29 @@ namespace tanuki_proxy
                     }
                 }
 
-                // TODO(nodchip): この条件が必要かどうか考える
-                if (program.EngineBestmoves == null)
-                {
-                    return;
-                }
-
                 if (command[1] == "resign" || command[1] == "win")
                 {
-                    foreach (var engineBestmove in program.EngineBestmoves)
+                    foreach (var engine in program.engines)
                     {
-                        engineBestmove.move = command[1];
-                        engineBestmove.ponder = null;
+                        engine.Bestmove.move = command[1];
+                        engine.Bestmove.ponder = null;
                     }
 
                     if (command.Count == 4 && command[2] == "ponder")
                     {
-                        foreach (var engineBestmove in program.EngineBestmoves)
+                        foreach (var engine in program.engines)
                         {
-                            engineBestmove.ponder = command[3];
+                            engine.Bestmove.ponder = command[3];
                         }
                     }
                 }
-                else if (program.EngineBestmoves[id].move == null)
+                else if (Bestmove.move == null)
                 {
                     // Apery形式の定跡データベースを使用する場合はここに入る
-                    program.EngineBestmoves[id].move = command[1];
+                    Bestmove.move = command[1];
                     if (command.Count == 4 && command[2] == "ponder")
                     {
-                        program.EngineBestmoves[id].ponder = command[3];
+                        Bestmove.ponder = command[3];
                     }
 
                 }

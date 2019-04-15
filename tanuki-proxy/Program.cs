@@ -20,15 +20,6 @@ namespace tanuki_proxy
             Thinking,
         }
 
-        public class EngineBestmove
-        {
-            public string move { get; set; }
-            public string ponder { get; set; }
-            public int score { get; set; }
-            public List<string> command { get; set; }
-            public int nps { get; set; }
-        }
-
         public class CountAndScore
         {
             public int Count { get; set; } = 0;
@@ -52,7 +43,6 @@ namespace tanuki_proxy
             }
         }
         public int Depth { get; set; } = 0;
-        public EngineBestmove[] EngineBestmoves { get; set; }
         public string UpstreamPosition { get; set; }
         public int numberOfReadyoks = 0;
         private readonly System.Random random = new System.Random();
@@ -60,7 +50,7 @@ namespace tanuki_proxy
         public DateTime LastShowPv { get; set; } = DateTime.Now;
         private DateTime decideMoveLimit = DateTime.MaxValue;
         private volatile bool running = true;
-        private readonly List<Engine> engines = new List<Engine>();
+        public readonly List<Engine> engines = new List<Engine>();
         private Thread decideMoveTask;
 
         public void Dispose()
@@ -102,21 +92,21 @@ namespace tanuki_proxy
         {
             lock (UpstreamLockObject)
             {
-                if (EngineBestmoves.All(x => x.move == null))
+                if (engines.Select(x => x.Bestmove).All(x => x.move == null))
                 {
                     // いずれのスレーブもpvを返していない状態で
                     // 上流からstopが渡ってきたか、maximumTime経過した
                     Log("<P   {0}", "bestmove resign");
                     WriteLineAndFlush(Console.Out, "bestmove resign");
                 }
-                else if (EngineBestmoves.Any(x => x.move == "resign"))
+                else if (engines.Select(x => x.Bestmove).Any(x => x.move == "resign"))
                 {
                     // 投了
                     Log("<P   {0}", "bestmove resign");
                     WriteLineAndFlush(Console.Out, "bestmove resign");
 
                 }
-                else if (EngineBestmoves.Any(x => x.move == "win"))
+                else if (engines.Select(x => x.Bestmove).Any(x => x.move == "win"))
                 {
                     //宣言勝ち
                     Log("<P   {0}", "bestmove win");
@@ -125,16 +115,16 @@ namespace tanuki_proxy
                 else
                 {
                     // 詰み・優等局面となる指し手は最優先で指す
-                    var maxScoreBestMove = EngineBestmoves[0];
-                    foreach (var engineBestmove in EngineBestmoves)
+                    var maxScoreBestMove = engines[0].Bestmove;
+                    foreach (var engine in engines)
                     {
-                        if (maxScoreBestMove.score < engineBestmove.score)
+                        if (maxScoreBestMove.score < engine.Bestmove.score)
                         {
-                            maxScoreBestMove = engineBestmove;
+                            maxScoreBestMove = engine.Bestmove;
                         }
                     }
 
-                    EngineBestmove bestmove = null;
+                    Engine.EngineBestmove bestmove = null;
                     if (maxScoreBestMove.score > 30000)
                     {
                         bestmove = maxScoreBestMove;
@@ -144,19 +134,19 @@ namespace tanuki_proxy
                         // 楽観合議制っぽいなにか…。
                         // 各指し手の投票数を数える
                         var bestmoveToCount = new Dictionary<string, CountAndScore>();
-                        foreach (var engineBestmove in EngineBestmoves)
+                        foreach (var engine in engines)
                         {
-                            if (engineBestmove.move == null)
+                            if (engine.Bestmove.move == null)
                             {
                                 continue;
                             }
 
-                            if (!bestmoveToCount.ContainsKey(engineBestmove.move))
+                            if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
                             {
-                                bestmoveToCount.Add(engineBestmove.move, new CountAndScore());
+                                bestmoveToCount.Add(engine.Bestmove.move, new CountAndScore());
                             }
-                            ++bestmoveToCount[engineBestmove.move].Count;
-                            bestmoveToCount[engineBestmove.move].Score = Math.Max(bestmoveToCount[engineBestmove.move].Score, engineBestmove.score);
+                            ++bestmoveToCount[engine.Bestmove.move].Count;
+                            bestmoveToCount[engine.Bestmove.move].Score = Math.Max(bestmoveToCount[engine.Bestmove.move].Score, engine.Bestmove.score);
                         }
 
                         // 最も得票数の高い指し手を選ぶ
@@ -177,7 +167,8 @@ namespace tanuki_proxy
                         // 最もスコアが高かった指し手をbestmoveとして選択する
                         // スコアが等しいものが複数ある場合はランダムに1つを選ぶ
                         // Ponderが存在するものを優先する
-                        var bestmovesWithPonder = EngineBestmoves
+                        var bestmovesWithPonder = engines
+                            .Select(x => x.Bestmove)
                             .Where(x => x.move == bestBestmove && x.score == bestScore && !IsNullOrEmpty(x.ponder))
                             .ToList();
                         if (bestmovesWithPonder.Count > 0)
@@ -186,7 +177,8 @@ namespace tanuki_proxy
                         }
                         else
                         {
-                            var bestmoves = EngineBestmoves
+                            var bestmoves = engines
+                                .Select(x => x.Bestmove)
                                 .Where(x => x.move == bestBestmove && x.score == bestScore)
                                 .ToList();
                             bestmove = bestmoves[random.Next(bestmoves.Count)];
@@ -199,7 +191,9 @@ namespace tanuki_proxy
                     {
                         // PVを出力する
                         // npsは再計算する
-                        int sumNps = EngineBestmoves.Sum(x => x.nps);
+                        int sumNps = engines
+                            .Select(x => x.Bestmove)
+                            .Sum(x => x.nps);
                         var commandWithNps = new List<string>(bestmove.command);
                         int sumNpsIndex = commandWithNps.IndexOf("nps");
                         if (sumNpsIndex != -1)
@@ -222,7 +216,10 @@ namespace tanuki_proxy
 
                 UpstreamState = UpstreamStateEnum.Stopped;
                 Depth = 0;
-                EngineBestmoves = null;
+                foreach (var engine in engines)
+                {
+                    engine.Bestmove = null;
+                }
                 decideMoveLimit = DateTime.MaxValue;
                 WriteToEachEngine("stop");
             }
@@ -309,10 +306,9 @@ namespace tanuki_proxy
                             decideMoveLimit = DateTime.Now.AddMilliseconds(maximumTime);
                         }
 
-                        EngineBestmoves = new EngineBestmove[engines.Count];
-                        for (int i = 0; i < engines.Count; ++i)
+                        foreach (var engine in engines)
                         {
-                            EngineBestmoves[i] = new EngineBestmove();
+                            engine.Bestmove = new Engine.EngineBestmove();
                         }
                         Depth = 0;
                         UpstreamState = UpstreamStateEnum.Thinking;
