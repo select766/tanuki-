@@ -32,23 +32,6 @@ struct TTEntry {
 	uint8_t generation() const { return genBound8 & 0xfc; }
 	void set_generation(uint8_t g) { genBound8 = bound() | g; }
 
-    // 送受信済みビット操作。Clusterのパディングの最初の1バイトのうちの3ビットを送受信済みビットとして使う。
-    bool get_bit_passed() const {
-        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
-        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
-        return *reinterpret_cast<const uint8_t *>(((ptte & ~31uLL) + 30)) & uint8_t(1) << idx;
-    }
-    void set_bit_passed() const {
-        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
-        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
-        *reinterpret_cast<uint8_t *>(((ptte & ~31uLL) + 30)) |= uint8_t(1) << idx;
-    }
-    void reset_bit_passed() const {
-        const uintptr_t ptte = reinterpret_cast<uintptr_t>(this);
-        const uintptr_t idx = (ptte & 31uLL) / 8uLL;    // 結果は0,1,2なので除数は10でなく8で十分。
-        *reinterpret_cast<uint8_t *>(((ptte & ~31uLL) + 30)) &= ~(uint8_t(1) << idx);
-    }
-
 	// 置換表のエントリーに対して与えられたデータを保存する。上書き動作
 	//   v    : 探索のスコア
 	//   eval : 評価関数 or 静止探索の値
@@ -197,15 +180,12 @@ struct TranspositionTable {
 	TranspositionTable() { mem = nullptr; clusterCount = 0; }
 	~TranspositionTable() { free(mem); }
 
-    // keyとインスタンスの中身を文字列としてcstrに追加する。
-    // 戻り値は文字列の末尾（'\0'が入るべき場所）。
-    // 送信済みなら何もしない。
-    char *serialize_ttentry(char *cstr, const TTEntry *tte, Key key) const;
+	// keyに対応するTTEntryをエンコードしてストリームに追加する
+    void serialize_ttentry(Key key, std::ostream& is) const;
 
-    // 文字列からインスタンスの中身を復元し、TranspositionTableに入れる。
-    // 文字列は'\0'終端されている必要はない。
-    // 戻り値は処理された文字列の末尾。
-    const char *deserialize_ttentry(const char *cstr);
+	// ストリームからTTEntryをデコードしてTTに追加する
+	// デコードできた場合はtrue、そうでない場合はfalseを返す
+    bool deserialize_ttentry(std::istream& is);
 
 private:
 
@@ -288,55 +268,5 @@ inline void update_pv(Move* pv, Move move, Move* childPv) {
 
 
 extern TranspositionTable TT;
-
-inline char *TranspositionTable::serialize_ttentry(char *cstr, const TTEntry *tte, Key key) const {
-    if (tte->get_bit_passed()) return cstr;
-    tte->set_bit_passed();
-    // '0'(0x30)から'o'(0x6f)を用いた軽量base64を用いる。
-    uint8_t buf[15];
-    buf[14] = tte->depth8;
-    // keyを詰める。
-    *reinterpret_cast<uint64_t *>(buf) = key;
-    // key16, move16, value16, eval16を詰める。（key16はkeyの上位16ビットと同一）
-    *reinterpret_cast<uint64_t *>(buf + 6) = *reinterpret_cast<const uint64_t *>(tte);
-    alignas(uint32_t) uint8_t j[4];
-    for (int i = 0; i < 15; i += 3) {
-        uint8_t i0 = buf[i], i1 = buf[i + 1], i2 = buf[i + 2];
-        j[0] = i0 >> 2;
-        j[1] = (i0 & 0x3) << 4 | i1 >> 4;
-        j[2] = (i1 & 0xf) << 2 | i2 >> 6;
-        j[3] = i2;
-        *reinterpret_cast<uint32_t *>(cstr) =
-            (*reinterpret_cast<const uint32_t *>(j) & 0x3f3f3f3f) + 0x30303030;
-        cstr += 4;
-    }
-    // genBound8の下位2ビットを"pqrs"のうちの一文字で表す。
-    *cstr++ = 'p' + (tte->genBound8 & 3);
-    return cstr;
-}
-
-inline const char *TranspositionTable::deserialize_ttentry(const char *cstr) {
-    // '0'(0x30)から'o'(0x6f)を用いた軽量base64を用いる。
-    uint8_t buf[15];
-    alignas(uint32_t) uint8_t j[4];
-    for (int i = 0; i < 15; i += 3) {
-        *reinterpret_cast<uint32_t *>(j) = *reinterpret_cast<const uint32_t *>(cstr) - 0x30303030;
-        cstr += 4;
-        buf[i] = j[0] << 2 | j[1] >> 4;
-        buf[i + 1] = j[1] << 4 | j[2] >> 2;
-        buf[i + 2] = j[2] << 6 | j[3];
-    }
-    const uint8_t bound = *cstr++ - 'p';
-    Key key = *reinterpret_cast<const uint64_t *>(buf);
-    bool found;
-    TTEntry* tte = TT.probe(key, found);
-    if (!found) {
-        tte->set_bit_passed();
-        *reinterpret_cast<uint64_t *>(tte) = *reinterpret_cast<const uint64_t *>(buf + 6);
-        tte->depth8 = buf[14];
-        tte->genBound8 = bound;
-    }
-    return cstr;
-}
 
 #endif // _TT_H_

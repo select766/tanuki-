@@ -273,3 +273,54 @@ int TranspositionTable::hashfull() const
 	}
 	return cnt;
 }
+
+// keyに対応するTTEntryをエンコードしてストリームに追加する
+void TranspositionTable::serialize_ttentry(Key key, std::ostream& os) const
+{
+	bool found = false;
+	const auto* entry = probe(key, found);
+	if (!found) {
+		return;
+	}
+	os
+		<< " " << key
+		<< " " << static_cast<uint32_t>(entry->move())
+		<< " " << entry->value()
+#if !defined (NO_EVAL_IN_TT)
+		<< " " << entry->eval()
+#endif
+		<< " " << entry->bound()
+		<< " " << entry->depth();
+}
+
+// ストリームからTTEntryをデコードしてTTに追加する
+// デコードできた場合はtrue、そうでない場合はfalseを返す
+bool TranspositionTable::deserialize_ttentry(std::istream& is)
+{
+	Key key;
+	uint32_t move;
+	int32_t value;
+#if !defined (NO_EVAL_IN_TT)
+	int32_t eval;
+#endif
+	int bound;
+	int32_t depth;
+	if (!(is
+		>> key
+		>> move
+		>> value
+#if !defined (NO_EVAL_IN_TT)
+		>> eval
+#endif
+		>> bound
+		>> depth)) {
+		return false;
+	}
+	//sync_cout << "info string deserialize_ttentry()" << sync_endl;
+	bool found = false;
+	auto* entry = TT.probe(key, found);
+	entry->save(key, static_cast<Value>(value), static_cast<Bound>(bound),
+		static_cast<Depth>(depth), static_cast<Move>(move),
+		static_cast<Value>(eval), TT.generation());
+	return true;
+}

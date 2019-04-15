@@ -69,13 +69,6 @@ static std::fstream result_log;
 #define TT_GEN(POS) (TT.generation((POS).this_thread()->thread_id()))
 #endif
 
-void send_tt_entry(TTEntry *tte, Key key) {
-    char buf[23];
-    char *p = TT.serialize_ttentry(buf, tte, key);
-    *p = '\0';
-    sync_cout << "tt " << buf << sync_endl;
-}
-
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
 void USI::extra_option(USI::OptionsMap & o)
@@ -2686,14 +2679,20 @@ void Thread::search()
 
         // PVのTTEntryを送る。
         if (Limits.send_ttentries) {
-            StateInfo st;
-            rootPos.do_move(rootMoves[0].pv[0], st);
-            Key key = rootPos.key();
-            bool found;
-            TTEntry *tte = TT.probe(key, found);
-            if (found) {
-                send_tt_entry(tte, key);
-            }
+			std::ostringstream oss;
+			for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
+				StateInfo state_info[MAX_PLY] = {};
+				TT.serialize_ttentry(rootPos.key(), oss);
+				int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
+				for (int move_index = 0; move_index < num_moves; ++move_index) {
+					rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
+					TT.serialize_ttentry(rootPos.key(), oss);
+				}
+				for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
+					rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
+				}
+			}
+			sync_cout << "tt" << oss.str() << sync_endl;
         }
 
 		// ponder用の指し手として、2手目の指し手を保存しておく。

@@ -842,9 +842,8 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 // TTEntryを受け取り、TTに入れる。
 void recieve_tt_entries(istringstream& is)
 {
-    string ttstr;
-    is >> ttstr;
-    TT.deserialize_ttentry(ttstr.c_str());
+	while (TT.deserialize_ttentry(is))
+		;
 }
 
 // --------------------
