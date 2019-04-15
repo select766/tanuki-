@@ -88,7 +88,11 @@ int max_game_ply = 100000;
 
 namespace USI
 {
-	// 入玉ルール
+  // 最後に受け取ったpositionコマンド文字列
+  // tanuki-proxyでどの局面に対しての指し手が出力されたか管理するために使う
+  std::string last_position_cmd;
+  
+  // 入玉ルール
 #ifdef USE_ENTERING_KING_WIN
 	EnteringKingRule ekr = EKR_27_POINT;
 	// 入玉ルールのUSI文字列
@@ -398,12 +402,15 @@ namespace USI
 
 #if !defined(MATE_ENGINE)
 		o["Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
-#else
-		o["Hash"] << Option(4096, 1, MaxHashMB);
-#endif
 
 		// その局面での上位N個の候補手を調べる機能
 		o["MultiPV"] << Option(1, 1, 800);
+
+		// 弱くするために調整する。20なら手加減なし。0が最弱。
+		o["SkillLevel"] << Option(20, 0, 20);
+#else
+		o["Hash"] << Option(4096, 1, MaxHashMB);
+#endif
 
 		// cin/coutの入出力をファイルにリダイレクトする
 		o["WriteDebugLog"] << Option(false, [](const Option& o) { start_logger(o); });
@@ -454,7 +461,7 @@ namespace USI
 		o["ContemptFromBlack"] << Option(false);
 
 
-#ifdef USE_ENTERING_KING_WIN
+#if defined (USE_ENTERING_KING_WIN)
 		// 入玉ルール
 		o["EnteringKingRule"] << Option(ekr_rules, ekr_rules[EKR_27_POINT], [](const Option& o) { set_entering_king_rule(o); });
 #endif
@@ -469,12 +476,6 @@ namespace USI
 		o["EvalShare"] << Option(false);
 #endif
 
-#if defined(LOCAL_GAME_SERVER)
-		// 子プロセスでEngineを実行するプロセッサグループ(Numa node)
-		// -1なら、指定なし。
-		o["EngineNuma"] << Option(-1, -1, 99999);
-#endif
-
 #if defined(EVAL_LEARN)
 		// isreadyタイミングで評価関数を読み込まれると、新しい評価関数の変換のために
 		// test evalconvertコマンドを叩きたいのに、その新しい評価関数がないがために
@@ -482,6 +483,13 @@ namespace USI
 		// そこでこの隠しオプションでisready時の評価関数の読み込みを抑制して、
 		// test evalconvertコマンドを叩く。
 		o["SkipLoadingEval"] << Option(false);
+#endif
+
+#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
+		// 読みの各局面ですべての合法手を生成する
+		// (普通、歩の2段目での不成などは指し手自体を生成しないのですが、これのせいで不成が必要な詰みが絡む問題が解けないことが
+		// あるので、このオプションを用意しました。トーナメントモードではこのオプションは無効化されます。)
+		o["GenerateAllLegalMoves"] << Option(false);
 #endif
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
@@ -559,6 +567,27 @@ u64 eval_sum;
 // 局面は初期化されないので注意。
 void is_ready(bool skipCorruptCheck)
 {
+	// "isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。(keep alive的な処理)
+	//	USI2.0の仕様より。
+	//  -"isready"のあとのtime out時間は、30秒程度とする。これを超えて、評価関数の初期化、hashテーブルの確保をしたい場合、
+	//  思考エンジン側から定期的に何らかのメッセージ(改行可)を送るべきである。
+	//  -ShogiGUIではすでにそうなっているので、MyShogiもそれに追随する。
+	//  -また、やねうら王のエンジン側は、"isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。
+	 
+	auto ended = false;
+	auto th = std::thread([&ended] {
+		int count = 0;
+		while (!ended)
+		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			if (++count >= 50 /* 5秒 */)
+			{
+				count = 0;
+				sync_cout << sync_endl; // 改行を送信する。
+			}
+		}
+	});
+
 	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
 	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
 	if (!load_eval_finished)
@@ -592,6 +621,10 @@ void is_ready(bool skipCorruptCheck)
 
 	Threads.received_go_ponder = false;
 	Threads.stop = false;
+
+	// keep aliveを送信するために生成したスレッドを終了させ、待機する。
+	ended = true;
+	th.join();
 }
 
 // isreadyコマンド処理部
@@ -617,7 +650,10 @@ void is_ready_cmd(Position& pos, StateListPtr& states)
 // "position"コマンド処理部
 void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 {
-	Move m;
+  Threads.stop = true;
+  Threads.main()->wait_for_search_finished();
+  
+  Move m;
 	string token, sfen;
 
 	is >> token;
@@ -722,7 +758,13 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	// 終局(引き分け)になるまでの手数
 	limits.max_game_ply = max_game_ply;
 
+	// すべての合法手を生成するのか
+#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
+	limits.generate_all_legal_moves = Options["GenerateAllLegalMoves"];
+#endif
+
 	// エンジンオプションによる探索制限(0なら無制限)
+	// このあと、depthもしくはnodesが指定されていたら、その値で上書きされる。(この値は無視される)
 	if (Options["DepthLimit"] >= 0)    limits.depth = (int)Options["DepthLimit"];
 	if (Options["NodesLimit"] >= 0)    limits.nodes = (u64)Options["NodesLimit"];
 
@@ -771,6 +813,7 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 			if (token == "infinite")
 				limits.mate = INT32_MAX;
 			else
+				// USIプロトコルでは、UCIと異なり、ここは手数ではなく、探索に使う時間[ms]が指定されている。
 				limits.mate = stoi(token);
 		}
 
@@ -938,7 +981,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "go") go_cmd(pos, is , states);
 
 		// (思考などに使うための)開始局面(root)を設定する
-		else if (token == "position") position_cmd(pos, is , states);
+    else if (token == "position") {
+      last_position_cmd = cmd;
+      position_cmd(pos, is, states);
+    }
 
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
 		else if (token == "usi")

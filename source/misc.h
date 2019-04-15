@@ -285,15 +285,31 @@ namespace Math {
 //       Path
 // --------------------
 
-// path名とファイル名を結合して、それを返す。
-// folder名のほうは空文字列でないときに、末尾に'/'か'\\'がなければそれを付与する。
-inline std::string path_combine(const std::string& folder, const std::string& filename)
+// C#にあるPathクラス的なもの。ファイル名の操作。
+// C#のメソッド名に合わせておく。
+struct Path
 {
-	if (folder.length() >= 1 && *folder.rbegin() != '/' && *folder.rbegin() != '\\')
-		return folder + "/" + filename;
+	// path名とファイル名を結合して、それを返す。
+	// folder名のほうは空文字列でないときに、末尾に'/'か'\\'がなければそれを付与する。
+	static std::string Combine(const std::string& folder, const std::string& filename)
+	{
+		if (folder.length() >= 1 && *folder.rbegin() != '/' && *folder.rbegin() != '\\')
+			return folder + "/" + filename;
 
-	return folder + filename;
-}
+		return folder + filename;
+	}
+
+	// full path表現から、(フォルダ名を除いた)ファイル名の部分を取得する。
+	static std::string GetFileName(const std::string& path)
+	{
+		// "\"か"/"か、どちらを使ってあるかはわからない。
+		auto path_index1 = path.find_last_of("\\") + 1;
+		auto path_index2 = path.find_last_of("/") + 1;
+		auto path_index = std::max(path_index1, path_index2);
+
+		return path.substr(path_index);
+	}
+};
 
 // --------------------
 //       Parser
@@ -312,16 +328,22 @@ struct LineScanner
 	std::string get_text();
 
 	// 解析位置(カーソル)が行の末尾まで進んだのか？
-	bool eof() const { return token.empty() && !(pos < line.length()); }
+	// get_text()をしてpeek_text()したときに保持していたものがなくなるまではこの関数はfalseを返し続ける。
+	// このクラスの内部からeof()を呼ばないほうが無難。(token.empty() == trueが保証されていないといけないので)
+	// 内部から呼び出すならraw_eof()のほうではないかと。
+	bool eof() const { return token.empty() && raw_eof(); }
 
 private:
+	// 解析位置(カーソル)が行の末尾まで進んだのか？(内部実装用)
+	bool raw_eof() const { return !(pos < line.length()); }
+
 	// 解析対象の行
 	std::string line;
 
 	// 解析カーソル(現在の解析位置)
 	unsigned int pos;
 
-	// peek_text()した文字列
+	// peek_text()した文字列。get_text()のときにこれを返す。
 	std::string token;
 };
 
@@ -368,6 +390,15 @@ extern void prefetch(void* addr);
 
 // 連続する128バイトをprefetchするときに用いる。
 extern void prefetch2(void* addr);
+
+
+// --------------------
+//    memclear
+// --------------------
+
+// 進捗を表示しながら並列化してゼロクリア
+extern void memclear(void* table, size_t size);
+
 
 // --------------------
 //  全プロセッサを使う
