@@ -69,15 +69,14 @@ bool Tanuki::CreateRawBook() {
 	}
 	std::string line;
 
+	MemoryBook memory_book;
 	StateInfo state_info[4096] = {};
 	StateInfo* state = state_info + 8;
-	std::map<std::string, int> sfen_to_count;
 	int num_records = 0;
 	while (std::getline(ifs, line)) {
 		std::istringstream iss(line);
 		Position pos;
 		pos.set_hirate(state, Threads[0]);
-		++sfen_to_count[pos.sfen()];
 
 		std::string token;
 		int num_moves = 0;
@@ -88,10 +87,12 @@ bool Tanuki::CreateRawBook() {
 			Move move = move_from_usi(pos, token);
 			if (!pos.pseudo_legal(move) || !pos.legal(move)) {
 				continue;
-	}
+			}
+
+			BookPos book_pos(move, Move::MOVE_NONE, 0, 0, 1);
+			memory_book.insert(pos.sfen(), book_pos);
 
 			pos.do_move(move, state[num_moves]);
-			++sfen_to_count[pos.sfen()];
 			++num_moves;
 		}
 
@@ -99,25 +100,6 @@ bool Tanuki::CreateRawBook() {
 		if (num_records % 10000 == 0) {
 			sync_cout << "info string " << num_records << sync_endl;
 		}
-	}
-
-	sync_cout << "info string |sfen_to_count|=" << sfen_to_count.size() << sync_endl;
-
-	std::vector<std::pair<std::string, int> > narrowed_book(sfen_to_count.begin(),
-		sfen_to_count.end());
-	if (narrow_book) {
-		narrowed_book.erase(std::remove_if(narrowed_book.begin(), narrowed_book.end(),
-			[](const auto& x) { return x.second == 1; }),
-			narrowed_book.end());
-	}
-	sync_cout << "info string |sfen_to_count|=" << narrowed_book.size() << " (narrow)" << sync_endl;
-
-	MemoryBook memory_book;
-	for (const auto& sfen_and_count : narrowed_book) {
-		const std::string& sfen = sfen_and_count.first;
-		int count = sfen_and_count.second;
-		BookPos book_pos(Move::MOVE_NONE, Move::MOVE_NONE, 0, 0, count);
-		memory_book.insert(sfen, book_pos);
 	}
 
 	sync_cout << "info string Writing book file..." << sync_endl;
