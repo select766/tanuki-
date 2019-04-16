@@ -86,6 +86,10 @@ bool Tanuki::CreateRawBook() {
 				continue;
 			}
 			Move move = move_from_usi(pos, token);
+			if (!pos.pseudo_legal(move) || !pos.legal(move)) {
+				continue;
+	}
+
 			pos.do_move(move, state[num_moves]);
 			++sfen_to_count[pos.sfen()];
 			++num_moves;
@@ -116,9 +120,13 @@ bool Tanuki::CreateRawBook() {
 		memory_book.insert(sfen, book_pos);
 	}
 
+	sync_cout << "info string Writing book file..." << sync_endl;
+
 	std::string book_file = Options[kBookFile];
 	book_file = "book/" + book_file;
 	memory_book.write_book(book_file, true);
+
+	sync_cout << "info string Done..." << sync_endl;
 
 	return true;
 }
