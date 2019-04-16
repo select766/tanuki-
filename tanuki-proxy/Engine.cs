@@ -35,11 +35,12 @@ namespace tanuki_proxy
         private Thread thread;
         public string name { get; }
         private readonly int id;
-        private readonly bool timeKeeper;
+        public bool TimeKeeper { get; set; }
         public bool ProcessHasExited { get { return process.HasExited; } }
         public EngineBestmove Bestmove { get; set; }
+        public bool MateEngine { get; set; }
 
-        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool timeKeeper)
+        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool mateEngine)
         {
             this.program = program;
             this.name = engineName;
@@ -54,10 +55,11 @@ namespace tanuki_proxy
             this.process.ErrorDataReceived += HandleStderr;
             this.optionOverrides = optionOverrides;
             this.id = id;
-            this.timeKeeper = timeKeeper;
+            this.TimeKeeper = false;
+            this.MateEngine = mateEngine;
         }
 
-        public Engine(Program program, EngineOption opt, int id) : this(program, opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.timeKeeper)
+        public Engine(Program program, EngineOption opt, int id) : this(program, opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.mateEngine)
         {
         }
 
@@ -184,7 +186,7 @@ namespace tanuki_proxy
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
         private void HandleGo(List<string> command)
         {
-            if (timeKeeper)
+            if (TimeKeeper)
             {
                 Log("  P> [{0}] {1}", id, Join(command));
                 WriteLineAndFlush(process.StandardInput, Join(command));
@@ -207,12 +209,11 @@ namespace tanuki_proxy
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
         private void HandlePonderhit(List<string> command)
         {
-            if (timeKeeper)
+            if (TimeKeeper)
             {
                 Log("  P> [{0}] {1}", id, Join(command));
                 WriteLineAndFlush(process.StandardInput, Join(command));
             }
-            // タイムキーパー以外にはそのまま思考を続けさせる
         }
 
         /// <summary>
@@ -441,7 +442,7 @@ namespace tanuki_proxy
 
                         // info pvの表示
                         int sumNps = program.engines
-                            .Select(x=>x.Bestmove)
+                            .Select(x => x.Bestmove)
                             .Sum(x => x.nps);
                         var commandWithNps = new List<string>(command);
                         int sumNpsIndex = commandWithNps.IndexOf("nps");
@@ -461,7 +462,7 @@ namespace tanuki_proxy
         private void HandleBestmove(List<string> command)
         {
             // タイムキーパー以外はbestmoveを無視する
-            if (!timeKeeper)
+            if (!TimeKeeper)
             {
                 return;
             }

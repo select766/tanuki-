@@ -315,6 +315,12 @@ namespace tanuki_proxy
                         WriteLineAndFlush(Console.Out, "info string " + UpstreamPosition);
                         LastShowPv = DateTime.Now;
                     }
+
+                    foreach (var engine in engines)
+                    {
+                        engine.TimeKeeper = false;
+                    }
+                    engines.Where(x => !x.MateEngine).First().TimeKeeper = true;
                 }
                 else if (command[0] == "isready")
                 {

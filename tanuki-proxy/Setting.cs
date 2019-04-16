@@ -36,16 +36,16 @@ namespace tanuki_proxy
             [DataMember]
             public Option[] optionOverrides { get; set; }
             [DataMember]
-            public bool timeKeeper { get; set; } = false;
+            public bool mateEngine { get; set; } = false;
 
-            public EngineOption(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, bool timeKeeper)
+            public EngineOption(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, bool mateEngine)
             {
                 this.engineName = engineName;
                 this.fileName = fileName;
                 this.arguments = arguments;
                 this.workingDirectory = workingDirectory;
                 this.optionOverrides = optionOverrides;
-                this.timeKeeper = timeKeeper;
+                this.mateEngine = mateEngine;
             }
 
             public EngineOption()
@@ -81,7 +81,7 @@ namespace tanuki_proxy
                     new Option("Max_Random_Score_Diff", "0"),
                     new Option("Max_Random_Score_Diff_Ply", "0"),
                     new Option("Threads", "1"),
-                },true),
+                },false),
             new EngineOption(
                 "nighthawk",
                 "ssh",
