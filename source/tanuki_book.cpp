@@ -114,14 +114,6 @@ bool Tanuki::CreateRawBook() {
 }
 
 bool Tanuki::CreateScoredBook() {
-	Search::LimitsType limits;
-	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
-	limits.max_game_ply = 1 << 16;
-	limits.depth = MAX_PLY;
-	limits.silent = true;
-	limits.enteringKingRule = EKR_27_POINT;
-	Search::Limits = limits;
-
 	int num_threads = (int)Options[kThreads];
 	std::string input_book_file = Options[kBookInputFile];
 	int search_depth = (int)Options[kBookSearchDepth];
@@ -141,7 +133,14 @@ bool Tanuki::CreateScoredBook() {
 	sync_cout << "info string overwrite_existing_positions=" << overwrite_existing_positions
 		<< sync_endl;
 
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
 	limits.nodes_per_thread = search_nodes;
+	Search::Limits = limits;
 
 	MemoryBook input_book;
 	input_book_file = "book/" + input_book_file;
@@ -246,14 +245,6 @@ bool Tanuki::CreateScoredBook() {
 }
 
 bool Tanuki::ExtendBook() {
-	Search::LimitsType limits;
-	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
-	limits.max_game_ply = 1 << 16;
-	limits.depth = MAX_PLY;
-	limits.silent = true;
-	limits.enteringKingRule = EKR_27_POINT;
-	Search::Limits = limits;
-
 	int num_threads = (int)Options[kThreads];
 	std::string input_file = Options[kBookInputFile];
 	std::string output_file = Options[kBookOutputFile];
@@ -273,7 +264,14 @@ bool Tanuki::ExtendBook() {
 	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
 	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
 
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
 	limits.nodes_per_thread = search_nodes;
+	Search::Limits = limits;
 
 	BookMoveSelector input_book;
 	sync_cout << "Reading input book file: " << input_file << sync_endl;
