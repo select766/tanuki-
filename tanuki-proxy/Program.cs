@@ -29,6 +29,7 @@ namespace tanuki_proxy
         private const int decideMoveSleepMs = 10;
         private const int moveHorizon = 80;
         private const int maxPly = 127;
+        private const string OptionNameMultiPV = "MultiPV";
 
         private bool disposed = false;
         public object UpstreamLockObject { get; } = new object();
@@ -309,6 +310,7 @@ namespace tanuki_proxy
                         foreach (var engine in engines)
                         {
                             engine.Bestmove = new Engine.EngineBestmove();
+                            engine.ExpectedDownstreamPosition = null;
                         }
                         Depth = 0;
                         UpstreamState = UpstreamStateEnum.Thinking;
@@ -316,11 +318,65 @@ namespace tanuki_proxy
                         LastShowPv = DateTime.Now;
                     }
 
-                    foreach (var engine in engines)
+                    // 詰将棋ルーチンには常にgoコマンドを送信する
+                    foreach (var engine in engines.Where(x => x.MateEngine))
                     {
-                        engine.TimeKeeper = false;
+                        engine.Write("go mate infinite");
                     }
-                    engines.Where(x => !x.MateEngine).First().TimeKeeper = true;
+
+                    if (command.Contains("ponder"))
+                    {
+                        foreach (var engine in engines)
+                        {
+                            engine.TimeKeeper = false;
+                        }
+
+                        // UpstreamPosition には相手の予想指し手を指したあとの局面がふくまれているので 1 手戻す
+                        List<string> multiPonderRootPosition = Split(UpstreamPosition);
+                        // 初期局面が渡されることはない
+                        Debug.Assert(multiPonderRootPosition.Contains("moves"));
+                        multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
+
+                        Debug.Assert(engines
+                            .Where(x => !x.MateEngine)
+                            .Count() > 0);
+
+                        var multipvEngine = engines
+                            .Where(x => !x.MateEngine)
+                            .First();
+                        var multipv = engines
+                            .Where(x => !x.MateEngine)
+                            .Count();
+                        multipvEngine.Write(Join(multiPonderRootPosition));
+                        var multipvMoves = multipvEngine.GoWithMultiPv(multipv);
+                        var multipvEngines = engines
+                            .Where(x => !x.MateEngine)
+                            .ToList();
+                        Debug.Assert(multipvMoves.Length == multipvEngines.Count);
+                        for (int i = 0; i < multipvMoves.Length; ++i)
+                        {
+                            string move = multipvMoves[i];
+                            // multipvの数が少なくなっている可能性があるのでnullチェックする
+                            if (move == null)
+                            {
+                                continue;
+                            }
+                            var engine = multipvEngines[i];
+                            // 1手指した後の局面を渡す
+                            multiPonderRootPosition.Add(move);
+                            engine.Write(Join(multiPonderRootPosition));
+                            // go ponderを送る
+                            engine.Write(input);
+                            multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
+                        }
+                    }
+                    else
+                    {
+                        GoNonPonderOrPonderhit(input);
+                    }
+
+                    // goコマンドは直接下流に渡さない
+                    continue;
                 }
                 else if (command[0] == "isready")
                 {
@@ -335,6 +391,9 @@ namespace tanuki_proxy
                     {
                         UpstreamPosition = input;
                         Log("     upstreamPosition=" + UpstreamPosition);
+                        // positionコマンドは直接下流に渡さない
+                        // goコマンドの中で下流に渡すようにする
+                        continue;
                     }
                 }
                 else if (command[0] == "ponderhit")
@@ -345,6 +404,10 @@ namespace tanuki_proxy
                             minimumThinkingTime, maxGamePly, time, byoyomi, inc, Ply());
                         decideMoveLimit = DateTime.Now.AddMilliseconds(maximumTime);
                     }
+
+                    GoNonPonderOrPonderhit(input);
+                    // ponderhitコマンドは直接下流に渡さない
+                    continue;
                 }
                 else if (command[0] == "stop")
                 {
@@ -353,6 +416,9 @@ namespace tanuki_proxy
                         // stopが来た時に指し手を返さないと次のgoがもらえない
                         DecideMove();
                     }
+                    // stopコマンドは直接下流に渡さない
+                    // positionコマンドを受信した場合に止まるようにする
+                    continue;
                 }
                 else if (command[0] == "setoption")
                 {
@@ -388,8 +454,106 @@ namespace tanuki_proxy
                     break;
                 }
             }
+        }
 
+        private void GoNonPonderOrPonderhit(string input)
+        {
+            foreach (var engine in engines)
+            {
+                engine.TimeKeeper = false;
+            }
 
+            if (engines
+                .Where(x => !x.MateEngine)
+                .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
+            {
+                WriteLineAndFlush(Console.Out, "info string Multi Ponder Hit !!!");
+
+                // multi ponderがヒットした場合
+                // ヒットしたノードにponderhitを渡し、引き続き探索させる
+                var timeKeeperNode = engines
+                    .Where(x => !x.MateEngine)
+                    .Where(x => UpstreamPosition == x.ExpectedDownstreamPosition)
+                    .First();
+                timeKeeperNode.TimeKeeper = true;
+                // 前回思考時に go ponder を渡していると仮定する
+                timeKeeperNode.Write("ponderhit");
+
+                // 他のノードに子ノードを探索させる
+                SearchChildNodesInParallel();
+            }
+            else
+            {
+                WriteLineAndFlush(Console.Out, "info string multi ponder unhit ...");
+
+                // multi ponderがヒットしなかった場合
+                // 最初のエンジンにrootPosを担当させる
+                var timeKeeperNode = engines
+                    .Where(x => !x.MateEngine)
+                    .First();
+                timeKeeperNode.TimeKeeper = true;
+                timeKeeperNode.Write(UpstreamPosition);
+                timeKeeperNode.Write(input);
+
+                // 他のノードに子ノードを探索させる
+                SearchChildNodesInParallel();
+            }
+        }
+
+        private void SearchChildNodesInParallel()
+        {
+            if (engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Count() == 0)
+            {
+                return;
+            }
+
+            List<string> multiPonderRootPosition = Split(UpstreamPosition);
+
+            var multipvEngine = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .First();
+            var multipv = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Count();
+            multipvEngine.Write(Join(multiPonderRootPosition));
+            var multipvMoves = multipvEngine.GoWithMultiPv(multipv);
+            var multipvEngines = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .ToList();
+            Debug.Assert(multipvMoves.Length == multipvEngines.Count);
+            for (int i = 0; i < multipvMoves.Length; ++i)
+            {
+                string move = multipvMoves[i];
+                // multipvの数が少なくなっている可能性があるのでnullチェックする
+                if (move == null)
+                {
+                    continue;
+                }
+                var engine = multipvEngines[i];
+                // 1手指した後の局面を渡す
+
+                // 初期局面ではmovesを付ける
+                if (multiPonderRootPosition.Count == 2)
+                {
+                    multiPonderRootPosition.Add("moves");
+                }
+
+                multiPonderRootPosition.Add(move);
+                engine.Write(Join(multiPonderRootPosition));
+                // go infiniteを送る
+                engine.Write("go infinite");
+                multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
+                if (multiPonderRootPosition.Count == 3)
+                {
+                    multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
+                }
+            }
         }
 
         private static int ParseCommandParameter(List<string> command, string parameter)

@@ -27,7 +27,8 @@ namespace tanuki_proxy
 
                 Task.Run(() =>
                 {
-                    while (!Queue.IsCompleted)
+                    var queue = Queue;
+                    while (!queue.IsCompleted)
                     {
                         string line = null;
                         try

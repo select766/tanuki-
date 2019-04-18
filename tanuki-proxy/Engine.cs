@@ -29,7 +29,8 @@ namespace tanuki_proxy
         private readonly Program program;
         private readonly Process process = new Process();
         private readonly Option[] optionOverrides;
-        private string downstreamPosition = "";
+        public string ExpectedDownstreamPosition { get; set; } = null;
+        private string actualDownstreamPosition = "";
         private readonly object downstreamLockObject = new object();
         private readonly BlockingCollection<string> commandQueue = new BlockingCollection<string>();
         private Thread thread;
@@ -39,6 +40,8 @@ namespace tanuki_proxy
         public bool ProcessHasExited { get { return process.HasExited; } }
         public EngineBestmove Bestmove { get; set; }
         public bool MateEngine { get; set; }
+        private readonly ManualResetEvent eventBestmove = new ManualResetEvent(false);
+        private string[] multipvMoves;
 
         public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool mateEngine)
         {
@@ -101,15 +104,15 @@ namespace tanuki_proxy
                 // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
                 if (command.Contains("setoption"))
                 {
-                    HandleSetoption(command);
+                    HandleUpstreamSetoption(command);
                 }
-                else if (command.Contains("go"))
+                else if (command.Contains("position"))
                 {
-                    HandleGo(command);
+                    HandleUpstreamPosition(command);
                 }
                 else if (command.Contains("ponderhit"))
                 {
-                    HandlePonderhit(command);
+                    HandleUpstreamPonderhit(command);
                 }
                 else if (command.Contains("tt"))
                 {
@@ -160,7 +163,7 @@ namespace tanuki_proxy
         /// setoptionコマンドを処理する
         /// </summary>
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
-        private void HandleSetoption(List<string> command)
+        private void HandleUpstreamSetoption(List<string> command)
         {
             // エンジンに対して値を設定する時に送ります。
             Debug.Assert(command.Count == 5);
@@ -181,33 +184,22 @@ namespace tanuki_proxy
         }
 
         /// <summary>
-        /// goコマンドを処理する
+        /// positionコマンドを処理する
         /// </summary>
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
-        private void HandleGo(List<string> command)
+        private void HandleUpstreamPosition(List<string> command)
         {
-            if (TimeKeeper)
-            {
-                Log("  P> [{0}] {1}", id, Join(command));
-                WriteLineAndFlush(process.StandardInput, Join(command));
-            }
-            else
-            {
-                string output = "go infinite";
-                if (command.Count > 1)
-                {
-                    output += " " + Join(command.Skip(1));
-                }
-                Log("  P> [{0}] {1}", id, output);
-                WriteLineAndFlush(process.StandardInput, output);
-            }
+            var input = Join(command);
+            ExpectedDownstreamPosition = input;
+            Log("  P> [{0}] {1}", id, input);
+            WriteLineAndFlush(process.StandardInput, input);
         }
 
         /// <summary>
         /// ponderhitコマンドを処理する
         /// </summary>
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
-        private void HandlePonderhit(List<string> command)
+        private void HandleUpstreamPonderhit(List<string> command)
         {
             if (TimeKeeper)
             {
@@ -242,19 +234,19 @@ namespace tanuki_proxy
             }
             else if (command.Contains("readyok"))
             {
-                HandleReadyok(command);
+                HandleDownstreamReadyok(command);
             }
             else if (command.Contains("position"))
             {
-                HandlePosition(command);
+                HandleDownstreamPosition(command);
             }
             else if (command.Contains("pv"))
             {
-                HandlePv(command);
+                HandleDownstreamPv(command);
             }
             else if (command.Contains("bestmove"))
             {
-                HandleBestmove(command);
+                HandleDownstreamBestmove(command);
             }
             else
             {
@@ -277,7 +269,7 @@ namespace tanuki_proxy
             Log("  <D [{0}] {1}", id, e.Data);
         }
 
-        private void HandleReadyok(List<string> command)
+        private void HandleDownstreamReadyok(List<string> command)
         {
             // goコマンドが受理されたのでpvの受信を開始する
             lock (program.UpstreamLockObject)
@@ -294,14 +286,14 @@ namespace tanuki_proxy
         /// info string startedを受信し、goコマンドが受理されたときの処理を行う
         /// </summary>
         /// <param name="command">思考エンジンの出力文字列</param>
-        private void HandlePosition(List<string> command)
+        private void HandleDownstreamPosition(List<string> command)
         {
             // goコマンドが受理されたのでpvの受信を開始する
             lock (downstreamLockObject)
             {
                 int index = command.IndexOf("position");
-                downstreamPosition = Join(command.Skip(index));
-                Log("     downstreamPosition=" + downstreamPosition);
+                actualDownstreamPosition = Join(command.Skip(index));
+                Log("     actualDownstreamPosition=" + actualDownstreamPosition);
             }
         }
 
@@ -309,7 +301,7 @@ namespace tanuki_proxy
         /// pvを含むinfoコマンドを処理する
         /// </summary>
         /// <param name="command">思考エンジンの出力文字列</param>
-        private void HandlePv(List<string> command)
+        private void HandleDownstreamPv(List<string> command)
         {
             lock (program.UpstreamLockObject)
             {
@@ -323,9 +315,10 @@ namespace tanuki_proxy
                 lock (downstreamLockObject)
                 {
                     // 思考中の局面が違う場合は処理しない
-                    if (program.UpstreamPosition != downstreamPosition)
+                    if (ExpectedDownstreamPosition != actualDownstreamPosition)
                     {
-                        Log("     ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                        Log("     [{0}] # process={1} ExpectedDownstreamPosition(={2}) != actualDownstreamPosition(={3})",
+                            id, process, ExpectedDownstreamPosition, actualDownstreamPosition);
                         return;
                     }
                 }
@@ -339,8 +332,45 @@ namespace tanuki_proxy
                 int depthIndex = command.IndexOf("depth");
                 int pvIndex = command.IndexOf("pv");
                 int mateIndex = command.IndexOf("mate");
+                int multipvIndex = command.IndexOf("multipv");
 
                 if (depthIndex == -1 || pvIndex == -1)
+                {
+                    return;
+                }
+
+                // Multi PV探索の結果を格納する
+                if (multipvIndex != -1)
+                {
+                    //if (multipvMoves == null)
+                    //{
+                    //    Debugger.Launch();
+                    //}
+                    Debug.Assert(multipvMoves != null);
+                    if (pvIndex + 1 == command.Count)
+                    {
+                        // ここは通らないはず
+                        return;
+                    }
+
+                    string move = command[pvIndex + 1];
+                    int multipv = int.Parse(command[multipvIndex + 1]);
+                    multipvMoves[multipv - 1] = move;
+                    return;
+                }
+                else if (multipvMoves != null && multipvMoves.Length == 1)
+                {
+                    // ノードが1個しかない場合の処理
+                    if (pvIndex + 1 < command.Count)
+                    {
+                        string move = command[pvIndex + 1];
+                        multipvMoves[0] = move;
+                        return;
+                    }
+                }
+
+                // Root局面の子局面を探索していた場合は投票しない
+                if (program.UpstreamPosition != ExpectedDownstreamPosition)
                 {
                     return;
                 }
@@ -459,8 +489,17 @@ namespace tanuki_proxy
             }
         }
 
-        private void HandleBestmove(List<string> command)
+        private void HandleDownstreamBestmove(List<string> command)
         {
+            // Multi Ponder の探索局面を探索中に bestmove を返した場合に
+            // eventBestmove のスレッドをを進行する
+            // 以下の if 文の条件がないと、ひとつ前の探索で bestmove を受け取ったときに
+            // eventBestmove のスレッドを進行してしまう
+            if (ExpectedDownstreamPosition == actualDownstreamPosition)
+            {
+                eventBestmove.Set();
+            }
+
             // タイムキーパー以外はbestmoveを無視する
             if (!TimeKeeper)
             {
@@ -480,7 +519,7 @@ namespace tanuki_proxy
                 lock (downstreamLockObject)
                 {
                     // 思考中の局面が違う場合は処理しない
-                    if (program.UpstreamPosition != downstreamPosition)
+                    if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition)
                     {
                         Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                         return;
@@ -516,6 +555,25 @@ namespace tanuki_proxy
 
                 program.DecideMove();
             }
+        }
+
+        public string[] GoWithMultiPv(int multiPv)
+        {
+            Write(string.Format("setoption name MultiPV value {0}", multiPv));
+            multipvMoves = new string[multiPv];
+
+            // eventBestmoveはひとつスレッドを進行すると自動的にリセットされる
+            eventBestmove.Reset();
+
+            Write("go byoyomi 100");
+
+            eventBestmove.WaitOne();
+
+            Write("setoption name MultiPV value 1");
+
+            var result = multipvMoves;
+            multipvMoves = null;
+            return result;
         }
     }
 }
