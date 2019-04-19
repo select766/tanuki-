@@ -53,6 +53,7 @@ namespace tanuki_proxy
         private volatile bool running = true;
         public readonly List<Engine> engines = new List<Engine>();
         private Thread decideMoveTask;
+        private List<String> lastGoCommand = null;
 
         public void Dispose()
         {
@@ -236,18 +237,18 @@ namespace tanuki_proxy
 
         private void CheckDecideMoveLimit()
         {
-            while (running)
-            {
-                lock (UpstreamLockObject)
-                {
-                    //Log("     limit={0}", decideMoveLimit.ToString("o"));
-                    if (decideMoveLimit < DateTime.Now)
-                    {
-                        DecideMove();
-                    }
-                }
-                Thread.Sleep(decideMoveSleepMs);
-            }
+            //while (running)
+            //{
+            //    lock (UpstreamLockObject)
+            //    {
+            //        //Log("     limit={0}", decideMoveLimit.ToString("o"));
+            //        if (decideMoveLimit < DateTime.Now)
+            //        {
+            //            DecideMove();
+            //        }
+            //    }
+            //    Thread.Sleep(decideMoveSleepMs);
+            //}
         }
 
         public void Run()
@@ -289,6 +290,11 @@ namespace tanuki_proxy
 
                 if (command[0] == "go")
                 {
+                    // Multi Ponder 中、 ponderhit が送られてきて、
+                    // 実際には ponder がヒットしなかった場合に go コマンドを送るため、
+                    // 最後に送られてきた go コマンドを保存しておく
+                    lastGoCommand = new List<string>(command);
+
                     lock (UpstreamLockObject)
                     {
                         // 思考開始の合図です。エンジンはこれを受信すると思考を開始します。
@@ -467,6 +473,7 @@ namespace tanuki_proxy
                 .Where(x => !x.MateEngine)
                 .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
             {
+                Log("Multi Ponder Hit !!!");
                 WriteLineAndFlush(Console.Out, "info string Multi Ponder Hit !!!");
 
                 // multi ponderがヒットした場合
@@ -484,6 +491,7 @@ namespace tanuki_proxy
             }
             else
             {
+                Log("multi ponder unhit ...");
                 WriteLineAndFlush(Console.Out, "info string multi ponder unhit ...");
 
                 // multi ponderがヒットしなかった場合
@@ -493,7 +501,14 @@ namespace tanuki_proxy
                     .First();
                 timeKeeperNode.TimeKeeper = true;
                 timeKeeperNode.Write(UpstreamPosition);
-                timeKeeperNode.Write(input);
+
+                // 過去に保存しておいた go コマンドを送る
+                // ponderhit が送られてきた場合、その前に送られてきた go コマンドを送る
+                // ponder ではないので ponder は取り除く
+                // go コマンドが送られてきた場合、そのまま送る
+                List<string> goCommand = new List<string>(lastGoCommand);
+                goCommand.Remove("ponder");
+                timeKeeperNode.Write(Join(goCommand));
 
                 // 他のノードに子ノードを探索させる
                 SearchChildNodesInParallel();
