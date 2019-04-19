@@ -191,6 +191,7 @@ namespace tanuki_proxy
         {
             var input = Join(command);
             ExpectedDownstreamPosition = input;
+            actualDownstreamPosition = null;
             Log("  P> [{0}] {1}", id, input);
             WriteLineAndFlush(process.StandardInput, input);
         }
