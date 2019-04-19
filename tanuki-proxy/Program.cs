@@ -282,6 +282,8 @@ namespace tanuki_proxy
             int byoyomi = 0;
             int inc = 0;
 
+            Console.SetIn(new StreamReader(Console.OpenStandardInput(64 * 1024)));
+
             string input;
             while ((input = Console.ReadLine()) != null)
             {
@@ -359,6 +361,11 @@ namespace tanuki_proxy
                             .Where(x => !x.MateEngine)
                             .ToList();
                         Debug.Assert(multipvMoves.Length == multipvEngines.Count);
+
+                        string message = "Searching child positions " + Join(multipvMoves);
+                        Log(message);
+                        WriteLineAndFlush(Console.Out, "info string " + message);
+
                         for (int i = 0; i < multipvMoves.Length; ++i)
                         {
                             string move = multipvMoves[i];
@@ -473,8 +480,8 @@ namespace tanuki_proxy
                 .Where(x => !x.MateEngine)
                 .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
             {
-                Log("Multi Ponder Hit !!!");
-                WriteLineAndFlush(Console.Out, "info string Multi Ponder Hit !!!");
+                Log("Multi Ponder Hit (*'ω'*)");
+                WriteLineAndFlush(Console.Out, "info string Multi Ponder Hit (*'ω'*)");
 
                 // multi ponderがヒットした場合
                 // ヒットしたノードにponderhitを渡し、引き続き探索させる
@@ -491,8 +498,8 @@ namespace tanuki_proxy
             }
             else
             {
-                Log("multi ponder unhit ...");
-                WriteLineAndFlush(Console.Out, "info string multi ponder unhit ...");
+                Log("multi ponder unhit (._.)");
+                WriteLineAndFlush(Console.Out, "info string multi ponder unhit (._.)");
 
                 // multi ponderがヒットしなかった場合
                 // 最初のエンジンにrootPosを担当させる
@@ -542,6 +549,11 @@ namespace tanuki_proxy
                 .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
                 .ToList();
             Debug.Assert(multipvMoves.Length == multipvEngines.Count);
+
+            string message = "Searching child positions " + Join(multipvMoves);
+            Log(message);
+            WriteLineAndFlush(Console.Out, "info string " + message);
+
             for (int i = 0; i < multipvMoves.Length; ++i)
             {
                 string move = multipvMoves[i];
