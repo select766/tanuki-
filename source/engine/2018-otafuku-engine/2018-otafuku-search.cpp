@@ -2600,6 +2600,30 @@ void Thread::search()
 					sync_cout << USI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
 				}
 
+				// PVのTTEntryを送る。
+				if (Limits.send_ttentries
+					// 探索深さが浅いので
+					// Multi PV > 1 で探索しているときは TTEntry を送信しない
+					&& multiPV == 1
+					// 探索深さが浅すぎるので
+					// 探索開始から 200 ミリ秒間は TTEntry を送信しない
+					&& Time.elapsed() > 200) {
+					std::ostringstream oss;
+					for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
+						StateInfo state_info[MAX_PLY] = {};
+						TT.serialize_ttentry(rootPos.key(), oss);
+						int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
+						for (int move_index = 0; move_index < num_moves; ++move_index) {
+							rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
+							TT.serialize_ttentry(rootPos.key(), oss);
+						}
+						for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
+							rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
+						}
+					}
+					sync_cout << "tt" << oss.str() << sync_endl;
+				}
+
 				// aspiration窓の範囲外
 				if (bestValue <= alpha)
 				{
@@ -2676,24 +2700,6 @@ void Thread::search()
 
 		if (!mainThread)
 			continue;
-
-        // PVのTTEntryを送る。
-        if (Limits.send_ttentries) {
-			std::ostringstream oss;
-			for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
-				StateInfo state_info[MAX_PLY] = {};
-				TT.serialize_ttentry(rootPos.key(), oss);
-				int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
-				for (int move_index = 0; move_index < num_moves; ++move_index) {
-					rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
-					TT.serialize_ttentry(rootPos.key(), oss);
-				}
-				for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
-					rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
-				}
-			}
-			sync_cout << "tt" << oss.str() << sync_endl;
-        }
 
 		// ponder用の指し手として、2手目の指し手を保存しておく。
 		// これがmain threadのものだけでいいかどうかはよくわからないが。
