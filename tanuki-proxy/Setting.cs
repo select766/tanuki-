@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.IO;
+using System.Xml.Serialization;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 
 namespace tanuki_proxy
 {
@@ -14,6 +14,8 @@ namespace tanuki_proxy
             public string name;
             [DataMember]
             public string value;
+
+            public Option() { }
 
             public Option(string name, string value)
             {
@@ -63,7 +65,7 @@ namespace tanuki_proxy
             public string logDirectory { get; set; }
         }
 
-        private static void writeSampleSetting()
+        public static void writeSampleSetting()
         {
             ProxySetting setting = new ProxySetting();
             setting.logDirectory = "C:\\home\\develop\\tanuki-";
@@ -110,27 +112,27 @@ namespace tanuki_proxy
                 },false)
             };
 
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(ProxySetting));
-            using (FileStream f = new FileStream("proxy-setting.sample.json", FileMode.Create))
+            XmlSerializer serializer = new XmlSerializer(typeof(ProxySetting));
+            using (FileStream f = new FileStream("proxy-setting.sample.xml", FileMode.Create))
             {
-                serializer.WriteObject(f, setting);
+                serializer.Serialize(f, setting);
             }
         }
 
         public static ProxySetting loadSetting()
         {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(ProxySetting));
+            XmlSerializer serializer = new XmlSerializer(typeof(ProxySetting));
             // 1. まずはexeディレクトリに設定ファイルがあれば使う(複数Proxy設定をexeごとディレクトリに分け、カレントディレクトリは制御できない場合)
             // 2. それが無ければ、カレントディレクトリの設定を使う
             string[] search_dirs = { ExeDir(), "." };
             foreach (string search_dir in search_dirs)
             {
-                string path = Path.Combine(search_dir, "proxy-setting.json");
+                string path = Path.Combine(search_dir, "proxy-setting.xml");
                 if (File.Exists(path))
                 {
                     using (FileStream f = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                     {
-                        return (ProxySetting)serializer.ReadObject(f);
+                        return (ProxySetting)serializer.Deserialize(f);
                     }
                 }
             }
