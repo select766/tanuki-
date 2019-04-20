@@ -442,34 +442,34 @@ namespace tanuki_proxy
                         !command.Contains("upperbound") &&
                         program.Depth < tempDepth)
                     {
-                        // voteの表示
-                        Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        foreach (var engine in program.engines)
-                        {
-                            if (engine.Bestmove.move == null)
-                            {
-                                continue;
-                            }
+                        //// voteの表示
+                        //Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
+                        //foreach (var engine in program.engines)
+                        //{
+                        //    if (engine.Bestmove.move == null)
+                        //    {
+                        //        continue;
+                        //    }
 
-                            if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
-                            {
-                                bestmoveToCount.Add(engine.Bestmove.move, 0);
-                            }
-                            ++bestmoveToCount[engine.Bestmove.move];
-                        }
-                        List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
-                        bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+                        //    if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
+                        //    {
+                        //        bestmoveToCount.Add(engine.Bestmove.move, 0);
+                        //    }
+                        //    ++bestmoveToCount[engine.Bestmove.move];
+                        //}
+                        //List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
+                        //bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
 
-                        string vote = "info string";
-                        foreach (var p in bestmoveAndCount)
-                        {
-                            vote += " ";
-                            vote += p.Key;
-                            vote += "=";
-                            vote += p.Value;
-                        }
-                        Log("<P   {0}", vote);
-                        WriteLineAndFlush(Console.Out, vote);
+                        //string vote = "info string";
+                        //foreach (var p in bestmoveAndCount)
+                        //{
+                        //    vote += " ";
+                        //    vote += p.Key;
+                        //    vote += "=";
+                        //    vote += p.Value;
+                        //}
+                        //Log("<P   {0}", vote);
+                        //WriteLineAndFlush(Console.Out, vote);
 
                         // info pvの表示
                         int sumNps = program.engines
