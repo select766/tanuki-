@@ -99,7 +99,7 @@ bool Tanuki::KifuReader::EnsureOpen() {
 
 	// http://qiita.com/tkymx/items/f9190c16be84d4a48f8a
 	HANDLE find = nullptr;
-	WIN32_FIND_DATAA find_data = { 0 };
+	WIN32_FIND_DATAA find_data = {};
 
 	std::string search_name = folder_name_ + "/*.*";
 	find = FindFirstFileA(search_name.c_str(), &find_data);

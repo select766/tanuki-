@@ -362,7 +362,7 @@ bool Tanuki::ExtendBook() {
 	bool input_is_first = true;
 	for (;;) {
 		Position& pos = Threads[0]->rootPos;
-		StateInfo state_info[512] = { 0 };
+		StateInfo state_info[512] = {};
 		pos.set_hirate(&state_info[0], Threads[0]);
 		bool input_is_turn = input_is_first;
 

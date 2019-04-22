@@ -74,7 +74,7 @@ namespace {
 		int line_index = 0;
 		while (!fs_book.eof()) {
 			Thread& thread = *Threads[0];
-			StateInfo state_infos[4096] = { 0 };
+			StateInfo state_infos[4096] = {};
 			StateInfo* state = state_infos + 8;
 			Position& pos = thread.rootPos;
 			pos.set_hirate(state, &thread);
@@ -236,7 +236,7 @@ void Tanuki::GenerateKifu() {
 
 		while (global_position_index < num_positions) {
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_infos[4096] = { 0 };
+			StateInfo state_infos[4096] = {};
 			StateInfo* state = state_infos + 8;
 			Position& pos = thread.rootPos;
 			pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
@@ -273,7 +273,7 @@ void Tanuki::GenerateKifu() {
 
 				Move pv_move = pv[0];
 
-				Learner::PackedSfenValue record = { 0 };
+				Learner::PackedSfenValue record = {};
 				pos.sfen_pack(record.sfen);
 				record.score = last_value;
 				record.gamePly = pos.game_ply();
@@ -428,7 +428,7 @@ void Tanuki::ConvertSfenToLearningData() {
 			sfen_index = global_sfen_index++) {
 			const std::string& sfen = sfens[sfen_index];
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_infos[4096] = { 0 };
+			StateInfo state_infos[4096] = {};
 			StateInfo* state = state_infos + 8;
 			Position& pos = thread.rootPos;
 			pos.set_hirate(state, &thread);
@@ -454,7 +454,7 @@ void Tanuki::ConvertSfenToLearningData() {
 				const auto& root_moves = pos.this_thread()->rootMoves;
 				const auto& root_move = root_moves[0];
 
-				Learner::PackedSfenValue record = { 0 };
+				Learner::PackedSfenValue record = {};
 				pos.sfen_pack(record.sfen);
 				record.score = root_move.score;
 				record.gamePly = pos.game_ply();
