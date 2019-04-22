@@ -125,6 +125,9 @@ void USI::extra_option(USI::OptionsMap & o)
 
     // プロセス間でTTEntryをやり取りするかどうか
     o["SendTTEnties"] << Option(false);
+
+	// 前回TTEntryを送ってから次にTTEntryを送るまでの時間
+	o["SendTTEntriesInterval"] << Option(10, 0, 1000);
 }
 
 // -----------------------
@@ -2403,6 +2406,12 @@ void Search::clear()
 	Threads.clear();
 }
 
+namespace {
+	// TTEntryを送りすぎないようにするため、
+	// 前回送信した時刻を記録しておき、
+	// そこから一定時間経過してから次のTTEntryを送るようにする。
+	int lastSendTTEntryTime = 0;
+}
 
 // 探索本体。並列化している場合、ここがslaveのエントリーポイント。
 // Lazy SMPなので、それぞれのスレッドが勝手に探索しているだけ。
@@ -2424,6 +2433,13 @@ void Thread::search()
 
     // プロセス間でTTEntryをやり取りするかどうか
     Limits.send_ttentries = Options["SendTTEnties"];
+
+	// 一度TTEntryを送信してから次にTTEntryを送信するまでの間隔
+	int sendTTEtnriesInterval = Options["SendTTEntriesInterval"];
+
+	lastSendTTEntryTime = 0;
+
+	std::mutex sendTTEtnriesMutex;
 
 	// PVの出力間隔[ms]
 	// go infiniteはShogiGUIなどの検討モードで動作させていると考えられるので
@@ -2600,30 +2616,6 @@ void Thread::search()
 					sync_cout << USI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
 				}
 
-				// PVのTTEntryを送る。
-				if (Limits.send_ttentries
-					// 探索深さが浅いので
-					// Multi PV > 1 で探索しているときは TTEntry を送信しない
-					&& multiPV == 1
-					// 探索深さが浅すぎるので
-					// 探索開始から 200 ミリ秒間は TTEntry を送信しない
-					&& Time.elapsed() > 200) {
-					std::ostringstream oss;
-					for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
-						StateInfo state_info[MAX_PLY] = {};
-						TT.serialize_ttentry(rootPos.key(), oss);
-						int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
-						for (int move_index = 0; move_index < num_moves; ++move_index) {
-							rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
-							TT.serialize_ttentry(rootPos.key(), oss);
-						}
-						for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
-							rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
-						}
-					}
-					sync_cout << "tt" << oss.str() << sync_endl;
-				}
-
 				// aspiration窓の範囲外
 				if (bestValue <= alpha)
 				{
@@ -2697,6 +2689,45 @@ void Thread::search()
 		  // ここでこの反復深化の1回分は終了したのでcompletedDepthに反映させておく。
 		if (!Threads.stop)
 			completedDepth = rootDepth;
+
+		// PVのTTEntryを送る。
+		if (Limits.send_ttentries
+			// 探索深さが浅いので
+			// Multi PV > 1 で探索しているときは TTEntry を送信しない
+			&& multiPV == 1
+			// 通信量が増えすぎるのと、I/O負荷が高くなりすぎるのを防ぐため、
+			// 前回からsendTTEtnriesInterval経過してから送るようにする
+			&& lastSendTTEntryTime + sendTTEtnriesInterval < Time.elapsed()) {
+
+			// ロックのスコープを最小にするため、
+			// まず本当にTTEntryを送るかどうか決める
+			bool sendTTEntry = false;
+			{
+				std::lock_guard<std::mutex> lock(sendTTEtnriesMutex);
+				if (lastSendTTEntryTime + sendTTEtnriesInterval < Time.elapsed()) {
+					lastSendTTEntryTime = sendTTEtnriesInterval + Time.elapsed();
+					sendTTEntry = true;
+				}
+			}
+
+			// 本当にTTEntryを送ると決めた場合のみ送る
+			if (sendTTEntry) {
+				std::ostringstream oss;
+				for (size_t pv_index = 0; pv_index < multiPV; ++pv_index) {
+					StateInfo state_info[MAX_PLY] = {};
+					TT.serialize_ttentry(rootPos.key(), oss);
+					int num_moves = static_cast<int>(rootMoves[pv_index].pv.size());
+					for (int move_index = 0; move_index < num_moves; ++move_index) {
+						rootPos.do_move(rootMoves[pv_index].pv[move_index], state_info[move_index]);
+						TT.serialize_ttentry(rootPos.key(), oss);
+					}
+					for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
+						rootPos.undo_move(rootMoves[pv_index].pv[move_index]);
+					}
+				}
+				sync_cout << "tt" << oss.str() << sync_endl;
+			}
+		}
 
 		if (!mainThread)
 			continue;
