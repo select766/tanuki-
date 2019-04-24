@@ -193,7 +193,7 @@ namespace tanuki_proxy
                     {
                         // PVを出力する
                         // npsは再計算する
-                        int sumNps = engines
+                        long sumNps = engines
                             .Select(x => x.Bestmove)
                             .Sum(x => x.nps);
                         var commandWithNps = new List<string>(bestmove.command);
@@ -444,8 +444,8 @@ namespace tanuki_proxy
                 .Where(x => !x.MateEngine)
                 .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
             {
-                Log("Multi Ponder Hit (*'ω'*)");
-                WriteLineAndFlush(Console.Out, "info string Multi Ponder Hit (*'ω'*)");
+                Log("Ponder Hit (*'ω'*)");
+                WriteLineAndFlush(Console.Out, "info string Ponder Hit (*'ω'*)");
 
                 // multi ponderがヒットした場合
                 // ヒットしたノードにponderhitを渡し、引き続き探索させる
@@ -459,8 +459,8 @@ namespace tanuki_proxy
             }
             else
             {
-                Log("multi ponder unhit (´・ω・｀)");
-                WriteLineAndFlush(Console.Out, "info string multi ponder unhit (´・ω・｀)");
+                Log("ponder unhit (´・ω・｀)");
+                WriteLineAndFlush(Console.Out, "info string ponder unhit (´・ω・｀)");
 
                 // multi ponderがヒットしなかった場合
                 // 最初のエンジンにrootPosを担当させる

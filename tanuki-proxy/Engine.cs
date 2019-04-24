@@ -19,7 +19,7 @@ namespace tanuki_proxy
             public string ponder { get; set; }
             public int score { get; set; }
             public List<string> command { get; set; }
-            public int nps { get; set; }
+            public long nps { get; set; }
         }
 
         private const double showPvSupressionMs = 200.0;
@@ -370,6 +370,15 @@ namespace tanuki_proxy
                     }
                 }
 
+                // Root局面のpv出力時に合算した値を出力できるように
+                // Root局面以外でもnpsの値を保持しておく
+                int npsIndex = command.IndexOf("nps");
+                if (npsIndex != -1)
+                {
+                    long nps = long.Parse(command[npsIndex + 1]);
+                    Bestmove.nps = nps;
+                }
+
                 // Root局面の子局面を探索していた場合は投票しない
                 if (program.UpstreamPosition != ExpectedDownstreamPosition)
                 {
@@ -426,13 +435,6 @@ namespace tanuki_proxy
                     }
                 }
 
-                int npsIndex = command.IndexOf("nps");
-                if (npsIndex != -1)
-                {
-                    int nps = int.Parse(command[npsIndex + 1]);
-                    Bestmove.nps = nps;
-                }
-
                 // Fail-low/Fail-highした探索結果は表示しない
                 lock (program.LastShowPvLockObject)
                 {
@@ -472,7 +474,7 @@ namespace tanuki_proxy
                         //WriteLineAndFlush(Console.Out, vote);
 
                         // info pvの表示
-                        int sumNps = program.engines
+                        long sumNps = program.engines
                             .Select(x => x.Bestmove)
                             .Sum(x => x.nps);
                         var commandWithNps = new List<string>(command);
