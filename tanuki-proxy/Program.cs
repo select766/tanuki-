@@ -319,6 +319,7 @@ namespace tanuki_proxy
                         {
                             engine.Bestmove = new Engine.EngineBestmove();
                             engine.ExpectedDownstreamPosition = null;
+                            engine.ExpectedDownstreamGo = null;
                         }
                         Depth = 0;
                         UpstreamState = UpstreamStateEnum.Thinking;

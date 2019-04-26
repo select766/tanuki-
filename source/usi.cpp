@@ -92,6 +92,13 @@ namespace USI
   // tanuki-proxyでどの局面に対しての指し手が出力されたか管理するために使う
   std::string last_position_cmd;
   
+  // 最後に受け取ったgoコマンド文字列
+  // tanuki-proxyでどの局面に対しての指し手が出力されたか管理するために使う
+  // positionコマンドとgoコマンドの両方を保持するのは
+  // ponder + multi ponderで前回探索した局面と同じ局面に対して探索する場合があり、
+  // positionだけではどのgo命令に対する出力か判定できないため
+  std::string last_go_cmd;
+
   // 入玉ルール
 #ifdef USE_ENTERING_KING_WIN
 	EnteringKingRule ekr = EKR_27_POINT;
@@ -986,7 +993,10 @@ void USI::loop(int argc, char* argv[])
 		}
 
 		// 与えられた局面について思考するコマンド
-		else if (token == "go") go_cmd(pos, is , states);
+		else if (token == "go") {
+			last_go_cmd = cmd;
+			go_cmd(pos, is, states);
+		}
 
 		// (思考などに使うための)開始局面(root)を設定する
 		else if (token == "position") {

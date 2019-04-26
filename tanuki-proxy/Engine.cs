@@ -30,7 +30,9 @@ namespace tanuki_proxy
         private readonly Process process = new Process();
         private readonly Option[] optionOverrides;
         public string ExpectedDownstreamPosition { get; set; } = null;
+        public string ExpectedDownstreamGo { get; set; } = null;
         private string actualDownstreamPosition = "";
+        private string actualDownstreamGo = "";
         private readonly object downstreamLockObject = new object();
         private readonly BlockingCollection<string> commandQueue = new BlockingCollection<string>();
         private Thread thread;
@@ -109,6 +111,10 @@ namespace tanuki_proxy
                 else if (command.Contains("position"))
                 {
                     HandleUpstreamPosition(command);
+                }
+                else if (command.Contains("go"))
+                {
+                    HandleUpstreamGo(command);
                 }
                 else if (command.Contains("ponderhit"))
                 {
@@ -197,6 +203,19 @@ namespace tanuki_proxy
         }
 
         /// <summary>
+        /// goコマンドを処理する
+        /// </summary>
+        /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
+        private void HandleUpstreamGo(List<string> command)
+        {
+            var input = Join(command);
+            ExpectedDownstreamGo = input;
+            actualDownstreamGo = null;
+            Log("  P> [{0}] {1}", id, input);
+            WriteLineAndFlush(process.StandardInput, input);
+        }
+
+        /// <summary>
         /// ponderhitコマンドを処理する
         /// </summary>
         /// <param name="command">UIまたは上流proxyからのコマンド文字列</param>
@@ -241,6 +260,10 @@ namespace tanuki_proxy
             {
                 HandleDownstreamPosition(command);
             }
+            else if (command.Contains("go"))
+            {
+                HandleDownstreamGo(command);
+            }
             else if (command.Contains("pv"))
             {
                 HandleDownstreamPv(command);
@@ -284,17 +307,34 @@ namespace tanuki_proxy
         }
 
         /// <summary>
-        /// info string startedを受信し、goコマンドが受理されたときの処理を行う
+        /// info string positionを受信し、positionコマンドが受理されたときの処理を行う
         /// </summary>
         /// <param name="command">思考エンジンの出力文字列</param>
         private void HandleDownstreamPosition(List<string> command)
         {
-            // goコマンドが受理されたのでpvの受信を開始する
+            // positionコマンドが受理された
+            // positionコマンドとgoコマンドの両方が受信されたらpv等の受信を始める
             lock (downstreamLockObject)
             {
                 int index = command.IndexOf("position");
                 actualDownstreamPosition = Join(command.Skip(index));
                 Log("     actualDownstreamPosition=" + actualDownstreamPosition);
+            }
+        }
+
+        /// <summary>
+        /// info string goを受信し、goコマンドが受理されたときの処理を行う
+        /// </summary>
+        /// <param name="command">思考エンジンの出力文字列</param>
+        private void HandleDownstreamGo(List<string> command)
+        {
+            // goコマンドが受理された
+            // positionコマンドとgoコマンドの両方が受信されたらpv等の受信を始める
+            lock (downstreamLockObject)
+            {
+                int index = command.IndexOf("go");
+                actualDownstreamGo = Join(command.Skip(index));
+                Log("     actualDownstreamGo=" + actualDownstreamGo);
             }
         }
 
@@ -316,7 +356,7 @@ namespace tanuki_proxy
                 lock (downstreamLockObject)
                 {
                     // 思考中の局面が違う場合は処理しない
-                    if (ExpectedDownstreamPosition != actualDownstreamPosition)
+                    if (ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
                     {
                         Log("     [{0}] # process={1} ExpectedDownstreamPosition(={2}) != actualDownstreamPosition(={3})",
                             id, process, ExpectedDownstreamPosition, actualDownstreamPosition);
@@ -498,7 +538,7 @@ namespace tanuki_proxy
             // eventBestmove のスレッドをを進行する
             // 以下の if 文の条件がないと、ひとつ前の探索で bestmove を受け取ったときに
             // eventBestmove のスレッドを進行してしまう
-            if (ExpectedDownstreamPosition == actualDownstreamPosition)
+            if (ExpectedDownstreamPosition == actualDownstreamPosition && ExpectedDownstreamGo == actualDownstreamGo)
             {
                 eventBestmove.Set();
             }
@@ -522,7 +562,7 @@ namespace tanuki_proxy
                 lock (downstreamLockObject)
                 {
                     // 思考中の局面が違う場合は処理しない
-                    if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition)
+                    if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
                     {
                         Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
                         return;

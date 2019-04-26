@@ -6,7 +6,8 @@ void* Thread::operator new(size_t s) { return aligned_malloc(s, alignof(Thread))
 void Thread::operator delete(void*p) noexcept { aligned_free(p); }
 
 namespace USI {
-  extern std::string last_position_cmd;
+	extern std::string last_position_cmd;
+	extern std::string last_go_cmd;
 }
 
 Thread::Thread(size_t n) : idx(n) , stdThread(&Thread::idle_loop, this)
@@ -200,7 +201,8 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 	// Position::set()によってクリアされていた、st->previousを復元する。
 	setupStates->back() = tmp;
 
-  sync_cout << "info string " << USI::last_position_cmd << sync_endl;
+	sync_cout << "info string " << USI::last_position_cmd << sync_endl;
+	sync_cout << "info string " << USI::last_go_cmd << sync_endl;
 
 	main()->start_searching();
 }
