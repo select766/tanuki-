@@ -318,7 +318,7 @@ namespace tanuki_proxy
             {
                 int index = command.IndexOf("position");
                 actualDownstreamPosition = Join(command.Skip(index));
-                Log("     actualDownstreamPosition=" + actualDownstreamPosition);
+                Log("     [{0}] . actualDownstreamPosition={1}", id, actualDownstreamPosition);
             }
         }
 
@@ -334,7 +334,7 @@ namespace tanuki_proxy
             {
                 int index = command.IndexOf("go");
                 actualDownstreamGo = Join(command.Skip(index));
-                Log("     actualDownstreamGo=" + actualDownstreamGo);
+                Log("     [{0}] . actualDownstreamGo={1}", id, actualDownstreamGo);
             }
         }
 
