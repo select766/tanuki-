@@ -819,6 +819,37 @@ namespace MateEngine
 			int64_t nps = nodes_searched * 1000LL / time_ms;
 			sync_cout << "info  time " << time_ms << " nodes " << nodes_searched << " nps "
 				<< nps << " hashfull " << transposition_table.hashfull() << sync_endl;
+
+			// プロセス間でTTEntryをやり取りするかどうか
+			bool send_ttentries = Options["SendTTEnties"];
+			if (send_ttentries) {
+				std::ostringstream oss;
+				StateInfo state_info[MAX_PLY] = {};
+				int num_moves = static_cast<int>(moves.size());
+				for (int move_index = 0; move_index < num_moves; ++move_index) {
+					Value value = (move_index % 2 == 0)
+						? mate_in(num_moves - move_index)
+						: mated_in(num_moves - move_index);
+					Move move = moves[move_index];
+					uint32_t move_uint32_t = static_cast<uint32_t>(moves[move_index]);
+					Bound bound = BOUND_EXACT;
+					Depth depth = static_cast<Depth>(num_moves - move_index);
+					oss
+						<< " " << r.key()
+						<< " " << move_uint32_t
+						<< " " << value
+#if !defined (NO_EVAL_IN_TT)
+						<< " " << value
+#endif
+						<< " " << bound
+						<< " " << depth;
+					r.do_move(move, state_info[move_index]);
+				}
+				for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
+					r.undo_move(moves[move_index]);
+				}
+				sync_cout << "tt" << oss.str() << sync_endl;
+			}
 		}
 
 		// "stop"が送られてきたらThreads.stop == trueになる。

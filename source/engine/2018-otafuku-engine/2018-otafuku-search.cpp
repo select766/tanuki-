@@ -122,12 +122,6 @@ void USI::extra_option(USI::OptionsMap & o)
 
 	// fail low/highのときにPVを出力するかどうか。
 	o["OutputFailLHPV"] << Option(true);
-
-    // プロセス間でTTEntryをやり取りするかどうか
-    o["SendTTEnties"] << Option(false);
-
-	// 前回TTEntryを送ってから次にTTEntryを送るまでの時間
-	o["SendTTEntriesInterval"] << Option(10, 0, 1000);
 }
 
 // -----------------------

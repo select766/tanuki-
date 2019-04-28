@@ -500,6 +500,12 @@ namespace USI
 		o["GenerateAllLegalMoves"] << Option(false);
 #endif
 
+		// プロセス間でTTEntryをやり取りするかどうか
+		o["SendTTEnties"] << Option(false);
+
+		// 前回TTEntryを送ってから次にTTEntryを送るまでの時間
+		o["SendTTEntriesInterval"] << Option(10, 0, 1000);
+
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
