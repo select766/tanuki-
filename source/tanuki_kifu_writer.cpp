@@ -1,4 +1,7 @@
 #include "tanuki_kifu_writer.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include "misc.h"
 
@@ -57,3 +60,5 @@ bool Tanuki::KifuWriter::EnsureOpen() {
 
 	return true;
 }
+
+#endif

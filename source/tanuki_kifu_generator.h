@@ -1,6 +1,10 @@
 #ifndef _TANUKI_KIFU_GENERATOR_H_
 #define _TANUKI_KIFU_GENERATOR_H_
 
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
+
 #include "shogi.h"
 
 namespace Tanuki {
@@ -8,5 +12,7 @@ namespace Tanuki {
 	void GenerateKifu();
 	void ConvertSfenToLearningData();
 }
+
+#endif
 
 #endif

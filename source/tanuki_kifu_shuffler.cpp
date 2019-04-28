@@ -1,4 +1,7 @@
 #include "tanuki_kifu_shuffler.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include <direct.h>
 #include <cstdio>
@@ -112,3 +115,5 @@ void Tanuki::ShuffleKifu() {
 		file = nullptr;
 	}
 }
+
+#endif

@@ -1,4 +1,7 @@
 #include "tanuki_kifu_generator.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include <direct.h>
 #include <omp.h>
@@ -495,3 +498,5 @@ void Tanuki::ConvertSfenToLearningData() {
 		}
 	}
 }
+
+#endif

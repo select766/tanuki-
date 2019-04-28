@@ -1,4 +1,7 @@
 #include "tanuki_progress_report.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include <cstdio>
 #include <ctime>
@@ -55,3 +58,5 @@ void Tanuki::ProgressReport::Show(int64_t current_data) {
 	previous_data_ = current_data;
 	previous_time_ = current_time;
 }
+
+#endif

@@ -506,9 +506,11 @@ namespace USI
 		// カレントフォルダに"engine_option.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options();
 
+#ifdef EVAL_LEARN
 		Tanuki::InitializeBook(o);
 		Tanuki::InitializeGenerator(o);
 		Tanuki::InitializeShuffler(o);
+#endif
 	}
 
 
@@ -1096,6 +1098,7 @@ void USI::loop(int argc, char* argv[])
 		// 我々はこれに関知しないので単に無視すれば良い。
 		else if (token == "usinewgame") continue;
 
+#ifdef EVAL_LEARN
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
 
 		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
@@ -1110,6 +1113,7 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();
 
 		else if (token == "shuffle_kifu") Tanuki::ShuffleKifu();
+#endif
 
 		else
 		{

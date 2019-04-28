@@ -1,6 +1,10 @@
 #ifndef _TANUKI_PROGRESS_REPORT_H_
 #define _TANUKI_PROGRESS_REPORT_H_
 
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
+
 #include <cstdint>
 #include <mutex>
 
@@ -21,5 +25,7 @@ namespace Tanuki {
 		std::mutex show_mutex_;
 	};
 }
+
+#endif
 
 #endif

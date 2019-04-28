@@ -1,6 +1,10 @@
 #ifndef _TANUKI_KIFU_WRITER_H_
 #define _TANUKI_KIFU_WRITER_H_
 
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
+
 #include "learn/learn.h"
 #include "position.h"
 #include "shogi.h"
@@ -20,5 +24,7 @@ namespace Tanuki {
 		bool EnsureOpen();
 	};
 }
+
+#endif
 
 #endif

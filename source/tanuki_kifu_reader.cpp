@@ -1,4 +1,7 @@
 #include "tanuki_kifu_reader.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include <numeric>
 #include <sstream>
@@ -139,3 +142,5 @@ bool Tanuki::KifuReader::EnsureOpen() {
 
 	return true;
 }
+
+#endif

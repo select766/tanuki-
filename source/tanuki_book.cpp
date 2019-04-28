@@ -1,4 +1,7 @@
 #include "tanuki_book.h"
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
 
 #include <atomic>
 #include <fstream>
@@ -413,3 +416,5 @@ bool Tanuki::ExtendBook() {
 
 	return true;
 }
+
+#endif

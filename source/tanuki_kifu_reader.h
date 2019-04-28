@@ -1,6 +1,10 @@
 #ifndef _TANUKI_KIFU_READER_H_
 #define _TANUKI_KIFU_READER_H_
 
+#include "extra/config.h"
+
+#ifdef EVAL_LEARN
+
 #include <fstream>
 #include <mutex>
 #include <string>
@@ -28,5 +32,7 @@ namespace Tanuki {
 		int file_index_ = 0;
 	};
 }
+
+#endif
 
 #endif
