@@ -354,7 +354,7 @@
 
 
 #if defined(YANEURAOU_2018_TNK_ENGINE)
-#define ENGINE_NAME "YaneuraOu 2018 T.N.K."
+#define ENGINE_NAME "tanuki-wcsc29"
 #define EVAL_NNUE
 
 #define USE_EVAL_HASH
@@ -415,7 +415,7 @@
 // --- 詰将棋エンジンとして実行ファイルを公開するとき用の設定集
 
 #ifdef MATE_ENGINE
-#define ENGINE_NAME "YaneuraOu mate solver"
+#define ENGINE_NAME "tanuki-wcsc29 mate solver"
 #define KEEP_LAST_MOVE
 #undef  MAX_PLY_NUM
 #define MAX_PLY_NUM 2000

@@ -41,10 +41,10 @@ endif
 ifeq ($(OS),Windows_NT)
 	CFLAGS += $(WCFLAGS)
 	LDFLAGS += -static -Wl,--stack,25000000
-	TARGET = YaneuraOu-by-gcc.exe
+	TARGET = tanuki-wcsc29.exe
 else
 	CFLAGS += -D_LINUX
-	TARGET = YaneuraOu-by-gcc
+	TARGET = tanuki-wcsc29
 endif
 
 # リンク時最適化。これをつけるとmsys2環境だとセグフォで落ちる。
