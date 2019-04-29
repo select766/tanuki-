@@ -18,7 +18,7 @@ namespace tanuki_proxy
             public string move { get; set; }
             public string ponder { get; set; }
             public int score { get; set; }
-            public List<string> command { get; set; }
+            public List<string> pvCommand { get; set; }
             public long nps { get; set; }
         }
 
@@ -272,6 +272,10 @@ namespace tanuki_proxy
             {
                 HandleDownstreamBestmove(command);
             }
+            else if (command.Contains("checkmate"))
+            {
+                HandleDownstreamCheckmate(command);
+            }
             else
             {
                 Log("<P   [{0}] {1}", id, Join(command));
@@ -425,7 +429,7 @@ namespace tanuki_proxy
                     return;
                 }
 
-                Bestmove.command = command;
+                Bestmove.pvCommand = command;
 
                 int tempDepth = int.Parse(command[depthIndex + 1]);
 
@@ -597,6 +601,45 @@ namespace tanuki_proxy
                 }
 
                 program.DecideMove();
+            }
+        }
+
+        private void HandleDownstreamCheckmate(List<string> command)
+        {
+            lock (program.UpstreamLockObject)
+            {
+                if (program.UpstreamState == UpstreamStateEnum.Stopped)
+                {
+                    //Log("     ## process={0} upstreamState == UpstreamStateEnum.Stopped", process);
+                    return;
+                }
+
+                lock (downstreamLockObject)
+                {
+                    // 思考中の局面が違う場合は処理しない
+                    if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
+                    {
+                        Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                        return;
+                    }
+                }
+
+                // nomate は処理しない
+                if (command[1] == "nomate")
+                {
+                    return;
+                }
+
+                Bestmove.move = command[1];
+                if (command.Count > 2)
+                {
+                    Bestmove.ponder = command[2];
+                }
+                Bestmove.score = mateScore - command.Count + 1;
+
+                string infoStringCommand = "info string " + Join(command);
+                Log("<P   [{0}] {1}", id, infoStringCommand);
+                WriteLineAndFlush(Console.Out, infoStringCommand);
             }
         }
 

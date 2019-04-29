@@ -189,14 +189,14 @@ namespace tanuki_proxy
 
                     // Apery定跡データベースを使用した場合、pv情報が不完全となる
                     // Engineクラスではこのpv情報を処理しないため、bestmove.commandがnullとなる
-                    if (bestmove.command != null)
+                    if (bestmove.pvCommand != null)
                     {
                         // PVを出力する
                         // npsは再計算する
                         long sumNps = engines
                             .Select(x => x.Bestmove)
                             .Sum(x => x.nps);
-                        var commandWithNps = new List<string>(bestmove.command);
+                        var commandWithNps = new List<string>(bestmove.pvCommand);
                         int sumNpsIndex = commandWithNps.IndexOf("nps");
                         if (sumNpsIndex != -1)
                         {
@@ -205,6 +205,8 @@ namespace tanuki_proxy
                         Log("<P   {0}", Join(commandWithNps));
                         WriteLineAndFlush(Console.Out, Join(commandWithNps));
                     }
+
+                    // TODO(hnoda): 詰将棋専用エンジンが返してきた手順をinfo pvで出力する
 
                     // bestmoveを出力する
                     string outputCommand = "bestmove " + bestmove.move;
@@ -220,6 +222,8 @@ namespace tanuki_proxy
                 Depth = 0;
                 foreach (var engine in engines)
                 {
+                    // 本当はnullを代入したいが、思考エンジンがbesmoveを返してtanuki-proxyがbestmoveを返したあと、
+                    // stopコマンドを受信した場合、Bestmoveにアクセスして落ちるのを防ぐ
                     engine.Bestmove = null;
                 }
                 decideMoveLimit = DateTime.MaxValue;
@@ -327,10 +331,12 @@ namespace tanuki_proxy
                         LastShowPv = DateTime.Now;
                     }
 
-                    // 詰将棋ルーチンには常にgoコマンドを送信する
-                    foreach (var engine in engines.Where(x => x.MateEngine))
+                    // 詰将棋ルーチン1ノードには常にgoコマンドを送信する
+                    if (engines.Where(x => x.MateEngine).Count() > 0)
                     {
-                        engine.Write("go mate infinite");
+                        var mateEngine = engines.Where(x => x.MateEngine).First();
+                        mateEngine.Write(UpstreamPosition);
+                        mateEngine.Write("go mate infinite");
                     }
 
                     foreach (var engine in engines)
@@ -674,11 +680,11 @@ namespace tanuki_proxy
         }
 
         /// <summary>
-        /// 特定のエンジンを除くすべてのエンジンに対して出力する
+        /// 特定のエンジンと詰将棋エンジンを除くすべてのエンジンに対して出力する
         /// </summary>
         public void WriteToOtherEngines(string input, Engine own)
         {
-            foreach (var engine in engines)
+            foreach (var engine in engines.Where(x => !x.MateEngine))
             {
                 if (engine != own)
                 {
