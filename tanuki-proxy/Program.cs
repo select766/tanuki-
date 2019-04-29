@@ -508,8 +508,7 @@ namespace tanuki_proxy
                 .Where(x => !x.MateEngine)
                 .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
                 .Count();
-            multipvEngine.Write(Join(multiPonderRootPosition));
-            var multipvMoves = multipvEngine.GoWithMultiPv(multipv);
+            var multipvMoves = multipvEngine.SearchWithMultiPv(Join(multiPonderRootPosition), multipv);
             var multipvEngines = engines
                 .Where(x => !x.MateEngine)
                 .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
@@ -520,6 +519,24 @@ namespace tanuki_proxy
             Log(message);
             WriteLineAndFlush(Console.Out, "info string " + message);
 
+            SendPositionAndGoCommandToEngines(multiPonderRootPosition, goCommand, multipvMoves, multipvEngines);
+
+            // 詰将棋エンジンへ局面を割り当て、探索させる
+            if (engines
+                .Where(x => x.MateEngine)
+                .Count() > 1)
+            {
+                // 最初の詰将棋エンジンにはすでに現在の局面を割り当てているのでスキップする
+                var mateEngines = engines
+                    .Where(x => x.MateEngine)
+                    .Skip(1)
+                    .ToList();
+                SendPositionAndGoCommandToEngines(multiPonderRootPosition, "go mate infinite", multipvMoves, mateEngines);
+            }
+        }
+
+        private void SendPositionAndGoCommandToEngines(List<string> multiPonderRootPosition, string goCommand, String[] multipvMoves, List<Engine> engines)
+        {
             for (int i = 0; i < multipvMoves.Length; ++i)
             {
                 string move = multipvMoves[i];
@@ -528,7 +545,14 @@ namespace tanuki_proxy
                 {
                     continue;
                 }
-                var engine = multipvEngines[i];
+
+                // multipvの数に対してengineの数が足りていない可能性があるのでチェックする
+                if (engines.Count <= i)
+                {
+                    continue;
+                }
+
+                var engine = engines[i];
 
                 // 初期局面ではmovesを付ける
                 if (multiPonderRootPosition.Count == 2)
@@ -541,7 +565,7 @@ namespace tanuki_proxy
                 // 思考エンジンに局面を渡す
                 engine.Write(Join(multiPonderRootPosition));
 
-                // 思考エンジンにgoコマンドを渡す
+                // 思考エンジンにgo mate infiniteコマンドを渡す
                 engine.Write(goCommand);
 
                 // 1手指した後の局面を渡す

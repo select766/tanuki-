@@ -42,8 +42,9 @@ namespace tanuki_proxy
         public bool ProcessHasExited { get { return process.HasExited; } }
         public EngineBestmove Bestmove { get; set; }
         public bool MateEngine { get; set; }
-        private readonly ManualResetEvent eventBestmove = new ManualResetEvent(false);
+        private readonly ManualResetEvent eventMultipv = new ManualResetEvent(true);
         private string[] multipvMoves;
+        private readonly ManualResetEvent eventSearching = new ManualResetEvent(true);
 
         public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool mateEngine)
         {
@@ -211,6 +212,8 @@ namespace tanuki_proxy
             var input = Join(command);
             ExpectedDownstreamGo = input;
             actualDownstreamGo = null;
+            // eventSearchingを非シグナル状態にし、スレッドをブロックする
+            eventSearching.Reset();
             Log("  P> [{0}] {1}", id, input);
             WriteLineAndFlush(process.StandardInput, input);
         }
@@ -544,8 +547,12 @@ namespace tanuki_proxy
             // eventBestmove のスレッドを進行してしまう
             if (ExpectedDownstreamPosition == actualDownstreamPosition && ExpectedDownstreamGo == actualDownstreamGo)
             {
-                eventBestmove.Set();
+                eventMultipv.Set();
             }
+
+            // eventSearchingをシグナル状態にし、スレッドを進行可能な状態にする
+            // eventMultipvより先にシグナル状態にし、一つ前の手でスレッドが進行しないようにする
+            eventSearching.Set();
 
             // タイムキーパー以外はbestmoveを無視する
             if (!TimeKeeper)
@@ -643,17 +650,27 @@ namespace tanuki_proxy
             }
         }
 
-        public string[] GoWithMultiPv(int multiPv)
+        public string[] SearchWithMultiPv(string positionCommand, int multiPv)
         {
+            Write(positionCommand);
+
+            // 現在の探索が終了するまで待機する
+            eventSearching.WaitOne();
+
             Write(string.Format("setoption name MultiPV value {0}", multiPv));
             multipvMoves = new string[multiPv];
 
-            // eventBestmoveはひとつスレッドを進行すると自動的にリセットされる
-            eventBestmove.Reset();
+            // multipv探索結果がかえってくるまで待機できるよう
+            // eventMultipvを非シグナル状態にし、スレッドをブロックする
+            // eventSearchingとeventMultipvは統一しない
+            // 統一した場合、goコマンドがエンジンに出力される前に下のWaitOne()に到達し、
+            // multipv探索の結果を受け取らないまま進行してい舞う場合が考えられる
+            eventMultipv.Reset();
 
             Write("go byoyomi 100");
 
-            eventBestmove.WaitOne();
+            // multipv探索の結果が帰ってくるまで待機する
+            eventMultipv.WaitOne();
 
             Write("setoption name MultiPV value 1");
 
