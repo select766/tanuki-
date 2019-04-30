@@ -416,7 +416,7 @@ namespace USI
 		// 弱くするために調整する。20なら手加減なし。0が最弱。
 		o["SkillLevel"] << Option(20, 0, 20);
 #else
-		o["Hash"] << Option(4096, 1, MaxHashMB);
+		o["Hash"] << Option(1024, 1, MaxHashMB);
 #endif
 
 		// cin/coutの入出力をファイルにリダイレクトする
