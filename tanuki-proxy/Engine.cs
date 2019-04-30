@@ -40,7 +40,7 @@ namespace tanuki_proxy
         private readonly int id;
         public bool TimeKeeper { get; set; }
         public bool ProcessHasExited { get { return process.HasExited; } }
-        public EngineBestmove Bestmove { get; set; }
+        public EngineBestmove Bestmove { get; set; } = new EngineBestmove();
         public bool MateEngine { get; set; }
         private readonly ManualResetEvent eventMultipv = new ManualResetEvent(true);
         private string[] multipvMoves;
