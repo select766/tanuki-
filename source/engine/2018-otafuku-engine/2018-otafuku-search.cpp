@@ -2431,6 +2431,9 @@ void Thread::search()
 	// 一度TTEntryを送信してから次にTTEntryを送信するまでの間隔
 	int sendTTEtnriesInterval = Options["SendTTEntriesInterval"];
 
+	// TTEntryを送らない最初の時間
+	int dontSendTTEntriesFirst = Options["DontSendTTEntriesFirst"];
+
 	lastSendTTEntryTime = 0;
 
 	std::mutex sendTTEtnriesMutex;
@@ -2685,21 +2688,28 @@ void Thread::search()
 			completedDepth = rootDepth;
 
 		// PVのTTEntryを送る。
+		// ロックされている時間を最小にするため、
+		// Double-checked lockingを行う
 		if (Limits.send_ttentries
 			// 探索深さが浅いので
 			// Multi PV > 1 で探索しているときは TTEntry を送信しない
 			&& multiPV == 1
 			// 通信量が増えすぎるのと、I/O負荷が高くなりすぎるのを防ぐため、
 			// 前回からsendTTEtnriesInterval経過してから送るようにする
-			&& lastSendTTEntryTime + sendTTEtnriesInterval < Time.elapsed()) {
+			// sendTTEtnriesIntervalが0の場合はすべて送るようにする
+			&& lastSendTTEntryTime + sendTTEtnriesInterval <= Time.elapsed()
+			// 探索を始めてすぐはイテレーションが早く回り
+			// TTEntryをすべて送ろうとすると通信量が膨大になってしまう
+			// これを防ぐため、最初は送らないようにする
+			&& dontSendTTEntriesFirst < Time.elapsed()) {
 
 			// ロックのスコープを最小にするため、
-			// まず本当にTTEntryを送るかどうか決める
+			// まず本当にTTEntryを送るかどうかだけ決める
 			bool sendTTEntry = false;
 			{
 				std::lock_guard<std::mutex> lock(sendTTEtnriesMutex);
-				if (lastSendTTEntryTime + sendTTEtnriesInterval < Time.elapsed()) {
-					lastSendTTEntryTime = sendTTEtnriesInterval + Time.elapsed();
+				if (lastSendTTEntryTime + sendTTEtnriesInterval <= Time.elapsed()) {
+					lastSendTTEntryTime = Time.elapsed();
 					sendTTEntry = true;
 				}
 			}

@@ -504,7 +504,10 @@ namespace USI
 		o["SendTTEnties"] << Option(false);
 
 		// 前回TTEntryを送ってから次にTTEntryを送るまでの時間
-		o["SendTTEntriesInterval"] << Option(10, 0, 1000);
+		o["SendTTEntriesInterval"] << Option(10, 0, INT_MAX);
+
+		// TTEntryを送らない最初の時間
+		o["DontSendTTEntriesFirst"] << Option(100, 0, INT_MAX);
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
