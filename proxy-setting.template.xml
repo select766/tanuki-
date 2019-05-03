@@ -9,11 +9,11 @@
       <optionOverrides>
         <Option>
           <name>Hash</name>
-          <value>131072</value>
+          <value>262144</value>
         </Option>
         <Option>
           <name>Threads</name>
-          <value>71</value>
+          <value>95</value>
         </Option>
       </optionOverrides>
       <mateEngine>false</mateEngine>
@@ -26,11 +26,11 @@
       <optionOverrides>
         <Option>
           <name>Hash</name>
-          <value>131072</value>
+          <value>262144</value>
         </Option>
         <Option>
           <name>Threads</name>
-          <value>71</value>
+          <value>95</value>
         </Option>
       </optionOverrides>
       <mateEngine>false</mateEngine>
@@ -43,11 +43,11 @@
       <optionOverrides>
         <Option>
           <name>Hash</name>
-          <value>131072</value>
+          <value>262144</value>
         </Option>
         <Option>
           <name>Threads</name>
-          <value>71</value>
+          <value>95</value>
         </Option>
       </optionOverrides>
       <mateEngine>false</mateEngine>
@@ -60,11 +60,11 @@
       <optionOverrides>
         <Option>
           <name>Hash</name>
-          <value>131072</value>
+          <value>262144</value>
         </Option>
         <Option>
           <name>Threads</name>
-          <value>71</value>
+          <value>95</value>
         </Option>
       </optionOverrides>
       <mateEngine>false</mateEngine>
@@ -77,11 +77,11 @@
       <optionOverrides>
         <Option>
           <name>Hash</name>
-          <value>131072</value>
+          <value>262144</value>
         </Option>
         <Option>
           <name>Threads</name>
-          <value>71</value>
+          <value>95</value>
         </Option>
       </optionOverrides>
       <mateEngine>false</mateEngine>
