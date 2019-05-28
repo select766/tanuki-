@@ -1,11 +1,12 @@
 #include "tanuki_kifu_shuffler.h"
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 
 #include <direct.h>
 #include <cstdio>
 #include <random>
+#include <ctime>
 
 #include "tanuki_kifu_reader.h"
 #include "tanuki_kifu_writer.h"

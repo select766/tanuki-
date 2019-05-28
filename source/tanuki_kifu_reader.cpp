@@ -1,5 +1,5 @@
 #include "tanuki_kifu_reader.h"
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 
@@ -10,7 +10,7 @@
 #undef NOMINMAX
 
 #include "misc.h"
-#include "shogi.h"
+#include "usi.h"
 
 using USI::Option;
 using USI::OptionsMap;

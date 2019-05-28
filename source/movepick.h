@@ -1,7 +1,13 @@
-﻿#ifndef _MOVE_PICKER_H_
-#define _MOVE_PICKER_H_
+﻿#ifndef MOVEPICK_H_INCLUDED
+#define MOVEPICK_H_INCLUDED
 
-#include "shogi.h"
+#include <array>
+//#include <limits>
+//#include <type_traits>
+
+//#include "movegen.h"
+//#include "position.h"
+#include "types.h"
 
 // -----------------------
 //		history
@@ -24,15 +30,17 @@ class StatsEntry {
 	T entry;
 
 public:
-	T * get() { return &entry; }
 	void operator=(const T& v) { entry = v; }
-	operator TT() const { return entry; }
+	T* operator&() { return &entry; }
+	T* operator->() { return &entry; }
+	operator const T&() const { return entry; }
 
 	// このStatsEntry(Statsの1要素)に対して"<<"演算子でbonus値の加算が出来るようにしておく。
 	// 値が範囲外にならないように制限してある。
 	void operator<<(int bonus) {
-		ASSERT_LV3(abs(bonus) <= D);                   // 値の範囲が[-D, D]であることを保証する。
-		ASSERT_LV3(D < std::numeric_limits<T>::max()); // オーバーフローしないことを保証する。
+		ASSERT_LV3(abs(bonus) <= D); // 範囲が[-D,D]であるようにする。
+		// オーバーフローしないことを保証する。
+		static_assert(D <= std::numeric_limits<T>::max(), "D overflows T");
 		
 		entry += bonus - entry * abs(bonus) / D;
 
@@ -57,7 +65,7 @@ struct Stats : public std::array<Stats<T, D, Sizes...>, Size>
 
 template <typename T, int D, int Size>
 struct Stats<T, D, Size> : public std::array<StatsEntry<T, D>, Size> {
-	T* get() { return this->at(0).get(); }
+	T* get() { return &this->at(0); }
 };
 
 // stats tableにおいて、Dを0にした場合、このtemplate parameterは用いないという意味。
@@ -154,7 +162,7 @@ private:
 	// コンストラクタで渡されたhistroyのポインタを保存しておく変数。
 	const ButterflyHistory* mainHistory;
 	const CapturePieceToHistory* captureHistory;
-	const PieceToHistory** contHistory;
+	const PieceToHistory** continuationHistory;
 
 	// 置換表の指し手(コンストラクタで渡される)
 	Move ttMove;
@@ -186,4 +194,5 @@ private:
 	ExtMove moves[MAX_MOVES];
 };
 
-#endif // _MOVE_PICKER_H_
+#endif // #ifndef MOVEPICK_H_INCLUDED
+

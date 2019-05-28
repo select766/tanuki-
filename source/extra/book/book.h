@@ -1,10 +1,13 @@
 ﻿#ifndef _BOOK_H_
 #define _BOOK_H_
 
-#include "../../shogi.h"
+#include "../../types.h"
 #include "../../position.h"
 #include "../../misc.h"
+#include "../../usi.h"
+
 #include <unordered_map>
+#include <fstream>
 
 namespace Search { struct LimitsType; };
 
@@ -24,8 +27,15 @@ namespace Book
 
 		BookPos(Move best, Move next, int v, int d, uint64_t n) : bestMove(best), nextMove(next), value(v), depth(d), num(n) {}
 		bool operator == (const BookPos& rhs) const { return bestMove == rhs.bestMove; }
-		bool operator < (const BookPos& rhs) const { return num > rhs.num; } // std::sortで降順ソートされて欲しいのでこう定義する。
+
+		// std::sort()で出現回数に対して降順ソートされて欲しいのでこう定義する。
+		// また出現回数が同じ時は、評価値順に降順ソートされて欲しいので…。
+		bool operator < (const BookPos& rhs) const {
+			return (num != rhs.num) ? (num > rhs.num ) : (value > rhs.value);
+		}
 	};
+
+	static std::ostream& operator<<(std::ostream& os, BookPos c);
 
 	// ある局面での指し手の集合がPosMoveList。
 	// メモリ上ではこれをshared_ptrでくるんで保持する。
@@ -39,7 +49,7 @@ namespace Book
 
 	// PosMoveListPtrに対してBookPosを一つ追加するヘルパー関数。
 	// (その局面ですでに同じbestMoveの指し手が登録されている場合は上書き動作となる)
-	extern void insert_book_pos(PosMoveListPtr ptr, const BookPos& bp);
+	static void insert_book_pos(PosMoveListPtr ptr, const BookPos& bp);
 
 	// メモリ上にある定跡ファイル
 	// ・sfen文字列をkeyとして、局面の指し手へ変換するのが主な役割。(このとき重複した指し手は除外するものとする)
@@ -160,7 +170,13 @@ namespace Book
 		std::string get_book_name() const { return Path::Combine((std::string)Options["BookDir"], book_name); }
 
 		// probe()の下請け
-		bool probe_impl(Position& rootPos, bool silent, Move& bestMove, Move& ponderMove);
+		// forceHit == trueのときは、設定オプションの値を無視して強制的に定跡にhitさせる。(BookPvMovesの実装で用いる)
+		bool probe_impl(Position& rootPos, bool silent, Move& bestMove, Move& ponderMove , bool forceHit = false);
+
+		// 定跡のpv文字列を生成して返す。
+		// m : 局面posで進める指し手
+		// depth : 残りdepth
+		std::string pv_builder(Position& pos, Move m , int depth);
 
 		AsyncPRNG prng;
 	};

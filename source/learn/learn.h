@@ -1,9 +1,11 @@
 ﻿#ifndef _LEARN_H_
 #define _LEARN_H_
 
-#include "../shogi.h"
+#include "../config.h"
 
 #if defined(EVAL_LEARN)
+
+#include <vector>
 
 // =====================
 //  学習時の設定
@@ -214,8 +216,8 @@ namespace Learner
 
 		// 教師局面を書き出したファイルを他の人とやりとりするときに
 		// この構造体サイズが不定だと困るため、paddingしてどの環境でも必ず40bytesになるようにしておく。
-    // tanuki-棋譜生成ルーチンでは
-    // この変数を、各対局の最後の局面かどうかのフラグとして使う
+		// tanuki-棋譜生成ルーチンでは
+		// この変数を、各対局の最後の局面かどうかのフラグとして使う
 		u8 last_position;
 
 		// 32 + 2 + 2 + 2 + 1 + 1 = 40bytes
@@ -225,9 +227,9 @@ namespace Learner
 	// Learner::search() , Learner::qsearch()で用いる。
 	typedef std::pair<Value, std::vector<Move> > ValueAndPV;
 
-	// いまのところ、やねうら王2017Earlyしか、このスタブを持っていないが
+	// いまのところ、やねうら王2018 Otafukuしか、このスタブを持っていないが
 	// EVAL_LEARNをdefineするなら、このスタブが必須。
-	extern Learner::ValueAndPV  search(Position& pos, int depth , size_t multiPV = 1);
+	extern Learner::ValueAndPV  search(Position& pos, int depth , size_t multiPV = 1 , u64 NodesLimit = 0);
 	extern Learner::ValueAndPV qsearch(Position& pos);
 
 	double calc_grad(Value shallow, const PackedSfenValue& psv);

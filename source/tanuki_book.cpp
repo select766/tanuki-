@@ -1,5 +1,5 @@
 #include "tanuki_book.h"
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 
@@ -7,12 +7,14 @@
 #include <fstream>
 #include <sstream>
 #include <set>
+#include <ctime>
 
 #include "extra/book/book.h"
 #include "misc.h"
 #include "position.h"
 #include "tanuki_progress_report.h"
 #include "thread.h"
+#include "learn/learn.h"
 
 using Book::BookMoveSelector;
 using Book::BookPos;
@@ -34,10 +36,6 @@ namespace {
 	constexpr const char* kBookNarrowBook = "NarrowBook";
 	constexpr int kShowProgressAtMostSec = 10 * 60;
 	constexpr int kSaveEvalAtMostSec = 1 * 60;       // 1 minutes
-}
-
-namespace Learner {
-	std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV = 1);
 }
 
 bool Tanuki::InitializeBook(USI::OptionsMap& o) {
@@ -87,7 +85,7 @@ bool Tanuki::CreateRawBook() {
 			if (token == "startpos" || token == "moves") {
 				continue;
 			}
-			Move move = move_from_usi(pos, token);
+			Move move = USI::to_move(pos, token);
 			if (!pos.pseudo_legal(move) || !pos.legal(move)) {
 				continue;
 			}
@@ -342,7 +340,7 @@ bool Tanuki::ExtendBook() {
 				Move next_move =
 					value_and_pv.second.size() < 2 ? Move::MOVE_NONE : value_and_pv.second[1];
 				output_book.GetMemoryBook().insert(
-					sfen, { best_move, next_move, value_and_pv.first, search_depth, 1 });
+					sfen, Book::BookPos(best_move, next_move, value_and_pv.first, search_depth, 1));
 
 				sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size()
 					<< " |sfens_to_be_processed|=" << sfens_to_be_processed.size()

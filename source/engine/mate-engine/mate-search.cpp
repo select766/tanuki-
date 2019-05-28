@@ -1,10 +1,10 @@
-﻿#include "../../shogi.h"
-#ifdef MATE_ENGINE
+﻿#include "../../config.h"
+#if defined(MATE_ENGINE)
 
 #include <unordered_set>
+#include <cstring>	// std::memset()
 
 #include "../../extra/all.h"
-#include "mate-search.h" 
 
 using namespace std;
 using namespace Search;
@@ -351,7 +351,7 @@ namespace MateEngine
 		// 探索ノード数のチェック。
 		// 探索をマルチスレッドでやっていないので、nodes_searchedを求めるコストがなく、
 		// 毎回チェックしてもどうということはないはず。
-		if (Limits.nodes != 0 && nodes_searched >= Limits.nodes)
+		if (Limits.nodes != 0 && nodes_searched >= (uint64_t)Limits.nodes)
 		{
 			timeup = true;
 			Threads.stop = true;
@@ -819,44 +819,13 @@ namespace MateEngine
 			int64_t nps = nodes_searched * 1000LL / time_ms;
 			sync_cout << "info  time " << time_ms << " nodes " << nodes_searched << " nps "
 				<< nps << " hashfull " << transposition_table.hashfull() << sync_endl;
-
-			// プロセス間でTTEntryをやり取りするかどうか
-			bool send_ttentries = Options["SendTTEnties"];
-			if (send_ttentries) {
-				std::ostringstream oss;
-				StateInfo state_info[MAX_PLY] = {};
-				int num_moves = static_cast<int>(moves.size());
-				for (int move_index = 0; move_index < num_moves; ++move_index) {
-					Value value = (move_index % 2 == 0)
-						? mate_in(num_moves - move_index)
-						: mated_in(num_moves - move_index);
-					Move move = moves[move_index];
-					uint32_t move_uint32_t = static_cast<uint32_t>(moves[move_index]);
-					Bound bound = BOUND_EXACT;
-					Depth depth = static_cast<Depth>(num_moves - move_index);
-					oss
-						<< " " << r.key()
-						<< " " << move_uint32_t
-						<< " " << value
-#if !defined (NO_EVAL_IN_TT)
-						<< " " << value
-#endif
-						<< " " << bound
-						<< " " << depth;
-					r.do_move(move, state_info[move_index]);
-				}
-				for (int move_index = num_moves - 1; move_index >= 0; --move_index) {
-					r.undo_move(moves[move_index]);
-				}
-				sync_cout << "tt" << oss.str() << sync_endl;
-			}
 		}
 
 		// "stop"が送られてきたらThreads.stop == trueになる。
 		// "ponderhit"が送られてきたらThreads.ponder == 0になるので、それを待つ。(stopOnPonderhitは用いない)
 		//    また、このときThreads.stop == trueにはならない。(この点、Stockfishとは異なる。)
 		// "go infinite"に対してはstopが送られてくるまで待つ。
-		while (!Threads.stop && (Threads.ponder || Limits.infinite))
+		while (!Threads.stop && (Threads.main()->ponder || Limits.infinite))
 			sleep(1);
 		//	こちらの思考は終わっているわけだから、ある程度細かく待っても問題ない。
 		// (思考のためには計算資源を使っていないので。)
@@ -905,10 +874,10 @@ void Search::clear()
 #endif
 
 }
-void MainThread::think() {
-	Thread::search();
-}
-void Thread::search() {
+void MainThread::search() { Thread::search(); }
+
+void Thread::search()
+{
 	// 通常のgoコマンドで呼ばれたときは、resignを返す。
 	// 詰み用のworkerでそれだと支障がある場合は適宜変更する。
 	if (Search::Limits.mate == 0) {

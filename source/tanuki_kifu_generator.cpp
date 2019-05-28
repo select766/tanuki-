@@ -1,5 +1,5 @@
 #include "tanuki_kifu_generator.h"
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 
@@ -19,6 +19,7 @@
 #include "tanuki_kifu_writer.h"
 #include "tanuki_progress_report.h"
 #include "thread.h"
+#include "learn/learn.h"
 
 #ifdef abs
 #undef abs
@@ -27,11 +28,6 @@
 using Search::RootMove;
 using USI::Option;
 using USI::OptionsMap;
-
-namespace Learner {
-	std::pair<Value, std::vector<Move> > search(Position& pos, int depth, size_t multiPV);
-	std::pair<Value, std::vector<Move> > qsearch(Position& pos);
-}
 
 namespace {
 	constexpr int kMaxGamePlay = 400;
@@ -91,7 +87,7 @@ namespace {
 				}
 				if (token == "startpos" || token == "moves") continue;
 
-				Move m = move_from_usi(pos, token);
+				Move m = USI::to_move(pos, token);
 				if (!is_ok(m) || !pos.legal(m)) {
 					//  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " <<
 					//  token << endl << rootPos << sync_endl;
@@ -446,7 +442,7 @@ void Tanuki::ConvertSfenToLearningData() {
 					continue;
 				}
 
-				Move m = move_from_usi(pos, token);
+				Move m = USI::to_move(pos, token);
 				if (!is_ok(m) || !pos.legal(m)) {
 					break;
 				}

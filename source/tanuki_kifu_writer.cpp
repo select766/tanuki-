@@ -1,5 +1,5 @@
 #include "tanuki_kifu_writer.h"
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 

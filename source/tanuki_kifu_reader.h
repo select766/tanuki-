@@ -1,7 +1,7 @@
 #ifndef _TANUKI_KIFU_READER_H_
 #define _TANUKI_KIFU_READER_H_
 
-#include "extra/config.h"
+#include "config.h"
 
 #ifdef EVAL_LEARN
 

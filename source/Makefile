@@ -1,9 +1,7 @@
 # > Select YaneuraOu edition below.
 
 #YANEURAOU_EDITION = YANEURAOU_2018_OTAFUKU_ENGINE
-#YANEURAOU_EDITION = HELP_MATE_ENGINE
 #YANEURAOU_EDITION = MATE_ENGINE
-#YANEURAOU_EDITION = YANEURAOU_2018_GOKU_ENGINE
 YANEURAOU_EDITION = YANEURAOU_2018_TNK_ENGINE
 
 
@@ -41,10 +39,10 @@ endif
 ifeq ($(OS),Windows_NT)
 	CFLAGS += $(WCFLAGS)
 	LDFLAGS += -static -Wl,--stack,25000000
-	TARGET = tanuki-wcsc29.exe
+	TARGET = YaneuraOu-by-gcc.exe
 else
 	CFLAGS += -D_LINUX
-	TARGET = tanuki-wcsc29
+	TARGET = YaneuraOu-by-gcc
 endif
 
 # リンク時最適化。これをつけるとmsys2環境だとセグフォで落ちる。
@@ -106,17 +104,21 @@ ifeq "$(strip $(OBJDIR))" ""
 	OBJDIR = ..
 endif
 #SOURCES  = $(wildcard *.cpp)
-SOURCES  = shogi.cpp                                                           \
+SOURCES  = main.cpp                                                            \
+	types.cpp                                                                  \
 	bitboard.cpp                                                               \
 	misc.cpp                                                                   \
 	movegen.cpp                                                                \
 	position.cpp                                                               \
 	usi.cpp                                                                    \
+	usi_option.cpp                                                             \
 	thread.cpp                                                                 \
 	tt.cpp                                                                     \
-	move_picker.cpp                                                            \
+	movepick.cpp                                                               \
+	timeman.cpp                                                                \
 	extra/book/apery_book.cpp                                                  \
 	extra/book/book.cpp                                                        \
+	extra/book/makebook2019.cpp                                                \
 	extra/bitop.cpp                                                            \
 	extra/entering_king_win.cpp                                                \
 	extra/long_effect.cpp                                                      \
@@ -125,7 +127,6 @@ SOURCES  = shogi.cpp                                                           \
 	extra/mate/mate_n_ply.cpp                                                  \
 	extra/benchmark.cpp                                                        \
 	extra/test_cmd.cpp                                                         \
-	extra/timeman.cpp                                                          \
 	extra/see.cpp                                                              \
 	extra/sfen_packer.cpp                                                      \
 	extra/kif_converter/kif_convert_tools.cpp                                  \
@@ -134,21 +135,10 @@ SOURCES  = shogi.cpp                                                           \
 	eval/kppt/evaluate_kppt_learner.cpp                                        \
 	eval/kpp_kkpt/evaluate_kpp_kkpt.cpp                                        \
 	eval/kpp_kkpt/evaluate_kpp_kkpt_learner.cpp                                \
-	eval/kpppt/evaluate_kpppt.cpp                                              \
-	eval/kpppt/evaluate_kpppt_learner.cpp                                      \
-	eval/kppp_kkpt/evaluate_kppp_kkpt.cpp                                      \
-	eval/kppp_kkpt/evaluate_kppp_kkpt_learner.cpp                              \
-	eval/kkpp_kkpt/evaluate_kkpp_kkpt.cpp                                      \
-	eval/kkpp_kkpt/evaluate_kkpp_kkpt_learner.cpp                              \
-	eval/kkppt/evaluate_kkppt.cpp                                              \
-	eval/kkppt/evaluate_kkppt_learner.cpp                                      \
-	eval/kpp_kkpt_fv_var/evaluate_kpp_kkpt_fv_var.cpp                          \
-	eval/kpp_kkpt_fv_var/evaluate_kpp_kkpt_fv_var_learner.cpp                  \
 	eval/evaluate.cpp                                                          \
 	eval/evaluate_io.cpp                                                       \
 	eval/evaluate_mir_inv_tools.cpp                                            \
 	engine/user-engine/user-search.cpp                                         \
-	engine/help-mate-engine/help-mate-search.cpp                               \
 	engine/2018-otafuku-engine/2018-otafuku-search.cpp                         \
 	learn/learner.cpp                                                          \
 	learn/learning_tools.cpp                                                   \
@@ -191,6 +181,10 @@ evallearn:
 	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
 evallearn-sse42:
 	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE42 -msse4.2 -march=corei7' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
+
+# 教師棋譜生成用
+gensfen:
+	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -DGENSFEN2019 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
 tournament:
 	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -DFOR_TOURNAMENT -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)

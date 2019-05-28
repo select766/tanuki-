@@ -1,5 +1,8 @@
 ﻿#include "evaluate_io.h"
 #include "../misc.h"
+#include "../usi.h"
+
+#include <fstream>
 
 namespace EvalIO
 {
