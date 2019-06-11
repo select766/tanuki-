@@ -231,7 +231,7 @@ namespace TanukiColiseum
             EnableControls(false);
             progressBar1.Value = 0;
             textBoxOutput.Text = "(対局準備中です。しばらくお待ちください。)";
-            await Task.Run(() => coliseum.Run(options));
+            await coliseum.RunAsync(options);
             EnableControls(true);
         }
 

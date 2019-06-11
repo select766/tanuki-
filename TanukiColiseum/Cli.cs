@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace TanukiColiseum
 {
@@ -9,7 +10,7 @@ namespace TanukiColiseum
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowResult;
             coliseum.OnError += OnError;
-            coliseum.Run(options);
+            coliseum.RunAsync(options).Wait();
         }
 
         private void ShowResult(Status status)

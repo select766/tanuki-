@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
+using System.Threading.Tasks;
 
 namespace TanukiColiseum
 {
@@ -8,26 +9,11 @@ namespace TanukiColiseum
         public void Run(string[] args)
         {
             var options = new Options();
-            try
-            {
-                options.Parse(args);
-            }
-            catch (ArgumentException e)
-            {
-                Environment.FailFast("Failed to start TanukiColiseum.", e);
-            }
+            options.Parse(args);
 
             if (options.Interface == Options.UserInterface.Cli)
             {
-                try
-                {
-                    options.Validate();
-                }
-                catch (ArgumentException e)
-                {
-                    Environment.FailFast("Invalid argument(s).", e);
-                }
-
+                options.Validate();
                 var cli = new Cli();
                 cli.Run(options);
             }
