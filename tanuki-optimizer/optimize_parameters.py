@@ -269,12 +269,12 @@ def main():
     STATE = HyperoptState()
     STATE_STORE_PATH = 'optimize_parameters.hyperopt_state.{}.pickle'.format(datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     if COMMANDLINE_ARGS.dump_log is not None:
-        STATE = HyperoptState.load(commandline_args.dump_log)
+        STATE = HyperoptState.load(COMMANDLINE_ARGS.dump_log)
         STATE.dump_log()
         sys.exit(0)
 
     if COMMANDLINE_ARGS.resume is not None:
-        STATE = HyperoptState.load(commandline_args.resume)
+        STATE = HyperoptState.load(COMMANDLINE_ARGS.resume)
         START_COUNTER = STATE.get_n_accumulated_iterations()
         CURRENT_COUNTER = START_COUNTER
 

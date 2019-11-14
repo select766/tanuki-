@@ -78,6 +78,10 @@ namespace TanukiColiseum
                 Console.Out.Flush();
                 var engine1 = new Engine(options.Engine1FilePath, this, gameIndex * 2, gameIndex, 0, numaNode, overriddenOptions1);
                 engine1.StartAsync().Wait(TimeSpan.FromMinutes(1));
+                // Windows 10 May 2019 Updateにおいて、
+                // 複数のプロセスが同時に大量のメモリを確保しようとしたときに
+                // フリーズする現象を確認した
+                // 原因がわかるまでは1プロセスずつメモリを確保するようにする
                 if (engine1.HasExited)
                 {
                     OnError($"エンジン1が異常終了しました gameIndex={gameIndex}");
@@ -110,7 +114,6 @@ namespace TanukiColiseum
                     OnError($"エンジン2が異常終了しました gameIndex={gameIndex}");
                     return;
                 }
-
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手

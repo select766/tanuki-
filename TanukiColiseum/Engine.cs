@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -42,17 +43,17 @@ namespace TanukiColiseum
         /// 思考エンジンを開始し、isreadyを送信し、readyokが返るのを待つ
         /// </summary>
         /// <returns></returns>
-        public Task StartAsync()
+        public async Task StartAsync()
         {
-            //BeginOutputReadLine()/BeginErrorReadLine()が呼び出されたあと
-            //読み込みスレッドが動かないので
-            // スレッド経由で実行する
-            // TODO(nodchip): async/await構文に書き換える
+            // 同期的に実行した場合、
+            // BeginOutputReadLine()/BeginErrorReadLine()が呼び出されたあと
+            // 読み込みスレッドが動かない
+            // これを避けるため、ReadyokSemaphoreSlimを非同期的に待機する
             Process.Start();
             Process.BeginOutputReadLine();
             Process.BeginErrorReadLine();
             Send("usi");
-            return ReadyokSemaphoreSlim.WaitAsync();
+            await ReadyokSemaphoreSlim.WaitAsync();
         }
 
         public void Finish()
