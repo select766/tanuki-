@@ -54,8 +54,6 @@ namespace TanukiColiseum
             Console.WriteLine("Initializing engines...");
             Console.Out.Flush();
 
-            List<Task> startAsyncTasks = new List<Task>();
-
             for (int gameIndex = 0; gameIndex < options.NumConcurrentGames; ++gameIndex)
             {
                 int numaNode = gameIndex * options.NumNumaNodes / options.NumConcurrentGames;
@@ -79,7 +77,12 @@ namespace TanukiColiseum
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
                 var engine1 = new Engine(options.Engine1FilePath, this, gameIndex * 2, gameIndex, 0, numaNode, overriddenOptions1);
-                startAsyncTasks.Add(engine1.StartAsync());
+                engine1.StartAsync().Wait(TimeSpan.FromMinutes(1));
+                if (engine1.HasExited)
+                {
+                    OnError($"エンジン1が異常終了しました gameIndex={gameIndex}");
+                    return;
+                }
 
                 // エンジン2初期化
                 Dictionary<string, string> overriddenOptions2 = new Dictionary<string, string>()
@@ -101,17 +104,18 @@ namespace TanukiColiseum
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
                 var engine2 = new Engine(options.Engine2FilePath, this, gameIndex * 2 + 1, gameIndex, 1, numaNode, overriddenOptions2);
-                startAsyncTasks.Add(engine2.StartAsync());
+                engine2.StartAsync().Wait(TimeSpan.FromMinutes(1));
+                if (engine2.HasExited)
+                {
+                    OnError($"エンジン2が異常終了しました gameIndex={gameIndex}");
+                    return;
+                }
+
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手
                 Games.Add(new Game(gameIndex & 1, options.Nodes1, options.Nodes2, engine1, engine2,
                     options.NumBookMoves, openings));
-            }
-
-            foreach (var startAsyncTask in startAsyncTasks)
-            {
-                startAsyncTask.Wait();
             }
 
             Console.WriteLine("Initialized engines...");
