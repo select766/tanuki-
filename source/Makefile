@@ -43,8 +43,8 @@ DEBUG = OFF
 
 
 # clangでコンパイルしたほうがgccより数%速いっぽい。
-#COMPILER = g++
-COMPILER = clang++
+COMPILER = g++
+#COMPILER = clang++
 
 
 # 標準的なコンパイルオプション
@@ -148,7 +148,7 @@ endif
 
 # NNUE評価関数 学習バイナリ用 OpenBLAS
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
-	BLAS = -DUSE_BLAS
+	BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS
 	BLAS_LDFLAGS = -lopenblas
 	ifeq ($(MSYSTEM),MINGW64)
 		BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
@@ -197,7 +197,13 @@ SOURCES  = \
 	eval/evaluate_mir_inv_tools.cpp                                            \
 	learn/learner.cpp                                                          \
 	learn/learning_tools.cpp                                                   \
-	learn/multi_think.cpp
+	learn/multi_think.cpp                                                      \
+	tanuki_book.cpp                                                            \
+	tanuki_kifu_generator.cpp                                                  \
+	tanuki_kifu_shuffler.cpp                                                   \
+	tanuki_progress_report.cpp                                                 \
+	tanuki_kifu_writer.cpp                                                     \
+	tanuki_kifu_reader.cpp
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
 	SOURCES += \

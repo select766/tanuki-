@@ -2690,7 +2690,7 @@ void learn(Position&, istringstream& is)
 		#pragma warning(push)
 		#pragma warning(disable:4996)
 
-		namespace sys = std::tr2::sys;
+		namespace sys = std::filesystem;
 		sys::path p(kif_base_dir); // 列挙の起点
 		std::for_each(sys::directory_iterator(p), sys::directory_iterator(),
 			[&](const sys::path& p) {

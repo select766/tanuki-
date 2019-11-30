@@ -8,6 +8,10 @@
 #include <sstream>
 #include <queue>
 
+#include "tanuki_book.h"
+#include "tanuki_kifu_generator.h"
+#include "tanuki_kifu_shuffler.h"
+
 using namespace std;
 
 // ユーザーの実験用に開放している関数。
@@ -773,6 +777,23 @@ void USI::loop(int argc, char* argv[])
 		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
 		// 我々はこれに関知しないので単に無視すれば良い。
 		else if (token == "usinewgame") continue;
+
+#ifdef EVAL_LEARN
+		else if (token == "create_raw_book") Tanuki::CreateRawBook();
+
+		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
+
+		else if (token == "extend_book") {
+			Tanuki::ExtendBook();
+			break;
+		}
+
+		else if (token == "generate_kifu") Tanuki::GenerateKifu();
+
+		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();
+
+		else if (token == "shuffle_kifu") Tanuki::ShuffleKifu();
+#endif
 
 		else
 		{
