@@ -3,6 +3,10 @@
 #include "usi.h"
 #include "misc.h"
 
+#include "tanuki_book.h"
+#include "tanuki_kifu_generator.h"
+#include "tanuki_kifu_shuffler.h"
+
 using std::string;
 
 // Option設定が格納されたglobal object。
@@ -160,6 +164,11 @@ namespace USI {
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
+#ifdef EVAL_LEARN
+		Tanuki::InitializeBook(o);
+		Tanuki::InitializeGenerator(o);
+		Tanuki::InitializeShuffler(o);
+#endif
 		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options();
 	}

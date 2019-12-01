@@ -788,6 +788,11 @@ void USI::loop(int argc, char* argv[])
 			break;
 		}
 
+		else if (token == "merge_book") {
+			Tanuki::MergeBook();
+			break;
+		}
+
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();

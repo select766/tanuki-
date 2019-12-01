@@ -50,6 +50,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	return true;
 }
 
+// sfen棋譜ファイルから定跡データベースを作成する
 bool Tanuki::CreateRawBook() {
 	Search::LimitsType limits;
 	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
@@ -409,6 +410,59 @@ bool Tanuki::ExtendBook() {
 
 		input_is_first = !input_is_first;
 	}
+
+	return true;
+}
+
+// 複数の定跡をマージする
+// BookInputFileには「;」区切りで定跡データベースの古パースを指定する
+// BookOutputFileにはbook以下のファイル名を指定する
+bool Tanuki::MergeBook() {
+	std::string input_file_list = Options[kBookInputFile];
+	std::string output_file = Options[kBookOutputFile];
+
+	sync_cout << "info string input_file_list=" << input_file_list << sync_endl;
+	sync_cout << "info string output_file=" << output_file << sync_endl;
+
+	BookMoveSelector output_book;
+	sync_cout << "Reading output book file: " << output_file << sync_endl;
+	output_book.GetMemoryBook().read_book("book/" + output_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size() << sync_endl;
+
+	std::istringstream iss(input_file_list);
+	std::string input_file;
+	while (std::getline(iss, input_file, ';')) {
+		BookMoveSelector input_book;
+		sync_cout << "Reading input book file: " << input_file << sync_endl;
+		input_book.GetMemoryBook().read_book(input_file);
+		sync_cout << "done..." << sync_endl;
+		sync_cout << "|input_book|=" << input_book.GetMemoryBook().book_body.size() << sync_endl;
+
+		for (const auto& book_type : input_book.GetMemoryBook().book_body) {
+			const auto& sfen = book_type.first;
+			const auto& pos_move_list = book_type.second;
+
+			uint64_t max_num = 0;
+			for (const auto& pos_move : *pos_move_list) {
+				max_num = std::max(max_num, pos_move.num);
+			}
+
+			for (const auto& pos_move : *pos_move_list) {
+				if (max_num > 0 && pos_move.num == 0) {
+					// 採択回数が設定されており、この手の採択回数が0の場合、
+					// 手動でこの手を指さないよう調整されている。
+					// そのような手はスキップする。
+					continue;
+				}
+				output_book.GetMemoryBook().insert(sfen, pos_move);
+			}
+		}
+	}
+
+	sync_cout << "Writing the book file..." << sync_endl;
+	output_book.GetMemoryBook().write_book("book/" + output_file);
+	sync_cout << "done..." << sync_endl;
 
 	return true;
 }
