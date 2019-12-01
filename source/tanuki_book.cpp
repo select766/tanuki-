@@ -1,3 +1,5 @@
+#pragma optimize( "", off )
+
 #include "tanuki_book.h"
 #include "config.h"
 
@@ -34,8 +36,9 @@ namespace {
 	constexpr const char* kMultiPV = "MultiPV";
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
-	constexpr int kShowProgressAtMostSec = 10 * 60;
-	constexpr int kSaveEvalAtMostSec = 1 * 60;       // 1 minutes
+	constexpr int kShowProgressAtMostSec = 1 * 60;	// 1分
+	//constexpr int kShowProgressAtMostSec = 60 * 60;	// 1時間
+	constexpr int kSaveEvalAtMostSec = 60 * 60;		// 1時間
 }
 
 bool Tanuki::InitializeBook(USI::OptionsMap& o) {
@@ -186,52 +189,52 @@ bool Tanuki::CreateScoredBook() {
 			save_per_positions, &global_pos_index, &sfens, &output_book,
 			&output_book_mutex, &progress_report, &output_book_file,
 			&global_num_processed_positions]() {
-			WinProcGroup::bindThisThread(thread_index);
+				WinProcGroup::bindThisThread(thread_index);
 
-			for (int position_index = global_pos_index++; position_index < num_sfens;
-				position_index = global_pos_index++) {
-				const std::string& sfen = sfens[position_index];
-				Thread& thread = *Threads[thread_index];
-				StateInfo state_info = {};
-				Position& pos = thread.rootPos;
-				pos.set(sfen, &state_info, &thread);
+				for (int position_index = global_pos_index++; position_index < num_sfens;
+					position_index = global_pos_index++) {
+					const std::string& sfen = sfens[position_index];
+					Thread& thread = *Threads[thread_index];
+					StateInfo state_info = {};
+					Position& pos = thread.rootPos;
+					pos.set(sfen, &state_info, &thread);
 
-				if (pos.is_mated()) {
-					continue;
-				}
-
-				Learner::search(pos, search_depth, multi_pv, search_nodes);
-
-				int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
-				for (int pv_index = 0; pv_index < num_pv; ++pv_index) {
-					const auto& root_move = thread.rootMoves[pv_index];
-					Move best = Move::MOVE_NONE;
-					if (root_move.pv.size() >= 1) {
-						best = root_move.pv[0];
+					if (pos.is_mated()) {
+						continue;
 					}
-					Move next = Move::MOVE_NONE;
-					if (root_move.pv.size() >= 2) {
-						next = root_move.pv[1];
+
+					Learner::search(pos, search_depth, multi_pv, search_nodes);
+
+					int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
+					for (int pv_index = 0; pv_index < num_pv; ++pv_index) {
+						const auto& root_move = thread.rootMoves[pv_index];
+						Move best = Move::MOVE_NONE;
+						if (root_move.pv.size() >= 1) {
+							best = root_move.pv[0];
+						}
+						Move next = Move::MOVE_NONE;
+						if (root_move.pv.size() >= 2) {
+							next = root_move.pv[1];
+						}
+						int value = root_move.score;
+						BookPos book_pos(best, next, value, search_depth, 0);
+						{
+							std::lock_guard<std::mutex> lock(output_book_mutex);
+							output_book.insert(sfen, book_pos);
+						}
 					}
-					int value = root_move.score;
-					BookPos book_pos(best, next, value, search_depth, 0);
-					{
+
+					int num_processed_positions = ++global_num_processed_positions;
+					progress_report.Show(num_processed_positions);
+
+					if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
 						std::lock_guard<std::mutex> lock(output_book_mutex);
-						output_book.insert(sfen, book_pos);
+						sync_cout << "Writing the book file..." << sync_endl;
+						output_book.write_book(output_book_file);
+						sync_cout << "done..." << sync_endl;
 					}
 				}
-
-				int num_processed_positions = ++global_num_processed_positions;
-				progress_report.Show(num_processed_positions);
-
-				if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
-					std::lock_guard<std::mutex> lock(output_book_mutex);
-					sync_cout << "Writing the book file..." << sync_endl;
-					output_book.write_book(output_book_file);
-					sync_cout << "done..." << sync_endl;
-				}
-			}
-		}));
+			}));
 	}
 
 	for (auto& thread : threads) {
@@ -302,61 +305,61 @@ bool Tanuki::ExtendBook() {
 			&last_save_time, &sfens_to_be_processed, &sfens_processing,
 			&input_book, &output_book, &sfens_mutex, &output_mutex,
 			&cv]() {
-			WinProcGroup::bindThisThread(thread_index);
+				WinProcGroup::bindThisThread(thread_index);
 
-			for (;;) {
-				std::string sfen;
-				{
-					std::unique_lock<std::mutex> lock(sfens_mutex);
-					cv.wait(lock,
-						[&sfens_to_be_processed] { return !sfens_to_be_processed.empty(); });
-					sfen = *sfens_to_be_processed.begin();
-					sfens_to_be_processed.erase(sfens_to_be_processed.begin());
-					sfens_processing.insert(sfen);
-				}
+				for (;;) {
+					std::string sfen;
+					{
+						std::unique_lock<std::mutex> lock(sfens_mutex);
+						cv.wait(lock,
+							[&sfens_to_be_processed] { return !sfens_to_be_processed.empty(); });
+						sfen = *sfens_to_be_processed.begin();
+						sfens_to_be_processed.erase(sfens_to_be_processed.begin());
+						sfens_processing.insert(sfen);
+					}
 
-				Position& pos = Threads[thread_index]->rootPos;
-				StateInfo state_info[512];
-				pos.set(sfen, &state_info[0], Threads[thread_index]);
+					Position& pos = Threads[thread_index]->rootPos;
+					StateInfo state_info[512];
+					pos.set(sfen, &state_info[0], Threads[thread_index]);
 
-				if (pos.is_mated()) {
+					if (pos.is_mated()) {
+						std::lock_guard<std::mutex> lock_sfens(sfens_mutex);
+						sfens_processing.erase(sfen);
+
+						std::lock_guard<std::mutex> lock_output(output_mutex);
+						output_book.GetMemoryBook().insert(
+							sfen, { Move::MOVE_RESIGN, Move::MOVE_NONE, -VALUE_MATE, search_depth, 1 });
+					}
+
+					auto value_and_pv = Learner::search(pos, search_depth);
+
 					std::lock_guard<std::mutex> lock_sfens(sfens_mutex);
 					sfens_processing.erase(sfen);
 
 					std::lock_guard<std::mutex> lock_output(output_mutex);
+					Move best_move =
+						value_and_pv.second.empty() ? Move::MOVE_NONE : value_and_pv.second[0];
+					Move next_move =
+						value_and_pv.second.size() < 2 ? Move::MOVE_NONE : value_and_pv.second[1];
 					output_book.GetMemoryBook().insert(
-						sfen, { Move::MOVE_RESIGN, Move::MOVE_NONE, -VALUE_MATE, search_depth, 1 });
+						sfen, Book::BookPos(best_move, next_move, value_and_pv.first, search_depth, 1));
+
+					sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size()
+						<< " |sfens_to_be_processed|=" << sfens_to_be_processed.size()
+						<< " |sfens_processing|=" << sfens_processing.size() << sync_endl;
+
+					time_t now = std::time(nullptr);
+					if (now - last_save_time < kSaveEvalAtMostSec) {
+						continue;
+					}
+
+					sync_cout << "Writing the book file..." << sync_endl;
+					// 上書き保存する
+					output_book.GetMemoryBook().write_book("book/" + output_file);
+					last_save_time = now;
+					sync_cout << "done..." << sync_endl;
 				}
-
-				auto value_and_pv = Learner::search(pos, search_depth);
-
-				std::lock_guard<std::mutex> lock_sfens(sfens_mutex);
-				sfens_processing.erase(sfen);
-
-				std::lock_guard<std::mutex> lock_output(output_mutex);
-				Move best_move =
-					value_and_pv.second.empty() ? Move::MOVE_NONE : value_and_pv.second[0];
-				Move next_move =
-					value_and_pv.second.size() < 2 ? Move::MOVE_NONE : value_and_pv.second[1];
-				output_book.GetMemoryBook().insert(
-					sfen, Book::BookPos(best_move, next_move, value_and_pv.first, search_depth, 1));
-
-				sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size()
-					<< " |sfens_to_be_processed|=" << sfens_to_be_processed.size()
-					<< " |sfens_processing|=" << sfens_processing.size() << sync_endl;
-
-				time_t now = std::time(nullptr);
-				if (now - last_save_time < kSaveEvalAtMostSec) {
-					continue;
-				}
-
-				sync_cout << "Writing the book file..." << sync_endl;
-				// 上書き保存する
-				output_book.GetMemoryBook().write_book("book/" + output_file);
-				last_save_time = now;
-				sync_cout << "done..." << sync_endl;
-			}
-		}));
+			}));
 	}
 
 	bool input_is_first = true;
@@ -467,4 +470,167 @@ bool Tanuki::MergeBook() {
 	return true;
 }
 
+// 定跡の各指し手に評価値を付ける
+// 相手の応手が設定されていない場合、読み筋から設定する。
+bool Tanuki::SetScoreToMove() {
+	int num_threads = (int)Options[kThreads];
+	std::string input_book_file = Options[kBookInputFile];
+
+	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
+	std::string output_book_file = Options[kBookOutputFile];
+	int save_per_positions = (int)Options[kBookSavePerPositions];
+	bool overwrite_existing_positions = static_cast<bool>(Options[kBookOverwriteExistingPositions]);
+
+	sync_cout << "info string num_threads=" << num_threads << sync_endl;
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
+	sync_cout << "info string overwrite_existing_positions=" << overwrite_existing_positions
+		<< sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	MemoryBook input_book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	input_book.read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
+
+	std::vector<std::string> sfens;
+
+	// 既に探索した局面については探索しない
+	for (const auto& sfen_and_pos_move_list : input_book.book_body) {
+		if (!overwrite_existing_positions &&
+			output_book.book_body.find(sfen_and_pos_move_list.first) != output_book.book_body.end()) {
+			continue;
+		}
+		sfens.push_back(sfen_and_pos_move_list.first);
+	}
+	int num_sfens = sfens.size();
+	sync_cout << "Number of the positions to be processed: " << num_sfens << sync_endl;
+
+	// 定跡保存周期調整のため
+	time_t start_time = 0;
+	std::time(&start_time);
+
+	// マルチスレッド処理準備のため、インデックスを初期化する
+	std::atomic_int global_position_index;
+	global_position_index = 0;
+	std::mutex output_book_mutex;
+
+	// 進捗状況表示の準備
+	ProgressReport progress_report(num_sfens, kShowProgressAtMostSec);
+
+	// Apery式マルチスレッド処理
+	std::vector<std::thread> threads;
+	std::atomic_int global_pos_index;
+	global_pos_index = 0;
+	std::atomic_int global_num_processed_positions;
+	global_num_processed_positions = 0;
+	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+		auto procedure = [thread_index, num_sfens, search_depth, search_nodes,
+			save_per_positions, &global_pos_index, &sfens, &output_book, &output_book_mutex,
+			&progress_report, &output_book_file,
+			&global_num_processed_positions, &input_book]() {
+			WinProcGroup::bindThisThread(thread_index);
+
+			for (int position_index = global_pos_index++; position_index < num_sfens;
+				position_index = global_pos_index++) {
+				const std::string& sfen = sfens[position_index];
+				Thread& thread = *Threads[thread_index];
+				StateInfo state_info[MAX_PLY] = {};
+				Position& pos = thread.rootPos;
+				pos.set(sfen, state_info, &thread);
+
+				if (pos.is_mated()) {
+					continue;
+				}
+
+				auto sfen_and_pos_move_list_ptr = input_book.book_body.find(sfen);
+				if (sfen_and_pos_move_list_ptr == input_book.book_body.end()) {
+					sync_cout << "sfen not found. sfen=" << sfen << sync_endl;
+				}
+
+				for (auto& pos_move : *sfen_and_pos_move_list_ptr->second) {
+					// 定跡の手で1手進める
+					pos.do_move(pos_move.bestMove, state_info[1]);
+
+					// この局面について探索する
+					auto value_and_pv = Learner::search(pos, search_depth, 1, search_nodes);
+
+					auto value = value_and_pv.first;
+					auto pv = value_and_pv.second;
+
+					if (pos_move.nextMove == Move::MOVE_NONE && pv.size() >= 1) {
+						// 定跡の手を指した次の局面なので、nextMoveにはpv[0]を代入する。
+						// ただし、もともとnextMoveが設定されている場合、それを優先する。
+						pos_move.nextMove = pv[0];
+					}
+
+					// ひとつ前の局面から見た評価値を代入する必要があるので、符号を反転する。
+					pos_move.value = -value;
+
+					pos_move.depth = pos.this_thread()->completedDepth;
+
+					// 定跡の局面に戻す
+					pos.undo_move(pos_move.bestMove);
+				}
+
+				// 出力先の定跡に登録する
+				// 1手ずつ登録すると中途半端なタイミングでストレージに書かれる場合があり、
+				// 中断した際に一部の手が書きだされない場合がある。
+				// そのため、まとめて登録する
+				{
+					std::lock_guard<std::mutex> lock(output_book_mutex);
+					for (auto& pos_move : *sfen_and_pos_move_list_ptr->second) {
+						output_book.insert(sfen, pos_move);
+					}
+				}
+
+				// 進捗状況を表示する
+				int num_processed_positions = ++global_num_processed_positions;
+				progress_report.Show(num_processed_positions);
+
+				// 定跡をストレージに書き出す。
+				if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
+					std::lock_guard<std::mutex> lock(output_book_mutex);
+					sync_cout << "Writing the book file..." << sync_endl;
+					output_book.write_book(output_book_file);
+					sync_cout << "done..." << sync_endl;
+				}
+			}
+		};
+		threads.push_back(std::thread(procedure));
+	}
+
+	for (auto& thread : threads) {
+		thread.join();
+	}
+
+	sync_cout << "Writing the book file..." << sync_endl;
+	output_book.write_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+
+	return true;
+}
+
 #endif
+
+#pragma optimize( "", on )

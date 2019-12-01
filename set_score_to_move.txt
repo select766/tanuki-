@@ -1,0 +1,13 @@
+usi
+setoption name Hash value 1024
+setoption name EvalDir value C:\home\nodchip\hakubishin-private\book\tanuki-wcsc29-2019-05-06\eval
+setoption name BookInputFile value merged.db
+setoption name BookOutputFile value set_score_to_move.db
+setoption name Threads value 1
+setoption name BookSearchDepth value 64
+setoption name BookSearchNodes value 5000000
+setoption name BookSavePerPositions value 1
+setoption name OverwriteExistingPositions value false
+isready
+usinewgame
+set_score_to_move

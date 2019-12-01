@@ -13,6 +13,7 @@ namespace Tanuki {
 	bool CreateScoredBook();
 	bool ExtendBook();
 	bool MergeBook();
+	bool SetScoreToMove();
 }
 
 #endif

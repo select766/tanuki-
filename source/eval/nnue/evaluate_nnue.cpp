@@ -129,10 +129,22 @@ static Value ComputeScore(const Position& pos, bool refresh = false) {
     return accumulator.score;
   }
 
-  alignas(kCacheLineSize) TransformedFeatureType
-      transformed_features[FeatureTransformer::kBufferSize];
+  void* ptr = nullptr;
+  std::size_t space = 0;
+
+  char transformed_features_raw[
+	  FeatureTransformer::kBufferSize * sizeof(TransformedFeatureType) + kCacheLineSize];
+  ptr = transformed_features_raw;
+  space = sizeof(transformed_features_raw);
+  TransformedFeatureType* transformed_features = static_cast<TransformedFeatureType*>(
+	  std::align(kCacheLineSize, FeatureTransformer::kBufferSize * sizeof(TransformedFeatureType),
+		  ptr, space));
   feature_transformer->Transform(pos, transformed_features, refresh);
-  alignas(kCacheLineSize) char buffer[Network::kBufferSize];
+
+  char buffer_raw[Network::kBufferSize + kCacheLineSize];
+  ptr = buffer_raw;
+  space = sizeof(buffer_raw);
+  char* buffer = static_cast<char*>(std::align(kCacheLineSize, Network::kBufferSize, ptr, space));
   const auto output = network->Propagate(transformed_features, buffer);
 
   // VALUE_MAX_EVALより大きな値が返ってくるとaspiration searchがfail highして
