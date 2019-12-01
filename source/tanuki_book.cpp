@@ -1,5 +1,3 @@
-#pragma optimize( "", off )
-
 #include "tanuki_book.h"
 #include "config.h"
 
@@ -36,8 +34,8 @@ namespace {
 	constexpr const char* kMultiPV = "MultiPV";
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
-	constexpr int kShowProgressAtMostSec = 1 * 60;	// 1•ª
-	//constexpr int kShowProgressAtMostSec = 60 * 60;	// 1ŽžŠÔ
+	//constexpr int kShowProgressAtMostSec = 1 * 60;	// 1•ª
+	constexpr int kShowProgressAtMostSec = 60 * 60;	// 1ŽžŠÔ
 	constexpr int kSaveEvalAtMostSec = 60 * 60;		// 1ŽžŠÔ
 }
 
@@ -632,5 +630,3 @@ bool Tanuki::SetScoreToMove() {
 }
 
 #endif
-
-#pragma optimize( "", on )
