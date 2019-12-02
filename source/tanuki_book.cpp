@@ -553,9 +553,9 @@ bool Tanuki::SetScoreToMove() {
 				position_index = global_pos_index++) {
 				const std::string& sfen = sfens[position_index];
 				Thread& thread = *Threads[thread_index];
-				StateInfo state_info[MAX_PLY] = {};
+				StateInfo state_info = {};
 				Position& pos = thread.rootPos;
-				pos.set(sfen, state_info, &thread);
+				pos.set(sfen, &state_info, &thread);
 
 				if (pos.is_mated()) {
 					continue;
@@ -564,11 +564,22 @@ bool Tanuki::SetScoreToMove() {
 				auto sfen_and_pos_move_list_ptr = input_book.book_body.find(sfen);
 				if (sfen_and_pos_move_list_ptr == input_book.book_body.end()) {
 					sync_cout << "sfen not found. sfen=" << sfen << sync_endl;
+					continue;
 				}
 
 				for (auto& pos_move : *sfen_and_pos_move_list_ptr->second) {
-					// 定跡の手で1手進める
-					pos.do_move(pos_move.bestMove, state_info[1]);
+					// 定跡データベースに含まれているmoveは16ビットのため、
+					// このタイミングで32ビットに変換する。
+					pos_move.bestMove = pos.move16_to_move(pos_move.bestMove);
+
+					if (!pos.pseudo_legal(pos_move.bestMove) || !pos.legal(pos_move.bestMove)) {
+						sync_cout << "Illegal move. sfen=" << sfen << " move=" << pos_move.bestMove << sync_endl;
+						continue;
+					}
+
+					StateInfo state_info0;
+					pos.do_move(pos_move.bestMove, state_info0);
+					Eval::evaluate_with_no_return(pos);
 
 					// この局面について探索する
 					auto value_and_pv = Learner::search(pos, search_depth, 1, search_nodes);
