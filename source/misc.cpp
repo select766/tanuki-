@@ -461,14 +461,12 @@ int read_all_lines(std::string filename, std::vector<std::string>& lines)
 	if (fs.fail())
 		return 1; // 読み込み失敗
 
-	while (!fs.fail() && !fs.eof())
-	{
-		std::string line;
-		Dependency::getline(fs, line);
-		if (line.length())
+	std::string line;
+	while (std::getline(fs, line)) {
+		if (line.length()) {
 			lines.push_back(line);
+		}
 	}
-	fs.close();
 	return 0;
 }
 

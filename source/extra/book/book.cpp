@@ -895,13 +895,14 @@ namespace Book
 		// →　この関数はbookコマンドからしか呼び出さず、bookコマンドの処理の先頭付近でis_ready()を
 		// 呼び出しているため、この関数のなかでのis_ready()は呼び出さないことにする。
 
-		fstream fs;
-		fs.open(filename, ios::out);
+		FILE* file = fopen(filename.c_str(), "wt");
+
+		setvbuf(file, nullptr, _IOFBF, 1024 * 1024);
 
 		cout << endl << "write " + filename;
 
 		// バージョン識別用文字列
-		fs << "#YANEURAOU-DB2016 1.00" << endl;
+		fprintf(file, "#YANEURAOU-DB2016 1.00\n");
 
 		vector<pair<string, PosMoveListPtr> > vectored_book;
 		
@@ -984,19 +985,21 @@ namespace Book
 
 			// -- このentryを書き出す
 
-			fs << "sfen " << it.first /* is sfen string */ << endl; // sfen
+			fprintf(file, "sfen %s\n", it.first.c_str());
 
 			auto& move_list = *it.second;
 
 			// 採択回数でソートしておく。
 			std::stable_sort(move_list.begin(), move_list.end());
 
-			for (auto& bp : move_list)
-				fs << bp.bestMove << ' ' << bp.nextMove << ' ' << bp.value << " " << bp.depth << " " << bp.num << endl;
+			for (auto& bp : move_list) {
+				fprintf(file, "%s %s %d %d %lld\n", to_usi_string(bp.bestMove).c_str(), to_usi_string(bp.nextMove).c_str(), bp.value, bp.depth, bp.num);
+			}
 			// 指し手、相手の応手、そのときの評価値、探索深さ、採択回数
 		}
 
-		fs.close();
+		fclose(file);
+		file = nullptr;
 
 		cout << endl << "done!" << endl;
 
