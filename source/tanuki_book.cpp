@@ -806,12 +806,22 @@ bool Tanuki::TeraShock() {
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|input_book_file|=" << book.book_body.size() << sync_endl;
 
+	// •½Žè‚Ì‹Ç–Ê‚©‚ç‚½‚Ç‚ê‚é‹Ç–Ê‚É‚Â‚¢‚Äˆ—‚·‚é
 	auto& pos = Threads[0]->rootPos;
 	StateInfo state_info = {};
 	pos.set_hirate(&state_info, Threads[0]);
 	ValueMoveDepth root_vmd = {};
 	int counter = 0;
 	NegaMax(book, pos, root_vmd, counter);
+
+	// •½Žè‚Ì‹Ç–Ê‚©‚ç’H‚ê‚È‚©‚Á‚½‹Ç–Ê‚ðˆ—‚·‚é
+	for (const auto& book_entry : book.book_body) {
+		auto& pos = Threads[0]->rootPos;
+		StateInfo state_info = {};
+		pos.set(book_entry.first, &state_info, Threads[0]);
+		ValueMoveDepth root_vmd = {};
+		NegaMax(book, pos, root_vmd, counter);
+	}
 
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Writing output book file: " << output_book_file << sync_endl;
