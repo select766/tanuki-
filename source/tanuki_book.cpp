@@ -9,12 +9,13 @@
 #include <set>
 #include <ctime>
 
+#include "evaluate.h"
 #include "extra/book/book.h"
+#include "learn/learn.h"
 #include "misc.h"
 #include "position.h"
 #include "tanuki_progress_report.h"
 #include "thread.h"
-#include "learn/learn.h"
 
 using Book::BookMoveSelector;
 using Book::BookPos;
@@ -34,8 +35,8 @@ namespace {
 	constexpr const char* kMultiPV = "MultiPV";
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
-	//constexpr int kShowProgressAtMostSec = 1 * 60;	// 1分
-	constexpr int kShowProgressAtMostSec = 60 * 60;	// 1時間
+	constexpr int kShowProgressAtMostSec = 1 * 60;	// 1分
+	//constexpr int kShowProgressAtMostSec = 60 * 60;	// 1時間
 	constexpr int kSaveEvalAtMostSec = 60 * 60;		// 1時間
 }
 
@@ -636,6 +637,187 @@ bool Tanuki::SetScoreToMove() {
 	sync_cout << "Writing the book file..." << sync_endl;
 	output_book.write_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
+
+	return true;
+}
+
+namespace {
+	struct ValueMoveDepth {
+		// 評価値
+		Value value = VALUE_NONE;
+		// この局面における指し手
+		// 定跡の指し手に対する応手を定跡データベースに登録するため、指し手も返せるようにしておく
+		Move move = MOVE_NONE;
+		// 探索深さ
+		Depth depth = DEPTH_NONE;
+	};
+
+	// (sfen, ValueAndDepth)
+	// やねうら王本家では手数の部分を削除しているが、
+	// 実装を容易にするため手数も含めて格納する。
+	// 本来であればこれによる副作用を熟考する必要があるが、
+	// よく分からなかったので適当に実装する。
+	std::unordered_map<std::string, ValueMoveDepth> memo;
+
+	// Nega-Max法で末端局面の評価値をroot局面に向けて伝搬する
+	// book 定跡データベース
+	// pos 現在の局面
+	// value_and_depth_without_nega_max_parent SetScoreToMove()で設定した評価値と探索深さ
+	//                                         現局面から見た評価値になるよう、符号を反転してから渡すこと
+	ValueMoveDepth NegaMax(MemoryBook& book, Position& pos, const ValueMoveDepth vmd_without_nega_max_parent, int& counter) {
+		if (++counter % 100000 == 0) {
+			sync_cout << counter << " |memo|=" << memo.size() << sync_endl;
+		}
+
+		auto book_moves = book.find(pos);
+
+		if (!book_moves) {
+			// この局面が定跡データベースに登録されていない=末端局面である。
+			// SetScoreToMove()による探索の結果を返す。
+			return vmd_without_nega_max_parent;
+		}
+
+		std::string sfen = pos.sfen();
+		auto& vmd = memo[sfen];
+		if (vmd.depth != DEPTH_NONE) {
+			// キャッシュにヒットした場合、その値を返す。
+			return vmd;
+		}
+
+		if (pos.is_mated()) {
+			// 詰んでいる場合
+			vmd.value = mated_in(0);
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+		}
+
+		if (pos.DeclarationWin() != MOVE_NONE) {
+			// 宣言勝ちできる場合
+			vmd.value = mate_in(1);
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+		}
+
+		auto repetition_state = pos.is_repetition();
+		switch (repetition_state) {
+		case REPETITION_WIN:
+			// 連続王手の千日手により価値の場合
+			vmd.value = mate_in(MAX_PLY);
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+
+		case REPETITION_LOSE:
+			// 連続王手の千日手により負けの場合
+			vmd.value = mated_in(MAX_PLY);
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+
+		case REPETITION_DRAW:
+			// 引き分けの場合
+			vmd.value = static_cast<Value>(Options["Contempt"] * Eval::PawnValue / 100);
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+
+		case REPETITION_SUPERIOR:
+			// 優等局面の場合
+			vmd.value = VALUE_SUPERIOR;
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+
+		case REPETITION_INFERIOR:
+			// 劣等局面の場合
+			vmd.value = -VALUE_SUPERIOR;
+			vmd.depth = DEPTH_ZERO;
+			return vmd;
+
+		default:
+			break;
+		}
+
+		vmd.value = mated_in(0);
+		vmd.depth = DEPTH_ZERO;
+		// 全合法手について調べる
+		for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
+			auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
+				[&move, &pos](const BookPos& book_move) {
+					// 定跡データベースに含まれているmoveは16ビットのため、32ビットに変換する。
+					Move move32 = pos.move16_to_move(book_move.bestMove);
+					return move.move == move32;
+				});
+
+			// 定跡データベースの指し手に登録されている評価値と探索深さを
+			// 子局面に渡すためのインスタンス
+			ValueMoveDepth vmd_without_nega_max_child;
+			if (book_move != book_moves->end()) {
+				// 指し手につけられている評価値は現局面から見た評価値なので、
+				// NegaMax()に渡すときに符号を反転する
+				vmd_without_nega_max_child.value = static_cast<Value>(-book_move->value);
+				vmd_without_nega_max_child.depth = static_cast<Depth>(book_move->depth);
+			}
+
+			StateInfo state_info = {};
+			pos.do_move(move, state_info);
+			auto value_and_depth_child = NegaMax(book, pos, vmd_without_nega_max_child, counter);
+			pos.undo_move(move);
+
+			if (vmd_without_nega_max_child.depth == DEPTH_NONE) {
+				// 子局面が定跡データベースに登録されていなかった場合
+				continue;
+			}
+
+			// 指し手情報に探索の結果を格納する
+			// 返ってきた評価値は次の局面から見た評価値なので、符号を反転する
+			BookPos new_book_move(move, value_and_depth_child.move, -value_and_depth_child.value,
+				value_and_depth_child.depth, 1);
+			book.insert(sfen, new_book_move);
+
+			if (vmd.value < new_book_move.value) {
+				vmd.value = static_cast<Value>(new_book_move.value);
+				vmd.move = move;
+			}
+			// 最も深い探索深さ+1を設定する
+			vmd.depth = std::max(vmd.depth, static_cast<Depth>(new_book_move.depth + 1));
+		}
+
+		return vmd;
+	}
+}
+
+// 定跡データベースの末端局面の評価値をroot局面に向けて伝搬する
+bool Tanuki::TeraShock() {
+	std::string input_book_file = Options[kBookInputFile];
+	std::string output_book_file = Options[kBookOutputFile];
+
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	MemoryBook book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	book.read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book_file|=" << book.book_body.size() << sync_endl;
+
+	auto& pos = Threads[0]->rootPos;
+	StateInfo state_info = {};
+	pos.set_hirate(&state_info, Threads[0]);
+	ValueMoveDepth root_vmd = {};
+	int counter = 0;
+	NegaMax(book, pos, root_vmd, counter);
+
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Writing output book file: " << output_book_file << sync_endl;
+	book.write_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << book.book_body.size() << sync_endl;
 
 	return true;
 }
