@@ -931,9 +931,9 @@ namespace Book
 		u64 counter = 0;
 		auto output_progress = [&]()
 		{
-			if ((counter % 1000) == 0)
+			if ((counter % 10000) == 0)
 			{
-				if ((counter % 80000) == 0) // 80文字ごとに改行
+				if ((counter % 800000) == 0) // 80文字ごとに改行
 					cout << endl;
 				cout << ".";
 			}
