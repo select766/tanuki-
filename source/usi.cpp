@@ -799,8 +799,13 @@ void USI::loop(int argc, char* argv[])
 		}
 
 		else if (token == "tera_shock") {
-			Tanuki::TeraShock();
-			break;
+		Tanuki::TeraShock();
+		break;
+		}
+
+		else if (token == "extend_tera_shock") {
+		Tanuki::ExtendTeraShock();
+		break;
 		}
 
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();

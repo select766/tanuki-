@@ -1,3 +1,5 @@
+//#pragma optimize( "", off )
+
 #include "tanuki_book.h"
 #include "config.h"
 
@@ -828,6 +830,201 @@ bool Tanuki::TeraShock() {
 	book.write_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << book.book_body.size() << sync_endl;
+
+	return true;
+}
+
+// テラショック定跡を延長する
+bool Tanuki::ExtendTeraShock() {
+	int num_threads = (int)Options[kThreads];
+	int multi_pv = (int)Options[kMultiPV];
+	std::string input_book_file = Options[kBookInputFile];
+	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
+	std::string output_book_file = Options[kBookOutputFile];
+	int save_per_positions = (int)Options[kBookSavePerPositions];
+
+	sync_cout << "info string num_threads=" << num_threads << sync_endl;
+	sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+	sync_cout << "info string save_per_positions=" << save_per_positions << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	BookMoveSelector book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	book.GetMemoryBook().read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+
+	std::vector<std::thread> threads;
+	std::set<std::string> searching_positions;
+	std::mutex mutex;
+	std::atomic_int global_num_processed_positions;
+	global_num_processed_positions = 0;
+	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+		auto procedure = [thread_index, multi_pv, search_depth, search_nodes,
+			save_per_positions, &book, &mutex, &searching_positions,
+			&global_num_processed_positions, &output_book_file]() {
+			for (;;) {
+				std::vector<StateInfo> state_info(512);
+				std::vector<Move> moves;
+				//int thread_index = 0;
+				auto th = Threads[thread_index];
+				auto& pos = th->rootPos;
+				pos.set_hirate(&state_info[0], Threads[thread_index]);
+
+				bool extend = false;
+				{
+					std::lock_guard lock(mutex);
+
+					for (;;) {
+						auto book_moves = book.GetMemoryBook().find(pos);
+
+						if (!book_moves) {
+							// 定跡データベースの末端局面にたどり着いたので延長する
+							extend = true;
+							break;
+						}
+
+						if (book_moves->size() < multi_pv) {
+							// 指し手の候補数が少ないので延長する
+							extend = true;
+							break;
+						}
+
+						auto move = book.probe(pos);
+						if (move == MOVE_NONE) {
+							// 手番側から見て不利な局面
+							// この局面にたどり着いたらどうしようもないので延長しない
+							break;
+						}
+
+						// 定跡の指し手に従って指し手を進める
+						moves.push_back(move);
+						pos.do_move(move, state_info[pos.game_ply()]);
+					}
+				}
+
+				if (!extend) {
+					continue;
+				}
+
+				//sync_cout << pos << sync_endl;
+
+				{
+					std::lock_guard lock(mutex);
+					if (searching_positions.count(pos.sfen())) {
+						// 現在他のスレッドで探索中の場合は探索しない
+						continue;
+					}
+					searching_positions.insert(pos.sfen());
+				}
+
+				// MultiPVで探索する
+				Learner::search(pos, search_depth, multi_pv, search_nodes);
+
+				{
+					std::lock_guard lock(mutex);
+
+					// 下のほうでposを変更するので、このタイミングで探索中フラグを下ろしておく。
+					searching_positions.erase(pos.sfen());
+
+					// 定跡データベースを更新する
+					for (int pv_index = 0; pv_index < multi_pv && pv_index < th->rootMoves.size(); ++pv_index) {
+						Move best_move = MOVE_NONE;
+						if (th->rootMoves[pv_index].pv.size() > 0) {
+							best_move = th->rootMoves[pv_index].pv[0];
+						}
+
+						Move next_move = MOVE_NONE;
+						if (th->rootMoves[pv_index].pv.size() > 1) {
+							next_move = th->rootMoves[pv_index].pv[1];
+						}
+
+						int value = th->rootMoves[pv_index].selDepth;
+						int depth = th->completedDepth;
+						// 既存の指し手はには、定跡ツリー探索後の評価値が入っている可能性があるので、
+						// 上書きしないようにする
+						book.GetMemoryBook().insert(pos.sfen(), BookPos(best_move, next_move, value, depth, 1), false);
+					}
+
+					// 平手の局面に向かって評価値を伝搬する
+					while (!moves.empty())
+					{
+						// この局面の評価値を求める
+						auto pos_move_list = book.GetMemoryBook().find(pos);
+
+						// この局面は必ず見つかるはず
+						ASSERT_LV3(pos_move_list);
+
+						Value best_value = -VALUE_MATE;
+						Depth best_depth = DEPTH_ZERO;
+						// 一手前の局面の指し手に対する応手となる
+						Move next_move = MOVE_NONE;
+						for (const auto& book_move : *pos_move_list) {
+							if (best_value >= book_move.value) {
+								continue;
+							}
+							best_value = static_cast<Value>(book_move.value);
+							best_depth = static_cast<Depth>(book_move.depth);
+							next_move = static_cast<Move>(book_move.bestMove);
+						}
+
+						// 指し手は必ず登録されているはず
+						ASSERT_LV3(best_value != -VALUE_MATE);
+
+						// 一手戻す
+						Move best_move = moves.back();
+						pos.undo_move(best_move);
+						moves.pop_back();
+
+						pos_move_list = book.GetMemoryBook().find(pos);
+
+						// この局面は必ず見つかるはず
+						ASSERT_LV3(pos_move_list);
+
+						auto book_move = std::find_if(pos_move_list->begin(), pos_move_list->end(),
+							[best_move, &pos](const auto& x) {
+								return pos.move16_to_move(best_move) ==
+									pos.move16_to_move(x.bestMove);
+							});
+
+						// 指し手は必ず見つかるはず
+						ASSERT_LV3(book_move != pos_move_list->end());
+
+						book_move->nextMove = next_move;
+						book_move->depth = best_depth + 1;
+						book_move->value = -best_value;
+					}
+
+					// 定跡をストレージに書き出す。
+					int num_processed_positions = ++global_num_processed_positions;
+
+					if (num_processed_positions && num_processed_positions % save_per_positions == 0) {
+						sync_cout << "Writing the book file..." << sync_endl;
+						book.GetMemoryBook().write_book(output_book_file);
+						sync_cout << "done..." << sync_endl;
+					}
+				}
+			}
+		};
+		threads.push_back(std::thread(procedure));
+	}
+
+	for (auto& thread : threads) {
+		thread.join();
+	}
 
 	return true;
 }
