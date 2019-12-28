@@ -463,6 +463,7 @@ int read_all_lines(std::string filename, std::vector<std::string>& lines)
 
 	std::string line;
 	while (std::getline(fs, line)) {
+		line = StringExtension::trim(line);
 		if (line.length()) {
 			lines.push_back(line);
 		}
