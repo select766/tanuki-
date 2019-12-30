@@ -886,7 +886,7 @@ bool Tanuki::ExtendTeraShock() {
 
 				bool extend = false;
 				{
-					std::lock_guard lock(mutex);
+					std::lock_guard<std::mutex> lock(mutex);
 
 					for (;;) {
 						auto book_moves = book.GetMemoryBook().find(pos);
@@ -923,7 +923,7 @@ bool Tanuki::ExtendTeraShock() {
 				//sync_cout << pos << sync_endl;
 
 				{
-					std::lock_guard lock(mutex);
+					std::lock_guard<std::mutex> lock(mutex);
 					if (searching_positions.count(pos.sfen())) {
 						// 現在他のスレッドで探索中の場合は探索しない
 						continue;
@@ -935,7 +935,7 @@ bool Tanuki::ExtendTeraShock() {
 				Learner::search(pos, search_depth, multi_pv, search_nodes);
 
 				{
-					std::lock_guard lock(mutex);
+					std::lock_guard<std::mutex> lock(mutex);
 
 					// 下のほうでposを変更するので、このタイミングで探索中フラグを下ろしておく。
 					searching_positions.erase(pos.sfen());
