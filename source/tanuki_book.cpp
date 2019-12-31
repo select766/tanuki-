@@ -434,9 +434,19 @@ bool Tanuki::MergeBook() {
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size() << sync_endl;
 
-	std::istringstream iss(input_file_list);
-	std::string input_file;
-	while (std::getline(iss, input_file, ';')) {
+	std::vector<std::string> input_files;
+	{
+		std::istringstream iss(input_file_list);
+		std::string input_file;
+		while (std::getline(iss, input_file, ';')) {
+			input_files.push_back(input_file);
+		}
+	}
+
+	for (int input_file_index = 0; input_file_index < input_files.size(); ++input_file_index) {
+		sync_cout << (input_file_index + 1) << " / " << input_files.size() << sync_endl;
+
+		const auto& input_file = input_files[input_file_index];
 		BookMoveSelector input_book;
 		sync_cout << "Reading input book file: " << input_file << sync_endl;
 		input_book.GetMemoryBook().read_book(input_file);
@@ -459,7 +469,7 @@ bool Tanuki::MergeBook() {
 					// そのような手はスキップする。
 					continue;
 				}
-				output_book.GetMemoryBook().insert(sfen, pos_move);
+				output_book.GetMemoryBook().insert(sfen, pos_move, false);
 			}
 		}
 	}
