@@ -685,7 +685,7 @@ namespace {
 			return vmd_without_nega_max_parent;
 		}
 
-		std::string sfen = pos.sfen();
+		std::string sfen = StringExtension::trim_number(pos.sfen());
 		auto& vmd = memo[sfen];
 		if (vmd.depth != DEPTH_NONE) {
 			// キャッシュにヒットした場合、その値を返す。
