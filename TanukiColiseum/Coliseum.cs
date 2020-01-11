@@ -71,6 +71,7 @@ namespace TanukiColiseum
                     {"Threads", options.NumThreads1.ToString()},
                     {"BookEvalDiff", options.BookEvalDiff1.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount1},
+                    {"IgnoreBookPly", options.IgnoreBookPly1},
                     {"BookDepthLimit", "0"},
                     {"MaxMovesToDraw", "256"},
                 };
@@ -102,6 +103,7 @@ namespace TanukiColiseum
                     {"Threads", options.NumThreads2.ToString()},
                     {"BookEvalDiff", options.BookEvalDiff2.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount2},
+                    {"IgnoreBookPly", options.IgnoreBookPly2},
                     {"BookDepthLimit", "0"},
                     {"MaxMovesToDraw", "256"},
                 };

@@ -34,6 +34,8 @@ namespace TanukiColiseum
         public int BookEvalDiff2 { get; set; } = 30;
         public string ConsiderBookMoveCount1 { get; set; } = "false";
         public string ConsiderBookMoveCount2 { get; set; } = "false";
+        public string IgnoreBookPly1 { get; set; } = "false";
+        public string IgnoreBookPly2 { get; set; } = "false";
 
         public void Parse(string[] args)
         {
@@ -114,6 +116,12 @@ namespace TanukiColiseum
                         break;
                     case "--consider_book_move_count2":
                         ConsiderBookMoveCount2 = args[++i];
+                        break;
+                    case "--ignore_book_ply1":
+                        IgnoreBookPly1 = args[++i];
+                        break;
+                    case "--ignore_book_ply2":
+                        IgnoreBookPly2 = args[++i];
                         break;
                     default:
                         throw new ArgumentException("Unexpected option: " + args[i]);
