@@ -1,4 +1,4 @@
-//#pragma optimize( "", off )
+#pragma optimize( "", off )
 
 #include "tanuki_book.h"
 #include "config.h"
@@ -678,6 +678,10 @@ namespace {
 		}
 	}
 
+	Move To16Bit(Move move) {
+		return static_cast<Move>(static_cast<int>(move) & 0xffff);
+	}
+
 	// Nega-Max法で末端局面の評価値をroot局面に向けて伝搬する
 	// book 定跡データベース
 	// pos 現在の局面
@@ -774,6 +778,8 @@ namespace {
 				// NegaMax()に渡すときに符号を反転する
 				vmd_without_nega_max_child.value = static_cast<Value>(-book_move->value);
 				vmd_without_nega_max_child.depth = static_cast<Depth>(book_move->depth);
+				// 子局面の指し手なのでnextMoveを代入する
+				vmd_without_nega_max_child.move = static_cast<Move>(book_move->nextMove);
 			}
 
 			StateInfo state_info = {};
@@ -788,7 +794,7 @@ namespace {
 
 			// 指し手情報に探索の結果を格納する
 			// 返ってきた評価値は次の局面から見た評価値なので、符号を反転する
-			BookPos new_book_move(move, value_and_depth_child.move, -value_and_depth_child.value,
+			BookPos new_book_move(To16Bit(move), To16Bit(value_and_depth_child.move), -value_and_depth_child.value,
 				value_and_depth_child.depth, 1);
 			book.insert(sfen, new_book_move);
 
