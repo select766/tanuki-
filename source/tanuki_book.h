@@ -15,6 +15,7 @@ namespace Tanuki {
 	bool MergeBook();
 	bool SetScoreToMove();
 	bool TeraShock();
+	bool TeraShock2();
 	bool ExtendTeraShock();
 }
 

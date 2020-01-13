@@ -667,25 +667,38 @@ namespace {
 	// よく分からなかったので適当に実装する。
 	std::unordered_map<std::string, ValueMoveDepth> memo;
 
+	// IgnoreBookPlyオプションがtrueの場合、
+	// 与えられたsfen文字列からplyを取り除く
+	std::string RemovePlyIfIgnoreBookPly(const std::string& sfen) {
+		if (Options["IgnoreBookPly"]) {
+			return StringExtension::trim_number(sfen);
+		}
+		else {
+			return sfen;
+		}
+	}
+
 	// Nega-Max法で末端局面の評価値をroot局面に向けて伝搬する
 	// book 定跡データベース
 	// pos 現在の局面
 	// value_and_depth_without_nega_max_parent SetScoreToMove()で設定した評価値と探索深さ
 	//                                         現局面から見た評価値になるよう、符号を反転してから渡すこと
 	ValueMoveDepth NegaMax(MemoryBook& book, Position& pos, const ValueMoveDepth vmd_without_nega_max_parent, int& counter) {
-		if (++counter % 100000 == 0) {
+		if (++counter % 1000000 == 0) {
 			sync_cout << counter << " |memo|=" << memo.size() << sync_endl;
 		}
 
-		auto book_moves = book.find(pos);
+		// この局面に対してのキーとして使用するsfen文字列。
+		// 必要に応じて末尾のplyを取り除いておく。
+		std::string sfen = RemovePlyIfIgnoreBookPly(pos.sfen());
+		auto book_moves = book.book_body.find(sfen);
 
-		if (!book_moves) {
+		if (book_moves == book.book_body.end()) {
 			// この局面が定跡データベースに登録されていない=末端局面である。
 			// SetScoreToMove()による探索の結果を返す。
 			return vmd_without_nega_max_parent;
 		}
 
-		std::string sfen = StringExtension::trim_number(pos.sfen());
 		auto& vmd = memo[sfen];
 		if (vmd.depth != DEPTH_NONE) {
 			// キャッシュにヒットした場合、その値を返す。
@@ -746,7 +759,7 @@ namespace {
 		vmd.depth = DEPTH_ZERO;
 		// 全合法手について調べる
 		for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
-			auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
+			auto book_move = std::find_if(book_moves->second->begin(), book_moves->second->end(),
 				[&move, &pos](const BookPos& book_move) {
 					// 定跡データベースに含まれているmoveは16ビットのため、32ビットに変換する。
 					Move move32 = pos.move16_to_move(book_move.bestMove);
@@ -756,7 +769,7 @@ namespace {
 			// 定跡データベースの指し手に登録されている評価値と探索深さを
 			// 子局面に渡すためのインスタンス
 			ValueMoveDepth vmd_without_nega_max_child;
-			if (book_move != book_moves->end()) {
+			if (book_move != book_moves->second->end()) {
 				// 指し手につけられている評価値は現局面から見た評価値なので、
 				// NegaMax()に渡すときに符号を反転する
 				vmd_without_nega_max_child.value = static_cast<Value>(-book_move->value);
@@ -836,6 +849,108 @@ bool Tanuki::TeraShock() {
 	book.write_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << book.book_body.size() << sync_endl;
+
+	return true;
+}
+
+// 定跡データベースの各局面の評価値を親局面に伝搬するのを繰り返す
+bool Tanuki::TeraShock2() {
+	std::string input_book_file = Options[kBookInputFile];
+	std::string output_book_file = Options[kBookOutputFile];
+	bool ignore_book_ply = Options["IgnoreBookPly"];
+
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+	sync_cout << "info string ignore_book_ply=" << ignore_book_ply << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	MemoryBook current_book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	current_book.read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book_file|=" << current_book.book_body.size() << sync_endl;
+
+	// 1手ずつ伝搬させていく
+	for (int depth = 1; depth <= 16; ++depth) {
+		sync_cout << "depth:" << depth << sync_endl;
+
+		// このMemoryBookに処理結果を追加していく
+		MemoryBook next_book;
+
+		int counter = 0;
+		for (const auto& current_sfen_and_book_moves : current_book.book_body) {
+			if (++counter % 100000 == 0) {
+				sync_cout << counter << sync_endl;
+			}
+
+			const auto& current_sfen = current_sfen_and_book_moves.first;
+			const auto& current_book_moves = *current_sfen_and_book_moves.second;
+
+			Position& pos = Threads[0]->rootPos;
+			StateInfo state_info0;
+			pos.set(current_sfen, &state_info0, Threads[0]);
+
+			for (auto& current_book_move : current_book_moves) {
+				Move best_move = pos.move16_to_move(current_book_move.bestMove);
+				if (!pos.pseudo_legal(best_move) ||
+					!pos.legal(best_move)) {
+					continue;
+				}
+
+				StateInfo state_info1;
+				pos.do_move(best_move, state_info1);
+
+				// MemoryBook::find()はIgnoreBookPlyに対応していないため、
+				// MemoryBook::book_body::find()を直接呼び出す
+				auto current_child_book_moves = current_book.book_body.find(
+					RemovePlyIfIgnoreBookPly(pos.sfen()));
+				if (current_child_book_moves == current_book.book_body.end()) {
+					// 子局面が定跡データベースに含まれていなかった。
+					// この指し手はそのまま追加する。
+					pos.undo_move(best_move);
+
+					// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
+					next_book.insert(RemovePlyIfIgnoreBookPly(pos.sfen()), current_book_move);
+					continue;
+				}
+
+				// 子局面の指し手の中で最も評価値の高い指し手を選び
+				// その評価値を現在の局面の指し手に伝搬する
+				int best_value = -VALUE_MATE;
+				Move next_move = MOVE_NONE;
+				int depth = 0;
+				for (const auto& current_child_book_move : *current_child_book_moves->second) {
+					if (best_value < current_child_book_move.value) {
+						best_value = current_child_book_move.value;
+						next_move = current_child_book_move.bestMove;
+					}
+					depth = std::max(depth, current_child_book_move.depth);
+				}
+
+				pos.undo_move(best_move);
+
+				// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
+				next_book.insert(RemovePlyIfIgnoreBookPly(pos.sfen()),
+					BookPos(best_move, next_move, -best_value, depth, 1));
+			}
+		}
+
+		std::swap(current_book, next_book);
+
+		char output_book_file_for_this_depth[_MAX_PATH];
+		sprintf(output_book_file_for_this_depth, "book/%s.%02d", output_book_file.c_str(), depth);
+		sync_cout << "Writing output book file: " << output_book_file_for_this_depth << sync_endl;
+		current_book.write_book(output_book_file_for_this_depth);
+		sync_cout << "|output_book|=" << current_book.book_body.size() << sync_endl;
+	}
 
 	return true;
 }
