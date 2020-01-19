@@ -48,7 +48,7 @@ COMPILER = g++
 
 
 # 標準的なコンパイルオプション
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
+CFLAGS   = -std=c++17 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
 WCFLAGS  =
 LDFLAGS  =
 LIBS     =
