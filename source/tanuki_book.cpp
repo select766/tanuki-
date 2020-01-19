@@ -1003,6 +1003,7 @@ bool Tanuki::ExtendTeraShock() {
 		auto procedure = [thread_index, multi_pv, search_depth, search_nodes, &book, &mutex,
 			&searching_positions, &global_num_processed_positions, &output_book_file,
 			&last_save_time_sec]() {
+			sync_cout << "Thread " << thread_index << " started." << sync_endl;
 			for (;;) {
 				std::vector<StateInfo> state_info(512);
 				std::vector<Move> moves;
