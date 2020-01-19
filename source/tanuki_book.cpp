@@ -997,12 +997,9 @@ bool Tanuki::ExtendTeraShock() {
 	std::vector<std::thread> threads;
 	std::set<std::string> searching_positions;
 	std::mutex mutex;
-	std::atomic_int global_num_processed_positions;
-	global_num_processed_positions = 0;
 	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
 		auto procedure = [thread_index, multi_pv, search_depth, search_nodes, &book, &mutex,
-			&searching_positions, &global_num_processed_positions, &output_book_file,
-			&last_save_time_sec]() {
+			&searching_positions, &output_book_file, &last_save_time_sec]() {
 			sync_cout << "Thread " << thread_index << " started." << sync_endl;
 			for (;;) {
 				std::vector<StateInfo> state_info(512);
@@ -1139,8 +1136,6 @@ bool Tanuki::ExtendTeraShock() {
 					}
 
 					// 定跡をストレージに書き出す。
-					int num_processed_positions = ++global_num_processed_positions;
-
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
 						sync_cout << "Writing the book file..." << sync_endl;
 						book.GetMemoryBook().write_book(output_book_file);
