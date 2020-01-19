@@ -1000,7 +1000,7 @@ bool Tanuki::ExtendTeraShock() {
 	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
 		auto procedure = [thread_index, multi_pv, search_depth, search_nodes, &book, &mutex,
 			&searching_positions, &output_book_file, &last_save_time_sec]() {
-			sync_cout << "Thread " << thread_index << " started." << sync_endl;
+			//sync_cout << "Thread " << thread_index << " started." << sync_endl;
 			for (;;) {
 				std::vector<StateInfo> state_info(512);
 				std::vector<Move> moves;
@@ -1057,9 +1057,9 @@ bool Tanuki::ExtendTeraShock() {
 				}
 
 				// MultiPV‚Å’Tõ‚·‚é
-				sync_cout << "Searching " << pos.sfen() << sync_endl;
+				//sync_cout << "Searching " << pos.sfen() << sync_endl;
 				Learner::search(pos, search_depth, multi_pv, search_nodes);
-				sync_cout << "Searched  " << pos.sfen() << sync_endl;
+				//sync_cout << "Searched  " << pos.sfen() << sync_endl;
 
 				{
 					std::lock_guard<std::mutex> lock(mutex);
