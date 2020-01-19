@@ -1060,6 +1060,7 @@ bool Tanuki::ExtendTeraShock() {
 				}
 
 				// MultiPV‚Å’Tõ‚·‚é
+				sync_cout << pos.sfen() << sync_endl;
 				Learner::search(pos, search_depth, multi_pv, search_nodes);
 
 				{
