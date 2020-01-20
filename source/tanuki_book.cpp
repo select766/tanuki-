@@ -1143,6 +1143,7 @@ bool Tanuki::ExtendTeraShock() {
 						book.GetMemoryBook().write_book(output_book_file);
 						sync_cout << "done..." << sync_endl;
 						last_save_time_sec = std::time(nullptr);
+                        sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
                     }
 				}
 			}
