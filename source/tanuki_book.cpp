@@ -1059,9 +1059,9 @@ bool Tanuki::ExtendTeraShock() {
 				}
 
 				// MultiPV‚Å’Tõ‚·‚é
-				sync_cout << "Searching " << pos.sfen() << sync_endl;
+				sync_cout << "Searching sfen " << pos.sfen() << sync_endl;
 				Learner::search(pos, search_depth, multi_pv, search_nodes);
-				sync_cout << "Searched  " << pos.sfen() << sync_endl;
+				sync_cout << "Searched  sfen " << pos.sfen() << sync_endl;
 
 				{
 					std::lock_guard<std::mutex> lock(mutex);
