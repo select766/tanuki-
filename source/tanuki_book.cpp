@@ -6,10 +6,11 @@
 #ifdef EVAL_LEARN
 
 #include <atomic>
-#include <fstream>
-#include <sstream>
-#include <set>
 #include <ctime>
+#include <fstream>
+#include <queue>
+#include <set>
+#include <sstream>
 
 #include "evaluate.h"
 #include "extra/book/book.h"
@@ -992,7 +993,7 @@ bool Tanuki::ExtendTeraShock() {
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
 
-    output_book_file = "book/" + output_book_file;
+	output_book_file = "book/" + output_book_file;
 
 	time_t last_save_time_sec = std::time(nullptr);
 
@@ -1143,8 +1144,8 @@ bool Tanuki::ExtendTeraShock() {
 						book.GetMemoryBook().write_book(output_book_file);
 						sync_cout << "done..." << sync_endl;
 						last_save_time_sec = std::time(nullptr);
-                        sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
-                    }
+						sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+					}
 				}
 			}
 		};
@@ -1158,4 +1159,281 @@ bool Tanuki::ExtendTeraShock() {
 	return true;
 }
 
+// テラショック定跡を延長する
+bool Tanuki::ExtendTeraShockBfs() {
+	int num_threads = (int)Options[kThreads];
+	int multi_pv = (int)Options[kMultiPV];
+	std::string input_book_file = Options[kBookInputFile];
+	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
+	std::string output_book_file = Options[kBookOutputFile];
+	int book_depth_limit = (int)Options["BookDepthLimit"];
+	int book_eval_diff = (int)Options["BookEvalDiff"];
+	int book_eval_black_limit = (int)Options["BookEvalBlackLimit"];
+	int book_eval_white_limit = (int)Options["BookEvalWhiteLimit"];
+
+	sync_cout << "info string num_threads=" << num_threads << sync_endl;
+	sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+	sync_cout << "info string book_depth_limit=" << book_depth_limit << sync_endl;
+	sync_cout << "info string book_eval_diff=" << book_eval_diff << sync_endl;
+	sync_cout << "info string book_eval_black_limit=" << book_eval_black_limit << sync_endl;
+	sync_cout << "info string book_eval_white_limit=" << book_eval_white_limit << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	BookMoveSelector book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	book.GetMemoryBook().read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+
+	output_book_file = "book/" + output_book_file;
+
+	for (int iteration = 0;; ++iteration) {
+		sync_cout << "Iteration " << iteration << " started." << sync_endl;
+		sync_cout << "Enumerating target positions." << sync_endl;
+
+		// 延長対象の局面。
+		// 経路を保持するため、平手局面からの指し手の配列として持たせる。
+		// Moveは32ビット版を格納するようにする。
+		std::vector<std::vector<Move>> target_positions;
+
+		// 炎症対象の局面を探索する際、すでに探索した局面を表す集合。
+		// 途中の経路に依存しないようにするためsfen形式で持たせる。
+		std::set<std::string> visited;
+
+		auto& position = Threads.main()->rootPos;
+		std::vector<StateInfo> state_info(1024);
+		position.set_hirate(&state_info[0], Threads.main());
+
+		// 幅優先探索により延長対象の局面を探索する。
+		// 平手局面から開始する。
+		std::queue<std::vector<Move>> q;
+		q.push(std::vector<Move>());
+		while (!q.empty()) {
+			std::vector<Move> moves = q.front();
+			q.pop();
+
+			// 現在の局面まで進める
+			for (auto move : moves) {
+				position.do_move(move, state_info[position.game_ply()]);
+			}
+
+			std::string sfen = position.sfen();
+			//sync_cout << position << sync_endl;
+
+			auto book_moves = book.GetMemoryBook().find(position);
+
+			if (book_moves == nullptr) {
+				// 定跡データベースに登録されていない場合、探索対象に加える。
+				target_positions.push_back(moves);
+			}
+			else if (book_moves->size() < multi_pv) {
+				// 登録されている指し手の数が少ない場合、探索対象に加える。
+				target_positions.push_back(moves);
+			}
+
+			if (book_moves) {
+				std::vector<BookPos> valid_book_moves(book_moves->begin(), book_moves->end());
+
+				// Moveを16ビットから32ビットに変換する。
+				for (auto& move : valid_book_moves) {
+					move.bestMove = position.move16_to_move(move.bestMove);
+				}
+
+				// 非合法手・評価値が低すぎる指し手・探索深さが低すぎる指し手を取り除く。
+				int book_eval_limit = (position.side_to_move() == BLACK) ?
+					book_eval_black_limit : book_eval_white_limit;
+				valid_book_moves.erase(std::remove_if(
+					valid_book_moves.begin(), valid_book_moves.end(),
+					[book_eval_limit, book_depth_limit, &position](const BookPos& book_move) {
+						return
+							!position.pseudo_legal(book_move.bestMove) ||
+							!position.legal(book_move.bestMove) ||
+							book_move.value < book_eval_limit ||
+							book_move.depth < book_depth_limit;
+					}), valid_book_moves.end());
+
+				// 指し手の評価値の最大値を求める。
+				int best_value = -VALUE_MATE;
+				for (auto book_move : valid_book_moves) {
+					best_value = std::max(best_value, book_move.value);
+				}
+
+				// 指し手の評価値の最大値から評価値が離れすぎている指し手を取り除く。
+				valid_book_moves.erase(std::remove_if(
+					valid_book_moves.begin(), valid_book_moves.end(),
+					[book_eval_diff, best_value](const BookPos& book_move) {
+						return book_move.value < best_value - book_eval_diff;
+					}), valid_book_moves.end());
+
+				// キューに局面を加える。
+				for (const auto& move : valid_book_moves) {
+					position.do_move(move.bestMove, state_info[position.game_ply()]);
+					//sync_cout << position << sync_endl;
+					std::string next_sfen = position.sfen();
+					position.undo_move(move.bestMove);
+
+					// 一度キューに加えた局面は加えない。
+					if (visited.find(next_sfen) != visited.end()) {
+						continue;
+					}
+					visited.insert(next_sfen);
+
+					auto next_moves = moves;
+					next_moves.push_back(move.bestMove);
+					q.push(next_moves);
+				}
+			}
+
+			// 平手の局面まで戻す
+			for (auto rit = moves.rbegin(); rit != moves.rend(); ++rit) {
+				position.undo_move(*rit);
+			}
+		}
+
+		sync_cout << "Expanding " << target_positions.size() << " positions." << sync_endl;
+
+		// マルチスレッドで、探索対象局面を探索する。
+		std::vector<std::thread> threads;
+		std::atomic_int global_position_index;
+		global_position_index = 0;
+		std::mutex mutex;
+		time_t last_save_time_sec = std::time(nullptr);
+		for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+			auto procedure = [thread_index, multi_pv, search_depth, search_nodes, &book, &mutex,
+				&target_positions, &output_book_file, &last_save_time_sec,
+				&global_position_index]() {
+				//sync_cout << "Thread " << thread_index << " started." << sync_endl;
+				for (int position_index = global_position_index++;
+					position_index < target_positions.size();
+					position_index = global_position_index++) {
+					std::vector<StateInfo> state_info(512);
+					// 平手の局面から対象の局面までの指し手。
+					// あとで後ろのほうから要素を削除していくので、コピーを作成しておく。
+					std::vector<Move> moves = target_positions[position_index];
+					auto thread = Threads[thread_index];
+					auto& position = thread->rootPos;
+					position.set_hirate(&state_info[0], thread);
+
+					for (auto move : moves) {
+						position.do_move(move, state_info[position.game_ply()]);
+					}
+
+					//sync_cout << pos << sync_endl;
+
+					// MultiPVで探索する
+					sync_cout << "sfen " << position.sfen() << sync_endl;
+					Learner::search(position, search_depth, multi_pv, search_nodes);
+
+					{
+						std::lock_guard<std::mutex> lock(mutex);
+
+						// 定跡データベースを更新する
+						for (int pv_index = 0; pv_index < multi_pv && pv_index < thread->rootMoves.size(); ++pv_index) {
+							Move best_move = MOVE_NONE;
+							if (thread->rootMoves[pv_index].pv.size() > 0) {
+								best_move = thread->rootMoves[pv_index].pv[0];
+							}
+
+							Move next_move = MOVE_NONE;
+							if (thread->rootMoves[pv_index].pv.size() > 1) {
+								next_move = thread->rootMoves[pv_index].pv[1];
+							}
+
+							int value = thread->rootMoves[pv_index].selDepth;
+							int depth = thread->completedDepth;
+							// 既存の指し手はには、評価値伝搬後の評価値が入っている場合があるので、
+							// 上書きしないようにする。
+							book.GetMemoryBook().insert(position.sfen(), BookPos(best_move, next_move, value, depth, 1), false);
+						}
+
+						// 平手の局面に向かって評価値を伝搬する
+						while (!moves.empty())
+						{
+							// この局面の評価値を求める
+							auto pos_move_list = book.GetMemoryBook().find(position);
+
+							// この局面は必ず見つかるはず
+							ASSERT_LV3(pos_move_list);
+
+							Value best_value = -VALUE_MATE;
+							Depth best_depth = DEPTH_ZERO;
+							// 一手前の局面の指し手に対する応手となる
+							Move next_move = MOVE_NONE;
+							for (const auto& book_move : *pos_move_list) {
+								if (best_value >= book_move.value) {
+									continue;
+								}
+								best_value = static_cast<Value>(book_move.value);
+								best_depth = static_cast<Depth>(book_move.depth);
+								next_move = static_cast<Move>(book_move.bestMove);
+							}
+
+							// 指し手は必ず登録されているはず
+							ASSERT_LV3(best_value != -VALUE_MATE);
+
+							// 一手戻す
+							Move best_move = moves.back();
+							moves.pop_back();
+							position.undo_move(best_move);
+
+							pos_move_list = book.GetMemoryBook().find(position);
+
+							// この局面は必ず見つかるはず
+							ASSERT_LV3(pos_move_list);
+
+							auto book_move = std::find_if(pos_move_list->begin(), pos_move_list->end(),
+								[best_move, &position](const auto& x) {
+									return position.move16_to_move(best_move) ==
+										position.move16_to_move(x.bestMove);
+								});
+
+							// 指し手は必ず見つかるはず
+							ASSERT_LV3(book_move != pos_move_list->end());
+
+							book_move->nextMove = next_move;
+							book_move->depth = best_depth + 1;
+							book_move->value = -best_value;
+						}
+
+						// 定跡をストレージに書き出す。
+						if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+							sync_cout << "Writing the book file..." << sync_endl;
+							book.GetMemoryBook().write_book(output_book_file);
+							sync_cout << "done..." << sync_endl;
+							last_save_time_sec = std::time(nullptr);
+							sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+						}
+					}
+				}
+			};
+			threads.push_back(std::thread(procedure));
+		}
+
+		for (auto& thread : threads) {
+			thread.join();
+		}
+
+		// 定跡をストレージに書き出す。
+		sync_cout << "Writing the book file..." << sync_endl;
+		book.GetMemoryBook().write_book(output_book_file);
+		sync_cout << "done..." << sync_endl;
+		last_save_time_sec = std::time(nullptr);
+		sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+	}
+
+	return true;
+}
 #endif

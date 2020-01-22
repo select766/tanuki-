@@ -17,6 +17,7 @@ namespace Tanuki {
 	bool TeraShock();
 	bool TeraShock2();
 	bool ExtendTeraShock();
+	bool ExtendTeraShockBfs();
 }
 
 #endif
