@@ -148,7 +148,7 @@ endif
 
 # NNUE評価関数 学習バイナリ用 OpenBLAS
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
-	BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS
+	BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -IC:\msys64\mingw64\include\OpenBLAS
 	BLAS_LDFLAGS = -lopenblas
 	ifeq ($(MSYSTEM),MINGW64)
 		BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
