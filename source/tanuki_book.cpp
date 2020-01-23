@@ -1082,7 +1082,7 @@ bool Tanuki::ExtendTeraShock() {
 							next_move = th->rootMoves[pv_index].pv[1];
 						}
 
-						int value = th->rootMoves[pv_index].selDepth;
+						int value = th->rootMoves[pv_index].score;
 						int depth = th->completedDepth;
 						// 既存の指し手はには、定跡ツリー探索後の評価値が入っている可能性があるので、
 						// 上書きしないようにする
@@ -1352,7 +1352,7 @@ bool Tanuki::ExtendTeraShockBfs() {
 								next_move = thread->rootMoves[pv_index].pv[1];
 							}
 
-							int value = thread->rootMoves[pv_index].selDepth;
+							int value = thread->rootMoves[pv_index].score;
 							int depth = thread->completedDepth;
 							// 既存の指し手はには、評価値伝搬後の評価値が入っている場合があるので、
 							// 上書きしないようにする。
