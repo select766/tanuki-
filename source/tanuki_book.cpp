@@ -9,6 +9,7 @@
 #include <ctime>
 #include <fstream>
 #include <queue>
+#include <random>
 #include <set>
 #include <sstream>
 
@@ -1200,6 +1201,9 @@ bool Tanuki::ExtendTeraShockBfs() {
 
 	output_book_file = "book/" + output_book_file;
 
+	std::random_device rnd;
+	std::mt19937_64 mt(rnd());
+
 	for (int iteration = 0;; ++iteration) {
 		sync_cout << "Iteration " << iteration << " started." << sync_endl;
 		sync_cout << "Enumerating target positions." << sync_endl;
@@ -1277,6 +1281,9 @@ bool Tanuki::ExtendTeraShockBfs() {
 					[book_eval_diff, best_value](const BookPos& book_move) {
 						return book_move.value < best_value - book_eval_diff;
 					}), valid_book_moves.end());
+
+				// 指し手をシャッフルし、探索のルートをランダムにする。
+				std::shuffle(valid_book_moves.begin(), valid_book_moves.end(), mt);
 
 				// キューに局面を加える。
 				for (const auto& move : valid_book_moves) {
