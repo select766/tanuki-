@@ -86,7 +86,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 	CFLAGS += $(WCFLAGS)
-	LDFLAGS += -static -Wl,--stack,25000000
+	LDFLAGS += -static -Wl,--stack,25000000 -lwsock32 -lws2_32
 	TARGET = YaneuraOu-by-gcc.exe
 else
 	CFLAGS += -D_LINUX
@@ -203,7 +203,8 @@ SOURCES  = \
 	tanuki_kifu_shuffler.cpp                                                   \
 	tanuki_progress_report.cpp                                                 \
 	tanuki_kifu_writer.cpp                                                     \
-	tanuki_kifu_reader.cpp
+	tanuki_kifu_reader.cpp                                                     \
+	tanuki_lazy_cluster.cpp
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
 	SOURCES += \
