@@ -318,6 +318,9 @@ void is_ready(bool skipCorruptCheck)
 
 	Threads.stop = false;
 
+	// Lazy Clusterのクライアントとサーバーを開始する。
+	Tanuki::LazyCluster::Start();
+
 	// keep aliveを送信するために生成したスレッドを終了させ、待機する。
 	ended = true;
 	th.join();
@@ -858,6 +861,9 @@ void USI::loop(int argc, char* argv[])
 
 	// quitが来た時点ではまだ探索中かも知れないのでmain threadの停止を待つ。
 	Threads.main()->wait_for_search_finished();
+
+	// Lazy Clusterのクライアントとサーバーを終了する。
+	Tanuki::LazyCluster::Stop();
 }
 
 // --------------------
