@@ -1239,16 +1239,17 @@ bool Tanuki::ExtendTeraShockBfs() {
 
 			auto book_moves = book.GetMemoryBook().find(position);
 
-			if (book_moves == nullptr) {
-				// 定跡データベースに登録されていない場合、探索対象に加える。
+			if (book_moves == nullptr || book_moves->size() < multi_pv) {
+				// 定跡データベースに登録されていない場合、
+				// または登録されている指し手の数が少ない場合、
+				// 探索対象に加える。
 				target_positions.push_back(moves);
-			}
-			else if (book_moves->size() < multi_pv) {
-				// 登録されている指し手の数が少ない場合、探索対象に加える。
-				target_positions.push_back(moves);
-			}
-
-			if (book_moves) {
+			} else if (book_moves) {
+				// 探索対象に加えた局面も展開すると、特定の枝を深く展開してしまい、
+				// 評価値の絶対値の大きな局面を探索の対象に加えてしまう。
+				// その場合、評価値が低いと、次のイテレーション以降で展開されなくなってしまう。
+				// これを防ぐため、探索対象に加えなかった場合のみ、
+				// 局面を展開するようにする。
 				std::vector<BookPos> valid_book_moves(book_moves->begin(), book_moves->end());
 
 				// Moveを16ビットから32ビットに変換する。
