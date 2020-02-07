@@ -1422,6 +1422,14 @@ bool Tanuki::ExtendTeraShockBfs() {
 		}
 
 		// 定跡をストレージに書き出す。
+		std::string backup_file_path = output_book_file + ".bak";
+
+		sync_cout << "Removing the backup file. backup_file_path=" << backup_file_path << sync_endl;
+		std::filesystem::remove(backup_file_path);
+
+		sync_cout << "Renaming the output file. output_book_file=" << output_book_file << " backup_file_path=" << backup_file_path << sync_endl;
+		std::filesystem::rename(output_book_file, backup_file_path);
+
 		book.GetMemoryBook().write_book(output_book_file);
 		last_save_time_sec = std::time(nullptr);
 		sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
