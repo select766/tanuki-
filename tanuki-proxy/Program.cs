@@ -547,9 +547,9 @@ namespace tanuki_proxy
                     ++multiPV;
                 }
 
-                Log($"Searching child positions {Join(position)}");
-                WriteLineAndFlush(Console.Out, $"info string Searching child positions {Join(position)}");
-                var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(multiPonderRootPosition), multiPV);
+                Log($"Searching child positions. position={Join(position)}");
+                WriteLineAndFlush(Console.Out, $"info string Searching child positions. position={Join(position)}");
+                var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(position), multiPV);
 
                 int numRemainedNodes = numAssignedNodes;
                 foreach (var multiPVMove in multiPVMoves)
