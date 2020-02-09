@@ -45,6 +45,7 @@ namespace {
 		packet.is_pv = static_cast<uint16_t>(entry->is_pv());
 		packet.bound = static_cast<uint16_t>(entry->bound());
 		packet.depth = static_cast<uint16_t>(entry->depth());
+		return true;
 	}
 
 	void Deserialize(const Tanuki::LazyCluster::Packet& packet) {
@@ -68,7 +69,7 @@ namespace {
 			boost::array<Tanuki::LazyCluster::Packet, kMaxNumPacketsToSend> recv_buffer = {};
 			size_t bytes = UDP_SOCKET->receive(boost::asio::buffer(recv_buffer));
 			int num_packets = bytes / sizeof(Tanuki::LazyCluster::Packet);
-			sync_cout << "info string Lazy Cluster server: Received " << num_packets << " packets." << sync_endl;
+			//sync_cout << "info string Lazy Cluster server: Received " << num_packets << " packets." << sync_endl;
 			for (int packet_index = 0; packet_index < num_packets; ++packet_index) {
 				Deserialize(recv_buffer[packet_index]);
 			}
@@ -115,8 +116,7 @@ void Tanuki::LazyCluster::Start() {
 		std::getline(address_and_port_iss, port);
 		ASSERT_LV3(!port.empty());
 
-		sync_cout << "info string addresss=" << address << sync_endl;
-		sync_cout << "info string port=" << port << sync_endl;
+		sync_cout << "info string addresss=" << address << " port=" << port << sync_endl;
 
 		udp::endpoint receiver_endpoint =
 			*resolver.resolve(udp::v4(), address, port).begin();
@@ -194,8 +194,7 @@ void Tanuki::LazyCluster::Send(Thread& thread) {
 	for (const auto& receiver_endpoint : ENDPOINTS) {
 		UDP_SOCKET->send_to(boost::asio::buffer(packets), receiver_endpoint);
 	}
-	sync_cout << "info string Lazy Cluster client: Sent " << packets.size() << " packets." << sync_endl;
-
+	//sync_cout << "info string Lazy Cluster client: Sent " << packets.size() << " packets." << sync_endl;
 }
 
 #endif
