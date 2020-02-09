@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <queue>
 #include <random>
@@ -113,13 +114,9 @@ bool Tanuki::CreateRawBook() {
 		}
 	}
 
-	sync_cout << "info string Writing book file..." << sync_endl;
-
 	std::string book_file = Options[kBookFile];
 	book_file = "book/" + book_file;
 	memory_book.write_book(book_file);
-
-	sync_cout << "info string Done..." << sync_endl;
 
 	return true;
 }
@@ -236,9 +233,7 @@ bool Tanuki::CreateScoredBook() {
 				{
 					std::lock_guard<std::mutex> lock(output_book_mutex);
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-						sync_cout << "Writing the book file..." << sync_endl;
 						output_book.write_book(output_book_file);
-						sync_cout << "done..." << sync_endl;
 						last_save_time_sec = std::time(nullptr);
 					}
 				}
@@ -251,9 +246,7 @@ bool Tanuki::CreateScoredBook() {
 		thread.join();
 	}
 
-	sync_cout << "Writing the book file..." << sync_endl;
 	output_book.write_book(output_book_file);
-	sync_cout << "done..." << sync_endl;
 
 	return true;
 }
@@ -358,11 +351,9 @@ bool Tanuki::ExtendBook() {
 					continue;
 				}
 
-				sync_cout << "Writing the book file..." << sync_endl;
 				// 上書き保存する
 				output_book.GetMemoryBook().write_book("book/" + output_file);
 				last_save_time_sec = std::time(nullptr);
-				sync_cout << "done..." << sync_endl;
 			}
 		};
 		threads.push_back(std::thread(procedure));
@@ -479,9 +470,7 @@ bool Tanuki::MergeBook() {
 		}
 	}
 
-	sync_cout << "Writing the book file..." << sync_endl;
 	output_book.GetMemoryBook().write_book("book/" + output_file);
-	sync_cout << "done..." << sync_endl;
 
 	return true;
 }
@@ -629,9 +618,7 @@ bool Tanuki::SetScoreToMove() {
 
 					// 定跡をストレージに書き出す。
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-						sync_cout << "Writing the book file..." << sync_endl;
 						output_book.write_book(output_book_file);
-						sync_cout << "done..." << sync_endl;
 						last_save_time_sec = std::time(nullptr);
 					}
 				}
@@ -644,9 +631,7 @@ bool Tanuki::SetScoreToMove() {
 		thread.join();
 	}
 
-	sync_cout << "Writing the book file..." << sync_endl;
 	output_book.write_book(output_book_file);
-	sync_cout << "done..." << sync_endl;
 
 	return true;
 }
@@ -853,9 +838,7 @@ bool Tanuki::TeraShock() {
 	}
 
 	output_book_file = "book/" + output_book_file;
-	sync_cout << "Writing output book file: " << output_book_file << sync_endl;
 	book.write_book(output_book_file);
-	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << book.book_body.size() << sync_endl;
 
 	return true;
@@ -955,7 +938,6 @@ bool Tanuki::TeraShock2() {
 
 		char output_book_file_for_this_depth[_MAX_PATH];
 		sprintf(output_book_file_for_this_depth, "book/%s.%02d", output_book_file.c_str(), depth);
-		sync_cout << "Writing output book file: " << output_book_file_for_this_depth << sync_endl;
 		current_book.write_book(output_book_file_for_this_depth);
 		sync_cout << "|output_book|=" << current_book.book_body.size() << sync_endl;
 	}
@@ -1141,9 +1123,7 @@ bool Tanuki::ExtendTeraShock() {
 
 					// 定跡をストレージに書き出す。
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-						sync_cout << "Writing the book file..." << sync_endl;
 						book.GetMemoryBook().write_book(output_book_file);
-						sync_cout << "done..." << sync_endl;
 						last_save_time_sec = std::time(nullptr);
 						sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
 					}
@@ -1419,9 +1399,15 @@ bool Tanuki::ExtendTeraShockBfs() {
 
 						// 定跡をストレージに書き出す。
 						if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-							sync_cout << "Writing the book file..." << sync_endl;
+							std::string backup_file_path = output_book_file + ".bak";
+
+							sync_cout << "Removing the backup file. backup_file_path=" << backup_file_path << sync_endl;
+							std::filesystem::remove(backup_file_path);
+
+							sync_cout << "Renaming the output file. output_book_file=" << output_book_file << " backup_file_path=" << backup_file_path << sync_endl;
+							std::filesystem::rename(output_book_file, backup_file_path);
+
 							book.GetMemoryBook().write_book(output_book_file);
-							sync_cout << "done..." << sync_endl;
 							last_save_time_sec = std::time(nullptr);
 							sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
 						}
@@ -1436,9 +1422,15 @@ bool Tanuki::ExtendTeraShockBfs() {
 		}
 
 		// 定跡をストレージに書き出す。
-		sync_cout << "Writing the book file..." << sync_endl;
+		std::string backup_file_path = output_book_file + ".bak";
+
+		sync_cout << "Removing the backup file. backup_file_path=" << backup_file_path << sync_endl;
+		std::filesystem::remove(backup_file_path);
+
+		sync_cout << "Renaming the output file. output_book_file=" << output_book_file << " backup_file_path=" << backup_file_path << sync_endl;
+		std::filesystem::rename(output_book_file, backup_file_path);
+
 		book.GetMemoryBook().write_book(output_book_file);
-		sync_cout << "done..." << sync_endl;
 		last_save_time_sec = std::time(nullptr);
 		sync_cout << "|output_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
 	}
