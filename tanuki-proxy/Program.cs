@@ -53,7 +53,6 @@ namespace tanuki_proxy
         private volatile bool running = true;
         public readonly List<Engine> engines = new List<Engine>();
         private Thread decideMoveTask;
-        private List<String> lastGoCommand = null;
 
         public void Dispose()
         {
@@ -285,6 +284,7 @@ namespace tanuki_proxy
             int time = 0;
             int byoyomi = 0;
             int inc = 0;
+            List<string> lastGoCommand = null;
 
             Console.SetIn(new StreamReader(Console.OpenStandardInput(64 * 1024)));
 
@@ -352,11 +352,11 @@ namespace tanuki_proxy
                         Debug.Assert(multiPonderRootPosition.Contains("moves"));
                         multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
 
-                        SearchChildNodesInParallel(multiPonderRootPosition, input);
+                        SearchDescendentNodesInParallel(multiPonderRootPosition, lastGoCommand);
                     }
                     else
                     {
-                        GoNonPonderOrPonderhit(input);
+                        GoNonPonderOrPonderhit(lastGoCommand);
                     }
 
                     // goコマンドは直接下流に渡さない
@@ -394,7 +394,7 @@ namespace tanuki_proxy
                         engine.TimeKeeper = false;
                     }
 
-                    GoNonPonderOrPonderhit(input);
+                    GoNonPonderOrPonderhit(lastGoCommand);
                     // ponderhitコマンドは直接下流に渡さない
                     continue;
                 }
@@ -445,7 +445,7 @@ namespace tanuki_proxy
             }
         }
 
-        private void GoNonPonderOrPonderhit(string input)
+        private void GoNonPonderOrPonderhit(List<string> lastGoCommand)
         {
             if (engines
                 .Where(x => !x.MateEngine)
@@ -487,10 +487,22 @@ namespace tanuki_proxy
             }
 
             // 他のノードに子ノードを探索させる
-            SearchChildNodesInParallel(Split(UpstreamPosition), "go infinite");
+            SearchDescendentNodesInParallel(Split(UpstreamPosition), lastGoCommand);
         }
 
-        private void SearchChildNodesInParallel(List<string> multiPonderRootPosition, string goCommand)
+        private class PositionAndNumAssignedNodes
+        {
+            public List<string> Position { get; set; }
+            public int NumAssignedEngines { get; set; }
+        }
+
+
+        /// <summary>
+        /// 指定された局面の子孫局面を複数のノードで探索する。
+        /// 指定された局面はすでに1つの思考エンジンと1つの詰将棋専用エンジンで探索が始まっていると仮定してよい。
+        /// </summary>
+        /// <param name="multiPonderRootPosition"></param>
+        private void SearchDescendentNodesInParallel(List<string> multiPonderRootPosition, List<string> lastGoCommand)
         {
             if (engines
                 .Where(x => !x.MateEngine)
@@ -500,83 +512,169 @@ namespace tanuki_proxy
                 return;
             }
 
-            var multipvEngine = engines
-                .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
-                .First();
-            var multipv = engines
-                .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
-                .Count();
-            var multipvMoves = multipvEngine.SearchWithMultiPv(Join(multiPonderRootPosition), multipv);
-            var multipvEngines = engines
-                .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
-                .ToList();
-            Debug.Assert(multipvMoves.Length == multipvEngines.Count);
-
-            string message = "Searching child positions " + Join(multipvMoves);
-            Log(message);
-            WriteLineAndFlush(Console.Out, "info string " + message);
-
-            SendPositionAndGoCommandToEngines(multiPonderRootPosition, goCommand, multipvMoves, multipvEngines);
-
-            // 詰将棋エンジンへ局面を割り当て、探索させる
-            if (engines
+            var mateEngines = engines
                 .Where(x => x.MateEngine)
-                .Count() > 1)
+                .ToList();
+            int mateEngineIndex = 1;
+
+            var assignedEngines = new HashSet<Engine>();
+
+            // 幅優先探索でMultiPoonderの探索対象局面を割り当てていく。
+
+            // MultiPonderの開始局面をキューに入れる。
+            var queue = new Queue<PositionAndNumAssignedNodes>();
+            queue.Enqueue(new PositionAndNumAssignedNodes
             {
-                // 最初の詰将棋エンジンにはすでに現在の局面を割り当てているのでスキップする
-                var mateEngines = engines
-                    .Where(x => x.MateEngine)
-                    .Skip(1)
-                    .ToList();
-                SendPositionAndGoCommandToEngines(multiPonderRootPosition, "go mate infinite", multipvMoves, mateEngines);
+                Position = multiPonderRootPosition,
+                NumAssignedEngines = engines
+                    .Where(x => !x.MateEngine)
+                    .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                    .Count()
+            });
+
+            while (queue.Count() > 0)
+            {
+                var positionAndNumAssignedNodes = queue.Dequeue();
+                var position = positionAndNumAssignedNodes.Position;
+                var numAssignedNodes = positionAndNumAssignedNodes.NumAssignedEngines;
+
+                // MultiPV探索に使用するノードを選ぶ。
+                var multiPVEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, null);
+
+                int multiPV = 0;
+                for (int tempNumAssignedNodes = numAssignedNodes; tempNumAssignedNodes > 0; tempNumAssignedNodes -= (tempNumAssignedNodes + 1) / 2)
+                {
+                    ++multiPV;
+                }
+
+                Log($"Searching child positions {Join(position)}");
+                WriteLineAndFlush(Console.Out, $"info string Searching child positions {Join(position)}");
+                var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(multiPonderRootPosition), multiPV);
+
+                int numRemainedNodes = numAssignedNodes;
+                foreach (var multiPVMove in multiPVMoves)
+                {
+                    // multipvの数が少なくなっている可能性があるのでnullチェックする。
+                    if (multiPVMove == null)
+                    {
+                        // 探索する指し手が無かった。
+                        // 思考エンジンを遊ばせておく。
+                        continue;
+                    }
+
+                    var targetPosition = AddMove(position, multiPVMove);
+                    var assignedEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, Join(targetPosition));
+
+                    // 思考エンジンに局面を渡す。
+                    assignedEngine.Write(Join(targetPosition));
+
+                    // 思考エンジンに局面の探索を開始させる。
+                    // ponderヒット時にponderhitコマンドで即指すことができるよう、
+                    // go ponderコマンドを送信する。
+                    // go ponderコマンドの引数は、最後に受信したgoコマンドとする。
+                    var goPonderCommand = new List<string>(lastGoCommand);
+                    Debug.Assert(goPonderCommand[0] == "go");
+
+                    // ponderが含まれていない場合は追加する。
+                    // TODO(hnoda): Pre-ponderヒット時等、残り時間が実際の値と異なる場合がある。
+                    //              これにより、時間切れ等が起こる可能性がある。
+                    if (!goPonderCommand.Contains("ponder"))
+                    {
+                        goPonderCommand.Insert(1, "ponder");
+                    }
+
+                    // 進行エンジンにgo ponderコマンドを送信する。
+                    assignedEngine.Write(Join(goPonderCommand));
+
+                    assignedEngines.Add(assignedEngine);
+
+                    if (mateEngineIndex < mateEngines.Count)
+                    {
+                        // 詰将棋エンジンに局面を渡す。
+                        var mateEngine = mateEngines[mateEngineIndex++];
+                        mateEngine.Write(Join(targetPosition));
+
+                        // 詰将棋エンジンにgo mate infiniteコマンドを渡す。
+                        mateEngine.Write("go mate inifinite");
+                    }
+
+                    // この局面の子孫局面に割り当てられる思考エンジンの数。
+                    // この局面を探索する思考エンジンは除く。
+                    int nextNumAssignedNodes = (numRemainedNodes + 1) / 2 - 1;
+                    if (nextNumAssignedNodes > 0)
+                    {
+                        queue.Enqueue(new PositionAndNumAssignedNodes
+                        {
+                            Position = targetPosition,
+                            NumAssignedEngines = nextNumAssignedNodes,
+                        });
+                    }
+                }
             }
         }
 
-        private void SendPositionAndGoCommandToEngines(List<string> multiPonderRootPosition, string goCommand, String[] multipvMoves, List<Engine> engines)
+        /// <summary>
+        /// 局面の探索に利用可能な探索エンジンを一つ選ぶ
+        /// </summary>
+        /// <param name="assignedEngines"></param>
+        /// <param name="multiPonderRootPosition"></param>
+        /// <param name="preferredExpectedDownstreamPosition">指定されていた場合、この局面を探索中の思考エンジンを優先して返す。</param>
+        /// <returns></returns>
+        private Engine FindAvailaleEngine(HashSet<Engine> assignedEngines, List<string> multiPonderRootPosition, string preferredExpectedDownstreamPosition)
         {
-            for (int i = 0; i < multipvMoves.Length; ++i)
+            // preferredExpectedDownstreamPositionを探索中の思考エンジンがある場合、それを返す。
+            // 対局開始直後はExpectedDownstreamPositionが全て空になる。
+            // そのためSingleOrDefault()を使用すると例外が飛んでしまう。
+            // これを避けるためにFirstOrDefault()を使用する。
+            var engine = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Where(x => x.ExpectedDownstreamPosition == preferredExpectedDownstreamPosition)
+                .FirstOrDefault();
+            if (engine != null)
             {
-                string move = multipvMoves[i];
-                // multipvの数が少なくなっている可能性があるのでnullチェックする
-                if (move == null)
-                {
-                    continue;
-                }
-
-                // multipvの数に対してengineの数が足りていない可能性があるのでチェックする
-                if (engines.Count <= i)
-                {
-                    continue;
-                }
-
-                var engine = engines[i];
-
-                // 初期局面ではmovesを付ける
-                if (multiPonderRootPosition.Count == 2)
-                {
-                    multiPonderRootPosition.Add("moves");
-                }
-                // 1手指した後の局面を渡す
-                multiPonderRootPosition.Add(move);
-
-                // 思考エンジンに局面を渡す
-                engine.Write(Join(multiPonderRootPosition));
-
-                // 思考エンジンにgo mate infiniteコマンドを渡す
-                engine.Write(goCommand);
-
-                // 1手指した後の局面を渡す
-                multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
-
-                // 初期局面ではmovesを取り除く
-                if (multiPonderRootPosition.Count == 3)
-                {
-                    multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
-                }
+                return engine;
             }
+
+            // MultiPV探索に使用するノードを選ぶ。
+            // なるべく現在のRoot局面以下以外を探索している思考エンジンを選ぶ。
+            engine = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Where(x => !assignedEngines.Contains(x))
+                .Where(x => !x.ExpectedDownstreamPosition.StartsWith(Join(multiPonderRootPosition)))
+                .FirstOrDefault();
+            if (engine != null)
+            {
+                return engine;
+            }
+
+            // 見つからなかったので、Root局面以下を探索している思考エンジンを選ぶ。
+            return engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Where(x => !assignedEngines.Contains(x))
+                .First();
+        }
+
+        /// <summary>
+        /// positionコマンド列に指し手を追加する。
+        /// </summary>
+        /// <param name="position"></param>
+        /// <param name="move"></param>
+        /// <returns></returns>
+        private List<string> AddMove(List<string> position, string move)
+        {
+            var targetPosition = new List<string>(position);
+
+            // 初期局面ではmovesを付ける
+            if (targetPosition.Count == 2)
+            {
+                targetPosition.Add("moves");
+            }
+
+            targetPosition.Add(move);
+            return targetPosition;
         }
 
         private static int ParseCommandParameter(List<string> command, string parameter)
