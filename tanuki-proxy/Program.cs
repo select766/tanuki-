@@ -352,7 +352,7 @@ namespace tanuki_proxy
                         Debug.Assert(multiPonderRootPosition.Contains("moves"));
                         multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
 
-                        SearchDescendentNodesInParallel(multiPonderRootPosition, lastGoCommand);
+                        SearchDescendentNodesInParallel(multiPonderRootPosition, lastGoCommand, new HashSet<Engine>());
                     }
                     else
                     {
@@ -447,6 +447,8 @@ namespace tanuki_proxy
 
         private void GoNonPonderOrPonderhit(List<string> lastGoCommand)
         {
+            var assignedEngines = new HashSet<Engine>();
+
             if (engines
                 .Where(x => !x.MateEngine)
                 .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
@@ -463,6 +465,8 @@ namespace tanuki_proxy
                 timeKeeperNode.TimeKeeper = true;
                 // 前回思考時に go ponder を渡していると仮定する
                 timeKeeperNode.Write("ponderhit");
+
+                assignedEngines.Add(timeKeeperNode);
             }
             else
             {
@@ -481,13 +485,15 @@ namespace tanuki_proxy
                 // ponderhit が送られてきた場合、その前に送られてきた go コマンドを送る
                 // ponder ではないので ponder は取り除く
                 // go コマンドが送られてきた場合、そのまま送る
-                List<string> goCommand = new List<string>(lastGoCommand);
+                var goCommand = new List<string>(lastGoCommand);
                 goCommand.Remove("ponder");
                 timeKeeperNode.Write(Join(goCommand));
+
+                assignedEngines.Add(timeKeeperNode);
             }
 
             // 他のノードに子ノードを探索させる
-            SearchDescendentNodesInParallel(Split(UpstreamPosition), lastGoCommand);
+            SearchDescendentNodesInParallel(Split(UpstreamPosition), lastGoCommand, assignedEngines);
         }
 
         private class PositionAndNumAssignedNodes
@@ -502,11 +508,11 @@ namespace tanuki_proxy
         /// 指定された局面はすでに1つの思考エンジンと1つの詰将棋専用エンジンで探索が始まっていると仮定してよい。
         /// </summary>
         /// <param name="multiPonderRootPosition"></param>
-        private void SearchDescendentNodesInParallel(List<string> multiPonderRootPosition, List<string> lastGoCommand)
+        private void SearchDescendentNodesInParallel(List<string> multiPonderRootPosition, List<string> lastGoCommand, HashSet<Engine> assignedEngines)
         {
             if (engines
                 .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Where(x => !assignedEngines.Contains(x))
                 .Count() == 0)
             {
                 return;
@@ -517,8 +523,6 @@ namespace tanuki_proxy
                 .ToList();
             int mateEngineIndex = 1;
 
-            var assignedEngines = new HashSet<Engine>();
-
             // 幅優先探索でMultiPoonderの探索対象局面を割り当てていく。
 
             // MultiPonderの開始局面をキューに入れる。
@@ -528,7 +532,7 @@ namespace tanuki_proxy
                 Position = multiPonderRootPosition,
                 NumAssignedEngines = engines
                     .Where(x => !x.MateEngine)
-                    .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                    .Where(x => !assignedEngines.Contains(x))
                     .Count()
             });
 
@@ -583,7 +587,7 @@ namespace tanuki_proxy
                         goPonderCommand.Insert(1, "ponder");
                     }
 
-                    // 進行エンジンにgo ponderコマンドを送信する。
+                    // 思考エンジンにgo ponderコマンドを送信する。
                     assignedEngine.Write(Join(goPonderCommand));
 
                     assignedEngines.Add(assignedEngine);
@@ -601,6 +605,8 @@ namespace tanuki_proxy
                     // この局面の子孫局面に割り当てられる思考エンジンの数。
                     // この局面を探索する思考エンジンは除く。
                     int nextNumAssignedNodes = (numRemainedNodes + 1) / 2 - 1;
+                    // 現局面の探索に思考エンジンを一つ使っているので、1足す。
+                    numRemainedNodes -= nextNumAssignedNodes + 1;
                     if (nextNumAssignedNodes > 0)
                     {
                         queue.Enqueue(new PositionAndNumAssignedNodes
@@ -610,6 +616,8 @@ namespace tanuki_proxy
                         });
                     }
                 }
+
+                // MultiPV探索で得られた指し手が足りない場合、numRemainedNodesが1以上になる場合がある。
             }
         }
 
@@ -623,13 +631,13 @@ namespace tanuki_proxy
         private Engine FindAvailaleEngine(HashSet<Engine> assignedEngines, List<string> multiPonderRootPosition, string preferredExpectedDownstreamPosition)
         {
             // preferredExpectedDownstreamPositionを探索中の思考エンジンがある場合、それを返す。
-            // 対局開始直後はExpectedDownstreamPositionが全て空になる。
-            // そのためSingleOrDefault()を使用すると例外が飛んでしまう。
-            // これを避けるためにFirstOrDefault()を使用する。
             var engine = engines
                 .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
+                .Where(x => !assignedEngines.Contains(x))
                 .Where(x => x.ExpectedDownstreamPosition == preferredExpectedDownstreamPosition)
+                // 対局開始直後はExpectedDownstreamPositionが全て空になる。
+                // そのためSingleOrDefault()を使用すると例外が飛んでしまう。
+                // これを避けるためにFirstOrDefault()を使用する。
                 .FirstOrDefault();
             if (engine != null)
             {
@@ -640,9 +648,9 @@ namespace tanuki_proxy
             // なるべく現在のRoot局面以下以外を探索している思考エンジンを選ぶ。
             engine = engines
                 .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
                 .Where(x => !assignedEngines.Contains(x))
-                .Where(x => !x.ExpectedDownstreamPosition.StartsWith(Join(multiPonderRootPosition)))
+                // 開始直後はx.ExpectedDownstreamPositionがnullとなっている点に注意する。
+                .Where(x => x.ExpectedDownstreamPosition != null && !x.ExpectedDownstreamPosition.StartsWith(Join(multiPonderRootPosition)))
                 .FirstOrDefault();
             if (engine != null)
             {
@@ -652,7 +660,6 @@ namespace tanuki_proxy
             // 見つからなかったので、Root局面以下を探索している思考エンジンを選ぶ。
             return engines
                 .Where(x => !x.MateEngine)
-                .Where(x => !x.TimeKeeper) // TimeKeeperノードではmultipvによる探索を行わない
                 .Where(x => !assignedEngines.Contains(x))
                 .First();
         }
