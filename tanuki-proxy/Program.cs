@@ -453,9 +453,6 @@ namespace tanuki_proxy
                 .Where(x => !x.MateEngine)
                 .Any(x => UpstreamPosition == x.ExpectedDownstreamPosition))
             {
-                Log("Ponder Hit (^_^)");
-                WriteLineAndFlush(Console.Out, "info string Ponder Hit (^_^)");
-
                 // multi ponderがヒットした場合
                 // ヒットしたノードにponderhitを渡し、引き続き探索させる
                 var timeKeeperNode = engines
@@ -465,6 +462,10 @@ namespace tanuki_proxy
                 timeKeeperNode.TimeKeeper = true;
                 // 前回思考時に go ponder を渡していると仮定する
                 timeKeeperNode.Write("ponderhit");
+
+                int engineIndex = engines.IndexOf(timeKeeperNode);
+                Log($"Ponder Hit (^_^) engineIndex={engineIndex}");
+                WriteLineAndFlush(Console.Out, $"info string Ponder Hit (^_^) engineIndex={engineIndex}");
 
                 assignedEngines.Add(timeKeeperNode);
             }
@@ -569,26 +570,39 @@ namespace tanuki_proxy
                     var targetPosition = AddMove(position, multiPVMove);
                     var assignedEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, Join(targetPosition));
 
-                    // 思考エンジンに局面を渡す。
-                    assignedEngine.Write(Join(targetPosition));
-
-                    // 思考エンジンに局面の探索を開始させる。
-                    // ponderヒット時にponderhitコマンドで即指すことができるよう、
-                    // go ponderコマンドを送信する。
-                    // go ponderコマンドの引数は、最後に受信したgoコマンドとする。
-                    var goPonderCommand = new List<string>(lastGoCommand);
-                    Debug.Assert(goPonderCommand[0] == "go");
-
-                    // ponderが含まれていない場合は追加する。
-                    // TODO(hnoda): Pre-ponderヒット時等、残り時間が実際の値と異なる場合がある。
-                    //              これにより、時間切れ等が起こる可能性がある。
-                    if (!goPonderCommand.Contains("ponder"))
+                    if (assignedEngine.ExpectedDownstreamPosition != Join(targetPosition))
                     {
-                        goPonderCommand.Insert(1, "ponder");
-                    }
+                        // ExpectedDownstreamPositionがtargetPositionと等しい場合、
+                        // go ponderによりすでに局面の探索が行われていることを表す。
+                        // その場合は思考エンジンに対してコマンドは送らない。
+                        // それ以外の場合は思考エンジンに局面を渡し、goコマンドを送る。
+                        assignedEngine.Write(Join(targetPosition));
 
-                    // 思考エンジンにgo ponderコマンドを送信する。
-                    assignedEngine.Write(Join(goPonderCommand));
+                        // 思考エンジンに局面の探索を開始させる。
+                        // ponderヒット時にponderhitコマンドで即指すことができるよう、
+                        // go ponderコマンドを送信する。
+                        // go ponderコマンドの引数は、最後に受信したgoコマンドとする。
+                        var goPonderCommand = new List<string>(lastGoCommand);
+                        Debug.Assert(goPonderCommand[0] == "go");
+
+                        // ponderが含まれていない場合は追加する。
+                        // TODO(hnoda): Pre-ponderヒット時等、残り時間が実際の値と異なる場合がある。
+                        //              これにより、時間切れ等が起こる可能性がある。
+                        if (!goPonderCommand.Contains("ponder"))
+                        {
+                            goPonderCommand.Insert(1, "ponder");
+                        }
+
+                        // 思考エンジンにgo ponderコマンドを送信する。
+                        assignedEngine.Write(Join(goPonderCommand));
+
+                        int engineIndex = engines.IndexOf(assignedEngine);
+                        WriteLineAndFlush(Console.Out, $"info string Assigned a position to an engine. engineIndex={engineIndex} position ={Join(targetPosition)}");
+                    }
+                    else
+                    {
+                        WriteLineAndFlush(Console.Out, $"info string Engine reused. position={Join(targetPosition)}");
+                    }
 
                     assignedEngines.Add(assignedEngine);
 
