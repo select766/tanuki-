@@ -552,8 +552,8 @@ namespace tanuki_proxy
                     ++multiPV;
                 }
 
-                Log($"Searching child positions. position={Join(position)}");
-                WriteLineAndFlush(Console.Out, $"info string Searching child positions. position={Join(position)}");
+                Log($"Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
+                WriteLineAndFlush(Console.Out, $"info string Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                 var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(position), multiPV);
 
                 int numRemainedNodes = numAssignedNodes;
@@ -597,11 +597,11 @@ namespace tanuki_proxy
                         assignedEngine.Write(Join(goPonderCommand));
 
                         int engineIndex = engines.IndexOf(assignedEngine);
-                        WriteLineAndFlush(Console.Out, $"info string Assigned a position to an engine. engineIndex={engineIndex} position ={Join(targetPosition)}");
+                        WriteLineAndFlush(Console.Out, $"info string Assigned a position. engineIndex={engineIndex} position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                     }
                     else
                     {
-                        WriteLineAndFlush(Console.Out, $"info string Engine reused. position={Join(targetPosition)}");
+                        WriteLineAndFlush(Console.Out, $"info string Reused an engine. position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                     }
 
                     assignedEngines.Add(assignedEngine);
