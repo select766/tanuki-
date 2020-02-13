@@ -331,14 +331,6 @@ namespace tanuki_proxy
                         LastShowPv = DateTime.Now;
                     }
 
-                    // 詰将棋ルーチン1ノードには常にgoコマンドを送信する
-                    if (engines.Where(x => x.MateEngine).Count() > 0)
-                    {
-                        var mateEngine = engines.Where(x => x.MateEngine).First();
-                        mateEngine.Write(UpstreamPosition);
-                        mateEngine.Write("go mate infinite");
-                    }
-
                     foreach (var engine in engines)
                     {
                         engine.TimeKeeper = false;
@@ -348,11 +340,17 @@ namespace tanuki_proxy
                     {
                         // UpstreamPosition には相手の予想指し手を指したあとの局面がふくまれているので 1 手戻す
                         List<string> multiPonderRootPosition = Split(UpstreamPosition);
+
                         // 初期局面が渡されることはない
                         Debug.Assert(multiPonderRootPosition.Contains("moves"));
+
+                        // ponderの指し手に多くの思考エンジンを割り当てるため、ここで保存しておく。
+                        string ponder = multiPonderRootPosition[multiPonderRootPosition.Count - 1];
+
+                        // ponderの指し手を取り除く。
                         multiPonderRootPosition.RemoveAt(multiPonderRootPosition.Count - 1);
 
-                        SearchDescendentNodesInParallel(multiPonderRootPosition, lastGoCommand, new HashSet<Engine>());
+                        SearchDescendentNodesInParallel(multiPonderRootPosition, lastGoCommand, new HashSet<Engine>(), ponder, 0);
                     }
                     else
                     {
@@ -445,6 +443,10 @@ namespace tanuki_proxy
             }
         }
 
+        /// <summary>
+        /// ponderなしのgoコマンドやponderhitコマンドを処理する。
+        /// </summary>
+        /// <param name="lastGoCommand">最後に受信したgoコマンド</param>
         private void GoNonPonderOrPonderhit(List<string> lastGoCommand)
         {
             var assignedEngines = new HashSet<Engine>();
@@ -462,6 +464,16 @@ namespace tanuki_proxy
                 timeKeeperNode.TimeKeeper = true;
                 // 前回思考時に go ponder を渡していると仮定する
                 timeKeeperNode.Write("ponderhit");
+
+                // 詰将棋専用エンジンに局面の探索をさせる。
+                var mateEngines = engines
+                    .Where(x => x.MateEngine)
+                    .ToList();
+                if (mateEngines.Count > 0)
+                {
+                    mateEngines[0].Write(UpstreamPosition);
+                    mateEngines[0].Write("go mate infinite");
+                }
 
                 int engineIndex = engines.IndexOf(timeKeeperNode);
                 Log($"Ponder Hit (^_^) engineIndex={engineIndex}");
@@ -490,11 +502,21 @@ namespace tanuki_proxy
                 goCommand.Remove("ponder");
                 timeKeeperNode.Write(Join(goCommand));
 
+                // 詰将棋専用エンジンに局面の探索をさせる。
+                var mateEngines = engines
+                    .Where(x => x.MateEngine)
+                    .ToList();
+                if (mateEngines.Count > 0)
+                {
+                    mateEngines[0].Write(UpstreamPosition);
+                    mateEngines[0].Write("go mate infinite");
+                }
+
                 assignedEngines.Add(timeKeeperNode);
             }
 
             // 他のノードに子ノードを探索させる
-            SearchDescendentNodesInParallel(Split(UpstreamPosition), lastGoCommand, assignedEngines);
+            SearchDescendentNodesInParallel(Split(UpstreamPosition), lastGoCommand, assignedEngines, null, 1);
         }
 
         private class PositionAndNumAssignedNodes
@@ -506,10 +528,15 @@ namespace tanuki_proxy
 
         /// <summary>
         /// 指定された局面の子孫局面を複数のノードで探索する。
-        /// 指定された局面はすでに1つの思考エンジンと1つの詰将棋専用エンジンで探索が始まっていると仮定してよい。
         /// </summary>
-        /// <param name="multiPonderRootPosition"></param>
-        private void SearchDescendentNodesInParallel(List<string> multiPonderRootPosition, List<string> lastGoCommand, HashSet<Engine> assignedEngines)
+        /// <param name="multiPonderRootPosition">マルチponderを行うにあたってのRoot局面。この局面の子孫局面を思考エンジンに割り当てていく。</param>
+        /// <param name="lastGoCommand">最後に受信したgoコマンド</param>
+        /// <param name="assignedEngines">既に探索が始まっている思考エンジン</param>
+        /// <param name="ponder">ponderで指定された指し手。指し手がない場合はnull。</param>
+        /// <param name="nextMateEngineIndex">次に使用する思考エンジンのindex</param>
+        private void SearchDescendentNodesInParallel(
+            List<string> multiPonderRootPosition, List<string> lastGoCommand,
+            HashSet<Engine> assignedEngines, string ponder, int nextMateEngineIndex)
         {
             if (engines
                 .Where(x => !x.MateEngine)
@@ -546,6 +573,8 @@ namespace tanuki_proxy
                 // MultiPV探索に使用するノードを選ぶ。
                 var multiPVEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, null);
 
+                // いくつの指し手を出力させるか決める。
+                // TODO(hnoda): 計算式を決める。指し手の幅を大きくしたほうが良いか…？
                 int multiPV = 0;
                 for (int tempNumAssignedNodes = numAssignedNodes; tempNumAssignedNodes > 0; tempNumAssignedNodes -= (tempNumAssignedNodes + 1) / 2)
                 {
@@ -555,6 +584,29 @@ namespace tanuki_proxy
                 Log($"Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                 WriteLineAndFlush(Console.Out, $"info string Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                 var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(position), multiPV);
+
+                // ponderの指し手が存在していた場合、その指し手を先頭に持ってくる。
+                // この処理は、root局面の子局面についてのみ行われる。
+                if (ponder != null)
+                {
+                    // ponderとmultiPVMovesを結合する。
+                    multiPVMoves = new string[] { ponder }
+                        .Concat(multiPVMoves)
+                        // 重複した指し手を取り除く。
+                        .Distinct()
+                        .ToArray();
+
+                    // この時点で指し手の数はmultiPV個以上になっているはず。
+                    Debug.Assert(multiPVMoves.Length >= multiPV);
+
+                    // 先頭のmultiPV個を選ぶ。
+                    multiPVMoves = multiPVMoves
+                        .Take(multiPV)
+                        .ToArray();
+
+                    // 他の局面でponderの値が使用されないよう、nullを代入しておく。
+                    ponder = null;
+                }
 
                 int numRemainedNodes = numAssignedNodes;
                 foreach (var multiPVMove in multiPVMoves)
