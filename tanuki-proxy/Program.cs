@@ -648,6 +648,24 @@ namespace tanuki_proxy
                             goPonderCommand.Insert(1, "ponder");
                         }
 
+                        // 一つ前の手で長く思考した場合、残り時間が少なくなっている場合がある。
+                        // このとき、前の手と同じ残り時間のつもりで思考すると時間切れとなる場合がある。
+                        // これを防ぐため、思考時間を短くする。
+                        if (goPonderCommand.Contains("inc"))
+                        {
+                            int incIndex = goPonderCommand.IndexOf("inc");
+                            int btimeIndex = goPonderCommand.IndexOf("btime");
+                            if (btimeIndex != -1)
+                            {
+                                goPonderCommand[btimeIndex + 1] = goPonderCommand[incIndex + 1];
+                            }
+                            int wtimeIndex = goPonderCommand.IndexOf("wtime");
+                            if (wtimeIndex != -1)
+                            {
+                                goPonderCommand[wtimeIndex + 1] = goPonderCommand[incIndex + 1];
+                            }
+                        }
+
                         // 思考エンジンにgo ponderコマンドを送信する。
                         assignedEngine.Write(Join(goPonderCommand));
 
