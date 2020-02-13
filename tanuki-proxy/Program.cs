@@ -594,15 +594,18 @@ namespace tanuki_proxy
                         .Concat(multiPVMoves)
                         // 重複した指し手を取り除く。
                         .Distinct()
+                        .Where(x => x != null)
                         .ToArray();
-
-                    // この時点で指し手の数はmultiPV個以上になっているはず。
-                    Debug.Assert(multiPVMoves.Length >= multiPV);
 
                     // 先頭のmultiPV個を選ぶ。
-                    multiPVMoves = multiPVMoves
-                        .Take(multiPV)
-                        .ToArray();
+                    if (multiPVMoves.Length > multiPV)
+                    {
+                        multiPVMoves = multiPVMoves
+                            .Take(multiPV)
+                            .ToArray();
+                    }
+
+                    // 合法手がmultiPV未満の場合、multiPVMovesの数がmultiPV以下になっている点に注意する。
 
                     // 他の局面でponderの値が使用されないよう、nullを代入しておく。
                     ponder = null;
