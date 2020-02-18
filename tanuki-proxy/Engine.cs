@@ -24,6 +24,8 @@ namespace tanuki_proxy
 
         private const double showPvSupressionMs = 200.0;
         private const int mateScore = 32000;
+        private const int multiPVSearchTimeMs = 100;
+        private const int multiPVSearchTimeoutMs = 200;
 
         bool disposed = false;
         private readonly Program program;
@@ -387,35 +389,38 @@ namespace tanuki_proxy
                     return;
                 }
 
-                // Multi PV探索の結果を格納する
-                if (multipvIndex != -1)
+                // SearchWithMultiPv()の出力結果を保存する。
+                // Multi PV探索でタイムアウトした場合、SearchWithMultiPv()がmultipvMovesにnullを代入する。
+                // 処理中にタイムアウトすると、途中でnull参照を起こす可能性がある。
+                // これを避けるため、multipvMovesをローカルに保持しておく。
+                var localMultiPVMoves = multipvMoves;
+                if (localMultiPVMoves != null)
                 {
-                    //if (multipvMoves == null)
-                    //{
-                    //    Debugger.Launch();
-                    //}
-                    Debug.Assert(multipvMoves != null);
                     if (pvIndex + 1 == command.Count)
                     {
-                        // ここは通らないはず
+                        // pvが空の場合。おそらくここは通らない。
                         return;
                     }
 
-                    string move = command[pvIndex + 1];
-                    int multipv = int.Parse(command[multipvIndex + 1]);
-                    multipvMoves[multipv - 1] = move;
-                    return;
-                }
-                else if (multipvMoves != null && multipvMoves.Length == 1)
-                {
-                    // ノードが1個しかない場合の処理
-                    if (pvIndex + 1 < command.Count)
+                    if (multipvIndex != -1)
                     {
+                        // Multi PVで複数の指し手が出力された場合。
                         string move = command[pvIndex + 1];
-                        multipvMoves[0] = move;
+                        int multipv = int.Parse(command[multipvIndex + 1]);
+                        localMultiPVMoves[multipv - 1] = move;
+                        return;
+                    }
+                    else if (localMultiPVMoves.Length == 1)
+                    {
+                        // ノードが1個しかない場合の処理
+                        string move = command[pvIndex + 1];
+                        localMultiPVMoves[0] = move;
                         return;
                     }
                 }
+
+                // TODO(nodchip): Multi PV探索がタイムアウトした場合、ここより下が実行される。
+                //                問題ないかどうか調べる。
 
                 // Root局面のpv出力時に合算した値を出力できるように
                 // Root局面以外でもnpsの値を保持しておく
@@ -667,10 +672,17 @@ namespace tanuki_proxy
             // multipv探索の結果を受け取らないまま進行してい舞う場合が考えられる
             eventMultipv.Reset();
 
-            Write("go byoyomi 100");
+            Write($"go byoyomi {multiPVSearchTimeMs}");
 
-            // multipv探索の結果が帰ってくるまで待機する
-            eventMultipv.WaitOne();
+            // multipv探索の結果が帰ってくるまで待機する。
+            // multiPVSearchTimeMsを大きく超えても出力が返ってこない場合がある。
+            // その場合、思考エンジンの処理全体が停止してしまう。
+            // これを避けるため、タイムアウトを設ける。
+            if (!eventMultipv.WaitOne(multiPVSearchTimeoutMs))
+            {
+                Log("     [{0}] Multi PV search timed out.", id);
+                WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
+            }
 
             Write("setoption name MultiPV value 1");
 
