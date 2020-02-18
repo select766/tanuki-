@@ -221,7 +221,9 @@ namespace tanuki_proxy
                     engine.Bestmove = null;
                 }
                 decideMoveLimit = DateTime.MaxValue;
-                WriteToEachEngine("stop");
+
+                // ponderhit時に施行を継続するため、
+                // stopコマンドを送らないようにする。
             }
         }
 
