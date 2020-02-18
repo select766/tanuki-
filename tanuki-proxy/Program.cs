@@ -97,21 +97,18 @@ namespace tanuki_proxy
                 {
                     // いずれのスレーブもpvを返していない状態で
                     // 上流からstopが渡ってきたか、maximumTime経過した
-                    Log("<P   {0}", "bestmove resign");
-                    WriteLineAndFlush(Console.Out, "bestmove resign");
+                    WriteToUI("bestmove resign");
                 }
                 else if (engines.Select(x => x.Bestmove).Any(x => x.move == "resign"))
                 {
                     // 投了
-                    Log("<P   {0}", "bestmove resign");
-                    WriteLineAndFlush(Console.Out, "bestmove resign");
+                    WriteToUI("bestmove resign");
 
                 }
                 else if (engines.Select(x => x.Bestmove).Any(x => x.move == "win"))
                 {
                     //宣言勝ち
-                    Log("<P   {0}", "bestmove win");
-                    WriteLineAndFlush(Console.Out, "bestmove win");
+                    WriteToUI("bestmove win");
                 }
                 else
                 {
@@ -201,8 +198,7 @@ namespace tanuki_proxy
                         {
                             commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
                         }
-                        Log("<P   {0}", Join(commandWithNps));
-                        WriteLineAndFlush(Console.Out, Join(commandWithNps));
+                        WriteToUI(Join(commandWithNps));
                     }
 
                     // TODO(hnoda): 詰将棋専用エンジンが返してきた手順をinfo pvで出力する
@@ -213,8 +209,7 @@ namespace tanuki_proxy
                     {
                         outputCommand += " ponder " + bestmove.ponder;
                     }
-                    Log("<P   {0}", outputCommand);
-                    WriteLineAndFlush(Console.Out, outputCommand);
+                    WriteToUI(outputCommand);
                 }
 
                 UpstreamState = UpstreamStateEnum.Stopped;
@@ -327,7 +322,7 @@ namespace tanuki_proxy
                         }
                         Depth = 0;
                         UpstreamState = UpstreamStateEnum.Thinking;
-                        WriteLineAndFlush(Console.Out, "info string " + UpstreamPosition);
+                        WriteInfoStringToUI(UpstreamPosition);
                         LastShowPv = DateTime.Now;
                     }
 
@@ -476,15 +471,13 @@ namespace tanuki_proxy
                 }
 
                 int engineIndex = engines.IndexOf(timeKeeperNode);
-                Log($"Ponder Hit (^_^) engineIndex={engineIndex}");
-                WriteLineAndFlush(Console.Out, $"info string Ponder Hit (^_^) engineIndex={engineIndex}");
+                WriteInfoStringToUI($"Ponder Hit (^_^) engineIndex={engineIndex}");
 
                 assignedEngines.Add(timeKeeperNode);
             }
             else
             {
-                Log("ponder unhit (-_-)");
-                WriteLineAndFlush(Console.Out, "info string ponder unhit (-_-)");
+                WriteInfoStringToUI("ponder unhit (-_-)");
 
                 // multi ponderがヒットしなかった場合
                 // 最初のエンジンにrootPosを担当させる
@@ -581,8 +574,7 @@ namespace tanuki_proxy
                     ++multiPV;
                 }
 
-                Log($"Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
-                WriteLineAndFlush(Console.Out, $"info string Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
+                WriteInfoStringToUI($"Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                 var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(position), multiPV);
 
                 // ponderの指し手が存在していた場合、その指し手を先頭に持ってくる。
@@ -670,11 +662,12 @@ namespace tanuki_proxy
                         assignedEngine.Write(Join(goPonderCommand));
 
                         int engineIndex = engines.IndexOf(assignedEngine);
-                        WriteLineAndFlush(Console.Out, $"info string Assigned a position. engineIndex={engineIndex} position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
+                        WriteInfoStringToUI($"Assigned a position. engineIndex={engineIndex} position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                     }
                     else
                     {
-                        WriteLineAndFlush(Console.Out, $"info string Reused an engine. position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
+                        int engineIndex = engines.IndexOf(assignedEngine);
+                        WriteInfoStringToUI($"Reused an engine. engineIndex={engineIndex} position={Join(targetPosition).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                     }
 
                     assignedEngines.Add(assignedEngine);
@@ -804,7 +797,7 @@ namespace tanuki_proxy
             if (MTG <= 0)
             {
                 // 本来、終局までの最大手数が指定されているわけだから、この条件で呼び出されるはずはないのだが…。
-                WriteLineAndFlush(Console.Out, "info string max_game_ply is too small.");
+                WriteInfoStringToUI("max_game_ply is too small.");
                 return inc - networkDelay2;
             }
             if (MTG == 1)
@@ -865,8 +858,7 @@ namespace tanuki_proxy
 
             // 残り時間 - network_delay2よりは短くしないと切れ負けになる可能性が出てくる。
             maximumTime = Min(roundUp(maximumTime, minimumThinkingTime, networkDelay, remain_time), remain_time);
-            WriteLineAndFlush(Console.Out, "into string maximumTime {0}", maximumTime);
-            Log("     maximumTime {0}", maximumTime);
+            WriteInfoStringToUI($"maximumTime={maximumTime}");
             return maximumTime;
         }
 
@@ -934,6 +926,17 @@ namespace tanuki_proxy
                 }
                 return position.Count - index - 1;
             }
+        }
+
+        private static void WriteInfoStringToUI(string infoString)
+        {
+            WriteToUI($"info string {infoString}");
+        }
+
+        private static void WriteToUI(string usiCommand)
+        {
+            Log($"<P   {usiCommand}");
+            WriteLineAndFlush(Console.Out, $"{usiCommand}");
         }
 
         static void Main(string[] args)
