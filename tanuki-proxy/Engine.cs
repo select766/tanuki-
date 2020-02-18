@@ -30,6 +30,8 @@ namespace tanuki_proxy
         bool disposed = false;
         private readonly Program program;
         private readonly Process process = new Process();
+        private Thread readStandardOutputThread;
+        private Thread readStandardErrorThread;
         private readonly Option[] optionOverrides;
         public string ExpectedDownstreamPosition { get; set; } = null;
         public string ExpectedDownstreamGo { get; set; } = null;
@@ -57,8 +59,6 @@ namespace tanuki_proxy
             this.process.StartInfo.RedirectStandardInput = true;
             this.process.StartInfo.RedirectStandardOutput = true;
             this.process.StartInfo.RedirectStandardError = true;
-            this.process.OutputDataReceived += HandleStdout;
-            this.process.ErrorDataReceived += HandleStderr;
             this.optionOverrides = optionOverrides;
             this.id = id;
             this.TimeKeeper = false;
@@ -71,9 +71,33 @@ namespace tanuki_proxy
 
         public void Start()
         {
+            // プロセスを起動する。
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+
+            // 標準出力の読み込みを開始する。
+            // 非同期で標準出力を読むと、外部プロセスが行を出力してからC#プログラムに入力されるまでに
+            // 数秒遅延する場合がある。
+            // これを防ぐため、スレッド内で同期的に読み込むようにする。
+            readStandardOutputThread = new Thread(() =>
+            {
+                string line;
+                while ((line = process.StandardOutput.ReadLine()) != null)
+                {
+                    HandleStdout(line);
+                }
+            });
+            readStandardOutputThread.Start();
+
+            // 標準エラー出力の読み込みを開始する。
+            readStandardErrorThread = new Thread(() =>
+            {
+                string line;
+                while ((line = process.StandardError.ReadLine()) != null)
+                {
+                    HandleStderr(line);
+                }
+            });
+            readStandardErrorThread.Start();
         }
 
         public void Dispose()
@@ -87,6 +111,17 @@ namespace tanuki_proxy
             if (disposed)
             {
                 return;
+            }
+            if (readStandardOutputThread != null)
+            {
+                readStandardOutputThread.Join();
+                readStandardOutputThread = null;
+            }
+
+            if (readStandardErrorThread != null)
+            {
+                readStandardErrorThread.Join();
+                readStandardErrorThread = null;
             }
 
             process.Dispose();
@@ -210,24 +245,24 @@ namespace tanuki_proxy
         /// </summary>
         /// <param name="sender">出力を送ってきた思考エンジンのプロセス</param>
         /// <param name="e">思考エンジンの出力</param>
-        private void HandleStdout(object sender, DataReceivedEventArgs e)
+        private void HandleStdout(string line)
         {
-            if (string.IsNullOrEmpty(e.Data))
+            if (string.IsNullOrEmpty(line))
             {
                 return;
             }
 
-            var command = Split(e.Data);
+            var command = Split(line);
 
             if (!command.Contains("tt"))
             {
                 // ttコマンドは量が多いのでログに出力しないようにする
-                Log("  <D [{0}] {1}", id, e.Data);
+                Log("  <D [{0}] {1}", id, line);
             }
 
             if (command.Contains("tt"))
             {
-                program.WriteToOtherEngines(e.Data, this);
+                program.WriteToOtherEngines(line, this);
             }
             else if (command.Contains("readyok"))
             {
@@ -265,13 +300,13 @@ namespace tanuki_proxy
         /// </summary>
         /// <param name="sender">出力を送ってきた思考エンジンのプロセス</param>
         /// <param name="e">思考エンジンの出力</param>
-        private void HandleStderr(object sender, DataReceivedEventArgs e)
+        private void HandleStderr(string line)
         {
-            if (string.IsNullOrEmpty(e.Data))
+            if (string.IsNullOrEmpty(line))
             {
                 return;
             }
-            Log("  <D [{0}] {1}", id, e.Data);
+            Log("  <D [{0}] {1}", id, line);
         }
 
         private void HandleDownstreamReadyok(List<string> command)
