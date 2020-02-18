@@ -293,6 +293,21 @@ namespace tanuki_proxy
 
                 if (command[0] == "go")
                 {
+                    // 持ち時間0、1手毎の加算秒数を正に設定すると、初手の思考時間が0となる。
+                    // これにより初手の指し手が狂ってしまう。
+                    // これを避けるため、btimeとwtimeの値を補正する。
+                    int btimeIndex = command.IndexOf("btime");
+                    if (btimeIndex != -1 && command[btimeIndex + 1] == "0")
+                    {
+                        command[btimeIndex + 1] = "1000";
+                    }
+
+                    int wtimeIndex = command.IndexOf("wtime");
+                    if (wtimeIndex != -1 && command[wtimeIndex + 1] == "0")
+                    {
+                        command[wtimeIndex + 1] = "1000";
+                    }
+
                     // Multi Ponder 中、 ponderhit が送られてきて、
                     // 実際には ponder がヒットしなかった場合に go コマンドを送るため、
                     // 最後に送られてきた go コマンドを保存しておく
