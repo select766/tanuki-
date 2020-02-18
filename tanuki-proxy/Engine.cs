@@ -36,8 +36,6 @@ namespace tanuki_proxy
         private string actualDownstreamPosition = "";
         private string actualDownstreamGo = "";
         private readonly object downstreamLockObject = new object();
-        private readonly BlockingCollection<string> commandQueue = new BlockingCollection<string>();
-        private Thread thread;
         public string name { get; }
         private readonly int id;
         public bool TimeKeeper { get; set; }
@@ -73,67 +71,9 @@ namespace tanuki_proxy
 
         public void Start()
         {
-            thread = new Thread(ThreadRun);
-            thread.Start();
-        }
-
-        private void ThreadRun()
-        {
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-
-            while (!commandQueue.IsCompleted)
-            {
-                string input = null;
-                try
-                {
-                    input = commandQueue.Take();
-                }
-                catch (InvalidOperationException)
-                {
-                    continue;
-                }
-
-                if (string.IsNullOrEmpty(input))
-                {
-                    continue;
-                }
-
-                var command = Split(input);
-                if (command.Count == 0)
-                {
-                    continue;
-                }
-
-                // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
-                if (command.Contains("setoption"))
-                {
-                    HandleUpstreamSetoption(command);
-                }
-                else if (command.Contains("position"))
-                {
-                    HandleUpstreamPosition(command);
-                }
-                else if (command.Contains("go"))
-                {
-                    HandleUpstreamGo(command);
-                }
-                else if (command.Contains("ponderhit"))
-                {
-                    HandleUpstreamPonderhit(command);
-                }
-                else if (command.Contains("tt"))
-                {
-                    // ttコマンドは量が多いためログに出力しないようにする
-                    WriteLineAndFlush(process.StandardInput, Join(command));
-                }
-                else
-                {
-                    Log("  P> [{0}] {1}", id, Join(command));
-                    WriteLineAndFlush(process.StandardInput, Join(command));
-                }
-            }
         }
 
         public void Dispose()
@@ -149,9 +89,6 @@ namespace tanuki_proxy
                 return;
             }
 
-            commandQueue.CompleteAdding();
-            thread.Join();
-            commandQueue.Dispose();
             process.Dispose();
 
             disposed = true;
@@ -163,9 +100,44 @@ namespace tanuki_proxy
         /// <param name="input"></param>
         public void Write(string input)
         {
-            // コマンドをBlockingCollectionに入れる。
-            // 入れられたコマンドは別のスレッドで処理される。
-            commandQueue.Add(input);
+            if (string.IsNullOrEmpty(input))
+            {
+                return;
+            }
+
+            var command = Split(input);
+            if (command.Count == 0)
+            {
+                return;
+            }
+
+            // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
+            if (command.Contains("setoption"))
+            {
+                HandleUpstreamSetoption(command);
+            }
+            else if (command.Contains("position"))
+            {
+                HandleUpstreamPosition(command);
+            }
+            else if (command.Contains("go"))
+            {
+                HandleUpstreamGo(command);
+            }
+            else if (command.Contains("ponderhit"))
+            {
+                HandleUpstreamPonderhit(command);
+            }
+            else if (command.Contains("tt"))
+            {
+                // ttコマンドは量が多いためログに出力しないようにする
+                WriteLineAndFlush(process.StandardInput, Join(command));
+            }
+            else
+            {
+                Log("  P> [{0}] {1}", id, Join(command));
+                WriteLineAndFlush(process.StandardInput, Join(command));
+            }
         }
 
         /// <summary>
