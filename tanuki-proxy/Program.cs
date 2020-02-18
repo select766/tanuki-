@@ -581,7 +581,7 @@ namespace tanuki_proxy
                 var numAssignedNodes = positionAndNumAssignedNodes.NumAssignedEngines;
 
                 // MultiPV探索に使用するノードを選ぶ。
-                var multiPVEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, null);
+                var multiPVEngine = FindAvailaleEngineForMultiPVSearch(assignedEngines, multiPonderRootPosition);
 
                 // いくつの指し手を出力させるか決める。
                 int multiPV = 0;
@@ -631,7 +631,7 @@ namespace tanuki_proxy
                     }
 
                     var targetPosition = AddMove(position, multiPVMove);
-                    var assignedEngine = FindAvailaleEngine(assignedEngines, multiPonderRootPosition, Join(targetPosition));
+                    var assignedEngine = FindAvailaleEngineForSearch(assignedEngines, multiPonderRootPosition, Join(targetPosition));
 
                     if (assignedEngine.ExpectedDownstreamPosition != Join(targetPosition))
                     {
@@ -717,19 +717,19 @@ namespace tanuki_proxy
         }
 
         /// <summary>
-        /// 局面の探索に利用可能な探索エンジンを一つ選ぶ
+        /// 対象の局面の探索に使用する探索エンジンを一つ選ぶ
         /// </summary>
         /// <param name="assignedEngines"></param>
         /// <param name="multiPonderRootPosition"></param>
-        /// <param name="preferredExpectedDownstreamPosition">指定されていた場合、この局面を探索中の思考エンジンを優先して返す。</param>
+        /// <param name="targetPosition">指定されていた場合、この局面を探索中の思考エンジンを優先して返す。</param>
         /// <returns></returns>
-        private Engine FindAvailaleEngine(HashSet<Engine> assignedEngines, List<string> multiPonderRootPosition, string preferredExpectedDownstreamPosition)
+        private Engine FindAvailaleEngineForSearch(HashSet<Engine> assignedEngines, List<string> multiPonderRootPosition, string targetPosition)
         {
-            // preferredExpectedDownstreamPositionを探索中の思考エンジンがある場合、それを返す。
+            // targetPositionを探索中の思考エンジンがある場合、それを返す。
             var engine = engines
                 .Where(x => !x.MateEngine)
                 .Where(x => !assignedEngines.Contains(x))
-                .Where(x => x.ExpectedDownstreamPosition == preferredExpectedDownstreamPosition)
+                .Where(x => x.ExpectedDownstreamPosition == targetPosition)
                 // 対局開始直後はExpectedDownstreamPositionが全て空になる。
                 // そのためSingleOrDefault()を使用すると例外が飛んでしまう。
                 // これを避けるためにFirstOrDefault()を使用する。
@@ -739,7 +739,35 @@ namespace tanuki_proxy
                 return engine;
             }
 
-            // MultiPV探索に使用するノードを選ぶ。
+            // 見つからなかったので、Root局面以下を探索している思考エンジンを選ぶ。
+            return engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !assignedEngines.Contains(x))
+                .First();
+        }
+
+        /// <summary>
+        /// Multi PV探索に使用する探索エンジンを一つ選ぶ
+        /// </summary>
+        /// <param name="assignedEngines"></param>
+        /// <param name="multiPonderRootPosition"></param>
+        /// <returns></returns>
+        private Engine FindAvailaleEngineForMultiPVSearch(HashSet<Engine> assignedEngines, List<string> multiPonderRootPosition)
+        {
+            // 自分の手番中は、root局面==multiPonderRootPositionとなり、探索中である。
+            // 相手の手番中は、multiPonderRootPositionを探索していた思考エンジンは、局面を思考していない。
+            // multiPonderRootPositionを探索している局面を優先して返す。
+            var engine = engines
+                .Where(x => !x.MateEngine)
+                .Where(x => !assignedEngines.Contains(x))
+                // 相手の手番中、multiPonderRootPositionを探索している思考エンジンを優先して返す。
+                .Where(x => x.ExpectedDownstreamPosition == Join(multiPonderRootPosition))
+                .FirstOrDefault();
+            if (engine != null)
+            {
+                return engine;
+            }
+
             // なるべく現在のRoot局面以下以外を探索している思考エンジンを選ぶ。
             engine = engines
                 .Where(x => !x.MateEngine)
@@ -756,7 +784,10 @@ namespace tanuki_proxy
             return engines
                 .Where(x => !x.MateEngine)
                 .Where(x => !assignedEngines.Contains(x))
-                .First();
+                // エンジン番号の小さい思考エンジンは、rootに近い局面を探索している可能性が高い。
+                // これをMulti PV探索に使用すると若干損である。
+                // これを防ぐためエンジン番号の大きいエンジンを優先する。
+                .Last();
         }
 
         /// <summary>
