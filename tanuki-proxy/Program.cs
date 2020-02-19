@@ -698,16 +698,17 @@ namespace tanuki_proxy
                         mateEngine.Write("go mate inifinite");
                     }
 
-                    // この局面以下の局面に割り当てられる思考エンジンの数。
-                    int nextNumAssignedNodes = Math.Max(1, numRemainedNodes / 2);
-                    numRemainedNodes -= nextNumAssignedNodes;
-                    if (nextNumAssignedNodes > 1)
+                    // この局面の子孫局面に割り当てられる思考エンジンの数。
+                    // この局面を探索する思考エンジンは除く。
+                    int nextNumAssignedNodes = Math.Max(1, numRemainedNodes / 2) - 1;
+                    // 現局面の探索に思考エンジンを一つ使っているので、1足す。
+                    numRemainedNodes -= nextNumAssignedNodes + 1;
+                    if (nextNumAssignedNodes > 0)
                     {
                         queue.Enqueue(new PositionAndNumAssignedNodes
                         {
                             Position = targetPosition,
-                            // 現局面の探索に思考エンジンを一つ使っているので、1引く。
-                            NumAssignedEngines = nextNumAssignedNodes - 1,
+                            NumAssignedEngines = nextNumAssignedNodes,
                         });
                     }
                 }
