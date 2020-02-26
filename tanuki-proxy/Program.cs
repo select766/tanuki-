@@ -624,7 +624,8 @@ namespace tanuki_proxy
                 foreach (var multiPVMove in multiPVMoves)
                 {
                     // multipvの数が少なくなっている可能性があるのでnullチェックする。
-                    if (multiPVMove == null)
+                    // resign・winの場合、それ以上展開しないようにする。
+                    if (multiPVMove == null || multiPVMove == "resign" || multiPVMove == "win")
                     {
                         // 探索する指し手が無かった。
                         // 思考エンジンを遊ばせておく。
