@@ -63,6 +63,12 @@ namespace tanuki_proxy
             this.id = id;
             this.TimeKeeper = false;
             this.MateEngine = mateEngine;
+            this.process.EnableRaisingEvents = true;
+            this.process.Exited += (sender, e) =>
+            {
+                Log("     [{0}] Exitted abnormally. e={1}", id, e.ToString());
+
+            };
         }
 
         public Engine(Program program, EngineOption opt, int id) : this(program, opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.mateEngine)
