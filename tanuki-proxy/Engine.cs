@@ -20,6 +20,7 @@ namespace tanuki_proxy
             public int score { get; set; }
             public List<string> pvCommand { get; set; }
             public long nps { get; set; }
+            public long nodes { get; set; }
         }
 
         private const int mateScore = 32000;
@@ -443,6 +444,13 @@ namespace tanuki_proxy
                     Bestmove.nps = nps;
                 }
 
+                int nodesIndex = command.IndexOf("nodes");
+                if (nodesIndex != -1)
+                {
+                    long nodes = long.Parse(command[nodesIndex + 1]);
+                    Bestmove.nodes = nodes;
+                }
+
                 // Root局面の子局面を探索していた場合は投票しない
                 if (program.UpstreamPosition != ExpectedDownstreamPosition)
                 {
@@ -531,17 +539,28 @@ namespace tanuki_proxy
                     //WriteLineAndFlush(Console.Out, vote);
 
                     // info pvの表示
+                    var commandWithSum = new List<string>(command);
+
                     long sumNps = program.engines
                         .Select(x => x.Bestmove)
                         .Sum(x => x.nps);
-                    var commandWithNps = new List<string>(command);
-                    int sumNpsIndex = commandWithNps.IndexOf("nps");
+                    int sumNpsIndex = commandWithSum.IndexOf("nps");
                     if (sumNpsIndex != -1)
                     {
-                        commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
+                        commandWithSum[sumNpsIndex + 1] = sumNps.ToString();
                     }
-                    Log("<P   {0}", Join(commandWithNps));
-                    WriteLineAndFlush(Console.Out, Join(commandWithNps));
+
+                    long sumNodes = program.engines
+                        .Select(x => x.Bestmove)
+                        .Sum(x => x.nodes);
+                    int sumNodesIndex = commandWithSum.IndexOf("nodes");
+                    if (sumNodesIndex != -1)
+                    {
+                        commandWithSum[sumNodesIndex + 1] = sumNodes.ToString();
+                    }
+
+                    Log("<P   {0}", Join(commandWithSum));
+                    WriteLineAndFlush(Console.Out, Join(commandWithSum));
                     program.Depth = tempDepth;
                     program.LastShowPv = DateTime.Now;
                 }
