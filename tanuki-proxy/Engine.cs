@@ -22,7 +22,6 @@ namespace tanuki_proxy
             public long nps { get; set; }
         }
 
-        private const double showPvSupressionMs = 200.0;
         private const int mateScore = 32000;
         private const int multiPVSearchTimeMs = 100;
         private const int multiPVSearchTimeoutMs = 200;
@@ -500,59 +499,51 @@ namespace tanuki_proxy
                     }
                 }
 
-                // Fail-low/Fail-highした探索結果は表示しない
                 lock (program.LastShowPvLockObject)
                 {
-                    // 深さ3未満のPVを出力するのは将棋所にmateの値を認識させるため
-                    if ((tempDepth < 3 || program.LastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now) &&
-                        !command.Contains("lowerbound") &&
-                        !command.Contains("upperbound") &&
-                        program.Depth < tempDepth)
+                    //// voteの表示
+                    //Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
+                    //foreach (var engine in program.engines)
+                    //{
+                    //    if (engine.Bestmove.move == null)
+                    //    {
+                    //        continue;
+                    //    }
+
+                    //    if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
+                    //    {
+                    //        bestmoveToCount.Add(engine.Bestmove.move, 0);
+                    //    }
+                    //    ++bestmoveToCount[engine.Bestmove.move];
+                    //}
+                    //List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
+                    //bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+
+                    //string vote = "info string";
+                    //foreach (var p in bestmoveAndCount)
+                    //{
+                    //    vote += " ";
+                    //    vote += p.Key;
+                    //    vote += "=";
+                    //    vote += p.Value;
+                    //}
+                    //Log("<P   {0}", vote);
+                    //WriteLineAndFlush(Console.Out, vote);
+
+                    // info pvの表示
+                    long sumNps = program.engines
+                        .Select(x => x.Bestmove)
+                        .Sum(x => x.nps);
+                    var commandWithNps = new List<string>(command);
+                    int sumNpsIndex = commandWithNps.IndexOf("nps");
+                    if (sumNpsIndex != -1)
                     {
-                        //// voteの表示
-                        //Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        //foreach (var engine in program.engines)
-                        //{
-                        //    if (engine.Bestmove.move == null)
-                        //    {
-                        //        continue;
-                        //    }
-
-                        //    if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
-                        //    {
-                        //        bestmoveToCount.Add(engine.Bestmove.move, 0);
-                        //    }
-                        //    ++bestmoveToCount[engine.Bestmove.move];
-                        //}
-                        //List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
-                        //bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
-
-                        //string vote = "info string";
-                        //foreach (var p in bestmoveAndCount)
-                        //{
-                        //    vote += " ";
-                        //    vote += p.Key;
-                        //    vote += "=";
-                        //    vote += p.Value;
-                        //}
-                        //Log("<P   {0}", vote);
-                        //WriteLineAndFlush(Console.Out, vote);
-
-                        // info pvの表示
-                        long sumNps = program.engines
-                            .Select(x => x.Bestmove)
-                            .Sum(x => x.nps);
-                        var commandWithNps = new List<string>(command);
-                        int sumNpsIndex = commandWithNps.IndexOf("nps");
-                        if (sumNpsIndex != -1)
-                        {
-                            commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
-                        }
-                        Log("<P   {0}", Join(commandWithNps));
-                        WriteLineAndFlush(Console.Out, Join(commandWithNps));
-                        program.Depth = tempDepth;
-                        program.LastShowPv = DateTime.Now;
+                        commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
                     }
+                    Log("<P   {0}", Join(commandWithNps));
+                    WriteLineAndFlush(Console.Out, Join(commandWithNps));
+                    program.Depth = tempDepth;
+                    program.LastShowPv = DateTime.Now;
                 }
             }
         }
