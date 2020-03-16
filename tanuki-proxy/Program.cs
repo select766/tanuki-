@@ -594,31 +594,31 @@ namespace tanuki_proxy
                 WriteInfoStringToUI($"Searching child positions. position={Join(position).Substring(Join(multiPonderRootPosition).Length).Trim()}");
                 var multiPVMoves = multiPVEngine.SearchWithMultiPv(Join(position), multiPV);
 
-                //// ponderの指し手が存在していた場合、その指し手を先頭に持ってくる。
-                //// この処理は、root局面の子局面についてのみ行われる。
-                //if (ponder != null)
-                //{
-                //    // ponderとmultiPVMovesを結合する。
-                //    multiPVMoves = new string[] { ponder }
-                //        .Concat(multiPVMoves)
-                //        // 重複した指し手を取り除く。
-                //        .Distinct()
-                //        .Where(x => x != null)
-                //        .ToArray();
+                // ponderの指し手が存在していた場合、その指し手を先頭に持ってくる。
+                // この処理は、root局面の子局面についてのみ行われる。
+                if (ponder != null)
+                {
+                    // ponderとmultiPVMovesを結合する。
+                    multiPVMoves = new string[] { ponder }
+                        .Concat(multiPVMoves)
+                        // 重複した指し手を取り除く。
+                        .Distinct()
+                        .Where(x => x != null)
+                        .ToArray();
 
-                //    // 先頭のmultiPV個を選ぶ。
-                //    if (multiPVMoves.Length > multiPV)
-                //    {
-                //        multiPVMoves = multiPVMoves
-                //            .Take(multiPV)
-                //            .ToArray();
-                //    }
+                    // 先頭のmultiPV個を選ぶ。
+                    if (multiPVMoves.Length > multiPV)
+                    {
+                        multiPVMoves = multiPVMoves
+                            .Take(multiPV)
+                            .ToArray();
+                    }
 
-                //    // 合法手がmultiPV未満の場合、multiPVMovesの数がmultiPV以下になっている点に注意する。
+                    // 合法手がmultiPV未満の場合、multiPVMovesの数がmultiPV以下になっている点に注意する。
 
-                //    // 他の局面でponderの値が使用されないよう、nullを代入しておく。
-                //    ponder = null;
-                //}
+                    // 他の局面でponderの値が使用されないよう、nullを代入しておく。
+                    ponder = null;
+                }
 
                 int numRemainedNodes = numAssignedNodes;
                 foreach (var multiPVMove in multiPVMoves)
