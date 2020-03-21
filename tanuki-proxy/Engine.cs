@@ -696,7 +696,9 @@ namespace tanuki_proxy
             eventMultipv.Reset();
 
             int searchTimeMS = multiPVSearchTimePerPVMs * multiPv;
-            Log($"     [{id}] Searching for {searchTimeMS}ms.");
+            string message = $"Searching for {searchTimeMS}ms";
+            Log($"     [{id}] {message}.");
+            WriteLineAndFlush(Console.Out, $"info string {message}");
             Write($"go byoyomi {searchTimeMS}");
 
             // multipv探索の結果が帰ってくるまで待機する。
