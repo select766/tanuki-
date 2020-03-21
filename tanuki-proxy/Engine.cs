@@ -695,13 +695,15 @@ namespace tanuki_proxy
             // multipv探索の結果を受け取らないまま進行してい舞う場合が考えられる
             eventMultipv.Reset();
 
-            Write($"go byoyomi {multiPVSearchTimePerPVMs * multiPv}");
+            int searchTimeMS = multiPVSearchTimePerPVMs * multiPv;
+            Log($"     [{id}] Searching for {searchTimeMS}ms.");
+            Write($"go byoyomi {searchTimeMS}");
 
             // multipv探索の結果が帰ってくるまで待機する。
             // multiPVSearchTimeMsを大きく超えても出力が返ってこない場合がある。
             // その場合、思考エンジンの処理全体が停止してしまう。
             // これを避けるため、タイムアウトを設ける。
-            if (!eventMultipv.WaitOne(multiPVSearchTimePerPVMs * multiPv + multiPVSearchTimeoutMs))
+            if (!eventMultipv.WaitOne(searchTimeMS + multiPVSearchTimeoutMs))
             {
                 Log("     [{0}] Multi PV search timed out.", id);
                 WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
