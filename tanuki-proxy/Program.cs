@@ -586,7 +586,8 @@ namespace tanuki_proxy
                 // いくつの指し手を出力させるか決める。
                 // TODO(hnoda): 計算式を決める。指し手の幅を大きくしたほうが良いか…？
                 int multiPV = 0;
-                for (int tempNumAssignedNodes = numAssignedNodes; tempNumAssignedNodes > 0; tempNumAssignedNodes -= (tempNumAssignedNodes + 1) / 2)
+                //for (int tempNumAssignedNodes = numAssignedNodes; tempNumAssignedNodes > 0; tempNumAssignedNodes -= (tempNumAssignedNodes + 1) / 2)
+                for (int tempNumAssignedNodes = numAssignedNodes; tempNumAssignedNodes > 0; tempNumAssignedNodes -= Math.Max(tempNumAssignedNodes / 2, 1))
                 {
                     ++multiPV;
                 }
@@ -702,7 +703,8 @@ namespace tanuki_proxy
 
                     // この局面の子孫局面に割り当てられる思考エンジンの数。
                     // この局面を探索する思考エンジンは除く。
-                    int nextNumAssignedNodes = (numRemainedNodes + 1) / 2 - 1;
+                    //int nextNumAssignedNodes = (numRemainedNodes + 1) / 2 - 1;
+                    int nextNumAssignedNodes = Math.Max(numRemainedNodes / 2, 1) - 1;
                     // 現局面の探索に思考エンジンを一つ使っているので、1足す。
                     numRemainedNodes -= nextNumAssignedNodes + 1;
                     if (nextNumAssignedNodes > 0)
