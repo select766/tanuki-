@@ -24,8 +24,8 @@ namespace tanuki_proxy
         }
 
         private const int mateScore = 32000;
-        private const int multiPVSearchTimePerPVMs = 100;
-        private const int multiPVSearchTimeoutMs = 100;
+        private const int multiPVSearchTimeMs = 100;
+        private const int multiPVSearchTimeoutMs = 200;
 
         bool disposed = false;
         private readonly Program program;
@@ -695,17 +695,13 @@ namespace tanuki_proxy
             // multipv探索の結果を受け取らないまま進行してい舞う場合が考えられる
             eventMultipv.Reset();
 
-            int searchTimeMS = multiPVSearchTimePerPVMs * multiPv;
-            string message = $"Searching for {searchTimeMS}ms";
-            Log($"     [{id}] {message}.");
-            WriteLineAndFlush(Console.Out, $"info string {message}");
-            Write($"go byoyomi {searchTimeMS}");
+            Write($"go byoyomi {multiPVSearchTimeMs}");
 
             // multipv探索の結果が帰ってくるまで待機する。
             // multiPVSearchTimeMsを大きく超えても出力が返ってこない場合がある。
             // その場合、思考エンジンの処理全体が停止してしまう。
             // これを避けるため、タイムアウトを設ける。
-            if (!eventMultipv.WaitOne(searchTimeMS + multiPVSearchTimeoutMs))
+            if (!eventMultipv.WaitOne(multiPVSearchTimeoutMs))
             {
                 Log("     [{0}] Multi PV search timed out.", id);
                 WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
