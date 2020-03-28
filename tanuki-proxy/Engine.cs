@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using static tanuki_proxy.Logging;
 using static tanuki_proxy.Program;
 using static tanuki_proxy.Setting;
 using static tanuki_proxy.Utility;
@@ -66,8 +64,7 @@ namespace tanuki_proxy
             this.process.EnableRaisingEvents = true;
             this.process.Exited += (sender, e) =>
             {
-                Log("     [{0}] Exitted abnormally. e={1}", id, e.ToString());
-
+                Trace.WriteLine($"     [{id}] Exitted abnormally. e={e}");
             };
         }
 
@@ -176,7 +173,7 @@ namespace tanuki_proxy
             }
             else
             {
-                Log("  P> [{0}] {1}", id, Join(command));
+                Trace.WriteLine($"  P> [{id}] {Join(command)}");
                 WriteLineAndFlush(process.StandardInput, Join(command));
             }
         }
@@ -201,7 +198,7 @@ namespace tanuki_proxy
                 }
             }
 
-            Log("  P> [{0}] {1}", id, Join(command));
+            Trace.WriteLine($"  P> [{id}] {Join(command)}");
             WriteLineAndFlush(process.StandardInput, Join(command));
         }
 
@@ -214,7 +211,7 @@ namespace tanuki_proxy
             var input = Join(command);
             ExpectedDownstreamPosition = input;
             actualDownstreamPosition = null;
-            Log("  P> [{0}] {1}", id, input);
+            Trace.WriteLine($"  P> [{id}] {input}");
             WriteLineAndFlush(process.StandardInput, input);
         }
 
@@ -229,7 +226,7 @@ namespace tanuki_proxy
             actualDownstreamGo = null;
             // eventSearchingを非シグナル状態にし、スレッドをブロックする
             eventSearching.Reset();
-            Log("  P> [{0}] {1}", id, input);
+            Trace.WriteLine($"  P> [{id}] {input}");
             WriteLineAndFlush(process.StandardInput, input);
         }
 
@@ -241,7 +238,7 @@ namespace tanuki_proxy
         {
             if (TimeKeeper)
             {
-                Log("  P> [{0}] {1}", id, Join(command));
+                Trace.WriteLine($"  P> [{id}] {Join(command)}");
                 WriteLineAndFlush(process.StandardInput, Join(command));
             }
         }
@@ -263,7 +260,7 @@ namespace tanuki_proxy
             if (!command.Contains("tt"))
             {
                 // ttコマンドは量が多いのでログに出力しないようにする
-                Log("  <D [{0}] {1}", id, line);
+                Trace.WriteLine($"  <D [{id}] {line}");
             }
 
             if (command.Contains("tt"))
@@ -296,7 +293,7 @@ namespace tanuki_proxy
             }
             else
             {
-                Log("<P   [{0}] {1}", id, Join(command));
+                Trace.WriteLine($"<P   [{id}] {Join(command)}");
                 WriteLineAndFlush(Console.Out, Join(command));
             }
         }
@@ -312,7 +309,7 @@ namespace tanuki_proxy
             {
                 return;
             }
-            Log("  <D [{0}] {1}", id, line);
+            Trace.WriteLine($"  <D [{id}] {line}");
         }
 
         private void HandleDownstreamReadyok(List<string> command)
@@ -322,7 +319,7 @@ namespace tanuki_proxy
             {
                 if (program.NumberOfRunningEngines == Interlocked.Increment(ref program.numberOfReadyoks))
                 {
-                    Log("<P   [{0}] {1}", id, Join(command));
+                    Trace.WriteLine($"<P   [{id}] {Join(command)}");
                     WriteLineAndFlush(Console.Out, Join(command));
                 }
             }
@@ -340,7 +337,7 @@ namespace tanuki_proxy
             {
                 int index = command.IndexOf("position");
                 actualDownstreamPosition = Join(command.Skip(index));
-                Log("     [{0}] . actualDownstreamPosition={1}", id, actualDownstreamPosition);
+                Trace.WriteLine($"     [{id}] . actualDownstreamPosition={actualDownstreamPosition}");
             }
         }
 
@@ -356,7 +353,7 @@ namespace tanuki_proxy
             {
                 int index = command.IndexOf("go");
                 actualDownstreamGo = Join(command.Skip(index));
-                Log("     [{0}] . actualDownstreamGo={1}", id, actualDownstreamGo);
+                Trace.WriteLine($"     [{id}] . actualDownstreamGo={actualDownstreamGo}");
             }
         }
 
@@ -380,8 +377,7 @@ namespace tanuki_proxy
                     // 思考中の局面が違う場合は処理しない
                     if (ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
                     {
-                        Log("     [{0}] # process={1} ExpectedDownstreamPosition(={2}) != actualDownstreamPosition(={3})",
-                            id, process, ExpectedDownstreamPosition, actualDownstreamPosition);
+                        Trace.WriteLine($"     [{id}] # process={process} ExpectedDownstreamPosition(={ExpectedDownstreamPosition}) != actualDownstreamPosition(={actualDownstreamPosition})");
                         return;
                     }
                 }
@@ -559,7 +555,7 @@ namespace tanuki_proxy
                         commandWithSum[sumNodesIndex + 1] = sumNodes.ToString();
                     }
 
-                    Log("<P   {0}", Join(commandWithSum));
+                    Trace.WriteLine($"<P   {Join(commandWithSum)}");
                     WriteLineAndFlush(Console.Out, Join(commandWithSum));
                     program.Depth = tempDepth;
                     program.LastShowPv = DateTime.Now;
@@ -603,7 +599,7 @@ namespace tanuki_proxy
                     // 思考中の局面が違う場合は処理しない
                     if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
                     {
-                        Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                        Trace.WriteLine($"  ## process={process} upstreamGoIndex != downstreamGoIndex");
                         return;
                     }
                 }
@@ -654,7 +650,7 @@ namespace tanuki_proxy
                     // 思考中の局面が違う場合は処理しない
                     if (program.UpstreamPosition != ExpectedDownstreamPosition || ExpectedDownstreamPosition != actualDownstreamPosition || ExpectedDownstreamGo != actualDownstreamGo)
                     {
-                        Log("  ## process={0} upstreamGoIndex != downstreamGoIndex", process);
+                        Trace.WriteLine($"  ## process={process} upstreamGoIndex != downstreamGoIndex");
                         return;
                     }
                 }
@@ -673,7 +669,7 @@ namespace tanuki_proxy
                 Bestmove.score = mateScore - command.Count + 1;
 
                 string infoStringCommand = "info string " + Join(command);
-                Log("<P   [{0}] {1}", id, infoStringCommand);
+                Trace.WriteLine($"<P   [{id}] {infoStringCommand}");
                 WriteLineAndFlush(Console.Out, infoStringCommand);
             }
         }
@@ -703,7 +699,7 @@ namespace tanuki_proxy
             // これを避けるため、タイムアウトを設ける。
             if (!eventMultipv.WaitOne(multiPVSearchTimeoutMs))
             {
-                Log("     [{0}] Multi PV search timed out.", id);
+                Trace.WriteLine($"     [{id}] Multi PV search timed out.");
                 WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
             }
 
