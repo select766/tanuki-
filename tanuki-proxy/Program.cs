@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using static System.Math;
 using static System.String;
+using static tanuki_proxy.Logging;
 using static tanuki_proxy.Setting;
 using static tanuki_proxy.Utility;
 
@@ -38,7 +39,7 @@ namespace tanuki_proxy
             get { return upstreamState; }
             set
             {
-                Trace.WriteLine($"     {upstreamState} > {value}");
+                Log("     {0} > {1}", upstreamState, value);
                 upstreamState = value;
             }
         }
@@ -68,6 +69,7 @@ namespace tanuki_proxy
 
             running = false;
             decideMoveTask.Join();
+            Logging.Close();
             foreach (var engine in engines)
             {
                 engine.Dispose();
@@ -256,9 +258,7 @@ namespace tanuki_proxy
             string logFileFormat = Path.Combine(setting.logDirectory, string.Format(
                 "tanuki-proxy.{0}.pid={1}.log.txt", DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss"),
                 GetProcessId()));
-            var defaultListener = new DefaultTraceListener();
-            defaultListener.LogFileName = logFileFormat;
-            Trace.Listeners.Add(defaultListener);
+            Logging.Open(logFileFormat);
 
             for (int id = 0; id < setting.engines.Length; ++id)
             {
@@ -288,7 +288,7 @@ namespace tanuki_proxy
             string input;
             while ((input = Console.ReadLine()) != null)
             {
-                Trace.WriteLine($"U>       {input}");
+                Log("U>       {0}", input);
                 var command = Split(input);
 
                 if (command[0] == "go")
@@ -384,7 +384,7 @@ namespace tanuki_proxy
                     lock (UpstreamLockObject)
                     {
                         UpstreamPosition = input;
-                        Trace.WriteLine($"     upstreamPosition={UpstreamPosition}");
+                        Log("     upstreamPosition=" + UpstreamPosition);
                         // positionコマンドは直接下流に渡さない
                         // goコマンドの中で下流に渡すようにする
                         continue;
@@ -984,7 +984,7 @@ namespace tanuki_proxy
 
         private static void WriteToUI(string usiCommand)
         {
-            Trace.WriteLine($"<P   {usiCommand}");
+            Log($"<P   {usiCommand}");
             WriteLineAndFlush(Console.Out, $"{usiCommand}");
         }
 
