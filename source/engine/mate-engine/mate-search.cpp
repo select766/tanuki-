@@ -210,10 +210,10 @@ namespace MateEngine
 		}
 
 		// 置換表を確保する。
-		// 現在のOptions["Hash"]の値だけ確保する。
+		// 現在のOptions["USI_Hash"]の値だけ確保する。
 		void Resize()
 		{
-			int64_t hash_size_mb = (int)Options["Hash"];
+			int64_t hash_size_mb = (int)Options["USI_Hash"];
 
 			// 作成するクラスターの数。2のべき乗にする。
 			int64_t new_num_clusters = 1LL << MSB64((hash_size_mb * 1024 * 1024) / sizeof(Cluster));
@@ -826,7 +826,7 @@ namespace MateEngine
 		//    また、このときThreads.stop == trueにはならない。(この点、Stockfishとは異なる。)
 		// "go infinite"に対してはstopが送られてくるまで待つ。
 		while (!Threads.stop && (Threads.main()->ponder || Limits.infinite))
-			sleep(1);
+			Tools::sleep(1);
 		//	こちらの思考は終わっているわけだから、ある程度細かく待っても問題ない。
 		// (思考のためには計算資源を使っていないので。)
 
@@ -869,7 +869,7 @@ void Search::clear()
 #if defined(FOR_TOURNAMENT)
 
 	// 進捗を表示しながら並列化してゼロクリア
-	memclear("Hash" , MateEngine::transposition_table.tt , MateEngine::transposition_table.Size());
+	Tools::memclear("USI_Hash" , MateEngine::transposition_table.tt , MateEngine::transposition_table.Size());
 
 #endif
 
@@ -883,7 +883,7 @@ void Thread::search()
 	if (Search::Limits.mate == 0) {
 		// "go infinite"に対してはstopが送られてくるまで待つ。
 		while (!Threads.stop && Limits.infinite)
-			sleep(1);
+			Tools::sleep(1);
 		sync_cout << "bestmove resign" << sync_endl;
 		return;
 	}

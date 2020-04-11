@@ -71,7 +71,7 @@ void bench_cmd(Position& current, istringstream& is)
 	else
 		limits.depth = stoi(limit);
 
-	Options["Hash"] = ttSize;
+	Options["USI_Hash"] = ttSize;
 	Options["Threads"] = threads;
 
 #if defined(YANEURAOU_ENGINE)
@@ -92,7 +92,7 @@ void bench_cmd(Position& current, istringstream& is)
 	else if (fenFile == "current")
 		fens.push_back(current.sfen());
 	else
-		read_all_lines(fenFile, fens);
+		FileOperator::ReadAllLines(fenFile, fens);
 
 	// 評価関数の読み込み等
 	is_ready();

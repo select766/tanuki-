@@ -492,7 +492,7 @@ void test_read_record(Position& pos, istringstream& is)
 	uint64_t line_no = 0;
 
 	string line;
-	while (Dependency::getline(fs, line))
+	while (Tools::getline(fs, line))
 	{
 		++line_no;
 		if ((line_no % 100) == 0) cout << '.'; // 100行おきに'.'を一つ出力。
@@ -1469,7 +1469,7 @@ void eval_merge(istringstream& is)
 		}
 	}
 
-	Dependency::mkdir(dir3);
+	Directory::CreateFolder(dir3);
 
 	KPPT_reader eval1, eval2;
 	eval1.read(dir1);
@@ -1655,7 +1655,7 @@ void eval_convert(istringstream& is)
 		return;
 
 	// 出力先のフォルダ、なければ掘る。
-	Dependency::mkdir(output_dir);
+	Directory::CreateFolder(output_dir);
 
 	auto input = get_info(input_dir, input_format);
 	auto output = get_info(output_dir, output_format);
@@ -1984,7 +1984,7 @@ void test_mate_engine_cmd(Position& pos, istringstream& is) {
 	// →　デフォルト1024にしておかないと置換表あふれるな。
 	string ttSize = (is >> token) ? token : "1024";
 
-	Options["Hash"] = ttSize;
+	Options["USI_Hash"] = ttSize;
 
 	Search::LimitsType limits;
 

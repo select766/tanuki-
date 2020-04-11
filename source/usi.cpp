@@ -22,10 +22,10 @@ void user_test(Position& pos, std::istringstream& is);
 // USI拡張コマンドの"test"コマンドなど。
 // サンプル用のコードを含めてtest.cppのほうに色々書いてあるのでそれを呼び出すために使う。
 #if defined(ENABLE_TEST_CMD)
-	void test_cmd(Position& pos, istringstream& is);
-	void generate_moves_cmd(Position& pos);
+void test_cmd(Position& pos, istringstream& is);
+void generate_moves_cmd(Position& pos);
 #if defined(MATE_ENGINE)
-	void test_mate_engine_cmd(Position& pos, istringstream& is);
+void test_mate_engine_cmd(Position& pos, istringstream& is);
 #endif
 #endif
 
@@ -41,22 +41,22 @@ namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 #if defined (EVAL_LEARN)
 namespace Learner
 {
-  // 教師局面の自動生成
-  void gen_sfen(Position& pos, istringstream& is);
+	// 教師局面の自動生成
+	void gen_sfen(Position& pos, istringstream& is);
 
-  // 生成した棋譜からの学習
-  void learn(Position& pos, istringstream& is);
+	// 生成した棋譜からの学習
+	void learn(Position& pos, istringstream& is);
 
 #if defined(GENSFEN2019)
-  // 開発中の教師局面の自動生成コマンド
-  void gen_sfen2019(Position& pos, istringstream& is);
+	// 開発中の教師局面の自動生成コマンド
+	void gen_sfen2019(Position& pos, istringstream& is);
 #endif
 
-  // 読み筋と評価値のペア。Learner::search(),Learner::qsearch()が返す。
-  typedef std::pair<Value, std::vector<Move> > ValueAndPV;
+	// 読み筋と評価値のペア。Learner::search(),Learner::qsearch()が返す。
+	typedef std::pair<Value, std::vector<Move> > ValueAndPV;
 
-  ValueAndPV qsearch(Position& pos);
-  ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1 , u64 nodesLimit = 0 );
+	ValueAndPV qsearch(Position& pos);
+	ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1, u64 nodesLimit = 0);
 
 }
 #endif
@@ -114,10 +114,10 @@ namespace USI
 			if (ss.rdbuf()->in_avail()) // 1行目でないなら連結のための改行を出力
 				ss << endl;
 
-			ss  << "info"
-				<< " depth "    << d / ONE_PLY
+			ss << "info"
+				<< " depth " << d / ONE_PLY
 				<< " seldepth " << rootMoves[i].selDepth
-				<< " score "    << USI::value(v);
+				<< " score " << USI::value(v);
 
 			// これが現在探索中の指し手であるなら、それがlowerboundかupperboundかは表示させる
 			if (i == pvIdx)
@@ -128,17 +128,19 @@ namespace USI
 				ss << " multipv " << (i + 1);
 
 			ss << " nodes " << nodes_searched
-			   << " nps " << nodes_searched * 1000 / elapsed;
+				<< " nps " << nodes_searched * 1000 / elapsed;
 
 			// 置換表使用率。経過時間が短いときは意味をなさないので出力しない。
 			if (elapsed > 1000)
 				ss << " hashfull " << TT.hashfull();
 
 			ss << " time " << elapsed
-			   << " pv";
+				<< " pv";
 
 
 			// PV配列からPVを出力する。
+			// ※　USIの"info"で読み筋を出力するときは"pv"サブコマンドはサブコマンドの一番最後にしなければならない。
+
 			auto out_array_pv = [&]()
 			{
 				for (Move m : rootMoves[i].pv)
@@ -153,7 +155,7 @@ namespace USI
 				StateInfo si[MAX_PLY];
 				int ply = 0;
 
-				while ( ply < MAX_PLY )
+				while (ply < MAX_PLY)
 				{
 					// 千日手はそこで終了。ただし初手はPVを出力。
 					// 千日手がベストのとき、置換表を更新していないので
@@ -253,26 +255,54 @@ u64 eval_sum;
 // 局面は初期化されないので注意。
 void is_ready(bool skipCorruptCheck)
 {
+
+	// --- Keep Alive的な処理 ---
+
 	// "isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。(keep alive的な処理)
-	//	USI2.0の仕様より。
-	//  -"isready"のあとのtime out時間は、30秒程度とする。これを超えて、評価関数の初期化、hashテーブルの確保をしたい場合、
-	//  思考エンジン側から定期的に何らかのメッセージ(改行可)を送るべきである。
-	//  -ShogiGUIではすでにそうなっているので、MyShogiもそれに追随する。
-	//  -また、やねうら王のエンジン側は、"isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。
-	 
-	auto ended = false;
-	auto th = std::thread([&ended] {
+	// cf. USIプロトコルでisready後の初期化に時間がかかる時にどうすれば良いのか？
+	//     http://yaneuraou.yaneu.com/2020/01/05/usi%e3%83%97%e3%83%ad%e3%83%88%e3%82%b3%e3%83%ab%e3%81%a7isready%e5%be%8c%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96%e3%81%ab%e6%99%82%e9%96%93%e3%81%8c%e3%81%8b%e3%81%8b%e3%82%8b%e6%99%82%e3%81%ab%e3%81%a9/
+	// cf. isready後のkeep alive用改行コードの送信について
+	//		http://yaneuraou.yaneu.com/2020/03/08/isready%e5%be%8c%e3%81%aekeep-alive%e7%94%a8%e6%94%b9%e8%a1%8c%e3%82%b3%e3%83%bc%e3%83%89%e3%81%ae%e9%80%81%e4%bf%a1%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/
+
+	// これを送らないと、将棋所、ShogiGUIでタイムアウトになりかねない。
+	// ワーカースレッドを一つ生成して、そいつが5秒おきに改行を送信するようにする。
+	// このあと重い処理を行うのでスレッドの起動が遅延する可能性があるから、先にスレッドを生成して、そのスレッドが起動したことを
+	// 確認してから処理を行う。
+
+	// スレッドが起動したことを通知するためのフラグ
+	auto thread_started = false;
+
+	// この関数を抜ける時に立つフラグ(スレッドを停止させる用)
+	auto thread_end = false;
+
+	// 定期的な改行送信用のスレッド
+	auto th = std::thread([&] {
+		// スレッドが起動した
+		thread_started = true;
+
 		int count = 0;
-		while (!ended)
+		while (!thread_end)
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			if (++count >= 50 /* 5秒 */)
 			{
 				count = 0;
-				sync_cout << sync_endl; // 改行を送信する。
+				sync_cout << sync_endl; // 改行を送信する。	
+
+				// 定跡の読み込み部などで"info string.."で途中経過を出力する場合、
+				// sync_cout ～ sync_endlを用いて送信しないと、この改行を送るタイミングとかち合うと
+				// 変なところで改行されてしまうので注意。
 			}
 		}
-	});
+		});
+	SCOPE_EXIT({ thread_end = true; th.join(); });
+
+	// スレッド起動待ち
+	while (!thread_started)
+		Tools::sleep(100);
+
+	// --- Keep Alive的な処理ここまで ---
+
 
 #if defined (USE_EVAL_HASH)
 	Eval::EvalHash_Resize(Options["EvalHash"]);
@@ -316,19 +346,15 @@ void is_ready(bool skipCorruptCheck)
 	// isreadyに対してはreadyokを返すまで次のコマンドが来ないことは約束されているので
 	// このタイミングで各種変数の初期化もしておく。
 
-	TT.resize(Options["Hash"]);
+	TT.resize(Options["USI_Hash"]);
 
 	Search::clear();
-	Time.availableNodes = 0;
+	//	Time.availableNodes = 0;
 
 	Threads.stop = false;
 
 	// Lazy Clusterのクライアントとサーバーを開始する。
 	Tanuki::LazyCluster::Start();
-
-	// keep aliveを送信するために生成したスレッドを終了させ、待機する。
-	ended = true;
-	th.join();
 }
 
 // isreadyコマンド処理部
@@ -346,13 +372,13 @@ void is_ready_cmd(Position& pos, StateListPtr& states)
 
 	// 新しく渡す局面なので古いものは捨てて新しいものを作る。
 	states = StateListPtr(new StateList(1));
-	pos.set_hirate(&states->back(),Threads.main());
+	pos.set_hirate(&states->back(), Threads.main());
 
 	sync_cout << "readyok" << sync_endl;
 }
 
 // "position"コマンド処理部
-void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
+void position_cmd(Position& pos, istringstream& is, StateListPtr& states)
 {
 	// positionを受け取ったとき、探索中だと高確率でクラッシュする。
 	// これを防ぐため、stopコマンドを受け取ったとき相当の処理を行う。
@@ -383,7 +409,7 @@ void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 
 	// 新しく渡す局面なので古いものは捨てて新しいものを作る。
 	states = StateListPtr(new StateList(1));
-	pos.set(sfen , &states->back() , Threads.main());
+	pos.set(sfen, &states->back(), Threads.main());
 
 	// 指し手のリストをパースする(あるなら)
 	while (is >> token && (m = USI::to_move(pos, token)) != MOVE_NONE)
@@ -414,13 +440,9 @@ void setoption_cmd(istringstream& is)
 
 	if (Options.count(name))
 		Options[name] = value;
-	else {
-		// USI_Hashは無視してやる。
-		if (name != "USI_Hash" /* && name != "USI_Ponder" */)
-			// USI_Ponderは使うように変更した。
-			// この名前のoptionは存在しなかった
-			sync_cout << "Error! : No such option: " << name << sync_endl;
-	}
+	else
+		// この名前のoptionは存在しなかった
+		sync_cout << "Error! : No such option: " << name << sync_endl;
 }
 
 // getoptionコマンド応答(USI独自拡張)
@@ -451,7 +473,7 @@ void getoption_cmd(istringstream& is)
 
 // go()は、思考エンジンがUSIコマンドの"go"を受け取ったときに呼び出される。
 // この関数は、入力文字列から思考時間とその他のパラメーターをセットし、探索を開始する。
-void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
+void go_cmd(const Position& pos, istringstream& is, StateListPtr& states) {
 
 	Search::LimitsType limits;
 	string token;
@@ -549,7 +571,7 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	if (limits.byoyomi[BLACK] == 0 && limits.inc[BLACK] == 0 && limits.time[BLACK] == 0 && limits.rtime == 0)
 		limits.byoyomi[BLACK] = limits.byoyomi[WHITE] = 1000;
 
-	Threads.start_thinking(pos, states , limits , ponderMode);
+	Threads.start_thinking(pos, states, limits, ponderMode);
 }
 
 // --------------------
@@ -581,7 +603,7 @@ void search_cmd(Position& pos, istringstream& is)
 	}
 
 	cout << "search depth = " << depth << " , multi_pv = " << multi_pv << " : ";
-	auto pv = Learner::search(pos , depth , multi_pv);
+	auto pv = Learner::search(pos, depth, multi_pv);
 	cout << "Value = " << pv.first << " , PV = ";
 	for (auto m : pv.second)
 		cout << m << " ";
@@ -613,13 +635,14 @@ void USI::loop(int argc, char* argv[])
 	if (argc >= 3 && string(argv[1]) == "file")
 	{
 		vector<string> cmds0;
-		read_all_lines(argv[2], cmds0);
+		FileOperator::ReadAllLines(argv[2], cmds0);
 
 		// queueに変換する。
 		for (auto c : cmds0)
 			cmds.push(c);
 
-	} else {
+	}
+	else {
 
 		// 引数として指定されたものを一つのコマンドとして実行する機能
 		// ただし、','が使われていれば、そこでコマンドが区切れているものとして解釈する。
@@ -650,7 +673,8 @@ void USI::loop(int argc, char* argv[])
 		{
 			if (!std::getline(cin, cmd)) // 入力が来るかEOFがくるまでここで待機する。
 				cmd = "quit";
-		} else {
+		}
+		else {
 			// 積んであるコマンドがあるならそれを実行する。
 			// 尽きれば"quit"だと解釈してdoループを抜ける仕様にすることはできるが、
 			// そうしてしまうとgoコマンド(これはノンブロッキングなので)の最中にquitが送られてしまう。
@@ -685,7 +709,8 @@ void USI::loop(int argc, char* argv[])
 			// そいつらはThreads.stopを待っているので問題ない。
 			Threads.stop = true;
 
-		} else if (token == "ponderhit")
+		}
+		else if (token == "ponderhit")
 		{
 			Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
 			Threads.main()->ponder = false; // 通常探索に切り替える。
@@ -714,7 +739,7 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "getoption") getoption_cmd(is);
 
 		// 思考エンジンの準備が出来たかの確認
-		else if (token == "isready") is_ready_cmd(pos,states);
+		else if (token == "isready") is_ready_cmd(pos, states);
 
 #if defined(USER_ENGINE)
 		// ユーザーによる実験用コマンド。user.cppのuser()が呼び出される。
@@ -725,10 +750,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "d") cout << pos << endl;
 
 		// 指し手生成祭りの局面をセットする。
-		else if (token == "matsuri") pos.set("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1",&states->back(),Threads.main());
+		else if (token == "matsuri") pos.set("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1", &states->back(), Threads.main());
 
 		// "position sfen"の略。
-		else if (token == "sfen") position_cmd(pos, is , states);
+		else if (token == "sfen") position_cmd(pos, is, states);
 
 		// ログファイルの書き出しのon
 		else if (token == "log") start_logger(true);
@@ -740,7 +765,7 @@ void USI::loop(int argc, char* argv[])
 #if defined(EVAL_LEARN)
 		// テスト用にqsearch(),search()を直接呼ぶコマンド
 		else if (token == "qsearch") qsearch_cmd(pos);
-		else if (token == "search") search_cmd(pos,is);
+		else if (token == "search") search_cmd(pos, is);
 #endif
 
 		// この局面での指し手をすべて出力
@@ -751,7 +776,7 @@ void USI::loop(int argc, char* argv[])
 		}
 
 		// この局面の手番側がどちらであるかを返す。BLACK or WHITE
-		else if (token == "side") cout << (pos.side_to_move() == BLACK ? "black":"white") << endl;
+		else if (token == "side") cout << (pos.side_to_move() == BLACK ? "black" : "white") << endl;
 
 		// この局面が詰んでいるかの判定
 		else if (token == "mated") cout << pos.is_mated() << endl;
@@ -766,7 +791,7 @@ void USI::loop(int argc, char* argv[])
 
 		// ベンチコマンド(これは常に使える)
 		else if (token == "bench") bench_cmd(pos, is);
-		
+
 #if defined (ENABLE_TEST_CMD)
 		// 指し手生成のテスト
 		else if (token == "s") generate_moves_cmd(pos);

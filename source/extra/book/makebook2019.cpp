@@ -267,7 +267,7 @@ namespace {
 		// ※　it_write->second.gamePly > gamePly のとき、cacheにhitしなかったものとして再度調べる。
 
 		auto sfen_left = StringExtension::trim_number(sfen);
-		int gamePly = StringExtension::to_int(StringExtension::mid(sfen, sfen_left.length()), 0);
+		int gamePly = StringExtension::to_int(sfen.substr(sfen_left.length()), 0);
 		
 		auto it_write = vmd_write_cache.find(sfen_left);
 		if (it_write != vmd_write_cache.end() && it_write->second.gamePly <= gamePly)
@@ -373,7 +373,7 @@ namespace {
 
 			// このnodeについて調べ終わったので格納
 			std::stable_sort(list->begin(), list->end());
-		write_book.book_body[sfen] = list;
+		write_book.append(sfen,list);
 
 			// 10 / 1000 node 処理したので進捗を出力
 			output_progress();
@@ -409,10 +409,10 @@ namespace {
 
 		auto oldValue = (std::string)Options["IgnoreBookPly"];
 		Options["IgnoreBookPly"] = true;
-		Tools::Finally f([&](){ Options["IgnoreBookPly"] = oldValue; });
+		SCOPE_EXIT( Options["IgnoreBookPly"] = oldValue; );
 
 		MemoryBook read_book, write_book;
-		if (read_book.read_book(read_book_name) != 0)
+		if (read_book.read_book(read_book_name).is_not_ok())
 		{
 			cout << "Error! : failed to read " << read_book_name << endl;
 			return;
@@ -655,13 +655,13 @@ namespace {
 		// write_sfen_name : 同上。
 
 		MemoryBook read_book;
-		if (read_book.read_book(read_book_name) != 0)
+		if (read_book.read_book(read_book_name).is_not_ok())
 		{
 			cout << "Error! : failed to read " << read_book_name << endl;
 			return;
 		}
 		vector<string> lines;
-		read_all_lines(read_sfen_name, lines);
+		FileOperator::ReadAllLines(read_sfen_name, lines);
 
 		// 初期局面から(depth 10000ではないものを)辿ってgame treeを構築する。
 
@@ -680,7 +680,7 @@ namespace {
 		this->max_game_ply = max_game_ply;
 
 		// これより長い棋譜、食わせないやろ…。
-		std::vector<StateInfo, AlignedAllocator<StateInfo>> states(1024);
+		std::vector<StateInfo> states(1024);
 
 		for (int i = 0; i < (int)lines.size(); ++i)
 		{
@@ -787,7 +787,7 @@ namespace {
 
 		for (int i = 0; i < iteration; ++i)
 		{
-			cout << "makebook engless_extend_tree : iteration " << i << endl;
+			cout << "makebook endless_extend_tree : iteration " << i << endl;
 
 			string command;
 #if 0
@@ -820,8 +820,7 @@ namespace {
 				// なので、やらない(´ω｀)
 
 				command = "think " + think_sfen_name + " " + read_book_name + " depth " + to_string(depth)
-					+ " startmoves " + to_string(start_moves) + " moves " + to_string(end_moves) + +" nodes " + to_string(nodes)
-					+ " max_game_ply " + to_string(max_game_ply);
+					+ " startmoves " + to_string(start_moves) + " moves " + to_string(end_moves) + " nodes " + to_string(nodes);
 				do_command(command);
 
 			}

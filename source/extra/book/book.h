@@ -69,31 +69,54 @@ namespace Book
 		// 　　定跡作成時などはこれをtrueにしてはいけない。(メモリに読み込まれないため)
 		// ・同じファイルを二度目は読み込み動作をskipする。
 		// ・filenameはpathとして"book/"を補完しないので生のpathを指定する。
-		// ・返し値は正常終了なら0。さもなくば非0。
-		int read_book(const std::string& filename, bool on_the_fly = false);
+		Tools::Result read_book(const std::string& filename, bool on_the_fly = false);
 
 		// 定跡ファイルの書き出し
 		// ・sort = 書き出すときにsfen文字列で並び替えるのか。(書き出しにかかる時間増)
 		// →　必ずソートするように変更した。
 		// ・ファイルへの書き出しは、*thisを書き換えないという意味においてconst性があるので関数にconstを付与しておく。
-		// ・返し値は正常終了なら0。さもなくば非0。
 		// また、事前にis_ready()は呼び出されているものとする。
-		int write_book(const std::string& filename /*, bool sort = false*/) const;
+		Tools::Result write_book(const std::string& filename /*, bool sort = false*/) const;
 
 		// Aperyの定跡ファイルを読み込む
 		// ・この関数はread_bookの下請けとして存在する。外部から直接呼び出すのは定跡のコンバートの時ぐらい。
-		// ・返し値は正常終了なら0。さもなくば非0。
-		int read_apery_book(const std::string& filename);
+		Tools::Result read_apery_book(const std::string& filename);
 
-		// --- 以下のメンバ、普段は外部から普段は直接アクセスすべきではない。
+		// --------------------------------------------------------------------------
+		//     以下のメンバは、普段は外部から普段は直接アクセスすべきではない 
+		//
 		// 定跡を書き換えてwrite_book()で書き出すような作業を行なうときだけアクセスする。
+		// --------------------------------------------------------------------------
 
-		// メモリ上に読み込まれた定跡本体
-		BookType book_body;
+		// メモリに読み込んでいる定跡本体。定跡編集の時以外、このメソッドを呼び出すべきではない。
+		BookType* get_body() { return &book_body;}
+
+		// book_body.find()のwrapper。book_body.find()ではなく、こちらのfindを呼び出して用いること。
+		// 例)
+		// auto it = book.find(sfen);
+		//   if (book.is_not_found(it))
+		// のように書ける
+		BookType::iterator find(const std::string& sfen);
+		bool is_found(const BookType::iterator& it) const { return it != book_body.end(); }
+		bool is_not_found(const BookType::iterator& it) const { return it == book_body.end(); }
+
+		// メモリに保持している定跡に局面を一つ追加する。
+		// book_body[sfen] = ptr;
+		// と等価。
+		void append(const std::string& sfen, const Book::PosMoveListPtr& ptr) { book_body[sfen] = ptr; }
 
 		// book_bodyに対してBookPosを一つ追加するヘルパー関数。
 		// overwrite : このフラグがtrueならば、その局面ですでに同じbestMoveの指し手が登録されている場合は上書き動作
-		void insert(const std::string sfen, const BookPos& bp , bool overwrite = true);
+		void insert(const std::string& sfen, const BookPos& bp , bool overwrite = true);
+
+		// book_bodyに対してBookType::insert()を呼び出すwrapper。
+		std::pair<BookType::iterator,bool> insert(const std::pair<std::string/*sfen*/, Book::PosMoveListPtr>& p) { return book_body.insert(p);  };
+
+		// メモリ上に読み込まれた定跡本体
+		// book_body.find()の直接呼び出しは禁止
+		// (Options["IgnoreBookPly"]==trueのときにplyの部分を削ってメモリに読み込んでいるため、一致しないから)
+		// このクラス(MemoryBookクラス)のfind()メソッドを用いること。
+		BookType book_body;
 
 	protected:
 
@@ -153,6 +176,8 @@ namespace Book
 		// ・この関数自体はthread safeなのでread_book()したあとは非同期に呼び出して問題ない。
 		// 　ただし、on_the_flyのときは、ディスクアクセスが必要で、その部分がthread safeではないので
 		//   on_the_fly == falseでなければ、非同期にこの関数を呼び出してはならない。
+		// ・Options["USI_OwnBook"]==trueにすることでエンジン側の定跡を有効化されていないなら、
+		// 　probe()には常に失敗する。(falseが返る)
 		bool probe(Thread& th , Search::LimitsType& limit);
 
 		// 現在の局面が定跡に登録されているかを調べる。

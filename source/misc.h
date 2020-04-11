@@ -63,7 +63,7 @@ typedef std::chrono::milliseconds::rep TimePoint;
 static_assert(sizeof(TimePoint) == sizeof(int64_t), "TimePoint should be 64 bits");
 
 // ms単位で現在時刻を返す
-inline TimePoint now() {
+static TimePoint now() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>
 		(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
@@ -137,7 +137,7 @@ private:
 };
 
 // 乱数のseedを表示する。(デバッグ用)
-inline std::ostream& operator<<(std::ostream& os, PRNG& prng)
+static std::ostream& operator<<(std::ostream& os, PRNG& prng)
 {
 	os << "PRNG::seed = " << std::hex << prng.get_seed() << std::dec;
 	return os;
@@ -159,54 +159,6 @@ namespace WinProcGroup {
 	// 1つ目のプロセッサの論理コアを使い切ったら次は2つ目のプロセッサを使っていくような動作。
 	void bindThisThread(size_t idx);
 }
-
-// --------------------
-//   以下は、やねうら王の独自追加
-// --------------------
-
-// 指定されたミリ秒だけsleepする。
-extern void sleep(int ms);
-
-// 現在時刻を文字列化したもを返す。(評価関数の学習時などにログ出力のために用いる)
-std::string now_string();
-
-
-// 途中での終了処理のためのwrapper
-static void my_exit()
-{
-	sleep(3000); // エラーメッセージが出力される前に終了するのはまずいのでwaitを入れておく。
-	exit(EXIT_FAILURE);
-}
-
-// 進捗を表示しながら並列化してゼロクリア
-// Stockfishではtt.cppにこのコードがあるのだが、独自の置換表を確保したいときに
-// これが独立していないと困るので、ここに用意する。
-// nameは"Hash" , "eHash"などクリアしたいものの名前を書く。メモリクリアの途中経過が出力されるときにその名前が出力される。
-extern void memclear(const char* name , void * table, size_t size);
-
-// insertion sort
-// 昇順に並び替える。学習時のコードを使いたい時があるので用意。
-template <typename T >
-void my_insertion_sort(T* arr, int left, int right)
-{
-	for (int i = left + 1; i < right; i++)
-	{
-		auto key = arr[i];
-		int j = i - 1;
-
-		// keyより大きな arr[0..i-1]の要素を現在処理中の先頭へ。
-		while (j >= left && (arr[j] > key))
-		{
-			arr[j + 1] = arr[j];
-			j = j - 1;
-		}
-		arr[j + 1] = key;
-	}
-}
-
-// 乱数のseedなどとしてthread idを使いたいが、
-// C++のthread idは文字列しか取り出せないので無理やりcastしてしまう。
-extern uint64_t get_thread_id();
 
 // -----------------------
 //  探索のときに使う時間管理用
@@ -233,12 +185,17 @@ struct Timer
 	// reset()されてからreset_for_ponderhit()までの時間
 	TimePoint elapsed_from_start_to_ponderhit() const { return (TimePoint)(startTimeFromPonderhit - startTime); }
 
+#if 0
 	// 探索node数を経過時間の代わりに使う。(こうするとタイマーに左右されない思考が出来るので、思考に再現性を持たせることが出来る)
 	// node数を指定して探索するとき、探索できる残りnode数。
-	int64_t availableNodes;
+	// ※　StockfishでここintになっているのはTimePointにするのが正しいと思う。[2020/01/20]
+	TimePoint availableNodes;
+	// →　NetworkDelayやMinimumThinkingTimeなどの影響を考慮するのが難しく、将棋の場合、
+	// 　相性があまりよろしくないのでこの機能はやねうら王ではサポートしないことにする。
+#endif
 
 	// このシンボルが定義されていると、今回の思考時間を計算する機能が有効になる。
-#ifdef  USE_TIME_MANAGEMENT
+#if defined(USE_TIME_MANAGEMENT)
 
   // 今回の思考時間を計算して、optimum(),maximum()が値をきちんと返せるようにする。
 	void init(Search::LimitsType& limits, Color us, int ply);
@@ -249,13 +206,7 @@ struct Timer
 
 	// 1秒単位で繰り上げてdelayを引く。
 	// ただし、remain_timeよりは小さくなるように制限する。
-	TimePoint round_up(TimePoint t) const {
-		// 1000で繰り上げる。Options["MinimalThinkingTime"]が最低値。
-		t = std::max(((t + 999) / 1000) * 1000, minimum_thinking_time);
-		// そこから、Options["NetworkDelay"]の値を引くが、remain_timeを上回ってはならない。
-		t = std::min(t - network_delay, remain_time);
-		return t;
-	}
+	TimePoint round_up(TimePoint t) const;
 
 	// 探索終了の時間(startTime + search_end >= now()になったら停止)
 	TimePoint search_end;
@@ -284,26 +235,215 @@ private:
 
 extern Timer Time;
 
+
+// =====   以下は、やねうら王の独自追加   =====
+
+// --------------------
+//  ツール類
+// --------------------
+
+namespace Tools
+{
+	// 進捗を表示しながら並列化してゼロクリア
+	// Stockfishではtt.cppにこのコードがあるのだが、独自の置換表を確保したいときに
+	// これが独立していないと困るので、ここに用意する。
+	// nameは"Hash" , "eHash"などクリアしたいものの名前を書く。
+	// メモリクリアの途中経過が出力されるときにその名前(引数nameで渡している)が出力される。
+	extern void memclear(const char* name, void* table, size_t size);
+
+	// insertion sort
+	// 昇順に並び替える。学習時のコードで使いたい時があるので用意してある。
+	template <typename T >
+	void insertion_sort(T* arr, int left, int right)
+	{
+		for (int i = left + 1; i < right; i++)
+		{
+			auto key = arr[i];
+			int j = i - 1;
+
+			// keyより大きな arr[0..i-1]の要素を現在処理中の先頭へ。
+			while (j >= left && (arr[j] > key))
+			{
+				arr[j + 1] = arr[j];
+				j = j - 1;
+			}
+			arr[j + 1] = key;
+		}
+	}
+
+	// 途中での終了処理のためのwrapper
+	// コンソールの出力が完了するのを待ちたいので3秒待ってから::exit(EXIT_FAILURE)する。
+	extern void exit();
+
+	// 指定されたミリ秒だけsleepする。
+	extern void sleep(int ms);
+
+	// 現在時刻を文字列化したもを返す。(評価関数の学習時などにログ出力のために用いる)
+	extern std::string now_string();
+
+	// Linux環境ではgetline()したときにテキストファイルが'\r\n'だと
+	// '\r'が末尾に残るのでこの'\r'を除去するためにwrapperを書く。
+	// そのため、ifstreamに対してgetline()を呼び出すときは、
+	// std::getline()ではなくこのこの関数を使うべき。
+	extern bool getline(std::ifstream& fs, std::string& s);
+
+	// マルチバイト文字列をワイド文字列に変換する。
+	// WindowsAPIを呼び出しているのでWindows環境専用。
+	extern std::wstring MultiByteToWideChar(const std::string& s);
+
+	// 他言語にあるtry～finally構文みたいなの。
+	// SCOPE_EXIT()マクロの実装で使う。このクラスを直接使わないで。
+	struct __FINALLY__ {
+		__FINALLY__(std::function<void()> fn_) : fn(fn_) {}
+		~__FINALLY__() { fn(); }
+	private:
+		std::function<void()> fn;
+	};
+
+	// --------------------
+	//  Result
+	// --------------------
+
+	// 一般的な関数の返し値のコード。(エラー理由などのenum)
+	enum struct ResultCode
+	{
+		// 正常終了
+		Ok,
+
+		// 原因の詳細不明。何らかのエラー。
+		SomeError,
+
+		// メモリ割り当てのエラー
+		MemoryAllocationError,
+
+		// ファイルのオープンに失敗。ファイルが存在しないなど。
+		FileOpenError,
+
+		// ファイル読み込み時のエラー。
+		FileReadError,
+
+		// ファイル書き込み時のエラー。
+		FileWriteError,
+
+		// フォルダ作成時のエラー。
+		CreateFolderError,
+
+		// 実装されていないエラー。
+		NotImplementedError,
+	};
+
+	// ResultCodeを文字列化する。
+	extern std::string to_string(ResultCode);
+
+	// エラーを含む関数の返し値を表現する型
+	// RustにあるOption型のような何か
+	struct Result
+	{
+		Result(ResultCode code_) : code(code_) {}
+
+		// エラーの種類
+		ResultCode code;
+
+		// 返し値が正常終了かを判定する
+		bool is_ok() const { return code == ResultCode::Ok; }
+
+		// 返し値が正常終了でなければtrueになる。
+		bool is_not_ok() const { return code != ResultCode::Ok; }
+
+		// ResultCodeを文字列化して返す。
+		std::string to_string() const { return Tools::to_string(code); }
+
+		//  正常終了の時の型を返すbuilder
+		static Result Ok() { return Result(ResultCode::Ok); }
+	};
+}
+
+// スコープを抜ける時に実行してくれる。BOOST::BOOST_SCOPE_EXITマクロみたいな何か。
+// 使用例) SCOPE_EXIT( x = 10 );
+#define SCOPE_EXIT(STATEMENT) Tools::__FINALLY__ __clean_up_object__([&]{ STATEMENT });
+
+
 // --------------------
 //  ファイルの丸読み
 // --------------------
 
-// ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。
-int read_all_lines(std::string filename, std::vector<std::string>& lines);
+struct FileOperator
+{
+	// ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。末尾の改行は除去される。
+	// 引数で渡されるlinesは空であるを期待しているが、空でない場合は、そこに追加されていく。
+	// 引数で渡されるtrimはtrueを渡すと末尾のスペース、タブがトリムされる。
+	static Tools::Result ReadAllLines(const std::string& filename, std::vector<std::string>& lines, bool trim = false);
 
-// msys2、Windows Subsystem for Linuxなどのgcc/clangでコンパイルした場合、
-// C++のstd::ifstreamで::read()は、一発で2GB以上のファイルの読み書きが出来ないのでそのためのwrapperである。
-//
-// read_file_to_memory()の引数のcallback_funcは、ファイルがオープン出来た時点でそのファイルサイズを引数として
-// callbackされるので、バッファを確保して、その先頭ポインタを返す関数を渡すと、そこに読み込んでくれる。
-// これらの関数は、ファイルが見つからないときなどエラーの際には非0を返す。
-//
-// また、callbackされた関数のなかでバッファが確保できなかった場合や、想定していたファイルサイズと異なった場合は、
-// nullptrを返せば良い。このとき、read_file_to_memory()は、読み込みを中断し、エラーリターンする。
 
-int read_file_to_memory(std::string filename, std::function<void*(u64)> callback_func);
-int write_memory_to_file(std::string filename, void *ptr, u64 size);
+	// msys2、Windows Subsystem for Linuxなどのgcc/clangでコンパイルした場合、
+	// C++のstd::ifstreamで::read()は、一発で2GB以上のファイルの読み書きが出来ないのでそのためのwrapperである。
+	//
+	// read_file_to_memory()の引数のcallback_funcは、ファイルがオープン出来た時点でそのファイルサイズを引数として
+	// callbackされるので、バッファを確保して、その先頭ポインタを返す関数を渡すと、そこに読み込んでくれる。
+	//
+	// また、callbackされた関数のなかでバッファが確保できなかった場合や、想定していたファイルサイズと異なった場合は、
+	// nullptrを返せば良い。このとき、read_file_to_memory()は、読み込みを中断し、エラーリターンする。
 
+	static Tools::Result ReadFileToMemory(const std::string& filename, std::function<void* (u64)> callback_func);
+	static Tools::Result WriteMemoryToFile(const std::string& filename, void* ptr, u64 size);
+};
+
+// C#のTextReaderみたいなもの。
+// C++のifstreamが遅すぎるので、高速化されたテキストファイル読み込み器
+// fopen()～fread()で実装されている。
+struct TextFileReader
+{
+	TextFileReader();
+	~TextFileReader();
+
+	// ファイルをopenする。
+	Tools::Result Open(const std::string& filename);
+
+	// Open()を呼び出してオープンしたファイルをクローズする。
+	void Close();
+
+	// ファイルの終了判定。
+	// ファイルを最後まで読み込んだのなら、trueを返す。
+	bool Eof() const;
+
+	// 1行読み込む(改行まで)
+	// 改行コードは返さない。
+	// 引数のtrimがtrueの時は、末尾のスペース、タブはトリムする
+	std::string ReadLine(bool trim = false);
+
+
+private:
+	// 各種状態変数の初期化
+	void clear();
+
+	// 次のblockのbufferへの読み込み。
+	void read_next();
+
+	// オープンしているファイル。
+	// オープンしていなければnullptrが入っている。
+	FILE* fp;
+
+	// ファイルの読み込みバッファ 1MB
+	std::vector<u8> buffer;
+
+	// 行バッファ
+	std::vector<u8> line_buffer;
+
+	// バッファに今回読み込まれたサイズ
+	size_t read_size;
+
+	// bufferの解析位置
+	// 次のReadLine()でここから解析して1行返す
+	// 次の文字 c = buffer[cursor]
+	size_t cursor;
+
+	// eofフラグ。
+	// fp.eof()は、bufferにまだ未処理のデータが残っているかも知れないのでそちらを信じるわけにはいかない。
+	bool is_eof;
+
+	// 直前が\r(CR)だったのか？のフラグ
+	bool is_prev_cr;
+};
 
 // --------------------
 //    PRNGのasync版
@@ -333,7 +473,7 @@ protected:
 };
 
 // 乱数のseedを表示する。(デバッグ用)
-inline std::ostream& operator<<(std::ostream& os, AsyncPRNG& prng)
+static std::ostream& operator<<(std::ostream& os, AsyncPRNG& prng)
 {
 	os << "AsyncPRNG::seed = " << std::hex << prng.get_seed() << std::dec;
 	return os;
@@ -355,15 +495,21 @@ struct LineScanner
 	// 次のtokenを返す。
 	std::string get_text();
 
+	// 次の文字列を数値化して返す。
+	// 空の文字列である場合は引数の値がそのまま返る。
+	// "ABC"のような文字列で数値化できない場合は0が返る。(あまり良くない仕様だがatoll()を使うので仕方ない)
+	s64 get_number(s64 defaultValue);
+
 	// 解析位置(カーソル)が行の末尾まで進んだのか？
+	// eolとはEnd Of Lineの意味。
 	// get_text()をしてpeek_text()したときに保持していたものがなくなるまではこの関数はfalseを返し続ける。
-	// このクラスの内部からeof()を呼ばないほうが無難。(token.empty() == trueが保証されていないといけないので)
-	// 内部から呼び出すならraw_eof()のほうではないかと。
-	bool eof() const { return token.empty() && raw_eof(); }
+	// このクラスの内部からeol()を呼ばないほうが無難。(token.empty() == trueが保証されていないといけないので)
+	// 内部から呼び出すならraw_eol()のほうではないかと。
+	bool eol() const { return token.empty() && raw_eol(); }
 
 private:
 	// 解析位置(カーソル)が行の末尾まで進んだのか？(内部実装用)
-	bool raw_eof() const { return !(pos < line.length()); }
+	bool raw_eol() const { return !(pos < line.length()); }
 
 	// 解析対象の行
 	std::string line;
@@ -411,28 +557,17 @@ namespace Math {
 
 // C#にあるPathクラス的なもの。ファイル名の操作。
 // C#のメソッド名に合わせておく。
-struct Path
+namespace Path
 {
 	// path名とファイル名を結合して、それを返す。
 	// folder名のほうは空文字列でないときに、末尾に'/'か'\\'がなければそれを付与する。
-	static std::string Combine(const std::string& folder, const std::string& filename)
-	{
-		if (folder.length() >= 1 && *folder.rbegin() != '/' && *folder.rbegin() != '\\')
-			return folder + "/" + filename;
+	extern std::string Combine(const std::string& folder, const std::string& filename);
 
-		return folder + filename;
-	}
+	// full path表現から、(フォルダ名をすべて除いた)ファイル名の部分を取得する。
+	extern std::string GetFileName(const std::string& path);
 
-	// full path表現から、(フォルダ名を除いた)ファイル名の部分を取得する。
-	static std::string GetFileName(const std::string& path)
-	{
-		// "\"か"/"か、どちらを使ってあるかはわからない。
-		auto path_index1 = path.find_last_of("\\") + 1;
-		auto path_index2 = path.find_last_of("/") + 1;
-		auto path_index = std::max(path_index1, path_index2);
-
-		return path.substr(path_index);
-	}
+	// full path表現から、(ファイル名だけを除いた)ディレクトリ名の部分を取得する。
+	extern std::string GetDirectoryName(const std::string& path);
 };
 
 // --------------------
@@ -442,7 +577,9 @@ struct Path
 namespace StringExtension
 {
 	// 大文字・小文字を無視して文字列の比較を行う。
-	// string case insensitive compareの略？
+	// Windowsだと_stricmp() , Linuxだとstrcasecmp()を使うのだが、
+	// 後者がどうも動作が怪しい。自前実装しておいたほうが無難。
+	// stricmpは、string case insensitive compareの略？
 	// s1==s2のとき0(false)を返す。
 	extern bool stricmp(const std::string& s1, const std::string& s2);
 
@@ -450,56 +587,65 @@ namespace StringExtension
 	// ios::binaryでopenした場合などには'\r'なども入っていることがあるので…。
 	extern std::string trim(const std::string& input);
 
-	// 行の末尾の"\r","\n",スペース、"\t"、数字を除去した文字列を返す。
+	// trim()の高速版。引数で受け取った文字列を直接trimする。(この関数は返し値を返さない)
+	extern void trim_inplace(std::string& input);
+
+	// 行の末尾の数字を除去した文字列を返す。
 	// sfenの末尾の手数を削除する用
+	// 末尾のスペースを詰めたあと数字を詰めてそのあと再度スペースを詰める処理になっている。
+	// 例 : "abc 123 "→"abc"となって欲しいので。
 	extern std::string trim_number(const std::string& input);
 
-	// 文字列のstart番目以降を返す
-	static std::string mid(const std::string& input, size_t start) {
-		return input.substr(start, input.length() - start);
-	}
+	// trim_number()の高速版。引数で受け取った文字列を直接trimする。(この関数は返し値を返さない)
+	extern void trim_number_inplace(std::string& s);
 
 	// 文字列をint化する。int化に失敗した場合はdefault_の値を返す。
 	extern int to_int(const std::string input, int default_);
 
 	// スペース、タブなど空白に相当する文字で分割して返す。
 	extern std::vector<std::string> split(const std::string& input);
+
+	// --- 以下、C#のstringクラスにあるやつ。
+
+	// 文字列valueが、文字列endingで終了していればtrueを返す。
+	extern bool StartsWith(std::string const& value, std::string const& starting);
+
+	// 文字列valueが、文字列endingで終了していればtrueを返す。
+	extern bool EndsWith(std::string const& value, std::string const& ending);
+
 };
 
 // --------------------
-//  Tools
+//  FileSystem
 // --------------------
 
-namespace Tools
+// ディレクトリに存在するファイルの列挙用
+// C#のDirectoryクラスっぽい何か
+namespace Directory
 {
-	// 他言語にあるtry～finally構文みたいなの。
-	struct Finally {
-		Finally(std::function<void()> fn_) : fn(fn_){}
-		~Finally() { fn(); }
-	private:
-		std::function<void()> fn;
-	};
-
-}
-
-// --------------------
-//  Dependency Wrapper
-// --------------------
-
-namespace Dependency
-{
-	// Linux環境ではgetline()したときにテキストファイルが'\r\n'だと
-	// '\r'が末尾に残るのでこの'\r'を除去するためにwrapperを書く。
-	// そのため、fstreamに対してgetline()を呼び出すときは、
-	// std::getline()ではなく単にgetline()と書いて、この関数を使うべき。
-	extern bool getline(std::ifstream& fs, std::string& s);
+	// 指定されたフォルダに存在するファイルをすべて列挙する。
+	// 列挙するときに引数extensionで列挙したいファイル名の拡張子を指定できる。(例 : ".bin")
+	// 拡張子として""を指定すればすべて列挙される。
+	extern std::vector<std::string> EnumerateFiles(const std::string& sourceDirectory, const std::string& extension);
 
 	// フォルダを作成する。
 	// カレントフォルダ相対で指定する。dir_nameに日本語は使っていないものとする。
-	// 成功すれば0、失敗すれば非0が返る。
-	extern int mkdir(std::string dir_name);
+	// ※　Windows環境だと、この関数名、WinAPIのCreateDirectoryというマクロがあって…。
+	// 　ゆえに、CreateDirectory()をやめて、CreateFolder()に変更する。
+	extern Tools::Result CreateFolder(const std::string& dir_name);
+
+	// カレントフォルダを返す(起動時のフォルダ)
+	// main関数に渡された引数から設定してある。
+	// "GetCurrentDirectory"という名前はWindowsAPI(で定義されているマクロ)と競合する。
+	extern std::string GetCurrentFolder();
+
 }
 
+namespace Misc
+{
+	// このmisc.hの各種クラスの初期化。起動時にmain()から一度呼び出すようにする。
+	extern void init(char* argv[]);
+}
 
 
 #endif // #ifndef MISC_H_INCLUDED

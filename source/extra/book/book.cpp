@@ -112,7 +112,7 @@ namespace Book
 			{
 				std::unique_lock<Mutex> lk(io_mutex);
 				// 前のエントリーは上書きされる。
-				book.book_body[sfen] = move_list;
+				book.append(sfen,move_list);
 
 				// 新たなエントリーを追加したのでフラグを立てておく。
 				appended = true;
@@ -125,7 +125,7 @@ namespace Book
 			// 思考、極めて遅いのでログにタイムスタンプを出力して残しておいたほうが良いのでは…。
 			// id番号(連番)とthread idと現在の時刻を出力する。
 			sync_cout << "[" << get_done_count() << "/" << get_loop_max() << ":" << thread_id << "] "
-				      << now_string() << " : " << sfen << sync_endl;
+				      << Tools::now_string() << " : " << sfen << sync_endl;
 #endif
 		}
 	}
@@ -154,8 +154,16 @@ namespace Book
 		// 評価関数を読み込まないとPositionのset()が出来ないのでis_ready()の呼び出しが必要。
 		// ただし、このときに定跡ファイルを読み込まれると読み込みに時間がかかって嫌なので一時的にno_bookに変更しておく。
 		auto original_book_file = Options["BookFile"];
-		Tools::Finally clean_up([&]() { Options["BookFile"] = original_book_file; });
 		Options["BookFile"] = string("no_book");
+
+		// IgnoreBookPlyオプションがtrue(デフォルトでtrue)のときは、定跡書き出し時にply(手数)のところを無視(0)にしてしまうので、
+		// これで書き出されるとちょっと嫌なので一時的にfalseにしておく。
+		auto original_ignore_book_ply = (bool)Options["IgnoreBookPly"];
+		Options["IgnoreBookPly"] = false;
+
+		SCOPE_EXIT(Options["BookFile"] = original_book_file; Options["IgnoreBookPly"] = original_ignore_book_ply; );
+
+		// ↑ SCOPE_EXIT()により、この関数を抜けるときには復旧する。
 
 		is_ready();
 
@@ -243,8 +251,18 @@ namespace Book
 
 			// 処理対象ファイル名の出力
 			cout << "makebook think.." << endl;
+
+			if (bw_files)
+			{
+				// 先後、個別の定跡ファイルを用いる場合
 			cout << "sfen_file_name[BLACK] = " << sfen_file_name[BLACK] << endl;
 			cout << "sfen_file_name[WHITE] = " << sfen_file_name[WHITE] << endl;
+			}
+			else {
+				// 先後、同一の定跡ファイルを用いる場合
+				cout << "sfen_file_name        = " << sfen_file_name[BLACK] << endl;
+			}
+
 			cout << "book_name             = " << book_name << endl;
 
 			if (from_sfen)
@@ -267,7 +285,7 @@ namespace Book
 			if (! bw_files)
 			{
 				vector<string> tmp_sfens;
-				read_all_lines(sfen_file_name[0], tmp_sfens);
+				FileOperator::ReadAllLines(sfen_file_name[0], tmp_sfens);
 
 				// こちらは先後、どちらの手番でも解析対象とするのでCOLOR_NBを指定しておく。
 				for (auto& sfen : tmp_sfens)
@@ -286,7 +304,7 @@ namespace Book
 						continue;
 
 					vector<string> tmp_sfens;
-					read_all_lines(filename, tmp_sfens);
+					FileOperator::ReadAllLines(filename, tmp_sfens);
 					for (auto& sfen : tmp_sfens)
 						sfens.push_back(SfenAndColor(sfen, c));
 				}
@@ -298,9 +316,9 @@ namespace Book
 
 			if (from_thinking)
 			{
-				cout << "read book..";
+				cout << "read book.." << endl;
 				// 初回はファイルがないので読み込みに失敗するが無視して続行。
-				if (book.read_book(book_name) != 0)
+				if (book.read_book(book_name).is_not_ok())
 				{
 					cout << "..failed but , create new file." << endl;
 				}
@@ -390,7 +408,7 @@ namespace Book
 				vector<SfenAndBool> sf;		// 初手から(moves+0)手までのsfen文字列格納用
 
 				// これより長い棋譜、食わせない＆思考対象としないやろ
-				std::vector<StateInfo, AlignedAllocator<StateInfo>> states(1024);
+				std::vector<StateInfo> states(1024);
 
 				// 変数sfに解析対象局面としてpush_backする。
 				// ただし、
@@ -476,6 +494,9 @@ namespace Book
 				// スレッド数(これは、USIのsetoptionで与えられる)
 				size_t multi_pv = (size_t)Options["MultiPV"];
 
+				// 手数無視なら、定跡読み込み時にsfen文字列の"ply"を削って読み込まれているはずなので、
+				// 比較するときにそこを削ってやる必要がある。
+
 				// 思考する局面をsfensに突っ込んで、この局面数をg_loop_maxに代入しておき、この回数だけ思考する。
 				MultiThinkBook multi_think(book , depth, nodes);
 
@@ -483,13 +504,13 @@ namespace Book
 				for (auto& s : thinking_sfens)
 				{
 					// この局面のいま格納されているデータを比較して、この局面を再考すべきか判断する。
-					auto it = book.book_body.find(s);
+					auto it = book.find(s);
 
 					// →　手数違いの同一局面がある場合、こちらのほうが手数が大きいなら思考しても無駄なのだが…。
 					// その局面の情報は、write_book()で書き出されないのでまあいいか…。
 
 					// MemoryBookにエントリーが存在しないなら無条件で、この局面について思考して良い。
-					if (it == book.book_body.end())
+					if (book.is_not_found(it))
 						sfens_.push_back(s);
 					else
 					{
@@ -542,10 +563,10 @@ namespace Book
 						static int book_number = 1;
 						string write_book_name = book_name + "-" + to_string(book_number++) + ".db";
 
-						sync_cout << "Save start : " << now_string() << " , book_name = " << write_book_name << sync_endl;
+						sync_cout << "Save start : " << Tools::now_string() << " , book_name = " << write_book_name << sync_endl;
 
 						book.write_book(write_book_name);
-						sync_cout << "Save done  : " << now_string() << sync_endl;
+						sync_cout << "Save done  : " << Tools::now_string() << sync_endl;
 						multi_think.appended = false;
 					}
 					else {
@@ -582,7 +603,7 @@ namespace Book
 			cout << "book merge from " << book_name[0] << " and " << book_name[1] << " to " << book_name[2] << endl;
 			for (int i = 0; i < 2; ++i)
 			{
-				if (book[i].read_book(book_name[i]) != 0)
+				if (book[i].read_book(book_name[i]).is_not_ok())
 					return;
 			}
 
@@ -597,13 +618,13 @@ namespace Book
 
 			// 1) 探索が深いほうを採用。
 			// 2) 同じ探索深さであれば、MultiPVの大きいほうを採用。
-			for (auto& it0 : book[0].book_body)
+			for (auto& it0 : *book[0].get_body())
 			{
 				auto sfen = it0.first;
 				// このエントリーがbook1のほうにないかを調べる。
-				auto it1_ = book[1].book_body.find(sfen);
+				auto it1_ = book[1].find(sfen);
 				auto& it1 = *it1_;
-				if (it1_ != book[1].book_body.end())
+				if ( book[1].is_found(it1_))
 				{
 					same_nodes++;
 
@@ -612,30 +633,30 @@ namespace Book
 					// 2) depthが深いほう
 					// 3) depthが同じならmulti pvが大きいほう(登録されている候補手が多いほう)
 					if (it0.second->size() == 0)
-						book[2].book_body.insert(it1);
+						book[2].insert(it1);
 					else if (it1.second->size() == 0)
-						book[2].book_body.insert(it0);
+						book[2].insert(it0);
 					else if (it0.second->at(0).depth > it1.second->at(0).depth)
-						book[2].book_body.insert(it0);
+						book[2].insert(it0);
 					else if (it0.second->at(0).depth < it1.second->at(0).depth)
-						book[2].book_body.insert(it1);
+						book[2].insert(it1);
 					else if (it0.second->size() >= it1.second->size())
-						book[2].book_body.insert(it0);
+						book[2].insert(it0);
 					else
-						book[2].book_body.insert(it1);
+						book[2].insert(it1);
 				}
 				else {
 					// なかったので無条件でbook2に突っ込む。
-					book[2].book_body.insert(it0);
+					book[2].insert(it0);
 					diffrent_nodes1++;
 				}
 			}
 			// book0の精査が終わったので、book1側で、まだ突っ込んでいないnodeを探して、それをbook2に突っ込む
-			for (auto& it1 : book[1].book_body)
+			for (auto& it1 : *book[1].get_body())
 			{
-				if (book[2].book_body.find(it1.first) == book[2].book_body.end())
+				if (book[2].is_not_found(book[2].find(it1.first)))
 				{
-					book[2].book_body.insert(it1);
+					book[2].insert(it1);
 					diffrent_nodes2++;
 				}
 			}
@@ -693,7 +714,7 @@ namespace Book
 	}
 
 	// 定跡ファイルの読み込み(book.db)など。
-	int MemoryBook::read_book(const std::string& filename, bool on_the_fly_)
+	Tools::Result MemoryBook::read_book(const std::string& filename, bool on_the_fly_)
 	{
 		// 読み込み済であるかの判定
 		// 一度read_book()が呼び出されたなら、そのときに読み込んだ定跡ファイル名が
@@ -705,7 +726,7 @@ namespace Book
 		//　 何らかの目的で変更したのであろうから、この場合もきちんと反映しないとまずい。)
 		bool ignore_book_ply_ = Options["IgnoreBookPly"];
 		if (this->book_name == filename && this->on_the_fly == on_the_fly_ && this->ignoreBookPly == ignore_book_ply_)
-			return 0;
+			return Tools::Result::Ok();
 
 		// 一度このクラスのメンバーが保持しているファイル名はクリアする。(何も読み込んでいない状態になるので)
 		this->book_name = "";
@@ -724,7 +745,7 @@ namespace Book
 		{
 			this->book_name = filename;
 			this->pure_book_name = pure_filename;
-			return 0;
+			return Tools::Result::Ok();
 		}
 
 		if (pure_filename == kAperyBookName) {
@@ -746,23 +767,25 @@ namespace Book
 				if (fs.fail())
 				{
 					sync_cout << "info string Error! : can't read file : " + filename << sync_endl;
-					return 1;
+					return Tools::Result(Tools::ResultCode::FileOpenError);
 				}
 
 				// 定跡ファイルのopenにも成功したし、on the flyできそう。
 				// このときに限りこのフラグをtrueにする。
 				this->on_the_fly = true;
 				this->book_name = filename;
-				return 0;
+				return Tools::Result::Ok();
 			}
 
 			sync_cout << "info string read book file : " << filename << sync_endl;
-			vector<string> lines;
-			if (read_all_lines(filename, lines))
+
+			TextFileReader reader;
+			auto result = reader.Open(filename);
+			if (result.is_not_ok())
 			{
 				sync_cout << "info string Error! : can't read file : " + filename << sync_endl;
 				//      exit(EXIT_FAILURE);
-				return 1; // 読み込み失敗
+				return result; // 読み込み失敗
 			}
 
 			string sfen;
@@ -795,8 +818,14 @@ namespace Book
 				num_sum = 0;
 			};
 
-			for (auto line : lines)
+			// 定跡に登録されている手数を無視するのか？
+			// (これがtrueならばsfenから手数を除去しておく)
+			bool ignoreBookPly = Options["IgnoreBookPly"];
+
+			while(!reader.Eof())
 			{
+				auto line = reader.ReadLine(/* trim = */true);
+
 				// バージョン識別文字列(とりあえず読み飛ばす)
 				if (line.length() >= 1 && line[0] == '#')
 					continue;
@@ -812,8 +841,12 @@ namespace Book
 					// (sortはされてるはずだが他のソフトで生成した定跡DBではそうとも限らないので)。
 					calc_prob();
 
-					sfen = line.substr(5, line.length() - 5); // 新しいsfen文字列を"sfen "を除去して格納
-					sfen = trim(sfen); // 末尾のゴミの除去(Options["IgnoreBookPly"] == trueのときは、手数も除去)
+					// 5文字目から末尾までをくり抜く。
+					// 末尾のゴミは除去されているはずなので、Options["IgnoreBookPly"] == trueのときは、手数(数字)を除去。
+
+					sfen = line.substr(5); // 新しいsfen文字列を"sfen "を除去して格納
+					if (ignoreBookPly)
+						StringExtension::trim_number_inplace(sfen); // 末尾の数字除去
 
 #if 0
 					if (ignore_book_ply)
@@ -844,14 +877,23 @@ namespace Book
 
 				Move best, next;
 
-				istringstream is(line);
 				string bestMove, nextMove;
 				int value = 0;
 				int depth = 0;
 				uint64_t num = 1;
 
-				// 末尾、欠けてるかもです
-				is >> bestMove >> nextMove >> value >> depth >> num;
+				//istringstream is(line);
+				// value以降は、元データに欠落してるかもですよ。
+				//is >> bestMove >> nextMove >> value >> depth >> num;
+
+				// → istringstream、げろげろ遅いので、自前でparseする。
+
+				LineScanner scanner(line);
+				bestMove = scanner.get_text();
+				nextMove = scanner.get_text();
+				value = (int)scanner.get_number(value);
+				depth = (int)scanner.get_number(depth);
+				num = (uint64_t)scanner.get_number(num);
 
 #if 0
 				// 思考した指し手に対しては指し手の出現頻度のところを強制的にエンジンバージョンを100倍したものに変更する。
@@ -872,6 +914,18 @@ namespace Book
 
 				BookPos bp(best, next, value, depth, num);
 				insert(sfen, bp);
+
+				// このinsert()、この関数の40%ぐらいの時間を消費している。
+				// 他の部分をせっかく高速化したのに…。
+
+				// これ、ファイルから読み込んだ文字列のまま保存しておき、
+				// アクセスするときに解凍するほうが良かったか…。
+
+				// unorderedmapなのでこれ以上どうしようもないな…。
+
+				// テキストそのまま持っておいて、メモリ上で二分探索する実装のほうが良かったか。
+				// (定跡がsfen文字列でソート済みであることが保証されているなら。保証されてないんだけども。)
+
 			}
 			// ファイルが終わるときにも最後の局面に対するcalc_probが必要。
 			calc_prob();
@@ -883,11 +937,11 @@ namespace Book
 
 		sync_cout << "info string read book done." << sync_endl;
 
-		return 0;
+		return Tools::Result::Ok();
 	}
 
 	// 定跡ファイルの書き出し
-	int MemoryBook::write_book(const std::string& filename /*, bool sort*/) const
+	Tools::Result MemoryBook::write_book(const std::string& filename /*, bool sort*/) const
 	{
 		// Position::set()で評価関数の読み込みが必要。
 		//is_ready();
@@ -898,6 +952,9 @@ namespace Book
 		FILE* file = fopen(filename.c_str(), "wt");
 
 		setvbuf(file, nullptr, _IOFBF, 1024 * 1024);
+
+		if (fs.fail())
+			return Tools::Result(Tools::ResultCode::FileOpenError);
 
 		cout << endl << "write " + filename;
 
@@ -954,7 +1011,7 @@ namespace Book
 					it.first = sfen;
 
 					auto sfen_left = StringExtension::trim_number(sfen); // 末尾にplyがあるはずじゃろ
-					int ply = StringExtension::to_int(StringExtension::mid(sfen, sfen_left.length()), 0);
+				int ply = StringExtension::to_int(sfen.substr(sfen_left.length()), 0);
 
 					auto it2 = book_ply.find(sfen_left);
 					if (it2 == book_ply.end())
@@ -979,7 +1036,7 @@ namespace Book
 
 			auto sfen = it.first;
 			auto sfen_left = StringExtension::trim_number(sfen); // 末尾にplyがあるはずじゃろ
-			int ply = StringExtension::to_int(StringExtension::mid(sfen, sfen_left.length()), 0);
+			int ply = StringExtension::to_int(sfen.substr(sfen_left.length()), 0);
 			if (book_ply[sfen_left] != ply)
 				continue;
 
@@ -996,6 +1053,9 @@ namespace Book
 				fprintf(file, "%s %s %d %d %lld\n", to_usi_string(bp.bestMove).c_str(), to_usi_string(bp.nextMove).c_str(), bp.value, bp.depth, bp.num);
 			}
 			// 指し手、相手の応手、そのときの評価値、探索深さ、採択回数
+
+			if (fs.fail())
+				return Tools::Result(Tools::ResultCode::FileWriteError);
 		}
 
 		fclose(file);
@@ -1003,10 +1063,17 @@ namespace Book
 
 		cout << endl << "done!" << endl;
 
-		return 0;
+		return Tools::Result::Ok();
 	}
 
-	void MemoryBook::insert(const std::string sfen, const BookPos& bp , bool overwrite)
+	// book_body.find()のwrapper。book_body.find()ではなく、こちらのfindを呼び出して用いること。
+	// sfen : sfen文字列(末尾にplyまで書かれているものとする)
+	BookType::iterator MemoryBook::find(const std::string& sfen)
+	{
+		return book_body.find(trim(sfen));
+	}
+
+	void MemoryBook::insert(const std::string& sfen, const BookPos& bp , bool overwrite)
 	{
 		auto it = book_body.find(sfen);
 		if (it == book_body.end())
@@ -1090,7 +1157,7 @@ namespace Book
 				// ディスクから読み込むなら、いずれにせよ、新規エントリーを作成してそれを返す必要がある。
 				PosMoveListPtr pml_entry(new PosMoveList());
 
-				// 末尾の手数は取り除いておく。
+				// IgnoreBookPlyのときは末尾の手数は取り除いておく。
 				// read_book()で取り除くと、そのあと書き出すときに手数が消失するのでまずい。(気がする)
 				sfen = trim(sfen);
 
@@ -1100,24 +1167,28 @@ namespace Book
 				// C++的には未定義動作だが、これのためにsys/stat.hをincludeしたくない。
 				// ここでfs.clear()を呼ばないとeof()のあと、tellg()が失敗する。
 				fs.clear();
-				fs.seekg(0, std::ios::end);
-				auto file_end = fs.tellg();
-
-				fs.clear();
 				fs.seekg(0, std::ios::beg);
 				auto file_start = fs.tellg();
 
-				auto file_size = u64(file_end - file_start);
+				// 現在のファイルのシーク位置を返す関数(ファイルの先頭位置を0とする)
+				auto current_pos = [&]() { return s64(fs.tellg() - file_start); };
+
+				fs.clear();
+				fs.seekg(0, std::ios::end);
+
+				// ファイルサイズ(現在、ファイルの末尾を指しているはずなので..)
+				auto file_size = current_pos();
 
 				// 与えられたseek位置から"sfen"文字列を探し、それを返す。どこまでもなければ""が返る。
 				// hackとして、seek位置は-2しておく。(1行読み捨てるので、seek_fromぴったりのところに
 				// "sfen"から始まる文字列があるとそこを読み捨ててしまうため。-2してあれば、そこに
 				// CR+LFがあるはずだから、ここを読み捨てても大丈夫。)
-				auto next_sfen = [&](u64 seek_from)
+				auto next_sfen = [&](s64 seek_from)
 				{
 					string line;
 
-					fs.seekg(max(s64(0), (s64)seek_from - 2), fstream::beg);
+					seek_from = std::max( s64(0), seek_from - 2);
+					fs.seekg(seek_from , fstream::beg);
 
 					// --- 1行読み捨てる
 
@@ -1129,11 +1200,13 @@ namespace Book
 					while (getline(fs, line))
 					{
 						if (!line.compare(0, 4, "sfen"))
+						{
+							// ios::binaryつけているので末尾に'\r'が付与されている。禿げそう。
+							// →　trim()で吸収する。(trimがStringExtension::trim_number()を呼び出すがそちらで吸収される)
 							return trim(line.substr(5));
 						// "sfen"という文字列は取り除いたものを返す。
-						// 手数の表記も取り除いて比較したほうがいい。
-						// ios::binaryつけているので末尾に'\r'が付与されている。禿げそう。
-						// → StringExtension::trim()で吸収する。
+							// IgnoreBookPly == trueのときは手数の表記も取り除いて比較したほうがいい。
+						}
 					}
 					return string();
 				};
@@ -1141,7 +1214,9 @@ namespace Book
 				// バイナリサーチ
 				// [s,e) の範囲で求める。
 
-				u64 s = 0, e = file_size, m;
+				s64 s = 0, e = file_size, m;
+				// s,eは無符号型だと、s - 2のような式が負にならないことを保証するのが面倒くさい。
+				// こういうのを無符号型で扱うのは筋が悪い。
 
 				while (true)
 				{
@@ -1154,20 +1229,20 @@ namespace Book
 					}
 					else if (sfen > sfen2)
 					{ // 右(それより大きいところ)を探す
-						s = u64(fs.tellg() - file_start);
+						s = current_pos();
 					}
 					else {
 						// 見つかった！
 						break;
 					}
 
-					// 40バイトより小さなsfenはありえないので探索範囲がこれより小さいなら終了。
-					// s,eは無符号型であることに注意。if (s-40 < e) と書くとs-40がマイナスになりかねない。
+					// 40バイトより小さなsfenはありえないので、この範囲に２つの"sfen"で始まる文字列が
+					// 入っていないことは保証されている。
+					// ゆえに、探索範囲がこれより小さいなら先頭から調べて("sfen"と書かれている文字列を探して)終了。
 					if (s + 40 > e)
 					{
-						// ただしs = 0のままだと先頭要素が探索されていないということなので
-						// このケースに限り先頭要素を再探索
-						if (s == 0 && next_sfen(s) == sfen)
+						if ( next_sfen(s) == sfen)
+							// 見つかった！
 							break;
 
 						// 見つからなかった
@@ -1214,14 +1289,23 @@ namespace Book
 
 					Move best, next;
 
-					istringstream is(line);
 					string bestMove, nextMove;
 					int value = 0;
 					int depth = 0;
 					uint64_t num = 1;
 
-					// 末尾、欠けてるかもですよ
-					is >> bestMove >> nextMove >> value >> depth >> num;
+					//istringstream is(line);
+					// value以降は、元データに欠落してるかもですよ。
+					//is >> bestMove >> nextMove >> value >> depth >> num;
+
+					// → istringstream、げろげろ遅いので、自前でparseする。
+
+					LineScanner scanner(line);
+					bestMove = scanner.get_text();
+					nextMove = scanner.get_text();
+					value = (int)scanner.get_number(value);
+					depth = (int)scanner.get_number(depth);
+					num = (uint64_t)scanner.get_number(num);
 
 					// 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
 					if (bestMove == "none" || bestMove == "resign")
@@ -1265,11 +1349,11 @@ namespace Book
 	}
 
 	// Apery用定跡ファイルの読み込み
-	int MemoryBook::read_apery_book(const std::string& filename)
+	Tools::Result MemoryBook::read_apery_book(const std::string& filename)
 	{
 		// 読み込み済であるかの判定
 		if (book_name == filename)
-			return 0;
+			return Tools::Result::Ok();
 
 		AperyBook apery_book(filename.c_str());
 		cout << "size of apery book = " << apery_book.size() << endl;
@@ -1343,7 +1427,7 @@ namespace Book
 		// 読み込んだファイル名を保存しておく。二度目のread_book()はskipする。
 		book_name = filename;
 
-		return 0;
+		return Tools::Result::Ok();
 	}
 
 	// ----------------------------------
@@ -1354,6 +1438,11 @@ namespace Book
 
 	void BookMoveSelector::init(USI::OptionsMap & o)
 	{
+		// エンジン側の定跡を有効化するか
+		// USI原案にこのオプションがあり、ShogiGUI、ShogiDroidで対応しているらしいので
+		// このオプションを追加。[2020/3/9]
+		o["USI_OwnBook"] << Option(true);
+
 		// 実現確率の低い狭い定跡を選択しない
 		o["NarrowBook"] << Option(false);
 
@@ -1502,15 +1591,19 @@ namespace Book
 						(to_usi_string(it.bestMove) + " " + to_usi_string(it.nextMove));
 				}
 
-				sync_cout << "info pv " << pv_string
-					<< " (" << fixed << std::setprecision(2) << (100 * it.prob) << "%)" // 採択確率
-					<< " score cp " << it.value << " depth " << it.depth
+				// USIの"info"で読み筋を出力するときは"pv"サブコマンドはサブコマンドの一番最後にしなければならない。
+				// 複数出力するときに"multipv"は連番なのでこれが先頭に来ているほうが見やすいと思うので先頭に"multipv"を出力する。
+				sync_cout << "info"
 #if !defined(NICONICO)
-					<< " multipv " << (i+1)
+					<< " multipv " << (i + 1)
 #endif					
+					<< " score cp " << it.value << " depth " << it.depth
+					<< " pv " << pv_string
+					<< " (" << fixed << std::setprecision(2) << (100 * it.prob) << "%)" // 採択確率
 					<< sync_endl;
 
 				// 電王盤はMultiPV非対応なので1番目の読み筋だけを"multipv"をつけずに送信する。
+				// ("multipv"を出力してはならない)
 #if defined(NICONICO)
 				break;
 #endif
@@ -1659,6 +1752,10 @@ namespace Book
 	// 定跡の指し手の選択
 	bool BookMoveSelector::probe(Thread& th, Search::LimitsType& Limits)
 	{
+		// エンジン側の定跡を有効化されていないなら、probe()に失敗する。
+		if (!Options["USI_OwnBook"])
+			return false;
+
 		Move bestMove, ponderMove;
 		if (probe_impl(th.rootPos, Limits.silent, bestMove, ponderMove))
 		{

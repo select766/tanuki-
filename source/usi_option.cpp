@@ -51,7 +51,7 @@ namespace USI {
 
 #if !defined(MATE_ENGINE)
 		// 置換表のサイズ。[MB]で指定。
-		o["Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
+		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
 
 #if defined(USE_EVAL_HASH)
 		// 評価値用のcacheサイズ。[MB]で指定。
@@ -61,9 +61,8 @@ namespace USI {
 		o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
 #else
 		o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
-#endif
-
-#endif
+#endif // defined(FOR_TOURNAMENT)
+#endif // defined(USE_EVAL_HASH)
 
 		o["USI_Ponder"] << Option(false);
 
@@ -72,9 +71,13 @@ namespace USI {
 
 		// 弱くするために調整する。20なら手加減なし。0が最弱。
 		o["SkillLevel"] << Option(20, 0, 20);
-#else
-		o["Hash"] << Option(4096, 1, MaxHashMB);
-#endif
+
+#else // !defined(MATE_ENGINE)
+
+		// MATE_ENGINEのとき
+		o["USI_Hash"] << Option(4096, 1, MaxHashMB);
+
+#endif // !defined(MATE_ENGINE)
 
 		// cin/coutの入出力をファイルにリダイレクトする
 		o["WriteDebugLog"] << Option(false, [](const Option& o) { start_logger(o); });
@@ -141,9 +144,9 @@ namespace USI {
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
 	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) )
-		// 評価関数パラメーターを共有するか
-		// 異種評価関数との自己対局のときにこの設定で引っかかる人が後を絶たないのでデフォルトでオフにする。
-		o["EvalShare"] << Option(false);
+		// 評価関数パラメーターを共有するか。
+		// デフォルトで有効に変更。(V4.90～)
+		o["EvalShare"] << Option(true);
 #endif
 
 #if defined(EVAL_LEARN)
@@ -324,7 +327,7 @@ namespace USI {
 		string name, value, option_type;
 		int64_t min_value = 0, max_value = 1;
 		std::vector<string> combo_list;
-		while (!scanner.eof())
+		while (!scanner.eol())
 		{
 			auto token = scanner.get_text();
 			if (token == "name") name = scanner.get_text();
@@ -361,7 +364,7 @@ namespace USI {
 		if (!ifs.fail())
 		{
 			std::string str;
-			while (Dependency::getline(ifs, str))
+			while (Tools::getline(ifs, str))
 				build_option(str);
 		}
 	}
