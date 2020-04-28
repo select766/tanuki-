@@ -57,12 +57,11 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 		|| b == BOUND_EXACT
 		)
 	{
-		ASSERT_LV3(d >= DEPTH_NONE);
-
 		key16 = (uint16_t)(k >> 48);
 		value16 = (int16_t)v;
 		eval16    = (int16_t)ev;
 		genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
+		ASSERT_LV3(d >= DEPTH_OFFSET);
 		depth8 = (uint8_t)(d - DEPTH_OFFSET); // DEPTH_OFFSETだけ下駄履きさせてある。
 	}
 }
@@ -227,17 +226,13 @@ int TranspositionTable::hashfull() const
 {
 	// すべてのエントリーにアクセスすると時間が非常にかかるため、先頭から1000エントリーだけ
 	// サンプリングして使用されているエントリー数を返す。
-
-	// Stockfish11では、1000 Cluster(3000 TTEntry)についてサンプリングするように変更されたが、
-	// 計測時間がもったいないので、古いコードのままにしておく。
-	
 	int cnt = 0;
-	for (int i = 0; i < 1000 / ClusterSize; ++i)
+	for (int i = 0; i < 1000; ++i)
 		for (int j = 0; j < ClusterSize; ++j)
 			cnt += (table[i].entry[j].genBound8 & 0xF8) == generation8;
 
 	// return cnt;でも良いが、そうすると最大で999しか返らず、置換表使用率が100%という表示にならない。
-	return cnt * 1000 / (ClusterSize * (1000 / ClusterSize));
+	return cnt / ClusterSize;
 }
 
 #if defined(EVAL_LEARN)
