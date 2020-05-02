@@ -685,6 +685,7 @@ namespace tanuki_proxy
             // 現在の探索が終了するまで待機する
             eventSearching.WaitOne();
 
+            Write("setoption name USI_OwnBook value false");
             Write(string.Format("setoption name MultiPV value {0}", multiPv));
             multipvMoves = new string[multiPv];
 
@@ -707,6 +708,7 @@ namespace tanuki_proxy
                 WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
             }
 
+            Write("setoption name USI_OwnBook value true");
             Write("setoption name MultiPV value 1");
 
             var result = multipvMoves;
