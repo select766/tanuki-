@@ -32,7 +32,7 @@ namespace tanuki_proxy
         private readonly Process process = new Process();
         private Thread readStandardOutputThread;
         private Thread readStandardErrorThread;
-        private readonly Option[] optionOverrides;
+        private readonly List<Option> optionOverrides;
         public string ExpectedDownstreamPosition { get; set; } = null;
         public string ExpectedDownstreamGo { get; set; } = null;
         private string actualDownstreamPosition = "";
@@ -48,7 +48,7 @@ namespace tanuki_proxy
         private string[] multipvMoves;
         private readonly ManualResetEvent eventSearching = new ManualResetEvent(true);
 
-        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool mateEngine)
+        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, List<Option> optionOverrides, int id, bool mateEngine)
         {
             this.program = program;
             this.name = engineName;

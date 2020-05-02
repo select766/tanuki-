@@ -2,6 +2,8 @@
 using System.IO;
 using System.Xml.Serialization;
 using System.Runtime.Serialization;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace tanuki_proxy
 {
@@ -11,17 +13,9 @@ namespace tanuki_proxy
         public class Option
         {
             [DataMember]
-            public string name;
+            public string name { get; set; }
             [DataMember]
-            public string value;
-
-            public Option() { }
-
-            public Option(string name, string value)
-            {
-                this.name = name;
-                this.value = value;
-            }
+            public string value { get; set; }
         }
 
         [DataContract]
@@ -36,31 +30,16 @@ namespace tanuki_proxy
             [DataMember]
             public string workingDirectory { get; set; }
             [DataMember]
-            public Option[] optionOverrides { get; set; }
+            public List<Option> optionOverrides { get; set; }
             [DataMember]
             public bool mateEngine { get; set; } = false;
-
-            public EngineOption(string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, bool mateEngine)
-            {
-                this.engineName = engineName;
-                this.fileName = fileName;
-                this.arguments = arguments;
-                this.workingDirectory = workingDirectory;
-                this.optionOverrides = optionOverrides;
-                this.mateEngine = mateEngine;
-            }
-
-            public EngineOption()
-            {
-                //empty constructor for serialization
-            }
         }
 
         [DataContract]
         public class ProxySetting
         {
             [DataMember]
-            public EngineOption[] engines { get; set; }
+            public List<EngineOption> engines { get; set; }
             [DataMember]
             public string logDirectory { get; set; }
         }
@@ -69,47 +48,59 @@ namespace tanuki_proxy
         {
             ProxySetting setting = new ProxySetting();
             setting.logDirectory = "C:\\home\\develop\\tanuki-";
-            setting.engines = new EngineOption[]
+            setting.engines = new List<EngineOption>
             {
-            new EngineOption(
-                "doutanuki",
-                "C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
-                "",
-                "C:\\home\\develop\\tanuki-\\bin",
-                new[] {
-                    new Option("USI_Hash", "1024"),
-                    new Option("Book_File", "../bin/book-2016-02-01.bin"),
-                    new Option("Best_Book_Move", "true"),
-                    new Option("Max_Random_Score_Diff", "0"),
-                    new Option("Max_Random_Score_Diff_Ply", "0"),
-                    new Option("Threads", "1"),
-                },false),
-            new EngineOption(
-                "nighthawk",
-                "ssh",
-                "-vvv nighthawk tanuki-.bat",
-                "C:\\home\\develop\\tanuki-\\bin",
-                new[] {
-                    new Option("USI_Hash", "1024"),
-                    new Option("Book_File", "../bin/book-2016-02-01.bin"),
-                    new Option("Best_Book_Move", "true"),
-                    new Option("Max_Random_Score_Diff", "0"),
-                    new Option("Max_Random_Score_Diff_Ply", "0"),
-                    new Option("Threads", "4"),
-                },false),
-            new EngineOption(
-                "doutanuki",
-                "C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
-                "",
-                "C:\\home\\develop\\tanuki-\\bin",
-                new[] {
-                    new Option("USI_Hash", "1024"),
-                    new Option("Book_File", "../bin/book-2016-02-01.bin"),
-                    new Option("Best_Book_Move", "true"),
-                    new Option("Max_Random_Score_Diff", "0"),
-                    new Option("Max_Random_Score_Diff_Ply", "0"),
-                    new Option("Threads", "1"),
-                },false)
+                new EngineOption
+                {
+                    engineName="doutanuki",
+                    fileName="C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
+                    arguments="",
+                    workingDirectory="C:\\home\\develop\\tanuki-\\bin",
+                    optionOverrides=new List<Option>
+                    {
+                        new Option{name="USI_Hash",value="1024",},
+                        new Option{name="Book_File",value="../bin/book-2016-02-01.bin",},
+                        new Option{name="Best_Book_Move",value="true",},
+                        new Option{name="Max_Random_Score_Diff",value="0",},
+                        new Option{name="Max_Random_Score_Diff_Ply",value="0",},
+                        new Option{name="Threads",value="1",},
+                    },
+                    mateEngine=false,
+                },
+                new EngineOption
+                {
+                    engineName="nighthawk",
+                    fileName="ssh",
+                    arguments="-vvv nighthawk tanuki-.bat",
+                    workingDirectory="C:\\home\\develop\\tanuki-\\bin",
+                    optionOverrides=new List<Option>
+                    {
+                        new Option{name="USI_Hash", value="1024", },
+                        new Option{name="Book_File", value="../bin/book-2016-02-01.bin", },
+                        new Option{name="Best_Book_Move", value="true", },
+                        new Option{name="Max_Random_Score_Diff", value="0", },
+                        new Option{name="Max_Random_Score_Diff_Ply", value="0",},
+                        new Option{name="Threads", value="4", },
+                    },
+                    mateEngine=false,
+                },
+                new EngineOption
+                {
+                    engineName="doutanuki",
+                    fileName="C:\\home\\develop\\tanuki-\\tanuki-\\x64\\Release\\tanuki-.exe",
+                    arguments="",
+                    workingDirectory="C:\\home\\develop\\tanuki-\\bin",
+                    optionOverrides=new List<Option>
+                    {
+                        new Option{name="USI_Hash", value="1024" },
+                        new Option{name="Book_File", value="../bin/book-2016-02-01.bin" },
+                        new Option{name="Best_Book_Move", value="true" },
+                        new Option{name="Max_Random_Score_Diff", value="0" },
+                        new Option{name="Max_Random_Score_Diff_Ply", value="0" },
+                        new Option{name="Threads", value="1" },
+                    },
+                    mateEngine=false,
+                },
             };
 
             XmlSerializer serializer = new XmlSerializer(typeof(ProxySetting));
@@ -143,6 +134,75 @@ namespace tanuki_proxy
             using (Process process = Process.GetCurrentProcess())
             {
                 return Path.GetDirectoryName(process.MainModule.FileName);
+            }
+        }
+
+        /// <summary>
+        /// 設定ファイルを生成する。
+        /// </summary>
+        /// <param name="engineServerAddressFile">通常の思考エンジンのサーバーアドレスが1行に一つ書かれたテキストファイルへのパス</param>
+        /// <param name="mateServerAddressFile">詰み探索専用思考エンジンのサーバーアドレスが1行に一つ書かれたテキストファイルへのパス</param>
+        public static void CreateSettingFile(FileInfo engineServerAddressFile,
+            FileInfo mateServerAddressFile)
+        {
+            var engineServerAddresses = File.ReadAllLines(engineServerAddressFile.FullName);
+            var mateServerAddresses = File.ReadAllLines(mateServerAddressFile.FullName);
+
+            var setting = new ProxySetting
+            {
+                logDirectory = "/home/ubuntu/log",
+                engines = new List<EngineOption>(),
+            };
+
+            // 通常の思考エンジンの設定を追加する。
+            foreach (var engineServerAddress in engineServerAddresses)
+            {
+                setting.engines.Add(new EngineOption
+                {
+                    engineName = "engineServerAddress",
+                    fileName = "ssh",
+                    arguments = $"ubuntu@{engineServerAddress} ./YaneuraOu-by-gcc-engine",
+                    workingDirectory = "/home/ubuntu",
+                    optionOverrides = new List<Option>
+                    {
+                        new Option{name="USI_Hash", value="65536" },
+                        new Option{name="Threads", value="95" },
+                        new Option{name="LazyClusterSendTo", value=engineServerAddresses
+                            .Where(x=>x!=engineServerAddress)
+                            .Select(x=>x+":30001")
+                            .Aggregate((x,y)=>x+","+y)
+                        },
+                    },
+                    mateEngine = false,
+                });
+            }
+
+            // 詰み専用思考エンジンの設定を追加する。
+            foreach (var mateServerAddress in mateServerAddresses)
+            {
+                setting.engines.Add(new EngineOption
+                {
+                    engineName = "engineServerAddress",
+                    fileName = "ssh",
+                    arguments = $"ubuntu@{mateServerAddress} ./YaneuraOu-by-gcc-mate",
+                    workingDirectory = "/home/ubuntu",
+                    optionOverrides = new List<Option>
+                    {
+                        new Option{name="USI_Hash", value="1024" },
+                        new Option{name="Threads", value="1" },
+                        new Option{name="LazyClusterSendTo", value=engineServerAddresses
+                            .Select(x=>x+":30001")
+                            .Aggregate((x,y)=>x+","+y)
+                        },
+                    },
+                    mateEngine = true,
+                });
+            }
+
+            var serializer = new XmlSerializer(typeof(ProxySetting));
+            using (var f = new FileStream("proxy-setting.xml", FileMode.Create))
+            {
+                serializer.Serialize(f, setting);
             }
         }
     }

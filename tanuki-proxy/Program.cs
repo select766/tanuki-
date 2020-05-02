@@ -69,6 +69,7 @@ namespace tanuki_proxy
 
             running = false;
             decideMoveTask.Join();
+            // TODO(nodchip): ログを最後にしないとまずくない…？
             Logging.Close();
             foreach (var engine in engines)
             {
@@ -260,7 +261,7 @@ namespace tanuki_proxy
                 GetProcessId()));
             Logging.Open(logFileFormat);
 
-            for (int id = 0; id < setting.engines.Length; ++id)
+            for (int id = 0; id < setting.engines.Count; ++id)
             {
                 engines.Add(new Engine(this, setting.engines[id], id));
             }
@@ -988,11 +989,26 @@ namespace tanuki_proxy
             WriteLineAndFlush(Console.Out, $"{usiCommand}");
         }
 
-        static void Main(string[] args)
+        static void Main(bool generateSettingFile = false,
+            FileInfo engineServerAddressFilePath = null, FileInfo mateServerAddressFilePath = null)
         {
-            using (var program = new Program())
+            if (generateSettingFile)
             {
-                program.Run();
+                Setting.CreateSettingFile(engineServerAddressFilePath, mateServerAddressFilePath);
+            }
+            else
+            {
+                using (var program = new Program())
+                {
+                    try
+                    {
+                        program.Run();
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"e={e}");
+                    }
+                }
             }
         }
     }
