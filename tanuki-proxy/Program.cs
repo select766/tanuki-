@@ -698,7 +698,7 @@ namespace tanuki_proxy
                         mateEngine.Write(Join(targetPosition));
 
                         // 詰将棋エンジンにgo mate infiniteコマンドを渡す。
-                        mateEngine.Write("go mate inifinite");
+                        mateEngine.Write("go mate infinite");
                     }
 
                     // この局面の子孫局面に割り当てられる思考エンジンの数。
