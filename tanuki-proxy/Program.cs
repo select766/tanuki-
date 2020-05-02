@@ -484,6 +484,8 @@ namespace tanuki_proxy
                     .ToList();
                 if (mateEngines.Count > 0)
                 {
+                    // Rootノードでは定跡を有効にする。
+                    mateEngines[0].Write("setoption name USI_OwnBook value true");
                     mateEngines[0].Write(UpstreamPosition);
                     mateEngines[0].Write("go mate infinite");
                 }
@@ -502,6 +504,10 @@ namespace tanuki_proxy
                 var timeKeeperNode = engines
                     .Where(x => !x.MateEngine)
                     .First();
+
+                // Rootノードでは定跡を有効にする。
+                timeKeeperNode.Write("setoption name USI_OwnBook value true");
+
                 timeKeeperNode.TimeKeeper = true;
                 timeKeeperNode.Write(UpstreamPosition);
 
@@ -638,6 +644,9 @@ namespace tanuki_proxy
 
                     if (assignedEngine.ExpectedDownstreamPosition != Join(targetPosition))
                     {
+                        // 子ノードでは定跡を使用しないようにする。
+                        assignedEngine.Write("setoption name USI_OwnBook value false");
+
                         // ExpectedDownstreamPositionがtargetPositionと等しい場合、
                         // go ponderによりすでに局面の探索が行われていることを表す。
                         // その場合は思考エンジンに対してコマンドは送らない。
