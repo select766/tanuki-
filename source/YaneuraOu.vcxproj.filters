@@ -297,6 +297,9 @@
     <ClInclude Include="tanuki_lazy_cluster.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="tanuki_progress.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -462,6 +465,9 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="tanuki_lazy_cluster.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="tanuki_progress.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

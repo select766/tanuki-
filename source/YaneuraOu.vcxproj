@@ -504,6 +504,7 @@
     <ClInclude Include="tanuki_kifu_shuffler.h" />
     <ClInclude Include="tanuki_kifu_writer.h" />
     <ClInclude Include="tanuki_lazy_cluster.h" />
+    <ClInclude Include="tanuki_progress.h" />
     <ClInclude Include="tanuki_progress_report.h" />
     <ClInclude Include="types.h" />
     <ClInclude Include="position.h" />
@@ -560,6 +561,7 @@
     <ClCompile Include="tanuki_kifu_shuffler.cpp" />
     <ClCompile Include="tanuki_kifu_writer.cpp" />
     <ClCompile Include="tanuki_lazy_cluster.cpp" />
+    <ClCompile Include="tanuki_progress.cpp" />
     <ClCompile Include="tanuki_progress_report.cpp" />
     <ClCompile Include="timeman.cpp" />
     <ClCompile Include="types.cpp" />
