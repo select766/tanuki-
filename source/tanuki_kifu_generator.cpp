@@ -247,7 +247,7 @@ void Tanuki::GenerateKifu() {
 			Value last_value;
 			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
 				pos.DeclarationWin() == MOVE_NONE) {
-				Learner::search(pos, search_depth);
+				Learner::search(pos, search_depth, 1, optimum_nodes_searched);
 
 				const auto& root_moves = pos.this_thread()->rootMoves;
 				const auto& root_move = root_moves[0];

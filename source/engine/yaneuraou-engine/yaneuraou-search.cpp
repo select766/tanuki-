@@ -245,7 +245,7 @@ namespace {
 	};
 
 	template <NodeType NT>
-	Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
+	Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning, u64 nodesLimit = 0);
 
 	template <NodeType NT>
 	Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth = DEPTH_ZERO);
@@ -1138,7 +1138,7 @@ namespace {
 
 	// cutNode = LMRで悪そうな指し手に対してreduction量を増やすnode
 	template <NodeType NT>
-	Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning)
+	Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning, u64 nodesLimit)
 	{
 		// -----------------------
 		//     nodeの種類
@@ -1302,7 +1302,9 @@ namespace {
 				return value_from_tt(draw_value(draw_type, pos.side_to_move()), ss->ply);
 
 			// 最大手数を超えている、もしくは停止命令が来ている。
-			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply))
+			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY || pos.game_ply() > Limits.max_game_ply)
+				|| (nodesLimit /*node制限あり*/ && thisThread->nodes.load(std::memory_order_relaxed) >= nodesLimit)
+				)
 				return draw_value(REPETITION_DRAW, pos.side_to_move());
 
 			// -----------------------
@@ -2271,7 +2273,9 @@ namespace {
 			// 停止シグナルが来たときは、探索の結果の値は信頼できないので、
 			// best moveの更新をせず、PVや置換表を汚さずに終了する。
 
-			if (Threads.stop.load(std::memory_order_relaxed))
+			if (Threads.stop.load(std::memory_order_relaxed)
+				|| (nodesLimit /*node制限あり*/ && thisThread->nodes.load(std::memory_order_relaxed) >= nodesLimit)
+				)
 				return VALUE_ZERO;
 
 			// -----------------------
@@ -3466,7 +3470,9 @@ namespace Learner
 				rm.previousScore = rm.score;
 
 			// MultiPV
-			for (pvIdx = 0; pvIdx < multiPV && !Threads.stop; ++pvIdx)
+			for (pvIdx = 0; pvIdx < multiPV && !Threads.stop
+				&& !(nodesLimit /*node制限あり*/ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
+				; ++pvIdx)
 			{
 				// それぞれのdepthとPV lineに対するUSI infoで出力するselDepth
 				selDepth = 0;
@@ -3488,6 +3494,11 @@ namespace Learner
 				{
 					Depth adjustedDepth = std::max(ONE_PLY, rootDepth - failedHighCnt * ONE_PLY);
 					bestValue = ::search<PV>(pos, ss, alpha, beta, adjustedDepth, false, false);
+
+					if (Threads.stop
+						|| (nodesLimit /*node制限あり*/ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
+						)
+						break;
 
 					stable_sort(rootMoves.begin() + pvIdx, rootMoves.end());
 					//my_stable_sort(pos.this_thread()->thread_id(),&rootMoves[0] + pvIdx, rootMoves.size() - pvIdx);
