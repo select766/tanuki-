@@ -220,7 +220,7 @@ void Tanuki::GenerateKifu() {
 	// スレッド間で共有する
 	std::atomic_int64_t global_position_index;
 	global_position_index = 0;
-	ProgressReport progress_report(num_positions, 10 * 60);
+	ProgressReport progress_report(num_positions, 60 * 60);
 #pragma omp parallel
 	{
 		int thread_index = ::omp_get_thread_num();
