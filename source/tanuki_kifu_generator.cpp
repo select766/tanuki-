@@ -48,6 +48,7 @@ namespace {
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
 	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
 	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
+	constexpr char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -63,6 +64,8 @@ namespace {
 		std::string book_file_name = Options[kOptionGeneratorStartposFileName];
 		std::ifstream fs_book;
 		fs_book.open(book_file_name);
+
+		int start_position_max_play = Options[kOptionGeneratorStartPositionMaxPlay];
 
 		if (!fs_book.is_open()) {
 			sync_cout << "Error! : can't read " << book_file_name << sync_endl;
@@ -82,7 +85,7 @@ namespace {
 			std::getline(fs_book, line);
 			std::istringstream is(line);
 			std::string token;
-			for (;;) {
+			while (pos.game_ply() <= start_position_max_play) {
 				if (!(is >> token)) {
 					break;
 				}
@@ -131,6 +134,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionGeneratorMeasureDepth] << Option(false);
+	o[kOptionGeneratorStartPositionMaxPlay] << Option(320, 1, 320);
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
