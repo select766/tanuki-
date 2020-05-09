@@ -215,7 +215,8 @@ SOURCES  = \
 	tanuki_kifu_writer.cpp                                                     \
 	tanuki_kifu_reader.cpp                                                     \
 	tanuki_lazy_cluster.cpp                                                    \
-	tanuki_progress.cpp
+	tanuki_progress.cpp                                                        \
+	tanuki_analysis.cpp
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
 	SOURCES += \

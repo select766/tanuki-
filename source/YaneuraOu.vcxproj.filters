@@ -300,6 +300,9 @@
     <ClInclude Include="tanuki_progress.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="tanuki_analysis.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -468,6 +471,9 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="tanuki_progress.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="tanuki_analysis.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

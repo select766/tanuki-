@@ -8,6 +8,7 @@
 #include <sstream>
 #include <queue>
 
+#include "tanuki_analysis.h"
 #include "tanuki_book.h"
 #include "tanuki_kifu_generator.h"
 #include "tanuki_kifu_shuffler.h"
@@ -874,6 +875,10 @@ void USI::loop(int argc, char* argv[])
 			Tanuki::Progress progress;
 			progress.Learn();
 			progress.Save();
+		}
+
+		else if (token == "analyze_progress") {
+			Tanuki::AnalyzeProgress();
 		}
 #endif
 
