@@ -40,6 +40,7 @@ namespace {
 		GameResultDraw = 0,
 	};
 
+	constexpr char* kOptionKifuDir = "KifuDir";
 	constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
 	constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
 	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
@@ -122,6 +123,7 @@ namespace {
 }
 
 void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
+	o[kOptionKifuDir] << Option("");
 	o[kOptionGeneratorNumPositions] << Option("10000000000");
 	o[kOptionGeneratorSearchDepth] << Option(8, 1, MAX_PLY);
 	o[kOptionGeneratorKifuTag] << Option("default_tag");
