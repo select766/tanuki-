@@ -51,7 +51,7 @@ void Tanuki::ProgressReport::Show(int64_t current_data) {
 		"%lld / %lld\n"
 		"        elapsed time = %02d:%02d:%02d\n"
 		"   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
-		"    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
+		"    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n"
 		"               speed = %.2f (data/sec)\n",
 		current_data, total_data_,
 		hour, minute, second,
