@@ -11,6 +11,7 @@
 #include "tanuki_book.h"
 #include "tanuki_kifu_generator.h"
 #include "tanuki_kifu_shuffler.h"
+#include "tanuki_progress.h"
 
 using namespace std;
 
@@ -868,6 +869,12 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();
 
 		else if (token == "shuffle_kifu") Tanuki::ShuffleKifu();
+
+		else if (token == "progress_learn") {
+			Tanuki::Progress progress;
+			progress.Learn();
+			progress.Save();
+		}
 #endif
 
 		else
