@@ -46,8 +46,8 @@ DEBUG = OFF
 
 
 # clangでコンパイルしたほうがgccより数%速いっぽい。
-COMPILER = g++
-#COMPILER = clang++
+#COMPILER = g++
+COMPILER = clang++
 
 
 # 標準的なコンパイルオプション
@@ -150,8 +150,8 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 			OPENMP_LDFLAGS =
 		else
 			# Other (normal clang++/libomp env)
-			OPENMP = -fopenmp
-			OPENMP_LDFLAGS = -lomp
+			OPENMP = -fopenmp=libgomp
+			OPENMP_LDFLAGS = -lomp -fopenmp=libgomp
 		endif
 	endif
 endif
