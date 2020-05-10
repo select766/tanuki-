@@ -154,14 +154,14 @@ namespace {
 		if (mt() & 1) {
 			root_moves.erase(std::remove_if(root_moves.begin(), root_moves.end(),
 				[&pos](const auto& root_move) {
-				Move move = root_move.pv.front();
-				if (is_drop(move)) {
-					return true;
-				}
-				Square sq = from_sq(move);
-				return pos.king_square(BLACK) != sq &&
-					pos.king_square(WHITE) != sq;
-			}),
+					Move move = root_move.pv.front();
+					if (is_drop(move)) {
+						return true;
+					}
+					Square sq = from_sq(move);
+					return pos.king_square(BLACK) != sq &&
+						pos.king_square(WHITE) != sq;
+				}),
 				root_moves.end());
 		}
 
@@ -184,7 +184,7 @@ void Tanuki::GenerateKifu() {
 		return;
 	}
 
-	omp_set_num_threads((int)Options["Threads"]);
+	int num_threads = (int)Options["Threads"];
 
 	Eval::load_eval();
 
@@ -225,134 +225,157 @@ void Tanuki::GenerateKifu() {
 	std::atomic_int64_t global_position_index;
 	global_position_index = 0;
 	ProgressReport progress_report(num_positions, 60 * 60);
-#pragma omp parallel
-	{
-		int thread_index = ::omp_get_thread_num();
-		WinProcGroup::bindThisThread(thread_index);
-		char output_file_path[1024];
-		std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
-			output_file_name_tag.c_str(), search_depth, num_positions, thread_index,
-			start_time);
-		// 各スレッドに持たせる
-		std::unique_ptr<KifuWriter> kifu_writer =
-			std::make_unique<KifuWriter>(output_file_path);
-		std::mt19937_64 mt19937_64(start_time + thread_index);
+	std::mutex mutex_game_play_to_depths;
 
-		while (global_position_index < num_positions) {
-			Thread& thread = *Threads[thread_index];
-			StateInfo state_infos[4096] = {};
-			StateInfo* state = state_infos + 8;
-			Position& pos = thread.rootPos;
-			pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
+	std::vector<std::thread> threads;
+	for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+		auto procedure =
+			[
+				thread_index,
+				search_depth,
+				num_positions,
+				start_time,
+				optimum_nodes_searched,
+				value_threshold,
+				measure_depth,
+				&kifu_directory,
+				&output_file_name_tag,
+				&global_position_index,
+				&start_positions_index,
+				&mutex_game_play_to_depths,
+				&game_play_to_depths,
+				&progress_report
+			]() {
+			WinProcGroup::bindThisThread(thread_index);
+			char output_file_path[1024];
+			std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
+				output_file_name_tag.c_str(), search_depth, num_positions, thread_index,
+				start_time);
+			// 各スレッドに持たせる
+			std::unique_ptr<KifuWriter> kifu_writer =
+				std::make_unique<KifuWriter>(output_file_path);
+			std::mt19937_64 mt19937_64(start_time + thread_index);
 
-			RandomMove(pos, state, mt19937_64);
+			while (global_position_index < num_positions) {
+				Thread& thread = *Threads[thread_index];
+				StateInfo state_infos[4096] = {};
+				StateInfo* state = state_infos + 8;
+				Position& pos = thread.rootPos;
+				pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
 
-			std::vector<Learner::PackedSfenValue> records;
-			Value last_value;
-			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
-				pos.DeclarationWin() == MOVE_NONE) {
-				Learner::search(pos, search_depth, 1, optimum_nodes_searched);
+				RandomMove(pos, state, mt19937_64);
 
-				const auto& root_moves = pos.this_thread()->rootMoves;
-				const auto& root_move = root_moves[0];
-				// 最も良かったスコアをこの局面のスコアとして記録する
-				last_value = root_move.score;
-				const std::vector<Move>& pv = root_move.pv;
+				std::vector<Learner::PackedSfenValue> records;
+				Value last_value;
+				while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
+					pos.DeclarationWin() == MOVE_NONE) {
+					Learner::search(pos, search_depth, 1, optimum_nodes_searched);
 
-				// 評価値の絶対値が閾値を超えたら終了する
-				if (std::abs(last_value) > value_threshold) {
-					break;
-				}
+					const auto& root_moves = pos.this_thread()->rootMoves;
+					const auto& root_move = root_moves[0];
+					// 最も良かったスコアをこの局面のスコアとして記録する
+					last_value = root_move.score;
+					const std::vector<Move>& pv = root_move.pv;
 
-				// 詰みの場合はpvが空になる
-				// 上記の条件があるのでこれはいらないかもしれない
-				if (pv.empty()) {
-					break;
-				}
+					// 評価値の絶対値が閾値を超えたら終了する
+					if (std::abs(last_value) > value_threshold) {
+						break;
+					}
 
-				// 局面が不正な場合があるので再度チェックする
-				if (!pos.pos_is_ok()) {
-					break;
-				}
+					// 詰みの場合はpvが空になる
+					// 上記の条件があるのでこれはいらないかもしれない
+					if (pv.empty()) {
+						break;
+					}
 
-				Move pv_move = pv[0];
+					// 局面が不正な場合があるので再度チェックする
+					if (!pos.pos_is_ok()) {
+						break;
+					}
 
-				Learner::PackedSfenValue record = {};
-				pos.sfen_pack(record.sfen);
-				record.score = last_value;
-				record.gamePly = pos.game_ply();
-				record.move = pv_move;
-				records.push_back(record);
+					Move pv_move = pv[0];
 
-				pos.do_move(pv_move, state[pos.game_ply()]);
-				// 差分計算のためevaluate()を呼び出す
-				Eval::evaluate(pos);
+					Learner::PackedSfenValue record = {};
+					pos.sfen_pack(record.sfen);
+					record.score = last_value;
+					record.gamePly = pos.game_ply();
+					record.move = pv_move;
+					records.push_back(record);
 
-				// 手数毎の探索の深さを記録しておく
-				// 何らかの形で勝ちが決まっている局面は
-				// 探索深さが極端に深くなるため除外する
-				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
-#pragma omp critical
-					{
+					pos.do_move(pv_move, state[pos.game_ply()]);
+					// 差分計算のためevaluate()を呼び出す
+					Eval::evaluate(pos);
+
+					// 手数毎の探索の深さを記録しておく
+					// 何らかの形で勝ちが決まっている局面は
+					// 探索深さが極端に深くなるため除外する
+					if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
+						std::lock_guard<std::mutex> lock(mutex_game_play_to_depths);
 						game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
 					}
 				}
-			}
 
-			int game_result = GameResultDraw;
-			Color win;
-			RepetitionState repetition_state = pos.is_repetition(0);
-			u8 entering_king = 0;
-			if (pos.is_mated()) {
-				// 負け
-				// 詰まされた
-				// 最後の局面は相手局面なので勝ち
-				game_result = GameResultWin;
-			}
-			else if (pos.DeclarationWin() != MOVE_NONE) {
-				// 勝ち
-				// 入玉勝利
-				// 最後の局面は相手局面なので負け
-				game_result = GameResultLose;
-				entering_king = 1;
-			}
-			else if (last_value > value_threshold) {
-				// 勝ち
-				// 最後の局面は相手局面なので負け
-				game_result = GameResultLose;
-			}
-			else if (last_value < -value_threshold) {
-				// 負け
-				// 最後の局面は相手局面なので勝ち
-				game_result = GameResultWin;
-			}
-			else {
-				continue;
-			}
-
-			for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
-				rit->game_result = game_result;
-				rit->entering_king = entering_king;
-				game_result = -game_result;
-			}
-
-			if (!records.empty()) {
-				records.back().last_position = true;
-			}
-
-			for (const auto& record : records) {
-				if (!kifu_writer->Write(record)) {
-					sync_cout << "info string Failed to write a record." << sync_endl;
-					std::exit(1);
+				int game_result = GameResultDraw;
+				Color win;
+				RepetitionState repetition_state = pos.is_repetition(0);
+				u8 entering_king = 0;
+				if (pos.is_mated()) {
+					// 負け
+					// 詰まされた
+					// 最後の局面は相手局面なので勝ち
+					game_result = GameResultWin;
 				}
+				else if (pos.DeclarationWin() != MOVE_NONE) {
+					// 勝ち
+					// 入玉勝利
+					// 最後の局面は相手局面なので負け
+					game_result = GameResultLose;
+					entering_king = 1;
+				}
+				else if (last_value > value_threshold) {
+					// 勝ち
+					// 最後の局面は相手局面なので負け
+					game_result = GameResultLose;
+				}
+				else if (last_value < -value_threshold) {
+					// 負け
+					// 最後の局面は相手局面なので勝ち
+					game_result = GameResultWin;
+				}
+				else {
+					continue;
+				}
+
+				for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
+					rit->game_result = game_result;
+					rit->entering_king = entering_king;
+					game_result = -game_result;
+				}
+
+				if (!records.empty()) {
+					records.back().last_position = true;
+				}
+
+				for (const auto& record : records) {
+					if (!kifu_writer->Write(record)) {
+						sync_cout << "info string Failed to write a record." << sync_endl;
+						std::exit(1);
+					}
+				}
+
+				progress_report.Show(global_position_index += records.size());
 			}
 
-			progress_report.Show(global_position_index += records.size());
-		}
+			// 必要局面数生成したら全スレッドの探索を停止する
+			// こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
+			Threads.stop = true;
+		};
+		threads.emplace_back(procedure);
+	}
 
-		// 必要局面数生成したら全スレッドの探索を停止する
-		// こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
-		Threads.stop = true;
+	// スレッドの終了を待機する。
+	for (auto& thread : threads) {
+		thread.join();
 	}
 
 	if (measure_depth) {
