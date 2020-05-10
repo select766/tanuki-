@@ -877,6 +877,13 @@ void USI::loop(int argc, char* argv[])
 			progress.Save();
 		}
 
+		else if (token == "progress_estimate") {
+			Tanuki::Progress progress;
+			progress.Load();
+			auto p = progress.Estimate(pos);
+			sync_cout << "info string progress = " << p << sync_endl;
+		}
+
 		else if (token == "analyze_progress") {
 			Tanuki::AnalyzeProgress();
 		}
