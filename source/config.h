@@ -291,7 +291,7 @@
 #define USE_GAMEOVER_HANDLER
 
 // NNUE-HalfKPE9
-#define LONG_EFFECT_LIBRARY
+//#define LONG_EFFECT_LIBRARY
 
 // GlobalOptionsは有効にしておく。
 #define USE_GLOBAL_OPTIONS
