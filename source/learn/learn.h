@@ -216,12 +216,17 @@ namespace Learner
 
 		// 教師局面を書き出したファイルを他の人とやりとりするときに
 		// この構造体サイズが不定だと困るため、paddingしてどの環境でも必ず40bytesになるようにしておく。
-		// tanuki-棋譜生成ルーチンでは
-		// この変数を、各対局の最後の局面かどうかのフラグとして使う
-		u8 last_position;
+
+		// 各対局の最後の局面の場合は1、そうでない場合は0
+		u8 last_position : 1;
+
+		// 入玉宣言勝ちにより勝敗が決まった場合は1、そうでない場合は0
+		u8 entering_king : 1;
 
 		// 32 + 2 + 2 + 2 + 1 + 1 = 40bytes
 	};
+
+	static_assert(sizeof(PackedSfenValue) == 40);
 
 	// 読み筋とそのときの評価値を返す型
 	// Learner::search() , Learner::qsearch()で用いる。

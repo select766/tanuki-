@@ -302,6 +302,7 @@ void Tanuki::GenerateKifu() {
 			int game_result = GameResultDraw;
 			Color win;
 			RepetitionState repetition_state = pos.is_repetition(0);
+			u8 entering_king = 0;
 			if (pos.is_mated()) {
 				// •‰‚¯
 				// ‹l‚Ü‚³‚ê‚½
@@ -313,6 +314,7 @@ void Tanuki::GenerateKifu() {
 				// “ü‹ÊŸ—˜
 				// ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚Å•‰‚¯
 				game_result = GameResultLose;
+				entering_king = 1;
 			}
 			else if (last_value > value_threshold) {
 				// Ÿ‚¿
@@ -330,6 +332,7 @@ void Tanuki::GenerateKifu() {
 
 			for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
 				rit->game_result = game_result;
+				rit->entering_king = entering_king;
 				game_result = -game_result;
 			}
 
