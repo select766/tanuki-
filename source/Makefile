@@ -151,7 +151,7 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 		else
 			# Other (normal clang++/libomp env)
 			OPENMP = -fopenmp=libgomp
-			OPENMP_LDFLAGS = -lomp -fopenmp=libgomp
+			OPENMP_LDFLAGS = -lomp
 		endif
 	endif
 endif
