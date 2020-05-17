@@ -2591,6 +2591,7 @@ namespace Learner
 		int newbob_num_trials = 2;
 		string nn_options;
 		bool weight_by_progress = false;
+		double l2_regularization_parameter = 0.0;
 #endif
 
 		u64 eval_save_interval = LEARN_EVAL_SAVE_INTERVAL;
@@ -2677,6 +2678,7 @@ namespace Learner
 			else if (option == "newbob_num_trials") is >> newbob_num_trials;
 			else if (option == "nn_options") is >> nn_options;
 			else if (option == "weight_by_progress") is >> weight_by_progress;
+			else if (option == "l2_regularization_parameter") is >> l2_regularization_parameter;
 #endif
 			else if (option == "eval_save_interval") is >> eval_save_interval;
 			else if (option == "loss_output_interval") is >> loss_output_interval;
@@ -2828,7 +2830,8 @@ namespace Learner
 		Eval::init_grad(eta1, eta1_epoch, eta2, eta2_epoch, eta3);
 #else
 		cout << "init_training.." << endl;
-		Eval::NNUE::InitializeTraining(eta1, eta1_epoch, eta2, eta2_epoch, eta3);
+		Eval::NNUE::InitializeTraining(eta1, eta1_epoch, eta2, eta2_epoch, eta3,
+			l2_regularization_parameter);
 		Eval::NNUE::SetBatchSize(nn_batch_size);
 		Eval::NNUE::SetOptions(nn_options);
 		if (newbob_decay != 1.0 && !Options["SkipLoadingEval"]) {
