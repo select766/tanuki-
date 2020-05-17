@@ -69,6 +69,7 @@
 
 #if defined(EVAL_NNUE)
 #include "../eval/nnue/evaluate_nnue_learner.h"
+#include "../tanuki_progress.h"
 #include <shared_mutex>
 #endif
 
@@ -1120,7 +1121,8 @@ namespace Learner
 
 	// 学習時の交差エントロピーの計算
 	// elmo式の勝敗項と勝率項との個別の交差エントロピーが引数であるcross_entropy_evalとcross_entropy_winに返る。
-	void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv,
+	// 進行度による学習率の調整についても考慮する。
+	void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv, double weight,
 		double& cross_entropy_eval, double& cross_entropy_win, double& cross_entropy,
 		double& entropy_eval, double& entropy_win, double& entropy)
 	{
@@ -1136,18 +1138,18 @@ namespace Learner
 		const double m = (1.0 - lambda) * t + lambda * p;
 
 		cross_entropy_eval =
-			(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon));
+			(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon)) * weight;
 		cross_entropy_win =
-			(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon));
+			(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon)) * weight;
 		entropy_eval =
-			(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon));
+			(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon)) * weight;
 		entropy_win =
-			(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon));
+			(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon)) * weight;
 
 		cross_entropy =
-			(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon));
+			(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon)) * weight;
 		entropy =
-			(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon));
+			(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon)) * weight;
 	}
 
 #endif
@@ -1499,6 +1501,7 @@ namespace Learner
 			best_loss = std::numeric_limits<double>::infinity();
 			latest_loss_sum = 0.0;
 			latest_loss_count = 0;
+			progress.Load();
 #endif
 		}
 
@@ -1558,6 +1561,9 @@ namespace Learner
 		double latest_loss_sum;
 		u64 latest_loss_count;
 		std::string best_nn_directory;
+		bool weight_by_progress;
+
+		Tanuki::Progress progress;
 #endif
 
 		u64 eval_save_interval;
@@ -1634,7 +1640,9 @@ namespace Learner
 			// TaskDispatcherを用いて各スレッドに作業を振る。
 			// そのためのタスクの定義。
 			// ↑で使っているposをcaptureされるとたまらんのでcaptureしたい変数は一つずつ指定しておく。
-			auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count](size_t thread_id)
+			auto weight_by_progress = this->weight_by_progress;
+			auto& progress = this->progress;
+			auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
 			{
 				// これ、C++ではループごとに新たなpsのインスタンスをちゃんとcaptureするのだろうか.. →　するようだ。
 				auto th = Threads[thread_id];
@@ -1691,9 +1699,15 @@ namespace Learner
 				// 交差エントロピーを計算して表示させる。
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				double progress_weight = weight_by_progress
+					? (1.0 - progress.Estimate(pos))
+					: 1.0;
+
 				double test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy;
 				double test_entropy_eval, test_entropy_win, test_entropy;
-				calc_cross_entropy(deep_value, shallow_value, ps, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
+				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
 				// 交差エントロピーの合計は定義的にabs()をとる必要がない。
 				test_sum_cross_entropy_eval += test_cross_entropy_eval;
 				test_sum_cross_entropy_win += test_cross_entropy_win;
@@ -2011,10 +2025,16 @@ namespace Learner
 				Value shallow_value = (rootColor == pos.side_to_move()) ? Eval::evaluate(pos) : -Eval::evaluate(pos);
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				double progress_weight = weight_by_progress
+					? (1.0 - progress.Estimate(pos))
+					: 1.0;
+
 				// 学習データに対するロスの計算
 				double learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy;
 				double learn_entropy_eval, learn_entropy_win, learn_entropy;
-				calc_cross_entropy(deep_value, shallow_value, ps, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
+				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
 				learn_sum_cross_entropy_eval += learn_cross_entropy_eval;
 				learn_sum_cross_entropy_win += learn_cross_entropy_win;
 				learn_sum_cross_entropy += learn_cross_entropy;
@@ -2037,8 +2057,13 @@ namespace Learner
 				// 勾配に基づくupdateはのちほど行なう。
 				Eval::add_grad(pos, rootColor, dj_dw, freeze);
 #else
-				const double example_weight =
+				double example_weight =
 					(discount_rate != 0 && ply != (int)pv.size()) ? discount_rate : 1.0;
+
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				example_weight *= progress_weight;
+
 				Eval::NNUE::AddExample(pos, rootColor, ps, example_weight);
 #endif
 
@@ -2565,6 +2590,7 @@ namespace Learner
 		double newbob_decay = 1.0;
 		int newbob_num_trials = 2;
 		string nn_options;
+		bool weight_by_progress = false;
 #endif
 
 		u64 eval_save_interval = LEARN_EVAL_SAVE_INTERVAL;
@@ -2650,6 +2676,7 @@ namespace Learner
 			else if (option == "newbob_decay") is >> newbob_decay;
 			else if (option == "newbob_num_trials") is >> newbob_num_trials;
 			else if (option == "nn_options") is >> nn_options;
+			else if (option == "weight_by_progress") is >> weight_by_progress;
 #endif
 			else if (option == "eval_save_interval") is >> eval_save_interval;
 			else if (option == "loss_output_interval") is >> loss_output_interval;
