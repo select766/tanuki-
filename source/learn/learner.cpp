@@ -2864,6 +2864,7 @@ namespace Learner
 		learn_think.newbob_scale = 1.0;
 		learn_think.newbob_decay = newbob_decay;
 		learn_think.newbob_num_trials = newbob_num_trials;
+		learn_think.weight_by_progress = weight_by_progress;
 #endif
 		learn_think.eval_save_interval = eval_save_interval;
 		learn_think.loss_output_interval = loss_output_interval;
