@@ -46,8 +46,8 @@ DEBUG = OFF
 
 
 # clangでコンパイルしたほうがgccより数%速いっぽい。
-#COMPILER = g++
-COMPILER = clang++
+COMPILER = g++
+#COMPILER = clang++
 
 
 # 標準的なコンパイルオプション
