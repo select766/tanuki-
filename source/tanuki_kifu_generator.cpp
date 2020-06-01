@@ -186,7 +186,8 @@ void Tanuki::GenerateKifu() {
 
 	int num_threads = (int)Options["Threads"];
 
-	Eval::load_eval();
+	// ここでEval::load_eval()を呼ぶと、Large Pageを使用している場合にメモリの確保に失敗し、クラッシュする。
+	//Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
 	_mkdir(kifu_directory.c_str());
@@ -408,7 +409,7 @@ void Tanuki::GenerateKifu() {
 }
 
 void Tanuki::ConvertSfenToLearningData() {
-	Eval::load_eval();
+	//Eval::load_eval();
 
 	omp_set_num_threads((int)Options["Threads"]);
 
