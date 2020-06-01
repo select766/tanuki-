@@ -117,17 +117,19 @@ namespace Eval
 		kpp_ = (ValueKpp(*)[SQ_NB][fe_end][fe_end]) (p + size_of_kk + size_of_kkp);
 	}
 
-	// 評価関数テーブルの読み込み用のメモリ
-	LargeMemory eval_memory;
-
 	void eval_malloc()
 	{
 		// benchコマンドなどでOptionsを保存して復元するのでこのときEvalDirが変更されたことになって、
 		// 評価関数の再読込の必要があるというフラグを立てるため、この関数は2度呼び出されることがある。
-		// その場合でもLargeMemoryクラスが前のを開放してくれるので安全。
+		if (kk_ != nullptr)
+		{
+			aligned_free((void*)kk_);
+			kk_ = nullptr;
+		}
 
 		// メモリ確保は一回にして、連続性のある確保にする。
-		eval_assign(eval_memory.alloc(size_of_eval));
+		// このメモリは、プロセス終了のときに自動開放されることを期待している。
+		eval_assign(aligned_malloc(size_of_eval, 32));
 	}
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32)

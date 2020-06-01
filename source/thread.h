@@ -116,6 +116,11 @@ public:
 	//   やねうら王、独自追加
 	// ------------------------------
 
+	// PositionクラスのEvalListにalignasを指定されていて、Positionクラスを保持するこのThreadクラスをnewするが、
+	// そのときにalignasを無視されるのでcustom allocatorを定義しておいてやる。
+	void* operator new(std::size_t s);
+	void operator delete(void*p) noexcept;
+
 	// スレッドidが返る。Stockfishにはないメソッドだが、
 	// スレッドごとにメモリ領域を割り当てたいときなどに必要となる。
 	// MainThreadなら0、slaveなら1,2,3,...

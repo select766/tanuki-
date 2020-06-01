@@ -3,6 +3,9 @@
 
 ThreadPool Threads;		// Global object
 
+void* Thread::operator new(size_t s) { return aligned_malloc(s, alignof(Thread)); }
+void Thread::operator delete(void*p) noexcept { aligned_free(p); }
+
 namespace USI {
 	extern std::string last_position_cmd;
 	extern std::string last_go_cmd;

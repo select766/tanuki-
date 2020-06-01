@@ -113,10 +113,9 @@ IntType Round(double value) {
 // アライメント付きmake_shared
 template <typename T, typename... ArgumentTypes>
 std::shared_ptr<T> MakeAlignedSharedPtr(ArgumentTypes&&... arguments) {
-    AlignedDeleter<T> deleter;
-    const auto ptr = new(deleter.large_memory()->alloc(sizeof(T), alignof(T)))
+  const auto ptr = new(aligned_malloc(sizeof(T), alignof(T)))
       T(std::forward<ArgumentTypes>(arguments)...);
-    return std::shared_ptr<T>(ptr, deleter);
+  return std::shared_ptr<T>(ptr, AlignedDeleter<T>());
 }
 
 }  // namespace NNUE

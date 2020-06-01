@@ -25,47 +25,15 @@ const std::string engine_info();
 
 void prefetch(void* addr);
 
+// 連続する128バイトをprefetchするときに用いる。
+void prefetch2(void* addr);
+
 // --------------------
 //  logger
 // --------------------
 
 // cin/coutへの入出力をファイルにリダイレクトを開始/終了する。
 void start_logger(bool b);
-
-// --------------------
-//  Large Page確保
-// --------------------
-
-// Large Pageを確保するwrapper class。
-// WindowsのLarge Pageを確保する。
-// Large Pageを用いるとメモリアクセスが速くなるらしい。
-// 置換表用のメモリなどはこれで確保する。
-// cf. やねうら王、Large Page対応で10数%速くなった件 : http://yaneuraou.yaneu.com/2020/05/31/%e3%82%84%e3%81%ad%e3%81%86%e3%82%89%e7%8e%8b%e3%80%81large-page%e5%af%be%e5%bf%9c%e3%81%a710%e6%95%b0%e9%80%9f%e3%81%8f%e3%81%aa%e3%81%a3%e3%81%9f%e4%bb%b6/
-//
-// Stockfishでは、Large Pageの確保～開放のためにaligned_ttmem_alloc(),aligned_ttmem_free()という関数が実装されている。
-// コードの簡単化のために、やねうら王では独自に本classからそれらを用いる。
-struct LargeMemory
-{
-	// メモリを確保する。Large Pageに確保できるなら、そこにする。
-	// aligned_ttmem_alloc()を内部的に呼び出すので、アドレスは少なくとも2MBでalignされていることは保証されるが、
-	// 気になる人のためにalignmentを明示的に指定できるようになっている。
-	// メモリ確保に失敗するか、引数のalignで指定したalignmentになっていなければ、
-	// エラーメッセージを出力してプログラムを終了させる。
-	void* alloc(size_t size, size_t align = 256);
-
-	// alloc()で確保したメモリを開放する。
-	// このクラスのデストラクタからも自動でこの関数が呼び出されるので明示的に呼び出す必要はない(かも)
-	void free();
-
-	// alloc()が呼び出されてメモリが確保されている状態か？
-	bool alloced() const { return mem != nullptr; }
-
-	~LargeMemory() { free(); }
-
-private:
-	// 確保されたメモリの先頭アドレス(free()で開放するときにこのアドレスを用いる)
-	void* mem = nullptr;
-};
 
 // --------------------
 //  統計情報
@@ -104,8 +72,7 @@ static TimePoint now() {
 //    HashTable
 // --------------------
 
-// このclass、Stockfishにあるんだけど、
-// EvalHashとしてLargePageを用いる同等のclassをすでに用意しているので、使わない。
+// 将棋では使わないので要らないや..
 
 //template<class Entry, int Size>
 //struct HashTable {
@@ -343,9 +310,6 @@ namespace Tools
 		// 正常終了
 		Ok,
 
-		// ファイルの終端に達した
-		Eof,
-
 		// 原因の詳細不明。何らかのエラー。
 		SomeError,
 
@@ -385,9 +349,6 @@ namespace Tools
 
 		// 返し値が正常終了でなければtrueになる。
 		bool is_not_ok() const { return code != ResultCode::Ok; }
-
-		// 返し値がEOFかどうかを判定する。
-		bool is_eof() const { return code == ResultCode::Eof; }
 
 		// ResultCodeを文字列化して返す。
 		std::string to_string() const { return Tools::to_string(code); }
@@ -443,41 +404,24 @@ struct TextFileReader
 
 	// ファイルの終了判定。
 	// ファイルを最後まで読み込んだのなら、trueを返す。
+	bool Eof() const;
 
-	// 1行読み込む(改行まで) 引数のlineに代入される。
+	// 1行読み込む(改行まで)
 	// 改行コードは返さない。
-	// SkipEmptyLine(),SetTrim()の設定を反映する。
-	// Eofに達した場合は、返し値としてTools::ResultCode::Eofを返す。
-	Tools::Result ReadLine(std::string& line);
+	// 引数のtrimがtrueの時は、末尾のスペース、タブはトリムする
+	std::string ReadLine(bool trim = false);
 
-	// ReadLine()で空行を読み飛ばすかどうかの設定。
-	// (ここで行った設定はOpen()/Close()ではクリアされない。)
-	// デフォルトでfalse
-	void SkipEmptyLine(bool skip = true) { skipEmptyLine = skip;  }
-
-	// ReadLine()でtrimするかの設定。
-	// 引数のtrimがtrueの時は、ReadLine()のときに末尾のスペース、タブはトリムする
-	// (ここで行った設定はOpen()/Close()ではクリアされない。)
-	// デフォルトでfalse
-	void SetTrim(bool trim = true) { this->trim = trim; }
 
 private:
 	// 各種状態変数の初期化
 	void clear();
 
 	// 次のblockのbufferへの読み込み。
-	void read_next_block();
+	void read_next();
 
 	// オープンしているファイル。
 	// オープンしていなければnullptrが入っている。
 	FILE* fp;
-
-	// バッファから1文字読み込む。eofに達したら、-1を返す。
-	int read_char();
-
-	// ReadLineの下請け。何も考えずに1行読み込む。行のtrim、空行のskipなどなし。
-	// line_bufferに読み込まれた行が代入される。
-	Tools::Result read_line_simple();
 
 	// ファイルの読み込みバッファ 1MB
 	std::vector<u8> buffer;
@@ -499,12 +443,6 @@ private:
 
 	// 直前が\r(CR)だったのか？のフラグ
 	bool is_prev_cr;
-
-	// ReadLine()で行の末尾をtrimするかのフラグ。
-	bool trim;
-
-	// ReadLine()で空行をskipするかのフラグ
-	bool skipEmptyLine;
 };
 
 // --------------------
