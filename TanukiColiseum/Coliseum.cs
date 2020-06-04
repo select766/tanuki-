@@ -61,7 +61,7 @@ namespace TanukiColiseum
                 // エンジン1初期化
                 Dictionary<string, string> overriddenOptions1 = new Dictionary<string, string>(){
                     {"EvalDir", options.Eval1FolderPath},
-                    {"Hash", options.HashMb.ToString()},
+                    {"USI_Hash", options.HashMb.ToString()},
                     {"MinimumThinkingTime", "1000"},
                     {"NetworkDelay", "0"},
                     {"NetworkDelay2", "0"},
@@ -93,7 +93,7 @@ namespace TanukiColiseum
                 Dictionary<string, string> overriddenOptions2 = new Dictionary<string, string>()
                 {
                     {"EvalDir", options.Eval2FolderPath},
-                    {"Hash", options.HashMb.ToString()},
+                    {"USI_Hash", options.HashMb.ToString()},
                     {"MinimumThinkingTime", "1000"},
                     {"NetworkDelay", "0"},
                     {"NetworkDelay2", "0"},
