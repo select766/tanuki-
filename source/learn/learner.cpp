@@ -160,7 +160,7 @@ namespace Learner
 				// sfen_buffers_poolに積んでおけばあとはworkerがよきに計らってくれる。
 
 				// sfen_buffers_poolの内容を変更するときはmutexのlockが必要。
-				std::unique_lock<Mutex> lk(mutex);
+			std::unique_lock<std::mutex> lk(mutex);
 				sfen_buffers_pool.push_back(buf);
 
 				buf = nullptr;
@@ -171,7 +171,7 @@ namespace Learner
 		// 自分のスレッド用のバッファに残っている分をファイルに書き出すためのバッファに移動させる。
 		void finalize(size_t thread_id)
 		{
-			std::unique_lock<Mutex> lk(mutex);
+		std::unique_lock<std::mutex> lk(mutex);
 
 			auto& buf = sfen_buffers[thread_id];
 
@@ -204,7 +204,7 @@ namespace Learner
 			{
 				vector<PSVector*> buffers;
 				{
-					std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 
 					// まるごとコピー
 					buffers = sfen_buffers_pool;
@@ -289,7 +289,7 @@ namespace Learner
 		std::vector<PSVector*> sfen_buffers_pool;
 
 		// sfen_buffers_poolにアクセスするときに必要なmutex
-		Mutex mutex;
+	std::mutex mutex;
 
 		// 書きだした局面の数
 		u64 sfen_write_count = 0;
@@ -1283,7 +1283,7 @@ namespace Learner
 			while (true)
 			{
 				{
-					std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 					// ファイルバッファから充填できたなら、それで良し。
 					if (packed_sfens_pool.size() != 0)
 					{
@@ -1401,7 +1401,7 @@ namespace Learner
 
 				// sfensの用意が出来たので、折を見てコピー
 				{
-					std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 
 					// ポインタをコピーするだけなのでこの時間は無視できるはず…。
 					// packed_sfens_poolの内容を変更するのでmutexのlockが必要。
@@ -1470,7 +1470,7 @@ namespace Learner
 		std::vector<PSVector*> packed_sfens;
 
 		// packed_sfens_poolにアクセスするときのmutex
-		Mutex mutex;
+	std::mutex mutex;
 
 		// sfenのpool。fileから読み込むworker threadはここに補充する。
 		// 各worker threadはここから自分のpacked_sfens[thread_id]に充填する。

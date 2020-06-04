@@ -40,7 +40,7 @@ namespace {
 std::vector<Example> examples;
 
 // examplesの排他制御をするMutex
-Mutex examples_mutex;
+std::mutex examples_mutex;
 
 // ミニバッチのサンプル数
 u64 batch_size;
@@ -175,7 +175,7 @@ void AddExample(Position& pos, Color rootColor,
     }
   }
 
-  std::lock_guard<Mutex> lock(examples_mutex);
+  std::lock_guard<std::mutex> lock(examples_mutex);
   examples.push_back(std::move(example));
 }
 
@@ -187,7 +187,7 @@ void UpdateParameters(u64 epoch) {
   const auto learning_rate = static_cast<LearnFloatType>(
       get_eta() / batch_size);
 
-  std::lock_guard<Mutex> lock(examples_mutex);
+  std::lock_guard<std::mutex> lock(examples_mutex);
   std::shuffle(examples.begin(), examples.end(), rng);
   while (examples.size() >= batch_size) {
     std::vector<Example> batch(examples.end() - batch_size, examples.end());

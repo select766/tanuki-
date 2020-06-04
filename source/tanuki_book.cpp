@@ -718,14 +718,14 @@ namespace {
         if (pos.is_mated()) {
             // 詰んでいる場合
             vmd.value = mated_in(0);
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
         }
 
         if (pos.DeclarationWin() != MOVE_NONE) {
             // 宣言勝ちできる場合
             vmd.value = mate_in(1);
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
         }
 
@@ -734,31 +734,31 @@ namespace {
         case REPETITION_WIN:
             // 連続王手の千日手により価値の場合
             vmd.value = mate_in(MAX_PLY);
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
 
         case REPETITION_LOSE:
             // 連続王手の千日手により負けの場合
             vmd.value = mated_in(MAX_PLY);
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
 
         case REPETITION_DRAW:
             // 引き分けの場合
             vmd.value = static_cast<Value>(Options["Contempt"] * Eval::PawnValue / 100);
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
 
         case REPETITION_SUPERIOR:
             // 優等局面の場合
             vmd.value = VALUE_SUPERIOR;
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
 
         case REPETITION_INFERIOR:
             // 劣等局面の場合
             vmd.value = -VALUE_SUPERIOR;
-            vmd.depth = DEPTH_ZERO;
+            vmd.depth = 0;
             return vmd;
 
         default:
@@ -766,7 +766,7 @@ namespace {
         }
 
         vmd.value = mated_in(0);
-        vmd.depth = DEPTH_ZERO;
+        vmd.depth = 0;
         // 全合法手について調べる
         for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
             auto book_move = std::find_if(book_moves->second->begin(), book_moves->second->end(),
@@ -1100,7 +1100,7 @@ bool Tanuki::ExtendTeraShock() {
                         ASSERT_LV3(pos_move_list);
 
                         Value best_value = -VALUE_MATE;
-                        Depth best_depth = DEPTH_ZERO;
+                        Depth best_depth = 0;
                         // 一手前の局面の指し手に対する応手となる
                         Move next_move = MOVE_NONE;
                         for (const auto& book_move : *pos_move_list) {
@@ -1375,7 +1375,7 @@ bool Tanuki::ExtendTeraShockBfs() {
                             ASSERT_LV3(pos_move_list);
 
                             Value best_value = -VALUE_MATE;
-                            Depth best_depth = DEPTH_ZERO;
+                            Depth best_depth = 0;
                             // 一手前の局面の指し手に対する応手となる
                             Move next_move = MOVE_NONE;
                             for (const auto& book_move : *pos_move_list) {

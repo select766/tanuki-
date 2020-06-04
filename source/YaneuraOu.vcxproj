@@ -459,6 +459,7 @@
     <ClInclude Include="misc.h" />
     <ClInclude Include="movepick.h" />
     <ClInclude Include="search.h" />
+    <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="tanuki_analysis.h" />
     <ClInclude Include="tanuki_book.h" />
     <ClInclude Include="tanuki_kifu_generator.h" />
@@ -471,7 +472,6 @@
     <ClInclude Include="types.h" />
     <ClInclude Include="position.h" />
     <ClInclude Include="thread.h" />
-    <ClInclude Include="thread_win32.h" />
     <ClInclude Include="tt.h" />
     <ClInclude Include="usi.h" />
   </ItemGroup>
