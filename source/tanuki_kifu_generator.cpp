@@ -249,9 +249,10 @@ void Tanuki::GenerateKifu() {
 			]() {
 			WinProcGroup::bindThisThread(thread_index);
 			char output_file_path[1024];
-			std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
-				output_file_name_tag.c_str(), search_depth, num_positions, thread_index,
-				start_time);
+			std::sprintf(output_file_path,
+				"%s/kifu.tag=%s.depth=%d.num_positions=%I64d.start_time=%I64d.thread_index=%03d.bin",
+				kifu_directory.c_str(), output_file_name_tag.c_str(), search_depth, num_positions,
+				start_time, thread_index);
 			// 各スレッドに持たせる
 			std::unique_ptr<KifuWriter> kifu_writer =
 				std::make_unique<KifuWriter>(output_file_path);
