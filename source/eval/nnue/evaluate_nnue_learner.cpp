@@ -21,8 +21,8 @@
 #include "trainer/features/factorizer_feature_set.h"
 
 // NNUE-HalfKPE9
-//#include "trainer/features/factorizer_half_kp.h"
-#include "trainer/features/factorizer_half_kpe9.h"
+#include "trainer/features/factorizer_half_kp.h"
+//#include "trainer/features/factorizer_half_kpe9.h"
 
 #include "trainer/trainer_feature_transformer.h"
 #include "trainer/trainer_input_slice.h"

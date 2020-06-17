@@ -295,9 +295,6 @@
     <ClInclude Include="tanuki_progress_report.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="tanuki_lazy_cluster.h">
-      <Filter>リソース ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="tanuki_progress.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
@@ -463,9 +460,6 @@
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="tanuki_progress_report.cpp">
-      <Filter>リソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="tanuki_lazy_cluster.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="tanuki_progress.cpp">

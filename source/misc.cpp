@@ -76,7 +76,7 @@ namespace {
 			return last = log->sputc((char)c);
 		}
 
-		streambuf* buf, * log; // 標準入出力 , ログファイル
+		streambuf *buf, *log; // 標準入出力 , ログファイル
 	};
 
 	struct Logger {
@@ -345,7 +345,7 @@ void* aligned_ttmem_alloc(size_t allocSize, void*& mem , size_t align /* ignore 
 
 	// Linux環境で、Hash TableのためにLarge Pageを確保したことを出力する。
 	if (largeMemoryAllocFirstCall)
-{
+	{
 		sync_cout << "info string Hash table allocation: Linux Large Pages used." << sync_endl;
 		largeMemoryAllocFirstCall = false;
 	}
@@ -589,7 +589,7 @@ namespace WinProcGroup {
 			return -1;
 
 		// Once we know returnLength, allocate the buffer
-		SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer, * ptr;
+		SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX *buffer, *ptr;
 		ptr = buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)malloc(returnLength);
 
 		// Second call, now we expect to succeed
@@ -736,44 +736,44 @@ namespace Tools
 	// ※ Stockfishのtt.cppのTranspositionTable::clear()にあるコードと同等のコード。
 	void memclear(const char* name_, void* table, size_t size)
 	{
-		// Windows10では、このゼロクリアには非常に時間がかかる。
-		// malloc()時点ではメモリを実メモリに割り当てられておらず、
-		// 初回にアクセスするときにその割当てがなされるため。
-		// ゆえに、分割してゼロクリアして、一定時間ごとに進捗を出力する。
+	// Windows10では、このゼロクリアには非常に時間がかかる。
+	// malloc()時点ではメモリを実メモリに割り当てられておらず、
+	// 初回にアクセスするときにその割当てがなされるため。
+	// ゆえに、分割してゼロクリアして、一定時間ごとに進捗を出力する。
 
-		// memset(table, 0, size);
+	// memset(table, 0, size);
 
 		if (name_ != nullptr)
 			sync_cout << "info string " + std::string(name_) + " Clear begin , Hash size =  " << size / (1024 * 1024) << "[MB]" << sync_endl;
 
-		// マルチスレッドで並列化してクリアする。
+	// マルチスレッドで並列化してクリアする。
 
-		std::vector<std::thread> threads;
+	std::vector<std::thread> threads;
 
-		auto thread_num = (size_t)Options["Threads"];
+	auto thread_num = (size_t)Options["Threads"];
 
-		for (size_t idx = 0; idx < thread_num; idx++)
-		{
-			threads.push_back(std::thread([table, size, thread_num, idx]() {
+	for (size_t idx = 0; idx < thread_num; idx++)
+	{
+		threads.push_back(std::thread([table, size, thread_num, idx]() {
 
-				// NUMA環境では、bindThisThread()を呼び出しておいたほうが速くなるらしい。
+			// NUMA環境では、bindThisThread()を呼び出しておいたほうが速くなるらしい。
 
-				// Thread binding gives faster search on systems with a first-touch policy
-				if (Options["Threads"] > 8)
-					WinProcGroup::bindThisThread(idx);
+			// Thread binding gives faster search on systems with a first-touch policy
+			if (Options["Threads"] > 8)
+				WinProcGroup::bindThisThread(idx);
 
-				// それぞれのスレッドがhash tableの各パートをゼロ初期化する。
-				const size_t stride = size / thread_num,
-					start = stride * idx,
-					len = idx != thread_num - 1 ?
-					stride : size - start;
+			// それぞれのスレッドがhash tableの各パートをゼロ初期化する。
+			const size_t stride = size / thread_num,
+				start = stride * idx,
+				len = idx != thread_num - 1 ?
+				stride : size - start;
 
-				std::memset((uint8_t*)table + start, 0, len);
-				}));
-		}
+			std::memset((uint8_t*)table + start, 0, len);
+		}));
+	}
 
-		for (std::thread& th : threads)
-			th.join();
+	for (std::thread& th : threads)
+		th.join();
 
 		if (name_ != nullptr)
 			sync_cout << "info string " + std::string(name_) + " Clear done." << sync_endl;
@@ -800,14 +800,14 @@ namespace Tools
 		// C++標準的にはそんなことないはずなのだが…。
 
 #if defined(_MSC_VER)
-	// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
+		// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
 #pragma warning(disable : 4996)
 #endif
 
 		auto now = std::chrono::system_clock::now();
 		auto tp = std::chrono::system_clock::to_time_t(now);
 		auto result = string(std::ctime(&tp));
-
+	
 		// 末尾に改行コードが含まれているならこれを除去する
 		while (*result.rbegin() == '\n' || (*result.rbegin() == '\r'))
 			result.pop_back();
@@ -859,7 +859,7 @@ namespace Tools
 		// ('\0'を格納するためにwchar_t 1文字分のバッファは少なくとも必要なので)
 
 		wchar_t* buffer = new wchar_t[length];
-		SCOPE_EXIT(delete[] buffer; );
+		SCOPE_EXIT( delete[] buffer; );
 
 		int result = ::MultiByteToWideChar(
 			CP_THREAD_ACP,			// コードページ = 現在のスレッドのコードページ
@@ -869,7 +869,7 @@ namespace Tools
 			buffer,					// マップ先ワイド文字列を入れるバッファのアドレス
 			length					// バッファのサイズ
 		);
-
+ 
 		if (result == 0)
 			return std::wstring(); // 何故かエラーなのだ…。
 
@@ -884,15 +884,15 @@ namespace Tools
 
 		switch (code)
 		{
-		case ResultCode::Ok: return "Ok";
+		case ResultCode::Ok                   : return "Ok";
 		case ResultCode::MemoryAllocationError: return "MemoryAllocationError";
-		case ResultCode::SomeError: return "SomeError";
-		case ResultCode::FileOpenError: return "FileOpenError";
-		case ResultCode::FileReadError: return "FileReadError";
-		case ResultCode::FileWriteError: return "FileWriteError";
-		case ResultCode::CreateFolderError: return "CreateFolderError";
-		case ResultCode::NotImplementedError: return "NotImplementedError";
-		default: return "OtherError";
+		case ResultCode::SomeError            : return "SomeError";
+		case ResultCode::FileOpenError        : return "FileOpenError";
+		case ResultCode::FileReadError        : return "FileReadError";
+		case ResultCode::FileWriteError       : return "FileWriteError";
+		case ResultCode::CreateFolderError    : return "CreateFolderError";
+		case ResultCode::NotImplementedError  : return "NotImplementedError";
+		default                               : return "OtherError";
 		}
 	}
 }
@@ -905,7 +905,7 @@ namespace Tools
 
 // ファイルを丸読みする。ファイルが存在しなくともエラーにはならない。空行はスキップする。末尾の改行は除去される。
 // 引数で渡されるlinesは空であるを期待しているが、空でない場合は、そこに追加されていく。
-Tools::Result FileOperator::ReadAllLines(const std::string& filename, std::vector<std::string>& lines, bool trim)
+Tools::Result FileOperator::ReadAllLines(const std::string& filename, std::vector<std::string>& lines,bool trim)
 {
 #if 0
 	ifstream fs(filename);
@@ -947,7 +947,7 @@ Tools::Result FileOperator::ReadAllLines(const std::string& filename, std::vecto
 	return Tools::Result::Ok();
 }
 
-Tools::Result FileOperator::ReadFileToMemory(const std::string& filename, std::function<void* (u64)> callback_func)
+Tools::Result FileOperator::ReadFileToMemory(const std::string& filename, std::function<void*(u64)> callback_func)
 {
 	fstream fs(filename, ios::in | ios::binary);
 	if (fs.fail())
@@ -1180,7 +1180,7 @@ void TextFileReader::read_next_block()
 	if (::feof(fp))
 		read_size = 0;
 	else
-		read_size = ::fread(&buffer[0], sizeof(u8), buffer.size(), fp);
+		read_size = ::fread(&buffer[0], sizeof(u8) , buffer.size(), fp);
 
 	// カーソル(解析位置)のリセット
 	cursor = 0;
@@ -1188,6 +1188,7 @@ void TextFileReader::read_next_block()
 	// 読み込まれたサイズが0なら、終端に達したと判定する。
 	is_eof = read_size == 0;
 }
+
 
 // --------------------
 //       Parser
@@ -1295,7 +1296,7 @@ namespace Path
 		// ファイル名部分を引き算してやる。
 
 		auto length = path.length() - GetFileName(path).length() - 1;
-		return (length == 0) ? "" : path.substr(0, length);
+		return (length == 0) ? "" : path.substr(0,length);
 	}
 
 };
@@ -1327,13 +1328,13 @@ namespace StringExtension
 
 		return to_upper(s1) != to_upper(s2);
 	}
-
+	
 	// スペースに相当する文字か
 	bool is_space(char c) { return c == '\r' || c == '\n' || c == ' ' || c == '\t'; }
 
 	// 数字に相当する文字か
 	bool is_number(char c) { return '0' <= c && c <= '9'; }
-
+	
 	// 行の末尾の"\r","\n",スペース、"\t"を除去した文字列を返す。
 	std::string trim(const std::string& input)
 	{
@@ -1347,9 +1348,9 @@ namespace StringExtension
 
 		auto cur = s.length();
 
-		// 改行文字、スペース、タブではないならループを抜ける。
-		// これらの文字が出現しなくなるまで末尾を切り詰める。
-		while (cur > 0 && is_space(s[cur - 1]))
+			// 改行文字、スペース、タブではないならループを抜ける。
+			// これらの文字が出現しなくなるまで末尾を切り詰める。
+		while (cur > 0 && is_space(s[cur-1]))
 			cur--;
 
 		s.resize(cur);
@@ -1361,7 +1362,7 @@ namespace StringExtension
 	{
 		auto cur = s.length();
 
-		while (cur > 0 && is_space(s[cur - 1]))
+		while (cur > 0 && is_space(s[cur-1]))
 			cur--;
 
 		s.resize(cur);
@@ -1377,13 +1378,13 @@ namespace StringExtension
 		// 末尾のスペースを詰めたあと数字を詰めてそのあと再度スペースを詰める。
 		// 例 : "abc 123 "→"abc"となって欲しいので。
 
-		while (cur > 0 && is_space(s[cur - 1]))
+		while (cur > 0 && is_space(s[cur-1]))
 			cur--;
 
-		while (cur > 0 && is_number(s[cur - 1]))
+		while (cur > 0 && is_number(s[cur-1]))
 			cur--;
 
-		while (cur > 0 && is_space(s[cur - 1]))
+		while (cur > 0 && is_space(s[cur-1]))
 			cur--;
 
 		s.resize(cur);
@@ -1557,7 +1558,7 @@ namespace Directory
 namespace Directory {
 	Tools::Result CreateFolder(const std::string& dir_name)
 	{
-		int result = _wmkdir(Tools::MultiByteToWideChar(dir_name).c_str());
+		int result =  _wmkdir(Tools::MultiByteToWideChar(dir_name).c_str());
 		//	::CreateDirectory(Tools::MultiByteToWideChar(dir_name).c_str(),NULL);
 
 		return result == 0 ? Tools::Result::Ok() : Tools::Result(Tools::ResultCode::CreateFolderError);

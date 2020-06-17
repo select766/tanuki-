@@ -135,16 +135,10 @@ namespace Eval {
     return accumulator.score;
   }
 
-  // gccでアラインメントが正しく行われないため、手動でアラインメントを行う。
-  TransformedFeatureType transformed_features_raw[
-	  FeatureTransformer::kBufferSize + kCacheLineSize / sizeof(TransformedFeatureType)];
-  TransformedFeatureType* transformed_features = reinterpret_cast<TransformedFeatureType*>((
-	  reinterpret_cast<intptr_t>(transformed_features_raw) + kCacheLineSize) / kCacheLineSize *
-	  kCacheLineSize);
+  alignas(kCacheLineSize) TransformedFeatureType
+      transformed_features[FeatureTransformer::kBufferSize];
   feature_transformer->Transform(pos, transformed_features, refresh);
-  char buffer_raw[Network::kBufferSize + kCacheLineSize / sizeof(char)];
-  char* buffer = reinterpret_cast<char*>(
-	  (reinterpret_cast<intptr_t>(buffer_raw) + kCacheLineSize) / kCacheLineSize * kCacheLineSize);
+  alignas(kCacheLineSize) char buffer[Network::kBufferSize];
   const auto output = network->Propagate(transformed_features, buffer);
 
   // VALUE_MAX_EVALより大きな値が返ってくるとaspiration searchがfail highして

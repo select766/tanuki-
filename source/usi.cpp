@@ -24,10 +24,10 @@ void user_test(Position& pos, std::istringstream& is);
 // USI拡張コマンドの"test"コマンドなど。
 // サンプル用のコードを含めてtest.cppのほうに色々書いてあるのでそれを呼び出すために使う。
 #if defined(ENABLE_TEST_CMD)
-void test_cmd(Position& pos, istringstream& is);
-void generate_moves_cmd(Position& pos);
+	void test_cmd(Position& pos, istringstream& is);
+	void generate_moves_cmd(Position& pos);
 #if defined(MATE_ENGINE)
-void test_mate_engine_cmd(Position& pos, istringstream& is);
+	void test_mate_engine_cmd(Position& pos, istringstream& is);
 #endif
 #endif
 
@@ -43,22 +43,22 @@ namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 #if defined (EVAL_LEARN)
 namespace Learner
 {
-	// 教師局面の自動生成
-	void gen_sfen(Position& pos, istringstream& is);
+  // 教師局面の自動生成
+  void gen_sfen(Position& pos, istringstream& is);
 
-	// 生成した棋譜からの学習
-	void learn(Position& pos, istringstream& is);
+  // 生成した棋譜からの学習
+  void learn(Position& pos, istringstream& is);
 
 #if defined(GENSFEN2019)
-	// 開発中の教師局面の自動生成コマンド
-	void gen_sfen2019(Position& pos, istringstream& is);
+  // 開発中の教師局面の自動生成コマンド
+  void gen_sfen2019(Position& pos, istringstream& is);
 #endif
 
-	// 読み筋と評価値のペア。Learner::search(),Learner::qsearch()が返す。
-	typedef std::pair<Value, std::vector<Move> > ValueAndPV;
+  // 読み筋と評価値のペア。Learner::search(),Learner::qsearch()が返す。
+  typedef std::pair<Value, std::vector<Move> > ValueAndPV;
 
-	ValueAndPV qsearch(Position& pos);
-	ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1, u64 nodesLimit = 0);
+  ValueAndPV qsearch(Position& pos);
+  ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1 , u64 nodesLimit = 0 );
 
 }
 #endif
@@ -70,11 +70,6 @@ void gameover_handler(const string& cmd);
 
 namespace USI
 {
-	// 最後に受け取ったpositionコマンド文字列とgoコマンド文字列
-	// tanuki-proxyでどの局面に対しての指し手が出力されたか管理するために使う
-	std::string last_position_cmd;
-	std::string last_go_cmd;
-
 	// --------------------
 	//    読み筋の出力
 	// --------------------
@@ -116,10 +111,10 @@ namespace USI
 			if (ss.rdbuf()->in_avail()) // 1行目でないなら連結のための改行を出力
 				ss << endl;
 
-			ss << "info"
+			ss  << "info"
 				<< " depth "    << d
 				<< " seldepth " << rootMoves[i].selDepth
-				<< " score " << USI::value(v);
+				<< " score "    << USI::value(v);
 
 			// これが現在探索中の指し手であるなら、それがlowerboundかupperboundかは表示させる
 			if (i == pvIdx)
@@ -130,14 +125,14 @@ namespace USI
 				ss << " multipv " << (i + 1);
 
 			ss << " nodes " << nodes_searched
-				<< " nps " << nodes_searched * 1000 / elapsed;
+			   << " nps " << nodes_searched * 1000 / elapsed;
 
 			// 置換表使用率。経過時間が短いときは意味をなさないので出力しない。
 			if (elapsed > 1000)
 				ss << " hashfull " << TT.hashfull();
 
 			ss << " time " << elapsed
-				<< " pv";
+			   << " pv";
 
 
 			// PV配列からPVを出力する。
@@ -157,7 +152,7 @@ namespace USI
 				StateInfo si[MAX_PLY];
 				int ply = 0;
 
-				while (ply < MAX_PLY)
+				while ( ply < MAX_PLY )
 				{
 					// 千日手はそこで終了。ただし初手はPVを出力。
 					// 千日手がベストのとき、置換表を更新していないので
@@ -342,12 +337,9 @@ void is_ready(bool skipCorruptCheck)
 	TT.resize(Options["USI_Hash"]);
 
 	Search::clear();
-	//	Time.availableNodes = 0;
+//	Time.availableNodes = 0;
 
 	Threads.stop = false;
-
-	// Lazy Clusterのクライアントとサーバーを開始する。
-	Tanuki::LazyCluster::Start();
 }
 
 // isreadyコマンド処理部
@@ -365,20 +357,14 @@ void is_ready_cmd(Position& pos, StateListPtr& states)
 
 	// 新しく渡す局面なので古いものは捨てて新しいものを作る。
 	states = StateListPtr(new StateList(1));
-	pos.set_hirate(&states->back(), Threads.main());
+	pos.set_hirate(&states->back(),Threads.main());
 
 	sync_cout << "readyok" << sync_endl;
 }
 
 // "position"コマンド処理部
-void position_cmd(Position& pos, istringstream& is, StateListPtr& states)
+void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 {
-	// positionを受け取ったとき、探索中だと高確率でクラッシュする。
-	// これを防ぐため、stopコマンドを受け取ったとき相当の処理を行う。
-	// tanuki-proxyはこの処理が行われることを前提として実装している。
-	Threads.stop = true;
-	Threads.main()->wait_for_search_finished();
-
 	Move m;
 	string token, sfen;
 
@@ -402,7 +388,7 @@ void position_cmd(Position& pos, istringstream& is, StateListPtr& states)
 
 	// 新しく渡す局面なので古いものは捨てて新しいものを作る。
 	states = StateListPtr(new StateList(1));
-	pos.set(sfen, &states->back(), Threads.main());
+	pos.set(sfen , &states->back() , Threads.main());
 
 	// 指し手のリストをパースする(あるなら)
 	while (is >> token && (m = USI::to_move(pos, token)) != MOVE_NONE)
@@ -467,7 +453,7 @@ void getoption_cmd(istringstream& is)
 
 // go()は、思考エンジンがUSIコマンドの"go"を受け取ったときに呼び出される。
 // この関数は、入力文字列から思考時間とその他のパラメーターをセットし、探索を開始する。
-void go_cmd(const Position& pos, istringstream& is, StateListPtr& states) {
+void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 
 	Search::LimitsType limits;
 	string token;
@@ -565,7 +551,7 @@ void go_cmd(const Position& pos, istringstream& is, StateListPtr& states) {
 	if (limits.byoyomi[BLACK] == 0 && limits.inc[BLACK] == 0 && limits.time[BLACK] == 0 && limits.rtime == 0)
 		limits.byoyomi[BLACK] = limits.byoyomi[WHITE] = 1000;
 
-	Threads.start_thinking(pos, states, limits, ponderMode);
+	Threads.start_thinking(pos, states , limits , ponderMode);
 }
 
 // --------------------
@@ -597,7 +583,7 @@ void search_cmd(Position& pos, istringstream& is)
 	}
 
 	cout << "search depth = " << depth << " , multi_pv = " << multi_pv << " : ";
-	auto pv = Learner::search(pos, depth, multi_pv);
+	auto pv = Learner::search(pos , depth , multi_pv);
 	cout << "Value = " << pv.first << " , PV = ";
 	for (auto m : pv.second)
 		cout << m << " ";
@@ -635,8 +621,7 @@ void USI::loop(int argc, char* argv[])
 		for (auto c : cmds0)
 			cmds.push(c);
 
-	}
-	else {
+	} else {
 
 		// 引数として指定されたものを一つのコマンドとして実行する機能
 		// ただし、','が使われていれば、そこでコマンドが区切れているものとして解釈する。
@@ -667,8 +652,7 @@ void USI::loop(int argc, char* argv[])
 		{
 			if (!std::getline(cin, cmd)) // 入力が来るかEOFがくるまでここで待機する。
 				cmd = "quit";
-		}
-		else {
+		} else {
 			// 積んであるコマンドがあるならそれを実行する。
 			// 尽きれば"quit"だと解釈してdoループを抜ける仕様にすることはできるが、
 			// そうしてしまうとgoコマンド(これはノンブロッキングなので)の最中にquitが送られてしまう。
@@ -703,23 +687,10 @@ void USI::loop(int argc, char* argv[])
 			// そいつらはThreads.stopを待っているので問題ない。
 			Threads.stop = true;
 
-		}
-		else if (token == "ponderhit")
+		} else if (token == "ponderhit")
 		{
 			Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
 			Threads.main()->ponder = false; // 通常探索に切り替える。
-		}
-
-		// 与えられた局面について思考するコマンド
-		else if (token == "go") {
-			last_go_cmd = cmd;
-			go_cmd(pos, is, states);
-		}
-
-		// (思考などに使うための)開始局面(root)を設定する
-		else if (token == "position") {
-			last_position_cmd = cmd;
-			position_cmd(pos, is, states);
 		}
 
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
@@ -742,7 +713,7 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "usinewgame") continue;
 
 		// 思考エンジンの準備が出来たかの確認
-		else if (token == "isready") is_ready_cmd(pos, states);
+		else if (token == "isready") is_ready_cmd(pos,states);
 
 		// 以下、デバッグのためのカスタムコマンド(非USIコマンド)
 		// 探索中には使わないようにすべし。
@@ -781,7 +752,7 @@ void USI::loop(int argc, char* argv[])
 #if defined(EVAL_LEARN)
 		// テスト用にqsearch(),search()を直接呼ぶコマンド
 		else if (token == "qsearch") qsearch_cmd(pos);
-		else if (token == "search") search_cmd(pos, is);
+		else if (token == "search") search_cmd(pos,is);
 #endif
 
 		// この局面での指し手をすべて出力
@@ -792,7 +763,7 @@ void USI::loop(int argc, char* argv[])
 		}
 
 		// この局面の手番側がどちらであるかを返す。BLACK or WHITE
-		else if (token == "side") cout << (pos.side_to_move() == BLACK ? "black" : "white") << endl;
+		else if (token == "side") cout << (pos.side_to_move() == BLACK ? "black":"white") << endl;
 
 		// この局面が詰んでいるかの判定
 		else if (token == "mated") cout << pos.is_mated() << endl;
@@ -804,7 +775,7 @@ void USI::loop(int argc, char* argv[])
 		// この局面での1手詰め判定
 		else if (token == "mate1") cout << pos.mate1ply() << endl;
 #endif
-
+		
 #if defined (ENABLE_TEST_CMD)
 		// 指し手生成のテスト
 		else if (token == "s") generate_moves_cmd(pos);
@@ -832,9 +803,6 @@ void USI::loop(int argc, char* argv[])
 #endif
 
 #endif
-		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
-		// 我々はこれに関知しないので単に無視すれば良い。
-		else if (token == "usinewgame") continue;
 
 #ifdef EVAL_LEARN
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
@@ -933,9 +901,6 @@ void USI::loop(int argc, char* argv[])
 
 	// quitが来た時点ではまだ探索中かも知れないのでmain threadの停止を待つ。
 	Threads.main()->wait_for_search_finished();
-
-	// Lazy Clusterのクライアントとサーバーを終了する。
-	Tanuki::LazyCluster::Stop();
 }
 
 // --------------------

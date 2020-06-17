@@ -173,7 +173,6 @@ namespace USI {
 		Tanuki::InitializeBook(o);
 		Tanuki::InitializeGenerator(o);
 		Tanuki::InitializeShuffler(o);
-		Tanuki::LazyCluster::InitializeLazyCluster(o);
 		Tanuki::Progress::Initialize(o);
 #endif
 		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。

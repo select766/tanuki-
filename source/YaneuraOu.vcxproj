@@ -246,19 +246,6 @@
     <Import Project="props\YaneuraOuCpu-x64-sse42.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug-mate|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug-NNUE|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug-user|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-KPP_KKPT|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-KPPT|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-mate-sse42|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-NNUE|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-NNUE-GEN|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-NNUE-LEARN|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-NNUE-SSE42|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-user|x64'" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release-user-sse42|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug-mate|x64'">
     <ClCompile>
       <OpenMPSupport>
@@ -466,7 +453,6 @@
     <ClInclude Include="tanuki_kifu_reader.h" />
     <ClInclude Include="tanuki_kifu_shuffler.h" />
     <ClInclude Include="tanuki_kifu_writer.h" />
-    <ClInclude Include="tanuki_lazy_cluster.h" />
     <ClInclude Include="tanuki_progress.h" />
     <ClInclude Include="tanuki_progress_report.h" />
     <ClInclude Include="types.h" />
@@ -522,7 +508,6 @@
     <ClCompile Include="tanuki_kifu_reader.cpp" />
     <ClCompile Include="tanuki_kifu_shuffler.cpp" />
     <ClCompile Include="tanuki_kifu_writer.cpp" />
-    <ClCompile Include="tanuki_lazy_cluster.cpp" />
     <ClCompile Include="tanuki_progress.cpp" />
     <ClCompile Include="tanuki_progress_report.cpp" />
     <ClCompile Include="timeman.cpp" />
@@ -553,17 +538,11 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\OpenBLAS.0.2.14.1\build\native\openblas.targets" Condition="Exists('..\packages\OpenBLAS.0.2.14.1\build\native\openblas.targets')" />
-    <Import Project="..\packages\boost.1.72.0.0\build\boost.targets" Condition="Exists('..\packages\boost.1.72.0.0\build\boost.targets')" />
-    <Import Project="..\packages\boost_date_time-vc142.1.72.0.0\build\boost_date_time-vc142.targets" Condition="Exists('..\packages\boost_date_time-vc142.1.72.0.0\build\boost_date_time-vc142.targets')" />
-    <Import Project="..\packages\boost_regex-vc142.1.72.0.0\build\boost_regex-vc142.targets" Condition="Exists('..\packages\boost_regex-vc142.1.72.0.0\build\boost_regex-vc142.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>このプロジェクトは、このコンピューター上にない NuGet パッケージを参照しています。それらのパッケージをダウンロードするには、[NuGet パッケージの復元] を使用します。詳細については、http://go.microsoft.com/fwlink/?LinkID=322105 を参照してください。見つからないファイルは {0} です。</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\OpenBLAS.0.2.14.1\build\native\openblas.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\OpenBLAS.0.2.14.1\build\native\openblas.targets'))" />
-    <Error Condition="!Exists('..\packages\boost.1.72.0.0\build\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost.1.72.0.0\build\boost.targets'))" />
-    <Error Condition="!Exists('..\packages\boost_date_time-vc142.1.72.0.0\build\boost_date_time-vc142.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost_date_time-vc142.1.72.0.0\build\boost_date_time-vc142.targets'))" />
-    <Error Condition="!Exists('..\packages\boost_regex-vc142.1.72.0.0\build\boost_regex-vc142.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost_regex-vc142.1.72.0.0\build\boost_regex-vc142.targets'))" />
   </Target>
 </Project>

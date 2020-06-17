@@ -953,9 +953,8 @@ namespace Book
 		// →　この関数はbookコマンドからしか呼び出さず、bookコマンドの処理の先頭付近でis_ready()を
 		// 呼び出しているため、この関数のなかでのis_ready()は呼び出さないことにする。
 
-		FILE* file = fopen(filename.c_str(), "wt");
-
-		setvbuf(file, nullptr, _IOFBF, 1024 * 1024);
+		fstream fs;
+		fs.open(filename, ios::out);
 
 		if (fs.fail())
 			return Tools::Result(Tools::ResultCode::FileOpenError);
@@ -963,7 +962,7 @@ namespace Book
 		cout << endl << "write " + filename;
 
 		// バージョン識別用文字列
-		fprintf(file, "#YANEURAOU-DB2016 1.00\n");
+		fs << "#YANEURAOU-DB2016 1.00" << endl;
 
 		vector<pair<string, PosMoveListPtr> > vectored_book;
 		
@@ -992,9 +991,9 @@ namespace Book
 		u64 counter = 0;
 		auto output_progress = [&]()
 		{
-			if ((counter % 10000) == 0)
+			if ((counter % 1000) == 0)
 			{
-				if ((counter % 800000) == 0) // 80文字ごとに改行
+				if ((counter % 80000) == 0) // 80文字ごとに改行
 					cout << endl;
 				cout << ".";
 			}
@@ -1046,24 +1045,22 @@ namespace Book
 
 			// -- このentryを書き出す
 
-			fprintf(file, "sfen %s\n", it.first.c_str());
+			fs << "sfen " << it.first /* is sfen string */ << endl; // sfen
 
 			auto& move_list = *it.second;
 
 			// 採択回数でソートしておく。
 			std::stable_sort(move_list.begin(), move_list.end());
 
-			for (auto& bp : move_list) {
-				fprintf(file, "%s %s %d %d %lld\n", to_usi_string(bp.bestMove).c_str(), to_usi_string(bp.nextMove).c_str(), bp.value, bp.depth, bp.num);
-			}
+			for (auto& bp : move_list)
+				fs << bp.bestMove << ' ' << bp.nextMove << ' ' << bp.value << " " << bp.depth << " " << bp.num << endl;
 			// 指し手、相手の応手、そのときの評価値、探索深さ、採択回数
 
 			if (fs.fail())
 				return Tools::Result(Tools::ResultCode::FileWriteError);
 		}
 
-		fclose(file);
-		file = nullptr;
+		fs.close();
 
 		cout << endl << "done!" << endl;
 
