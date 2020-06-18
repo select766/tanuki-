@@ -1331,7 +1331,7 @@ struct SfenReader
 			filenames.pop_back();
 
 			fs.open(filename, ios::in | ios::binary);
-			cout << "open filename = " << filename << endl;
+			//cout << "open filename = " << filename << endl;
 			ASSERT(fs);
 
 			return true;
