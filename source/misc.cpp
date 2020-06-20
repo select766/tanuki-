@@ -673,6 +673,8 @@ namespace WinProcGroup {
 
 	void bindThisThread(size_t idx) {
 
+		idx += Options["ThreadIdOffset"];
+
 		// Use only local variables to be thread-safe
 		int group = best_group(idx);
 

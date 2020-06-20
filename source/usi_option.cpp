@@ -166,6 +166,8 @@ namespace USI {
 		o["GenerateAllLegalMoves"] << Option(false);
 #endif
 
+		o["ThreadIdOffset"] << Option(0, 0, std::thread::hardware_concurrency() - 1);
+
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
