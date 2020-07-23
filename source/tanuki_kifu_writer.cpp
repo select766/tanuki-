@@ -6,7 +6,7 @@
 #include "misc.h"
 
 namespace {
-	constexpr int kBufferSize = 8192;
+	constexpr int kBufferSize = 1024 * 1024;
 }
 
 Tanuki::KifuWriter::KifuWriter(const std::string& output_file_path)
