@@ -73,6 +73,10 @@
 #include <shared_mutex>
 #endif
 
+bool use_draw_in_training=false;
+bool use_draw_in_validation=false;
+bool use_hash_in_training=true;
+
 using namespace std;
 
 // これは探索部で定義されているものとする。
@@ -1228,11 +1232,8 @@ struct SfenReader
 			{
 				if (eval_limit < abs(p.score) || abs(p.score) == VALUE_SUPERIOR)
 					continue;
-#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
-				if (p.game_result == 0)
+				if (!use_draw_in_validation && p.game_result == 0)
 					continue;
-#endif
-
 				sfen_for_mse.push_back(p);
 			} else {
 				break;
@@ -1926,10 +1927,10 @@ void LearnerThink::thread_worker(size_t thread_id)
 		if (eval_limit < abs(ps.score) || abs(ps.score) == VALUE_SUPERIOR)
 			goto RetryRead;
 
-#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
-		if (ps.game_result == 0)
+
+		if (!use_draw_in_training && ps.game_result == 0)
 			goto RetryRead;
-#endif
+
 
 		// 序盤局面に関する読み飛ばし
 		if (ps.gamePly < prng.rand(reduction_gameply))
@@ -1953,13 +1954,13 @@ void LearnerThink::thread_worker(size_t thread_id)
 		{
 			auto key = pos.key();
 			// rmseの計算用に使っている局面なら除外する。
-			if (sr.is_for_rmse(key))
+			if (sr.is_for_rmse(key) && use_hash_in_training)
 				goto RetryRead;
 
 			// 直近で用いた局面も除外する。
 			auto hash_index = size_t(key & (sr.READ_SFEN_HASH_SIZE - 1));
 			auto key2 = sr.hash[hash_index];
-			if (key == key2)
+			if (key == key2 && use_hash_in_training)
 				goto RetryRead;
 			sr.hash[hash_index] = key; // 今回のkeyに入れ替えておく。
 		}
@@ -2631,7 +2632,9 @@ void learn(Position&, istringstream& is)
 		else if (option == "eta3")       is >> eta3;
 		else if (option == "eta1_epoch") is >> eta1_epoch;
 		else if (option == "eta2_epoch") is >> eta2_epoch;
-
+		else if (option == "use_draw_in_training") is >> use_draw_in_training;
+		else if (option == "use_draw_in_validation") is >> use_draw_in_validation;
+		else if (option == "use_hash_in_training") is >> use_hash_in_training;
 		// 割引率
 		else if (option == "discount_rate") is >> discount_rate;
 
@@ -2667,7 +2670,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "eval_limit") is >> eval_limit;
 		else if (option == "save_only_once") save_only_once = true;
 		else if (option == "no_shuffle") no_shuffle = true;
-
+		
 #if defined(EVAL_NNUE)
 		else if (option == "nn_batch_size") is >> nn_batch_size;
 		else if (option == "newbob_decay") is >> newbob_decay;
