@@ -69,7 +69,7 @@ typedef  int64_t s64;
 //      PEXT(AVX2の命令)
 // ----------------------------
 
-#if defined (USE_AVX2) && defined (USE_BMI2)
+#if defined (USE_AVX2)
 
 // for AVX2 : hardwareによるpext実装
 #define PEXT32(a,b) _pext_u32((u32)(a),(u32)(b))
