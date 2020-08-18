@@ -1436,4 +1436,63 @@ bool Tanuki::ExtendTeraShockBfs() {
 
     return true;
 }
+
+// 悪い指し手を削除する。
+// 実際にはスコアにマイナスを設定する。
+bool Tanuki::RemoveBadMoves() {
+    std::string input_book_file = Options[kBookInputFile];
+    std::string output_book_file = Options[kBookOutputFile];
+
+    sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+    sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+
+    Search::LimitsType limits;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
+    limits.depth = MAX_PLY;
+    limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
+    Search::Limits = limits;
+
+    BookMoveSelector book;
+    input_book_file = "book/" + input_book_file;
+    sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+    book.GetMemoryBook().read_book(input_book_file);
+    sync_cout << "done..." << sync_endl;
+    sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+
+    output_book_file = "book/" + output_book_file;
+
+    int counter = 0;
+    for (auto& book_pos : book.GetMemoryBook().book_body) {
+        if (++counter % 10000 == 0) {
+            sync_cout << counter << sync_endl;
+        }
+
+        auto& position = Threads.main()->rootPos;
+        const auto& sfen = book_pos.first;
+        std::vector<StateInfo> state_info(1024);
+        position.set(sfen, &state_info[0], Threads.main());
+
+        for (auto& move : *book_pos.second) {
+            auto from = move_from(move.bestMove);
+            auto to = move_to(move.bestMove);
+
+            // 後手横歩取り
+            if (position.side_to_move() == WHITE &&
+                from == SQ_86 &&
+                to == SQ_76 &&
+                position.piece_on(from) == Piece::W_ROOK &&
+                position.piece_on(to) == Piece::B_PAWN) {
+                move.value = -10000;
+                sync_cout << "Set -10000 to a move. sfen=" << sfen << " move=" << move.bestMove << sync_endl;
+            }
+        }
+    }
+
+    // 定跡をストレージに書き出す。
+    WriteBook(book, output_book_file);
+
+    return true;
+}
 #endif

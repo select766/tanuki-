@@ -858,6 +858,11 @@ void USI::loop(int argc, char* argv[])
 			break;
 		}
 
+		else if (token == "remove_bad_moves") {
+			Tanuki::RemoveBadMoves();
+			break;
+		}
+
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();

@@ -18,6 +18,7 @@ namespace Tanuki {
 	bool TeraShock2();
 	bool ExtendTeraShock();
 	bool ExtendTeraShockBfs();
+	bool RemoveBadMoves();
 }
 
 #endif
