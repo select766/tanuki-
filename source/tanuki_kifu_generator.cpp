@@ -350,10 +350,7 @@ void Tanuki::GenerateKifu() {
 				}
 			}
 
-#pragma omp master
-			{
-				progress_report.Show(global_position_index += records.size());
-			}
+			progress_report.Show(global_position_index += records.size());
 
 			if (progress_report.HasDataPerTime() &&
 				progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime()) {

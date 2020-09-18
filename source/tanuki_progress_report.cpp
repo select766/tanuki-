@@ -47,6 +47,7 @@ void Tanuki::ProgressReport::Show(int64_t current_data) {
 
 	data_per_time_ = exponential_moving_averaged_data_ / exponential_moving_averaged_time_;
 	max_data_per_time_ = std::max(max_data_per_time_, data_per_time_);
+	has_data_per_time_ = true;
 
 	std::printf(
 		"%lld / %lld\n"
