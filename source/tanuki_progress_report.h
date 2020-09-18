@@ -13,8 +13,8 @@ namespace Tanuki {
 	public:
 		ProgressReport(int64_t total_data, int64_t show_at_most_sec);
 		void Show(int64_t current_data);
-		bool HasDataPerTime() const { return data_per_time_; }
-		double GetDataPerTime() const { return has_data_per_time_; }
+		bool HasDataPerTime() const { return has_data_per_time_; }
+		double GetDataPerTime() const { return data_per_time_; }
 		double GetMaxDataPerTime() const { return max_data_per_time_; }
 		void Reset();
 
