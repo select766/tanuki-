@@ -67,4 +67,10 @@ void Tanuki::ProgressReport::Show(int64_t current_data) {
 	previous_time_ = current_time;
 }
 
+void Tanuki::ProgressReport::Reset() {
+	exponential_moving_averaged_data_ = 0.0;
+	exponential_moving_averaged_time_ = 0.0;
+	has_data_per_time_ = false;
+}
+
 #endif

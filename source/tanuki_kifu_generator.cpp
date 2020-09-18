@@ -369,6 +369,7 @@ void Tanuki::GenerateKifu() {
 #pragma omp master
 				{
 					std::this_thread::sleep_for(std::chrono::minutes(3));
+					progress_report.Reset();
 				}
 
 				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。

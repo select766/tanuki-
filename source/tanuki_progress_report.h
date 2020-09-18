@@ -16,6 +16,7 @@ namespace Tanuki {
 		bool HasDataPerTime() const { return data_per_time_; }
 		double GetDataPerTime() const { return has_data_per_time_; }
 		double GetMaxDataPerTime() const { return max_data_per_time_; }
+		void Reset();
 
 	private:
 		const int64_t total_data_;
