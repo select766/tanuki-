@@ -228,6 +228,7 @@ void Tanuki::GenerateKifu() {
 	global_position_index = 0;
 	ProgressReport progress_report(num_positions, 60 * 60);
 	std::mutex mutex_game_play_to_depths;
+	std::atomic<bool> need_wait = false;
 
 #pragma omp parallel
 	{
@@ -352,12 +353,11 @@ void Tanuki::GenerateKifu() {
 
 			progress_report.Show(global_position_index += records.size());
 
-			if (progress_report.HasDataPerTime() &&
-				progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime()) {
-				sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
-					progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
-					progress_report.GetMaxDataPerTime() << sync_endl;
+			need_wait = need_wait ||
+				(progress_report.HasDataPerTime() &&
+					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
+			if (need_wait) {
 				// 処理速度が低下してきている。
 				// 全てのスレッドを待機する。
 #pragma omp barrier
@@ -365,8 +365,13 @@ void Tanuki::GenerateKifu() {
 				// マスタースレッドでしばらく待機する。
 #pragma omp master
 				{
-					std::this_thread::sleep_for(std::chrono::minutes(3));
+					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
+						progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
+						progress_report.GetMaxDataPerTime() << sync_endl;
+
+					std::this_thread::sleep_for(std::chrono::minutes(10));
 					progress_report.Reset();
+					need_wait = false;
 				}
 
 				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
