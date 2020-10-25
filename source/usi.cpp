@@ -838,13 +838,13 @@ void USI::loop(int argc, char* argv[])
 			break;
 		}
 
-		else if (token == "tera_shock") {
-			Tanuki::TeraShock();
+		else if (token == "propagate_leaf_node_values_to_root") {
+			Tanuki::PropagateLeafNodeValuesToRoot();
 			break;
 		}
 
-		else if (token == "tera_shock2") {
-			Tanuki::TeraShock2();
+		else if (token == "propagate_leaf_node_values_to_root_one") {
+			Tanuki::PropagateLeafNodeValuesToRootOne();
 			break;
 		}
 
@@ -860,6 +860,11 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "remove_bad_moves") {
 			Tanuki::RemoveBadMoves();
+			break;
+		}
+
+		else if (token == "extract_target_positions") {
+			Tanuki::ExtractTargetPositions();
 			break;
 		}
 

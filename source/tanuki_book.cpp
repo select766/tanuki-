@@ -39,6 +39,7 @@ namespace {
     constexpr const char* kMultiPV = "MultiPV";
     constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
     constexpr const char* kBookNarrowBook = "NarrowBook";
+    constexpr const char* kBookTargetSfensFile = "BookTargeSfensFile";
     constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
     constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -78,6 +79,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
     o[kBookInputFile] << Option("user_book1.db");
     o[kBookOutputFile] << Option("user_book2.db");
     o[kBookOverwriteExistingPositions] << Option(false);
+    o[kBookTargetSfensFile] << Option("");
     return true;
 }
 
@@ -817,7 +819,7 @@ namespace {
 }
 
 // 定跡データベースの末端局面の評価値をroot局面に向けて伝搬する
-bool Tanuki::TeraShock() {
+bool Tanuki::PropagateLeafNodeValuesToRoot() {
     std::string input_book_file = Options[kBookInputFile];
     std::string output_book_file = Options[kBookOutputFile];
 
@@ -863,7 +865,7 @@ bool Tanuki::TeraShock() {
 }
 
 // 定跡データベースの各局面の評価値を親局面に伝搬するのを繰り返す
-bool Tanuki::TeraShock2() {
+bool Tanuki::PropagateLeafNodeValuesToRootOne() {
     std::string input_book_file = Options[kBookInputFile];
     std::string output_book_file = Options[kBookOutputFile];
     bool ignore_book_ply = Options["IgnoreBookPly"];
@@ -1492,6 +1494,140 @@ bool Tanuki::RemoveBadMoves() {
 
     // 定跡をストレージに書き出す。
     WriteBook(book, output_book_file);
+
+    return true;
+}
+
+namespace {
+    // 与えられた局面における、与えられた指し手が、
+    // 定跡データベースの中で悪い指し手とされているか判断する。
+    bool IsBadMove(BookMoveSelector& book, Position& position, Move move32, int book_eval_black_limit, int book_eval_white_limit) {
+        auto book_moves = book.GetMemoryBook().find(position);
+        if (book_moves == nullptr) {
+            // 定跡データベースに、この局面が登録されていない場合。
+            return false;
+        }
+
+        auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
+            [move32](auto& m) {
+                return To16Bit(m.bestMove) == To16Bit(move32);
+            });
+        if (book_move == book_moves->end()) {
+            // 定跡データベースに、この指し手が登録されていない場合。
+            return false;
+        }
+
+        int book_eval_limit = position.side_to_move() == BLACK ? book_eval_black_limit : book_eval_white_limit;
+        // 指し手に付与されている評価値が、指定された閾値以下だった場合、悪い指し手と判断する。
+        return book_move->value < book_eval_limit;
+    }
+
+    // 与えられた局面を延長すべきかどうか判断する
+    bool IsTargetPosition(BookMoveSelector& book, Position& position, int multi_pv) {
+        auto book_moves = book.GetMemoryBook().find(position);
+        if (book_moves == nullptr) {
+            // 定跡データベースに、この局面が登録されていない場合、延長する。
+            return true;
+        }
+
+        // 登録されている指し手の数が、MultiPVより少ない場合、延長する。
+        return book_moves->size() < multi_pv;
+    }
+}
+
+// 定跡の延長の対象となる局面を抽出する。
+// MultiPVが指定された値より低い局面、および定跡データベースに含まれていない局面が対象となる。
+// あらかじめ、SetScoreToMove()を用い、定跡データベースの各指し手に評価値を付け、
+// PropagateLeafNodeValuesToRoot()を用い、Leaf局面の評価値をRoot局面に伝搬してから使用する。
+bool Tanuki::ExtractTargetPositions() {
+    int multi_pv = (int)Options[kMultiPV];
+    std::string input_book_file = Options[kBookInputFile];
+    int book_eval_black_limit = (int)Options["BookEvalBlackLimit"];
+    int book_eval_white_limit = (int)Options["BookEvalWhiteLimit"];
+    std::string target_sfens_file = Options[kBookTargetSfensFile];
+
+    sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
+    sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+    sync_cout << "info string book_eval_black_limit=" << book_eval_black_limit << sync_endl;
+    sync_cout << "info string book_eval_white_limit=" << book_eval_white_limit << sync_endl;
+    sync_cout << "info string target_sfens_file=" << sync_endl;
+
+    Search::LimitsType limits;
+    // 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+    limits.max_game_ply = 1 << 16;
+    limits.depth = MAX_PLY;
+    limits.silent = true;
+    limits.enteringKingRule = EKR_27_POINT;
+    Search::Limits = limits;
+
+    BookMoveSelector book;
+    input_book_file = "book/" + input_book_file;
+    sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+    book.GetMemoryBook().read_book(input_book_file);
+    sync_cout << "done..." << sync_endl;
+    sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+
+    std::set<std::string> explorered;
+    explorered.insert(SFEN_HIRATE);
+    // 千日手の処理等のため、平手局面からの指し手として保持する
+    // Moveは32ビット版とする
+    std::deque<std::vector<Move>> frontier;
+    frontier.push_back({});
+
+    std::ofstream ofs(target_sfens_file);
+
+    while (!frontier.empty()) {
+        auto moves = frontier.front();
+        Position position;
+        StateInfo state_info[1024] = {};
+        position.set_hirate(state_info, Threads[0]);
+        // 現局面まで指し手を進める
+        for (auto move : moves) {
+            position.do_move(move, state_info[position.game_ply()]);
+        }
+        frontier.pop_front();
+
+        // 千日手の局面は処理しない
+        auto draw_type = position.is_repetition(MAX_PLY);
+        if (draw_type == REPETITION_DRAW) {
+            continue;
+        }
+
+        // 詰み、宣言勝ちの局面も処理しない
+        if (position.is_mated() || position.DeclarationWin() != MOVE_NONE) {
+            continue;
+        }
+
+        // 子局面を展開する
+        for (const auto& move : MoveList<LEGAL_ALL>(position)) {
+            if (!position.pseudo_legal(move) || !position.legal(move)) {
+                // 不正な手の場合は処理しない
+                continue;
+            }
+
+            if (IsBadMove(book, position, move, book_eval_black_limit, book_eval_white_limit)) {
+                // 定跡データベースに登録されており、かつ悪い指し手の場合は処理しない
+                continue;
+            }
+
+            StateInfo state_info_next = {};
+            position.do_move(move, state_info_next);
+
+            // undo_move()を呼び出す必要があるので、continueとbreakを禁止する。
+            if (!explorered.count(position.sfen())) {
+                explorered.insert(position.sfen());
+                moves.push_back(move);
+                frontier.push_back(moves);
+                moves.pop_back();
+
+                if (IsTargetPosition(book, position, multi_pv)) {
+                    ofs << position.sfen() << std::endl;
+                }
+            }
+
+            position.undo_move(move);
+        }
+    }
 
     return true;
 }

@@ -14,11 +14,12 @@ namespace Tanuki {
 	bool ExtendBook();
 	bool MergeBook();
 	bool SetScoreToMove();
-	bool TeraShock();
-	bool TeraShock2();
+	bool PropagateLeafNodeValuesToRoot();
+	bool PropagateLeafNodeValuesToRootOne();
 	bool ExtendTeraShock();
 	bool ExtendTeraShockBfs();
 	bool RemoveBadMoves();
+	bool ExtractTargetPositions();
 }
 
 #endif
