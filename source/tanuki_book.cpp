@@ -1621,7 +1621,13 @@ bool Tanuki::ExtractTargetPositions() {
                 moves.pop_back();
 
                 if (IsTargetPosition(book, position, multi_pv)) {
-                    ofs << position.sfen() << std::endl;
+                    // 対象の局面を書き出す。
+                    // 形式はmoveをスペース区切りで並べたものとする。
+                    // これは、千日手等を認識させるため。
+                    for (auto m : moves) {
+                        ofs << m << " ";
+                    }
+                    ofs << move << std::endl;
                 }
             }
 
