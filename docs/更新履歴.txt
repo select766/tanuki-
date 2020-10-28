@@ -7,6 +7,302 @@
 		ちゃんと検証してからMakefile書き直す。
 
 
+■　2020/06/01 V4.91
+
+
+- V4.91
+	- LargePage周り、一通り動作確認できたのでバージョンを上げておく。
+	- 将棋神やねうら王のupdate3に収録するのは、このバージョンにする。
+	- 将棋神やねうら王の実行ファイルのupdateはこれが最終になる予定。
+
+
+- NNUE評価関数、Eval::load_eval()を連続して行うとクラッシュするのを修正。
+	- 通常、Eval::load_eval()を2回呼び出さないが、学習部の実装によってはこれをやりうる。
+
+- LargeMemory.alloc()によって256MB以上のメモリ空間を確保する場合、スレッド並列でクリアするように変更。
+	- EvalHashが大きいときに少しだけ有利かも。
+
+
+- Stockfishの現時点での最新コードのうち、探索に影響しない部分だけ取り入れる。
+	- ONE_PLY マクロの削除
+	- DEPTH_MAX削除。今後は、MAX_PLYを使うようにする。
+	- DEPTH_ZERO削除。0を使う。
+	- depthをtypedef intに変更。
+	- reverse_move()追加。
+	- TTのデストラクタでfree()を呼ぶコードになっていたの修正。
+	- compiler_info()追加。
+	- USIコマンドに"compiler"追加。
+	- thread_win32.h → thread_win32_osx.hにrename
+		- WIN32用のMutexクラス削除
+		- OSX用のThreadクラス追加。
+
+- benchコマンドに影響するのでConsiderationModeのとき、PV出力のときに置換表のconst性を保つように修正。
+	- (置換表はPV出力によって一切書き換えない)
+	- TT.read_probe()追加。
+	- USE_TT_PVコンパイルオプション削除
+
+
+// refactoring後に探索ノード数が一致するかのテスト
+Total time (ms) : 7527
+Nodes searched  : 3389007
+Nodes/second    : 450246
+
+
+■　2020/05/31
+
+
+- LargePageを使っているかどうかをLinux/Android環境でも初回だけ出力するようにする。
+
+
+- misc.cpp、Large Pageのコード、Linuxでビルドが通らなくなっていたのを修正。
+- KPPT/KKP_KKPTでEvalShare有効(default)のときは、評価関数テーブルはLargePage使えないが…。まあいいか…。
+
+
+- ファイル構成、少しStockfishに近づける。
+	- extra/benchmark.cpp → bench_mark.cpp に移動
+	- sse.cpp → position.cppのなかに移動させて削除
+- ifdefと書いてあるところ、if defined()で統一する。
+	- Stockfishのコードでそう書かれているところはそのままにしておく
+- コメント、色々整理した。
+
+
+- Large Pageを使うメモリアロケーター用にLargeMemory class作った。
+	- このclassを使って、ソースコード整理した。ずいぶん綺麗になった。
+
+
+■　2020/05/30
+
+
+- 置換表にLarge Pageを使うように変更。
+
+	Large Pageを使うには、SeLockMemoryPrivilegeが必要。
+
+	Group Policy Editorで変更する手順。
+
+	1. グループポリシーエディター(gpedit.msc)を起動する
+	2. ローカルコンピューターポリシー　→　コンピュータの構成　→　Windowsの設定　→　セキュリティの設定　→　ローカルポリシー
+		　→　ユーザー権利の割り当て　→　メモリ内のページのロック
+	3. ここで適切なユーザーに権限を付与する。
+	4. OSを再起動する
+
+	cf.
+	Enable the Lock Pages in Memory Option (Windows)
+	https://msdn.microsoft.com/en-us/library/ms190730.aspx
+
+===========================
+Total time (ms) : 9944
+Nodes searched  : 7129455
+Nodes/second    : 716960
+info string Hash table allocation: Windows large pages used.
+
+===========================
+Total time (ms) : 10523
+Nodes searched  : 7129455
+Nodes/second    : 677511
+info string Hash table allocation: Windows large pages not used.
+
+Surface Pro6で計測したところ、これにより5.8%程度、高速化しているようだ。
+NNUE/KPPT/KKP_KKPT用のメモリもここから確保するように変更。1,2%程度高速化するようだ。
+
+ついでにEvalHashもここから確保するように変更。
+EvalHashが大きいときに(1024MBとか)、5%前後高速化するようだ。
+
+この3つ合わせると、トータルで10数%高速化するようだ。
+
+確保～開放を繰り返すと、断片化するのか、Large Pageのメモリ確保に失敗するようになることがある。(´ω｀)
+うーん、、なんぞこれ…。プロセス終了の時にここで確保したメモリ、開放していないのがいけないのかも…。
+USIのquitコマンドで抜けても、そのときに開放してないという問題はあるのか..
+
+- misc.h / prefetch2()、使ってないので削除。
+
+- aligned_alloc()/aligned_free()　削除。
+	C++17では、newでもalignasの指定が生きることになったので
+
+	cf.
+		C++17： アライメント付き動的メモリ確保
+		https://qiita.com/niina/items/7a6c18c018c4100adb28
+
+
+■　2020/05/29
+
+
+- KPPT/KKP_KPPT用の実行ファイルをビルドする時、Clangだと20GB以上消費する問題を修正。
+
+	newでstd::arrayに関して巨大メモリを確保しようとすると、Clang10.0.0でのコンパイル時に
+	メモリを20GB以上持っていかれる(´ω｀) Clangのbugの何らかの最適化が悪さをしている可能性が…。
+
+
+■　2020/05/28 V4.90
+
+
+- V4.90
+	- 定跡まわり、問題なさげなのでバージョン上げておく。
+	- 次回は、メジャーバージョンアップの予定。V5.00
+
+
+■　2020/05/26
+
+
+- PV_OUTPUT_DRAW_ONLY オプション追加。(大人の都合により)
+
+- TextFileReader、eof()の判定おかしかった。最後が改行コードがないと永久ループになることがあったのを修正。
+　全面的に書き直した。(定跡の読み込み等で、ファイルの最後のほうが読み込まれていなかった可能性あり)
+
+　テストコード:
+
+	TextFileReader reader;
+	if (reader.Open("test.txt").is_ok())
+	{
+		reader.SkipEmptyLine(true);
+		reader.SetTrim(true);
+
+		std::string line;
+		while (reader.ReadLine(line).is_ok())
+			std::cout << line << "//" << std::endl;
+	}
+
+
+■　2020/05/19
+
+
+- USI拡張コマンド.txtのUSI_Hashの説明を修正した。
+
+
+■　2020/05/01
+
+- Book::read_book()で最終行の空行をnoneと解釈してしまう不具合を修正。
+	- cf. https://github.com/yaneurao/YaneuraOu/issues/113
+- TextFileReaderのReadLine()でtrimを引数の取るのやめる。
+	- SetTrim()で設定するようにする。
+
+
+■　2020/04/01
+
+
+- MemoryBookクラス、整理した。
+- makebookコマンドでBookIgnorePlyをデフォルトfalseに設定するようにした。
+
+// 定跡の生成テスト
+
+usi_hash 2048
+Threads 4
+MultiPv 4
+makebook think book/flood2018.sfen mybook.db startmoves 1 moves 4 depth 4
+
+
+// 定跡テスト用のUSIコマンド
+
+position startpos moves 5i5h 5a5b 5h5i 5b5a
+// ↑ply違いの初期局面
+
+---
+
+IgnoreBookPly true
+isready
+go
+
+IgnoreBookPly false
+isready
+go
+
+IgnoreBookPly true
+isready
+position startpos moves 5i5h 5a5b 5h5i 5b5a
+go
+
+IgnoreBookPly false
+isready
+position startpos moves 5i5h 5a5b 5h5i 5b5a
+go
+---
+BookOnTheFly true
+
+
+
+- IgnoreBookPly==true(default動作)のときにmakebookthinkコマンドで思考済みの局面がhitしない問題を修正。
+- IgnoreBookPly==trueのときに定跡を書き出す時は、sfenのplyのところを0にして書き出すようにした。(あまり嬉しくないけど、そうなってしまった)
+
+
+■　2020/03/13
+
+
+- Tools::Result型を追加。一般的なエラーはこれを用いて返すように変更。RustのOption型みたいな何か。
+- 置換表の初期化時に"USI_Hash clear"となっていたの"Hash clear"に修正。
+- main()でDirectory::init()は格好悪いので、Misc::init()に変更。
+
+
+■　2020/03/09
+
+
+- USI原案に従い、 "USI_OwnBook"というオプションの追加
+	- cf. SkillLevelのオプション名について
+    - https://github.com/yaneurao/YaneuraOu/issues/111
+- "USI_SkillLevel"に変更するのは、しない。
+- "Hash"オプションも、将棋所で個別にHash値が設定できるようになったので、USIプロトコルに従い
+	"USI_Hash"にリネームする。(あちこちに影響でかねないが…)
+
+	cf.
+	やねうら王のエンジンオプションをUSIプロトコル原案に準拠させる件
+	http://yaneuraou.yaneu.com/2020/03/09/%e3%82%84%e3%81%ad%e3%81%86%e3%82%89%e7%8e%8b%e3%81%ae%e3%82%a8%e3%83%b3%e3%82%b8%e3%83%b3%e3%82%aa%e3%83%97%e3%82%b7%e3%83%a7%e3%83%b3%e3%82%92usi%e3%83%97%e3%83%ad%e3%83%88%e3%82%b3%e3%83%ab/
+
+
+
+// やっぱやめる
+- floodgate用に、"isready"に対して即座に"readyok"を返すコンパイルオプションを追加。("FLOODGATE")
+
+	// floodgateは、"isready"のあとタイムアウトチェックがあるので初期化があまりに遅いとrejectされる。
+	// cf. https://twitter.com/JKishi18gou/status/1236667302134743042
+	// 大きなメモリを確保しようとするとこれでrejectされる可能性はあるので、
+	// この場合、先行して"readyok"を返す。(そのあと初期化を行うので思考時間は損をするが1分ぐらいなら…)
+
+	floodgateの仕様、そうでもないらしい → https://twitter.com/JKishi18gou/status/1236934238198362112
+
+
+
+- Android用Makefile、Windows版に合わせて更新。
+
+
+■　2020/03/08
+
+
+- isreadyの応答まで、keep alive代わりに改行を送る処理、やっぱり元のように送るようにする。
+	- https://github.com/yaneurao/YaneuraOu/commit/081511097b6f71ea14123c3227fd98dd1f99f830 のロールバック
+	- cf. http://yaneuraou.yaneu.com/2020/03/08/isready%e5%be%8c%e3%81%aekeep-alive%e7%94%a8%e6%94%b9%e8%a1%8c%e3%82%b3%e3%83%bc%e3%83%89%e3%81%ae%e9%80%81%e4%bf%a1%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/
+	- さらにworkerスレッドの生成完了を待機するコード追加する。
+
+
+
+■　2020/02/29
+
+
+- EvalShareは、評価関数の格納フォルダ("EvalDir"オプションで指定)のフルパス名が一致した時に共有するように仕様変更。
+	- これならハマる人もいないだろうから、KPPT/KPP_KKPTではEvalShareはデフォルトでOnに変更。
+
+- Directory::GetCurrentFolder()追加。
+
+- KPPT/KPP_KKPTのEvalShareの実装に使っている
+		std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> cv;
+	がdeprecated in C++17。
+	なので、WindowsAPIを用いてマルチバイトからワイド文字列に変換するように変更。
+
+- CreateDirectory()でcodecvt_utf8を使わないように変更。
+
+- 評価関数ファイルの読み込み時にそのフォルダ名をフルパスで出力するようにした。
+	- Linuxで動作確認した
+
+- StringExtension::mid(str,start)削除
+	- str.substr(start)と書いたほうがわかりやすい気がするので。
+
+- main.cpp、文字コードがsjisになっていたのでutf-8に変更。
+
+- my_insertion_sort → Tools::insertion_sortに変更
+	- 前回の変更忘れも修正。(Tools::をつけずにmy_insertion_sortを呼び出している箇所が残っていた)
+
+
+- mateエンジンでトーナメントビルドに失敗するのを修正。(Mizarさん)
+	cf. https://github.com/yaneurao/YaneuraOu/pull/109
+
+
 ■　2020/02/28 V4.89
 
 

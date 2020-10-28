@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "4.89"
+#define ENGINE_VERSION "4.91"
 
 // --------------------
 //  思考エンジンの種類
@@ -56,14 +56,26 @@
 #define USE_AVX2
 //#define USE_SSE42
 //#define USE_SSE41
+//#define USE_SSSE3
 //#define USE_SSE2
 //#define NO_SSE
 
+// -- BMI2命令を使う/使わない
+
+// AVX2環境でBMI2が使えるときに、BMI2対応命令を使うのか(ZEN/ZEN2ではBMI2命令は使わないほうが速い)
+// AMDのRyzenシリーズ(ZEN1/ZEN2)では、BMI2命令遅いので、これを定義しないほうが速い。
+#define USE_BMI2
+
+// やねうら王の従来の遠方駒の利きを求めるコードを用いる。
+// これをundefするとApery型の利きのコードを用いる。(そっちのほうがPEXTが使えない環境だと速い)
+// 互換性維持および、55将棋のように盤面を変形させるときに、magic tableで用いるmagic numberを求めたくないときに用いる。
+
+// #define USE_OLD_YANEURAOU_EFFECT
+
+
 #else
 
-// Makefileを使ってbuildするときは、
-// $ make avx2
-// のようにしてビルドすれば自動的にAVX2用実行ファイルがビルドされます。
+// Makefileを使ってbuildする手順は docs/解説.txt を見ること。
 
 #endif
 
@@ -185,6 +197,7 @@
 // かと言って、そのときにPVの出力をしないと、最後に出力されたPVとbest moveとは異なる可能性があるので、
 // それはよろしくない。検討モード用の思考オプションを用意すべき。
 // #define USE_TT_PV
+// →　ConsiderationMode というエンジンオプションを用意したので、この機能は無効化する。
 
 // 定跡を作るコマンド("makebook")を有効にする。
 // #define ENABLE_MAKEBOOK_CMD
@@ -197,9 +210,6 @@
 
 // 置換表のなかでevalを持たない
 // #define NO_EVAL_IN_TT
-
-// ONE_PLY == 1にするためのモード。これを指定していなければONE_PLY == 2
-// #define ONE_PLY_EQ_1
 
 // オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
 // #define USE_DROPBIT_IN_STATS
@@ -247,6 +257,12 @@
 // ニコニコ生放送の電王盤用
 // 電王盤はMultiPV非対応なので定跡を送るとき、"multipv"をつけずに1番目の候補手を送信する必要がある。
 // #define NICONICO
+
+// PVの出力時の千日手に関する出力をすべて"rep_draw"に変更するオプション。
+// GUI側が、何らかの都合で"rep_draw"のみしか処理できないときに用いる。
+// #define PV_OUTPUT_DRAW_ONLY
+
+
 
 // --------------------
 // release configurations
@@ -347,7 +363,8 @@
 
 #if defined(USER_ENGINE)
 #define ENGINE_NAME "YaneuraOu user engine"
-#define EVAL_KPP
+#define USE_SEE
+#define EVAL_MATERIAL
 #endif
 
 // --------------------
@@ -479,7 +496,7 @@ constexpr bool pretty_jp = false;
 // --- Dropbit
 
 // USE_DROPBIT_IN_STATSがdefineされているときは、Moveの上位16bitに格納するPieceとして駒打ちは +32(PIECE_DROP)　にする。
-#ifdef USE_DROPBIT_IN_STATS
+#if defined (USE_DROPBIT_IN_STATS)
 #define PIECE_DROP 32
 #else
 #define PIECE_DROP 0
@@ -489,7 +506,7 @@ constexpr bool pretty_jp = false;
 
 // KIF形式に変換するときにPositionクラスにその局面へ至る直前の指し手が保存されていないと
 // "同"金のように出力できなくて困る。
-#ifdef USE_KIF_CONVERT_TOOLS
+#if defined (USE_KIF_CONVERT_TOOLS)
 #define KEEP_LAST_MOVE
 #endif
 
@@ -507,14 +524,22 @@ constexpr bool Is64Bit = true;
 constexpr bool Is64Bit = false;
 #endif
 
+#if defined(USE_BMI2)
+#define BMI2_STR "BMI2"
+#else
+#define BMI2_STR ""
+#endif
+
 #if defined(USE_AVX512)
-#define TARGET_CPU "AVX512"
+#define TARGET_CPU "AVX512" BMI2_STR
 #elif defined(USE_AVX2)
-#define TARGET_CPU "AVX2"
+#define TARGET_CPU "AVX2" BMI2_STR
 #elif defined(USE_SSE42)
 #define TARGET_CPU "SSE4.2"
 #elif defined(USE_SSE41)
 #define TARGET_CPU "SSE4.1"
+#elif defined(USE_SSSE3)
+#define TARGET_CPU "SSSE3"
 #elif defined(USE_SSE2)
 #define TARGET_CPU "SSE2"
 #else
@@ -523,21 +548,26 @@ constexpr bool Is64Bit = false;
 
 // 上位のCPUをターゲットとするなら、その下位CPUの命令はすべて使えるはずなので…。
 
-#ifdef USE_AVX512
+#if defined (USE_AVX512)
 #define USE_AVX2
 #endif
 
-#ifdef USE_AVX2
+#if defined (USE_AVX2)
 #define USE_SSE42
 #endif
 
-#ifdef USE_SSE42
+#if defined (USE_SSE42)
 #define USE_SSE41
 #endif
 
-#ifdef USE_SSE41
+#if defined (USE_SSE41)
+#define USE_SSSE3
+#endif
+
+#if defined (USE_SSSE3)
 #define USE_SSE2
 #endif
+
 
 // --------------------
 //    for 32bit OS

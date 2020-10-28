@@ -3,9 +3,6 @@
 
 ThreadPool Threads;		// Global object
 
-void* Thread::operator new(size_t s) { return aligned_malloc(s, alignof(Thread)); }
-void Thread::operator delete(void*p) noexcept { aligned_free(p); }
-
 Thread::Thread(size_t n) : idx(n) , stdThread(&Thread::idle_loop, this)
 {
 	// スレッドはsearching == trueで開始するので、このままworkerのほう待機状態にさせておく
@@ -47,7 +44,7 @@ void Thread::clear()
 // 待機していたスレッドを起こして探索を開始させる
 void Thread::start_searching()
 {
-	std::lock_guard<Mutex> lk(mutex);
+	std::lock_guard<std::mutex> lk(mutex);
 	searching = true;
 	cv.notify_one(); // idle_loop()で回っているスレッドを起こす。(次の処理をさせる)
 }
@@ -55,7 +52,7 @@ void Thread::start_searching()
 // 探索が終わるのを待機する。(searchingフラグがfalseになるのを待つ)
 void Thread::wait_for_search_finished()
 {
-	std::unique_lock<Mutex> lk(mutex);
+	std::unique_lock<std::mutex> lk(mutex);
 	cv.wait(lk, [&] { return !searching; });
 }
 
@@ -76,7 +73,7 @@ void Thread::idle_loop() {
 
 	while (true)
 	{
-		std::unique_lock<Mutex> lk(mutex);
+		std::unique_lock<std::mutex> lk(mutex);
 		searching = false;
 		cv.notify_one(); // 他のスレッドがこのスレッドを待機待ちしてるならそれを起こす
 		cv.wait(lk, [&] { return searching; });

@@ -110,7 +110,7 @@ namespace Book
 			}
 
 			{
-				std::unique_lock<Mutex> lk(io_mutex);
+				std::unique_lock<std::mutex> lk(io_mutex);
 				// 前のエントリーは上書きされる。
 				book.append(sfen,move_list);
 
@@ -554,7 +554,7 @@ namespace Book
 				multi_think.callback_seconds = 15 * 60;
 				multi_think.callback_func = [&]()
 				{
-					std::unique_lock<Mutex> lk(multi_think.io_mutex);
+					std::unique_lock<std::mutex> lk(multi_think.io_mutex);
 					// 前回書き出し時からレコードが追加された？
 					if (multi_think.appended)
 					{
@@ -780,6 +780,10 @@ namespace Book
 			sync_cout << "info string read book file : " << filename << sync_endl;
 
 			TextFileReader reader;
+			// ReadLine()の時に行の末尾のスペース、タブを自動トリム。空行は自動スキップ。
+			reader.SetTrim(true);
+			reader.SkipEmptyLine(true);
+
 			auto result = reader.Open(filename);
 			if (result.is_not_ok())
 			{
@@ -822,9 +826,9 @@ namespace Book
 			// (これがtrueならばsfenから手数を除去しておく)
 			bool ignoreBookPly = Options["IgnoreBookPly"];
 
-			while(!reader.Eof())
+			std::string line;
+			while(reader.ReadLine(line).is_ok())
 			{
-				auto line = reader.ReadLine(/* trim = */true);
 
 				// バージョン識別文字列(とりあえず読み飛ばす)
 				if (line.length() >= 1 && line[0] == '#')

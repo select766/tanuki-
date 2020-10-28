@@ -57,6 +57,8 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 		|| b == BOUND_EXACT
 		)
 	{
+		ASSERT_LV3(d >= DEPTH_NONE);
+
 		key16 = (uint16_t)(k >> 48);
 		value16 = (int16_t)v;
 		eval16    = (int16_t)ev;
@@ -100,22 +102,13 @@ void TranspositionTable::resize(size_t mbSize) {
 
 	clusterCount = newClusterCount;
 
-	free(mem);
-
 	// tableはCacheLineSizeでalignされたメモリに配置したいので、CacheLineSize-1だけ余分に確保する。
 	// callocではなくmallocにしないと初回の探索でTTにアクセスするとき、特に巨大なTTだと
 	// 極めて遅くなるので、mallocで確保して自前でゼロクリアすることでこれを回避する。
 	// cf. Explicitly zero TT upon resize. : https://github.com/official-stockfish/Stockfish/commit/2ba47416cbdd5db2c7c79257072cd8675b61721f
-	mem = malloc(clusterCount * sizeof(Cluster) + CacheLineSize - 1);
 
-	if (!mem)
-	{
-		std::cout << "info string Error : Failed to allocate " << mbSize
-			<< "MB for transposition table. ClusterCount = " << newClusterCount << std::endl;
-		Tools::exit();
-	}
-
-	table = (Cluster*)((uintptr_t(mem) + CacheLineSize - 1) & ~(CacheLineSize - 1));
+	// Large Pageを確保する。ランダムメモリアクセスが5%程度速くなる。
+	table = static_cast<Cluster*>(tt_memory.alloc(clusterCount * sizeof(Cluster),32));
 
 	// clear();
 
@@ -204,10 +197,35 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const
 	return found = false, replace;
 }
 
+// read onlyであることが保証されているprobe()
+TTEntry* TranspositionTable::read_probe(const Key key, bool& found) const
+{
+	ASSERT_LV3(clusterCount != 0);
+
+#if defined(USE_GLOBAL_OPTIONS)
+	if (!GlobalOptions.use_hash_probe)
+		return found = false, first_entry(0);
+#endif
+
+	TTEntry* const tte = first_entry(key);
+	const uint16_t key16 = key >> 48;
+
+	for (int i = 0; i < ClusterSize; ++i)
+	{
+		if (!tte[i].key16 || tte[i].key16 == key16)
+			return found = (bool)tte[i].key16, &tte[i];
+	}
+	return found = false, nullptr;
+}
+
 int TranspositionTable::hashfull() const
 {
 	// すべてのエントリーにアクセスすると時間が非常にかかるため、先頭から1000エントリーだけ
 	// サンプリングして使用されているエントリー数を返す。
+
+	// Stockfish11では、1000 Cluster(3000 TTEntry)についてサンプリングするように変更されたが、
+	// 計測時間がもったいないので、古いコードのままにしておく。
+	
 	int cnt = 0;
 	for (int i = 0; i < 1000; ++i)
 		for (int j = 0; j < ClusterSize; ++j)

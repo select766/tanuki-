@@ -2,6 +2,7 @@
 #define TT_H_INCLUDED
 
 #include "types.h"
+#include "misc.h"
 
 // cf.【決定版】コンピュータ将棋のHASHの概念について詳しく : http://yaneuraou.yaneu.com/2018/11/18/%E3%80%90%E6%B1%BA%E5%AE%9A%E7%89%88%E3%80%91%E3%82%B3%E3%83%B3%E3%83%94%E3%83%A5%E3%83%BC%E3%82%BF%E5%B0%86%E6%A3%8B%E3%81%AEhash%E3%81%AE%E6%A6%82%E5%BF%B5%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6/
 
@@ -71,9 +72,6 @@ private:
 // このクラスターが、clusterCount個だけ確保されている。
 struct TranspositionTable {
 
-	// TTEntryはこのサイズでalignされたメモリに配置する。(される)
-	static const int CacheLineSize = 64;
-
 	// 1クラスターにおけるTTEntryの数
 	// TTEntry 10bytes×3つ + 2(padding) = 32bytes
 	static constexpr int ClusterSize = 3;
@@ -83,14 +81,12 @@ struct TranspositionTable {
 		u8 padding[2]; // 全体を32byteぴったりにするためのpadding
 	};
 
-	static_assert(sizeof(Cluster) == CacheLineSize / 2, "Cluster size incorrect");
+	static_assert(sizeof(Cluster) == 32, "Unexpected Cluster size");
 
 public:
-
-	// Stockfishではmemをコンストラクタで初期化していないが、初期化しておいたほうが
-	// 不用意に使った場合にアクセス保護違反で落ちるので都合が良い。
-	TranspositionTable() { mem = nullptr; clusterCount = 0; }
-	~TranspositionTable() { free(mem); }
+	//~TranspositionTable() { aligned_ttmem_free(mem); }
+	// メモリの開放は、LargeMemoryクラスが勝手にやってくれるので、やねうら王では、
+	// このclassのデストラクタでメモリを明示的に開放しなくて良い。
 
 	// 新しい探索ごとにこの関数を呼び出す。(generationを加算する。)
 	// USE_GLOBAL_OPTIONSが有効のときは、このタイミングで、Options["Threads"]の値を
@@ -101,6 +97,11 @@ public:
 	// 見つかったならfound == trueにしてそのTT_ENTRY*を返す。
 	// 見つからなかったらfound == falseで、このとき置換表に書き戻すときに使うと良いTT_ENTRY*を返す。
 	TTEntry* probe(const Key key, bool& found) const;
+
+	// probe()の、置換表を一切書き換えないことが保証されている版。
+	// ConsiderationMode時のPVの出力時は置換表をprobe()したいが、hitしないときに空きTTEntryを作る挙動が嫌なので、
+	// こちらを用いる。
+	TTEntry* read_probe(const Key key, bool& found) const;
 
 	// 置換表の使用率を1000分率で返す。(USIプロトコルで統計情報として出力するのに使う)
 	int hashfull() const;
@@ -126,6 +127,7 @@ public:
 
 		// cf. 置換表の128GB制限を取っ払う冴えない方法 : http://yaneuraou.yaneu.com/2018/05/03/%E7%BD%AE%E6%8F%9B%E8%A1%A8%E3%81%AE128gb%E5%88%B6%E9%99%90%E3%82%92%E5%8F%96%E3%81%A3%E6%89%95%E3%81%86%E5%86%B4%E3%81%88%E3%81%AA%E3%81%84%E6%96%B9%E6%B3%95/
 		// Stockfish公式で対応されるまでデフォルトでは無効にしておく。
+
 #if defined (IS_64BIT) && defined(USE_SSE2) && defined(USE_HUGE_HASH)
 
 		// cf. 128 GB TT size limitation : https://github.com/official-stockfish/Stockfish/issues/1349
@@ -147,22 +149,34 @@ public:
 		// excludedMoveはbit16..31にしか反映させないので、あまりいい性質でもないような…。
 		return &table[(((uint32_t(key >> 1) * uint64_t(clusterCount)) >> 32) & ~1) | (key & 1)].entry[0];
 #endif
+
 	}
 
 private:
 	friend struct TTEntry;
 
 	// この置換表が保持しているクラスター数。
-	size_t clusterCount;
+	// Stockfishはresize()ごとに毎回新しく置換表を確保するが、やねうら王では
+	// そこは端折りたいので、毎回は確保しない。そのため前回サイズがここに格納されていないと
+	// 再確保すべきかどうかの判定ができない。ゆえに0で初期化しておく。
+	size_t clusterCount = 0;
 
-	// 確保されているクラスターの先頭(alignされている)
-	Cluster* table;
+	// 確保されているClusterの先頭(alignされている)
+	// Stockfishではmemをコンストラクタで初期化していないが、初期化しておいたほうが
+	// 不用意に使った場合に確実にアクセス保護違反で落ちるので都合が良い。
+	Cluster* table = nullptr;
 
 	// 確保されたメモリの先頭(alignされていない)
-	void* mem;
+	//void* mem;
+	// →　やねうら王では、LargeMemoryで確保するのでこれは不要
 
 	// 世代カウンター。new_search()のごとに8ずつ加算する。TTEntry::save()で用いる。
 	uint8_t generation8;
+
+	// --- やねうら王独自拡張
+
+	// 置換表テーブルのメモリ確保用のhelpper
+	LargeMemory tt_memory;
 };
 
 extern TranspositionTable TT;

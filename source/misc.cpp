@@ -34,10 +34,16 @@ extern "C" {
 //#include <iostream>
 #include <sstream>
 //#include <vector>
+
 #include <ctime>	// std::ctime()
 #include <cstring>	// std::memset()
 #include <cmath>	// std::exp()
 #include <cstdio>	// fopen(),fread()
+
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <stdlib.h>
+#include <sys/mman.h> // madvise()
+#endif
 
 #include "misc.h"
 #include "thread.h"
@@ -165,6 +171,77 @@ const string engine_info() {
 	return ss.str();
 }
 
+// 使用したコンパイラについての文字列を返す。
+const std::string compiler_info() {
+
+#define stringify2(x) #x
+#define stringify(x) stringify2(x)
+#define make_version_string(major, minor, patch) stringify(major) "." stringify(minor) "." stringify(patch)
+
+	/// Predefined macros hell:
+	///
+	/// __GNUC__           Compiler is gcc, Clang or Intel on Linux
+	/// __INTEL_COMPILER   Compiler is Intel
+	/// _MSC_VER           Compiler is MSVC or Intel on Windows
+	/// _WIN32             Building on Windows (any)
+	/// _WIN64             Building on Windows 64 bit
+
+	std::string compiler = "\nCompiled by ";
+
+#ifdef __clang__
+	compiler += "clang++ ";
+	compiler += make_version_string(__clang_major__, __clang_minor__, __clang_patchlevel__);
+#elif __INTEL_COMPILER
+	compiler += "Intel compiler ";
+	compiler += "(version ";
+	compiler += stringify(__INTEL_COMPILER) " update " stringify(__INTEL_COMPILER_UPDATE);
+	compiler += ")";
+#elif _MSC_VER
+	compiler += "MSVC ";
+	compiler += "(version ";
+	compiler += stringify(_MSC_FULL_VER) "." stringify(_MSC_BUILD);
+	compiler += ")";
+#elif __GNUC__
+	compiler += "g++ (GNUC) ";
+	compiler += make_version_string(__GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+#else
+	compiler += "Unknown compiler ";
+	compiler += "(unknown version)";
+#endif
+
+#if defined(__APPLE__)
+	compiler += " on Apple";
+#elif defined(__CYGWIN__)
+	compiler += " on Cygwin";
+#elif defined(__MINGW64__)
+	compiler += " on MinGW64";
+#elif defined(__MINGW32__)
+	compiler += " on MinGW32";
+#elif defined(__ANDROID__)
+	compiler += " on Android";
+#elif defined(__linux__)
+	compiler += " on Linux";
+#elif defined(_WIN64)
+	compiler += " on Microsoft Windows 64-bit";
+#elif defined(_WIN32)
+	compiler += " on Microsoft Windows 32-bit";
+#else
+	compiler += " on unknown system";
+#endif
+
+#ifdef __VERSION__
+	// __VERSION__が定義されているときだけ、その文字列を出力する。(MSVCだと定義されていないようだ..)
+	compiler += "\n __VERSION__ macro expands to: ";
+	compiler += __VERSION__;
+#else
+	compiler += "(undefined macro)";
+#endif
+
+	compiler += "\n";
+
+	return compiler;
+}
+
 // --------------------
 //  統計情報
 // --------------------
@@ -192,7 +269,7 @@ void dbg_print() {
 
 std::ostream& operator<<(std::ostream& os, SyncCout sc) {
 
-	static Mutex m;
+	static std::mutex m;
 
 	if (sc == IO_LOCK)
 		m.lock();
@@ -208,7 +285,7 @@ std::ostream& operator<<(std::ostream& os, SyncCout sc) {
 // --------------------
 
 // prefetch命令を使わない。
-#ifdef NO_PREFETCH
+#if defined (NO_PREFETCH)
 
 void prefetch(void*) {}
 
@@ -217,7 +294,7 @@ void prefetch(void*) {}
 void prefetch(void* addr) {
 
 	// SSEの命令なのでSSE2が使える状況でのみ使用する。
-#ifdef USE_SSE2
+#if defined (USE_SSE2)
 
 	// 下位5bitが0でないような中途半端なアドレスのprefetchは、
 	// そもそも構造体がalignされていない可能性があり、バグに違いない。
@@ -244,14 +321,236 @@ void prefetch(void* addr) {
 
 #endif
 
-void prefetch2(void* addr)
-{
-	// Stockfishのコードはこうなっている。
-	// cache lineが32byteなら、あと2回やる必要があるように思うのだが…。
+// --------------------
+//  Large Page確保
+// --------------------
 
-	prefetch(addr);
-	prefetch((uint8_t*)addr + 64);
+namespace {
+	// LargeMemoryを使っているかどうかがわかるように初回だけその旨を出力する。
+	bool largeMemoryAllocFirstCall = true;
 }
+
+/// aligned_ttmem_alloc will return suitably aligned memory, and if possible use large pages.
+/// The returned pointer is the aligned one, while the mem argument is the one that needs to be passed to free.
+/// With c++17 some of this functionality can be simplified.
+#if defined(__linux__) && !defined(__ANDROID__)
+
+void* aligned_ttmem_alloc(size_t allocSize, void*& mem , size_t align /* ignore */ ) {
+
+	constexpr size_t alignment = 2 * 1024 * 1024; // assumed 2MB page sizes
+	size_t size = ((allocSize + alignment - 1) / alignment) * alignment; // multiple of alignment
+	if (posix_memalign(&mem, alignment, size))
+		mem = nullptr;
+	madvise(mem, allocSize, MADV_HUGEPAGE);
+
+	// Linux環境で、Hash TableのためにLarge Pageを確保したことを出力する。
+	if (largeMemoryAllocFirstCall)
+	{
+		sync_cout << "info string Hash table allocation: Linux Large Pages used." << sync_endl;
+		largeMemoryAllocFirstCall = false;
+	}
+
+	return mem;
+}
+
+#elif defined(_WIN64)
+
+static void* aligned_ttmem_alloc_large_pages(size_t allocSize) {
+
+	HANDLE hProcessToken{ };
+	LUID luid{ };
+	void* mem = nullptr;
+
+	const size_t largePageSize = GetLargePageMinimum();
+
+	// 普通、最小のLarge Pageサイズは、2MBである。
+	// Large Pageが使えるなら、ここでは 2097152 が返ってきているはず。
+
+	if (!largePageSize)
+		return nullptr;
+
+	// Large Pageを使うには、SeLockMemory権限が必要。
+	// cf. http://awesomeprojectsxyz.blogspot.com/2017/11/windows-10-home-how-to-enable-lock.html
+
+	// We need SeLockMemoryPrivilege, so try to enable it for the process
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hProcessToken))
+		return nullptr;
+
+	if (LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &luid))
+	{
+		TOKEN_PRIVILEGES tp{ };
+		TOKEN_PRIVILEGES prevTp{ };
+		DWORD prevTpLen = 0;
+
+		tp.PrivilegeCount = 1;
+		tp.Privileges[0].Luid = luid;
+		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+		// Try to enable SeLockMemoryPrivilege. Note that even if AdjustTokenPrivileges() succeeds,
+		// we still need to query GetLastError() to ensure that the privileges were actually obtained...
+		if (AdjustTokenPrivileges(
+			hProcessToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), &prevTp, &prevTpLen) &&
+			GetLastError() == ERROR_SUCCESS)
+		{
+			// round up size to full pages and allocate
+			allocSize = (allocSize + largePageSize - 1) & ~size_t(largePageSize - 1);
+			mem = VirtualAlloc(
+				NULL, allocSize, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);
+
+			// privilege no longer needed, restore previous state
+			AdjustTokenPrivileges(hProcessToken, FALSE, &prevTp, 0, NULL, NULL);
+		}
+	}
+
+	CloseHandle(hProcessToken);
+
+	return mem;
+}
+
+void* aligned_ttmem_alloc(size_t allocSize , void*& mem , size_t align /* ignore */) {
+
+	//static bool firstCall = true;
+
+	// try to allocate large pages
+	mem = aligned_ttmem_alloc_large_pages(allocSize);
+
+	// Suppress info strings on the first call. The first call occurs before 'uci'
+	// is received and in that case this output confuses some GUIs.
+
+	// uciが送られてくる前に"info string"で余計な文字を出力するとGUI側が誤動作する可能性があるので
+	// 初回は出力を抑制するコードが入っているが、やねうら王ではisreadyでメモリ初期化を行うので
+	// これは気にしなくて良い。
+
+	// 逆に、評価関数用のメモリもこれで確保するので、何度もこのメッセージが表示されると
+	// 煩わしいので、このメッセージは初回のみの出力と変更する。
+
+//	if (!firstCall)
+	if (largeMemoryAllocFirstCall)
+	{
+		if (mem)
+			sync_cout << "info string Hash table allocation: Windows Large Pages used." << sync_endl;
+		else
+			sync_cout << "info string Hash table allocation: Windows Large Pages not used." << sync_endl;
+
+		largeMemoryAllocFirstCall = false;
+	}
+
+	// fall back to regular, page aligned, allocation if necessary
+	// 4KB単位であることは保証されているはず..
+	if (!mem)
+		mem = VirtualAlloc(NULL, allocSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+	// VirtualAlloc()はpage size(4KB)でalignされていること自体は保証されているはず。
+
+	//cout << (u64)mem << "," << allocSize << endl;
+
+	return mem;
+}
+
+#else
+
+void* aligned_ttmem_alloc(size_t allocSize, void*& mem , size_t align) {
+
+	//constexpr size_t alignment = 64; // assumed cache line size
+	
+	// 引数で指定された値でalignmentされていて欲しい。
+	const size_t alignment = align;
+
+	size_t size = allocSize + alignment - 1; // allocate some extra space
+	mem = malloc(size);
+
+	if (largeMemoryAllocFirstCall)
+	{
+		sync_cout << "info string Hash table allocation: Large Pages not used." << sync_endl;
+		largeMemoryAllocFirstCall = false;
+	}
+
+	void* ret = reinterpret_cast<void*>((uintptr_t(mem) + alignment - 1) & ~uintptr_t(alignment - 1));
+	return ret;
+}
+
+#endif
+
+/// aligned_ttmem_free will free the previously allocated ttmem
+#if defined(_WIN64)
+
+void aligned_ttmem_free(void* mem) {
+
+	if (mem && !VirtualFree(mem, 0, MEM_RELEASE))
+	{
+		DWORD err = GetLastError();
+		std::cerr << "Failed to free transposition table. Error code: 0x" <<
+			std::hex << err << std::dec << std::endl;
+		Tools::exit();
+	}
+}
+
+#else
+
+void aligned_ttmem_free(void* mem) {
+	free(mem);
+}
+
+#endif
+
+// メモリを確保する。Large Pageに確保できるなら、そこにする。
+// aligned_ttmem_alloc()を内部的に呼び出すので、アドレスは少なくとも2MBでalignされていることは保証されるが、
+// 気になる人のためにalignmentを明示的に指定できるようになっている。
+// メモリ確保に失敗するか、引数のalignで指定したalignmentになっていなければ、
+// エラーメッセージを出力してプログラムを終了させる。
+void* LargeMemory::alloc(size_t size, size_t align , bool zero_clear)
+{
+	free();
+	return static_alloc(size, this->mem, align, zero_clear);
+}
+
+// alloc()で確保したメモリを開放する。
+// このクラスのデストラクタからも自動でこの関数が呼び出されるので明示的に呼び出す必要はない(かも)
+void LargeMemory::free()
+{
+	static_free(mem);
+	mem = nullptr;
+}
+
+// alloc()のstatic関数版。memには、static_free()に渡すべきポインタが得られる。
+void* LargeMemory::static_alloc(size_t size, void*& mem, size_t align, bool zero_clear)
+{
+	void* ptr = aligned_ttmem_alloc(size, mem, align);
+
+	auto error_exit = [&](std::string mes) {
+		sync_cout << "info string Error! : " << mes << " in LargeMemory::alloc(" << size << "," << align << ")" << sync_endl;
+		Tools::exit();
+	};
+
+	// メモリが正常に確保されていることを保証する
+	if (ptr == nullptr)
+		error_exit("can't alloc enough memory.");
+		
+	// ptrがalignmentされていることを保証する
+	if ((reinterpret_cast<size_t>(ptr) % align) != 0)
+		error_exit("can't alloc algined memory.");
+
+	// ゼロクリアが必要なのか？
+	if (zero_clear)
+	{
+		// 確保したのが256MB以上なら並列化してゼロクリアする。
+		if (size < 256 * 1024 * 1024)
+			// そんなに大きな領域ではないから、普通にmemset()でやっとく。
+		memset(ptr, 0, size);
+		else
+			// 並列版ゼロクリア
+			Tools::memclear(nullptr, ptr, size);
+	}
+
+	return ptr;
+}
+
+// static_alloc()で確保したメモリを開放する。
+void LargeMemory::static_free(void* mem)
+{
+	aligned_ttmem_free(mem);
+}
+
 
 
 // --------------------
@@ -273,9 +572,19 @@ namespace WinProcGroup {
 
 	int best_group(size_t idx) {
 
+		// スレッド番号idx(0 ～ 論理コア数-1)に対して
+		// 適切なNUMA NODEとCPU番号を設定する。
+		// 非対称プロセッサのことは考慮していない
+
+		// 論理コアの数
 		int threads = 0;
+
+		// NUMA NODEの数
 		int nodes = 0;
+
+		// 物理コア数
 		int cores = 0;
+
 		DWORD returnLength = 0;
 		DWORD byteOffset = 0;
 
@@ -302,12 +611,16 @@ namespace WinProcGroup {
 
 		while (byteOffset < returnLength)
 		{
+			// NUMA NODEの数
 			if (ptr->Relationship == RelationNumaNode)
 				nodes++;
 
 			else if (ptr->Relationship == RelationProcessorCore)
 			{
+				// 物理コアの数
 				cores++;
+
+				// 論理コア数の加算。HT対応なら2を足す。HT非対応なら1を足す。
 				threads += (ptr->Processor.Flags == LTP_PC_SMT) ? 2 : 1;
 			}
 
@@ -329,52 +642,33 @@ namespace WinProcGroup {
 		// In case a core has more than one logical processor (we assume 2) and we
 		// have still threads to allocate, then spread them evenly across available
 		// nodes.
+
+		// 論理プロセッサー数を上回ってスレッドを割り当てたいならば、あとは均等に
+		// 各NUMA NODEに割り当てていくしかない。
+
 		for (int t = 0; t < threads - cores; t++)
 			groups.push_back(t % nodes);
 
 		// If we still have more threads than the total number of logical processors
 		// then return -1 and let the OS to decide what to do.
 		return idx < groups.size() ? groups[idx] : -1;
-	}
 
-	// たぬきさんのXeon Phi用のコード。
-	// Dual Xeonでもう一つのコアが100%使えないようなのであとで修正する。
-#if 0
-	// スレッドID idxに対し、当該スレッドを実行すべきプロセッサーグループの番号を返す。
-	// Windowsではプロセッサーは以下のように扱われる。
-	// - システムは1つ以上のプロセッサーグループからなる
-	// - 1つのプロセッサーグループは1つ以上のNUMAノードからなる
-	// - 1つのNUMAノードは1つ以上の論理プロセッサーからなる
-	// - 1つのプロセッサーグループには最大で64個までの論理プロセッサーを含めることができる。
-	// https://technet.microsoft.com/ja-jp/windowsserver/ee661585.aspx
-	// 
-	// Intel Xeon Phi Knights Landings上でWindows Server 2016を動かした場合、
-	// 64論理プロセッサー毎にプロセッサーグループに分割される。
-	// 例えばIntel Xeon Phi Processor 7250の場合、
-	// 論理272コアは64+64+64+64+16の5つのプロセッサーグループに分割される。
-	// Stockfishのget_group()は全てのプロセッサーグループに同じ数の論理プロセッサが含まれることを仮定している。
-	// このため上記の構成ではCPUを使い切ることが出来ない。
-	// 以下の実装では先頭のプロセッサーグループから貪欲にスレッドを割り当てている。
-	// これによりIntel Xeon Phi Processor 7250においても100%CPUを使い切ることができる。
-	int get_group(size_t idx) {
-		WORD activeProcessorGroupCount = ::GetActiveProcessorGroupCount();
-		for (WORD processorGroupNumber = 0; processorGroupNumber < activeProcessorGroupCount; ++processorGroupNumber) {
-			DWORD activeProcessorCount = ::GetActiveProcessorCount(processorGroupNumber);
-			if (idx < activeProcessorCount) {
-				return processorGroupNumber;
-			}
-			idx -= activeProcessorCount;
-		}
-
-		return -1;
+		// NUMA NODEごとにプロセッサグループは分かれているだろうという想定なので
+		// NUMAが2(Dual CPU)であり、片側のCPUが40論理プロセッサであるなら、この関数は、
+		// idx = 0..39なら 0 , idx = 40..79なら1を返す。
 	}
-#endif
 
 	/// bindThisThread() set the group affinity of the current thread
 
 	void bindThisThread(size_t idx) {
 
+#if defined(_WIN32)
+		idx += Options["ThreadIdOffset"];
+#endif
+
 		// Use only local variables to be thread-safe
+
+		// 使うべきプロセッサグループ番号が返ってくる。
 		int group = best_group(idx);
 
 		if (group == -1)
@@ -444,8 +738,8 @@ namespace Tools
 
 	// memset(table, 0, size);
 
-	std::string name(name_);
-	sync_cout << "info string " + name + " Clear begin , Hash size =  " << size / (1024 * 1024) << "[MB]" << sync_endl;
+		if (name_ != nullptr)
+			sync_cout << "info string " + std::string(name_) + " Clear begin , Hash size =  " << size / (1024 * 1024) << "[MB]" << sync_endl;
 
 	// マルチスレッドで並列化してクリアする。
 
@@ -476,8 +770,8 @@ namespace Tools
 	for (std::thread& th : threads)
 		th.join();
 
-	sync_cout << "info string " + name + " Clear done." << sync_endl;
-
+		if (name_ != nullptr)
+			sync_cout << "info string " + std::string(name_) + " Clear done." << sync_endl;
 	}
 
 	// 途中での終了処理のためのwrapper
@@ -497,22 +791,22 @@ namespace Tools
 	// 現在時刻を文字列化したもを返す。(評価関数の学習時などに用いる)
 	std::string now_string()
 	{
-	// std::ctime(), localtime()を使うと、MSVCでセキュアでないという警告が出る。
-	// C++標準的にはそんなことないはずなのだが…。
+		// std::ctime(), localtime()を使うと、MSVCでセキュアでないという警告が出る。
+		// C++標準的にはそんなことないはずなのだが…。
 
 #if defined(_MSC_VER)
-	// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
+		// C4996 : 'ctime' : This function or variable may be unsafe.Consider using ctime_s instead.
 #pragma warning(disable : 4996)
 #endif
 
-	auto now = std::chrono::system_clock::now();
-	auto tp = std::chrono::system_clock::to_time_t(now);
-	auto result = string(std::ctime(&tp));
-
-	// 末尾に改行コードが含まれているならこれを除去する
-	while (*result.rbegin() == '\n' || (*result.rbegin() == '\r'))
-		result.pop_back();
-	return result;
+		auto now = std::chrono::system_clock::now();
+		auto tp = std::chrono::system_clock::to_time_t(now);
+		auto result = string(std::ctime(&tp));
+	
+		// 末尾に改行コードが含まれているならこれを除去する
+		while (*result.rbegin() == '\n' || (*result.rbegin() == '\r'))
+			result.pop_back();
+		return result;
 	}
 
 	// Linux環境ではgetline()したときにテキストファイルが'\r\n'だと
@@ -631,19 +925,19 @@ Tools::Result FileOperator::ReadAllLines(const std::string& filename, std::vecto
 	// ifstreamを使わない形で書き直す。これで4倍ぐらい速くなる。
 
 	TextFileReader reader;
+
+	// ReadLine()時のトリムの設定を反映させる。
+	reader.SetTrim(trim);
+	// 空行をスキップするモードにする。
+	reader.SkipEmptyLine(true);
+
 	auto result = reader.Open(filename);
 	if (!result.is_ok())
 		return result;
 
-	while (!reader.Eof())
-	{
-		std::string line;
-		line = reader.ReadLine(trim);
-
-		// 空行ではないなら書き出す
-		if (line.length())
-			lines.push_back(line);
-	}
+	string line;
+	while (reader.ReadLine(line).is_ok())
+		lines.emplace_back(line);
 
 	return Tools::Result::Ok();
 }
@@ -726,6 +1020,11 @@ TextFileReader::TextFileReader()
 	buffer.resize(1024 * 1024);
 	line_buffer.reserve(2048);
 	clear();
+
+	// この２つのフラグはOpen()したときに設定がクリアされるべきではないので、
+	// コンストラクタで一度だけ初期化する。
+	trim = false;
+	skipEmptyLine = false;
 }
 
 TextFileReader::~TextFileReader()
@@ -762,15 +1061,24 @@ void TextFileReader::Close()
 	clear();
 }
 
-// ファイルの終了判定。
-// ファイルを最後まで読み込んだのなら、trueを返す。
-bool TextFileReader::Eof() const
+// バッファから1文字読み込む。eofに達したら、-1を返す。
+int TextFileReader::read_char()
 {
-	return is_eof;
+	// ファイルからバッファの充填はこれ以上できなくて、バッファの末尾までcursorが進んでいるならeofという扱い。
+	while (!(is_eof && cursor >= read_size))
+	{
+		if (cursor < read_size)
+			return (int)buffer[cursor++];
+
+		// カーソル(解析位置)が読み込みバッファを超えていたら次のブロックを読み込む。
+		read_next_block();
+	}
+	return -1;
 }
 
-// 1行読み込む(改行まで)
-std::string TextFileReader::ReadLine(bool trim)
+// ReadLineの下請け。何も考えずに1行読み込む。行のtrim、空行のskipなどなし。
+// line_bufferに読み込まれた行が代入される。
+Tools::Result TextFileReader::read_line_simple()
 {
 	// buffer[cursor]から読み込んでいく。
 	// 改行コードに遭遇するとそこまでの文字列を返す。
@@ -787,16 +1095,19 @@ std::string TextFileReader::ReadLine(bool trim)
 		よって"\r"(CR)がきたときに次の"\n"(LF)は無視するという処理になる。
 	*/
 
-	while (!Eof())
+	while (true)
 	{
-		// カーソル(解析位置)が読み込みバッファを超えていたら
-		if (cursor >= read_size)
+		int c = read_char();
+		if (c == -1 /* EOF */)
 		{
-			read_next();
-			continue;
+			// line_bufferが空のままeofに遭遇したなら、eofとして扱う。
+			// さもなくば、line_bufferを一度返す。(次回呼び出し時にeofとして扱う)
+			if (line_buffer.size() == 0)
+					return Tools::ResultCode::Eof;
+
+			break;
 		}
 
-		char c = buffer[cursor++];
 		if (c == '\r')
 		{
 			// 直前は"\r"だった。
@@ -804,7 +1115,7 @@ std::string TextFileReader::ReadLine(bool trim)
 			break;
 		}
 
-		// 直前は"\r"ではないことは確定したのでこの段階でフラグをクリアしておく。
+		// 直前は"\r"ではないことは確定したのでこの段階でis_prev_crフラグをクリアしておく。
 		// ただし、このあと"\n"の判定の時に使うので古いほうの値をコピーして保持しておく。
 		auto prev_cr = is_prev_cr;
 		is_prev_cr = false;
@@ -824,6 +1135,19 @@ std::string TextFileReader::ReadLine(bool trim)
 	}
 
 	// 行バッファは完成した。
+	// line_bufferに入っているのでこのまま使って問題なし。
+
+	return Tools::ResultCode::Ok;
+}
+
+
+// 1行読み込む(改行まで)
+Tools::Result TextFileReader::ReadLine(std::string& line)
+{
+	while (true)
+	{
+		if (read_line_simple().is_eof())
+			return Tools::ResultCode::Eof;
 
 	// trimフラグが立っているなら末尾スペース、タブを除去する。
 	if (trim)
@@ -836,11 +1160,17 @@ std::string TextFileReader::ReadLine(bool trim)
 			line_buffer.resize(line_buffer.size() - 1);
 		}
 
-	return std::string((const char*)line_buffer.data(),line_buffer.size());
+		// 空行をスキップするモートであるなら、line_bufferが結果的に空になった場合は繰り返すようにする。
+		if (skipEmptyLine && line_buffer.size() == 0)
+			continue;
+
+		line = std::string((const char*)line_buffer.data(), line_buffer.size());
+		return Tools::ResultCode::Ok;
+	}
 }
 
 // 次のblockのbufferへの読み込み。
-void TextFileReader::read_next()
+void TextFileReader::read_next_block()
 {
 	if (::feof(fp))
 		read_size = 0;
@@ -853,6 +1183,7 @@ void TextFileReader::read_next()
 	// 読み込まれたサイズが0なら、終端に達したと判定する。
 	is_eof = read_size == 0;
 }
+
 
 // --------------------
 //       Parser
@@ -1209,7 +1540,7 @@ namespace Directory
 
 // カレントフォルダ相対で指定する。
 // フォルダを作成する。日本語は使っていないものとする。
-// どうもmsys2環境下のgccだと_wmkdir()だとフォルダの作成に失敗する。原因不明。
+// どうもMSYS2環境下のgccだと_wmkdir()だとフォルダの作成に失敗する。原因不明。
 // 仕方ないので_mkdir()を用いる。
 // ※　C++17のfilesystemがどの環境でも問題なく動くようになれば、
 //     std::filesystem::create_directories()を用いて書き直すべき。
@@ -1258,7 +1589,7 @@ namespace Directory {
 #else
 
 // Linux環境かどうかを判定するためにはmakefileを分けないといけなくなってくるな..
-// linuxでフォルダ掘る機能は、とりあえずナシでいいや..。評価関数ファイルの保存にしか使ってないし…。
+// Linuxでフォルダ掘る機能は、とりあえずナシでいいや..。評価関数ファイルの保存にしか使ってないし…。
 
 namespace Directory {
 	Tools::Result CreateFolder(const std::string& dir_name)

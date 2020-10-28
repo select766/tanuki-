@@ -1980,7 +1980,7 @@ namespace {
 			// これを調べるために、ttMove以外の探索深さを減らして探索して、
 			// その結果がttValue-s 以下ならttMoveの指し手を延長する。
 
-			// Stockfishの実装だとmargin = 2 * depthだが、(ONE_PLY==1として)、
+			// Stockfishの実装だとmargin = 2 * depthだが、
 			// 将棋だと1手以外はすべてそれぐらい悪いことは多々あり、
 			// ほとんどの指し手がsingularと判定されてしまう。
 			// これでは効果がないので、1割ぐらいの指し手がsingularとなるぐらいの係数に調整する。
@@ -2278,7 +2278,7 @@ namespace {
 
 			// Full depth search。LMRがskipされたか、LMRにおいてfail highを起こしたなら元の探索深さで探索する。
 
-			// ※　静止探索は残り探索深さはDEPTH_ZEROとして開始されるべきである。(端数があるとややこしいため)
+			// ※　静止探索は残り探索深さは0として開始されるべきである。(端数があるとややこしいため)
 			if (doFullDepthSearch)
 			{
 				value = -search<NonPV>(pos, ss + 1, -(alpha + 1), -alpha, newDepth, !cutNode);
@@ -2480,7 +2480,7 @@ namespace {
 	// -----------------------
 
 	// search()で残り探索深さが0以下になったときに呼び出される。
-	// (より正確に言うなら、残り探索深さがONE_PLY未満になったときに呼び出される)
+	// (より正確に言うなら、残り探索深さが1未満になったときに呼び出される)
 
 	template <NodeType NT>
 	Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth)

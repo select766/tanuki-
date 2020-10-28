@@ -454,6 +454,11 @@ public:
 	// 現局面で王手がかかっているか
 	bool in_check() const { return checkers(); }
 
+	// ピンされているc側の駒。下手な方向に移動させるとc側の玉が素抜かれる。
+	// 手番側のpinされている駒はpos.pinned_pieces(pos.side_to_move())のようにして取得できる。
+	// LONG_EFFECT_LIBRARYを使うときのmateルーチンで使用しているので消さないで！
+	Bitboard pinned_pieces(Color c) const { ASSERT_LV3(is_ok(c)); return st->blockersForKing[c] & pieces(c); }
+
 	// avoidで指定されている遠方駒は除外して、pinされている駒のbitboardを得る。
 	// ※利きのない1手詰め判定のときに必要。
 	Bitboard pinned_pieces(Color c, Square avoid) const;
@@ -491,7 +496,7 @@ public:
 	// 歩の成る指し手であるか？
 	bool pawn_promotion(Move m) const
 	{
-#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+#if defined (KEEP_PIECE_IN_GENERATE_MOVES)
 		// 移動させる駒が歩かどうかは、Moveの上位16bitを見れば良い
 		return (is_promote(m) && raw_type_of(moved_piece_after(m)) == PAWN);
 #else
@@ -509,7 +514,7 @@ public:
 	// 捕獲か価値のある駒の成り。(歩、角、飛車)
 	bool capture_or_valuable_promotion(Move m) const
 	{
-#ifdef KEEP_PIECE_IN_GENERATE_MOVES
+#if defined (KEEP_PIECE_IN_GENERATE_MOVES)
 		// 歩の成りを角・飛車の成りにまで拡大する。
 		auto pr = raw_type_of(moved_piece_after(m));
 		return (is_promote(m) && (pr == PAWN || pr == BISHOP || pr == ROOK)) || capture(m);
