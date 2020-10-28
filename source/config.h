@@ -277,7 +277,7 @@
 // 探索部は通常のやねうら王エンジンを用いる。
 #define YANEURAOU_ENGINE
 
-#define USE_EVAL_HASH
+//#define USE_EVAL_HASH
 #define USE_SEE
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
