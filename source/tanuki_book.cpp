@@ -71,6 +71,10 @@ namespace {
 	void WriteBook(BookMoveSelector& book, const std::string output_book_file_path) {
 		WriteBook(book.GetMemoryBook(), output_book_file_path);
 	}
+
+	Move As16(Move move) {
+		return static_cast<Move>(move & 0xffff);
+	}
 }
 
 bool Tanuki::InitializeBook(USI::OptionsMap& o) {
@@ -126,7 +130,7 @@ bool Tanuki::CreateRawBook() {
 				continue;
 			}
 
-			BookPos book_pos(move, Move::MOVE_NONE, 0, 0, 1);
+			BookPos book_pos(As16(move), As16(Move::MOVE_NONE), 0, 0, 1);
 			memory_book.insert(pos.sfen(), book_pos);
 
 			pos.do_move(move, state[num_moves]);
@@ -242,7 +246,7 @@ bool Tanuki::CreateScoredBook() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(best, next, value, search_depth, 0);
+				BookPos book_pos(As16(best), As16(next), value, search_depth, 0);
 				{
 					std::lock_guard<std::mutex> lock(output_book_mutex);
 					output_book.insert(sfen, book_pos);
@@ -490,7 +494,7 @@ bool Tanuki::SetScoreToMove() {
 			// 指し手を出力先の定跡に登録する
 			{
 				std::lock_guard<std::mutex> lock(output_book_mutex);
-				output_book.insert(sfen, BookPos(best_move, next_move, value, depth, 1));
+				output_book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, 1));
 
 				// 進捗状況を表示する
 				int num_processed_positions = ++global_num_processed_positions;
@@ -828,7 +832,7 @@ bool Tanuki::PropagateLeafNodeValuesToRootOne() {
 
 				// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
 				next_book.insert(RemovePlyIfIgnoreBookPly(pos.sfen()),
-					BookPos(best_move, next_move, -best_value, depth, 1));
+					BookPos(As16(best_move), As16(next_move), -best_value, depth, 1));
 			}
 		}
 
@@ -844,13 +848,13 @@ bool Tanuki::PropagateLeafNodeValuesToRootOne() {
 }
 
 namespace {
-	// 与えられた局面における、与えられた指し手が、
-	// 定跡データベースの中で悪い指し手とされているか判断する。
-	bool IsBadMove(BookMoveSelector& book, Position& position, Move move32, int book_eval_black_limit, int book_eval_white_limit) {
+	// 与えられた局面における、与えられた指し手が定跡データベースに含まれているかどうかを返す。
+	// 含まれている場合は、その指し手へのポインターを返す。
+	// 含まれていない場合は、nullptrを返す。
+	BookPos* IsBookMoveExist(BookMoveSelector& book, Position& position, Move move32) {
 		auto book_moves = book.GetMemoryBook().find(position);
 		if (book_moves == nullptr) {
-			// 定跡データベースに、この局面が登録されていない場合。
-			return false;
+			return nullptr;
 		}
 
 		auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
@@ -859,12 +863,31 @@ namespace {
 			});
 		if (book_move == book_moves->end()) {
 			// 定跡データベースに、この指し手が登録されていない場合。
-			return false;
+			return nullptr;
 		}
+		else {
+			return &*book_move;
+		}
+	}
 
-		int book_eval_limit = position.side_to_move() == BLACK ? book_eval_black_limit : book_eval_white_limit;
-		// 指し手に付与されている評価値が、指定された閾値以下だった場合、悪い指し手と判断する。
-		return book_move->value < book_eval_limit;
+	// 与えられた局面における、与えられた指し手が、展開すべき対象かどうかを返す。
+	// 展開する条件は、
+	// - 定跡データベースに指し手が含まれている、かつ評価値が閾値以上
+	// - 定跡データベースに指し手が含まれていない、かつ次の局面が含まれている
+	bool IsTargetMove(BookMoveSelector& book, Position& position, Move move32, int book_eval_black_limit, int book_eval_white_limit) {
+		auto book_pos = IsBookMoveExist(book, position, move32);
+		if (book_pos != nullptr) {
+			// 定跡データベースに指し手が含まれている
+			int book_eval_limit = position.side_to_move() == BLACK ? book_eval_black_limit : book_eval_white_limit;
+			return book_pos->value < book_eval_limit;
+		}
+		else {
+			StateInfo state_info = {};
+			position.do_move(move32, state_info);
+			bool exist = book.GetMemoryBook().book_body.find(position.sfen()) != book.GetMemoryBook().book_body.end();
+			position.undo_move(move32);
+			return exist;
+		}
 	}
 
 	// 与えられた局面を延長すべきかどうか判断する
@@ -948,6 +971,17 @@ bool Tanuki::ExtractTargetPositions() {
 			continue;
 		}
 
+		if (IsTargetPosition(book, position, multi_pv)) {
+			// 対象の局面を書き出す。
+			// 形式はmoveをスペース区切りで並べたものとする。
+			// これは、千日手等を認識させるため。
+
+			for (auto m : moves) {
+				ofs << m << " ";
+			}
+			ofs << std::endl;
+		}
+
 		// 子局面を展開する
 		for (const auto& move : MoveList<LEGAL_ALL>(position)) {
 			if (!position.pseudo_legal(move) || !position.legal(move)) {
@@ -955,8 +989,8 @@ bool Tanuki::ExtractTargetPositions() {
 				continue;
 			}
 
-			if (IsBadMove(book, position, move, book_eval_black_limit, book_eval_white_limit)) {
-				// 定跡データベースに登録されており、かつ悪い指し手の場合は処理しない
+			if (!IsTargetMove(book, position, move, book_eval_black_limit, book_eval_white_limit)) {
+				// この指し手の先の局面は処理しない。
 				continue;
 			}
 
@@ -966,23 +1000,9 @@ bool Tanuki::ExtractTargetPositions() {
 			if (!explorered.count(position.sfen())) {
 				explorered.insert(position.sfen());
 
-				// この局面が定跡データベースに含まれている場合は、キューに追加する。
-				if (book.GetMemoryBook().book_body.count(position.sfen())) {
-					moves.push_back(move);
-					frontier.push_back(moves);
-					moves.pop_back();
-				}
-
-				if (IsTargetPosition(book, position, multi_pv)) {
-					// 対象の局面を書き出す。
-					// 形式はmoveをスペース区切りで並べたものとする。
-					// これは、千日手等を認識させるため。
-
-					for (auto m : moves) {
-						ofs << m << " ";
-					}
-					ofs << move.move << std::endl;
-				}
+				moves.push_back(move);
+				frontier.push_back(moves);
+				moves.pop_back();
 			}
 
 			position.undo_move(move);
@@ -1095,10 +1115,10 @@ bool Tanuki::AddTargetPositions() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(best, next, value, search_depth, 0);
+				BookPos book_pos(As16(best), As16(next), value, thread.completedDepth, 0);
 				{
 					std::lock_guard<std::mutex> lock(output_book_mutex);
-					output_book.insert(pos.sfen(), book_pos);
+					output_book.insert(pos.sfen(), book_pos, true);
 				}
 			}
 
