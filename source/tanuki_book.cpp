@@ -41,7 +41,7 @@ namespace {
 	constexpr const char* kMultiPV = "MultiPV";
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
-	constexpr const char* kBookTargetSfensFile = "BookTargeSfensFile";
+	constexpr const char* kBookTargetSfensFile = "BookTargetSfensFile";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1ŽžŠÔ
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6ŽžŠÔ
 
