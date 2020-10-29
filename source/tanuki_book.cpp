@@ -981,7 +981,7 @@ bool Tanuki::ExtractTargetPositions() {
 					for (auto m : moves) {
 						ofs << m << " ";
 					}
-					ofs << move << std::endl;
+					ofs << move.move << std::endl;
 				}
 			}
 
