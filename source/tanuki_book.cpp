@@ -879,7 +879,7 @@ namespace {
 		if (book_pos != nullptr) {
 			// 定跡データベースに指し手が含まれている
 			int book_eval_limit = position.side_to_move() == BLACK ? book_eval_black_limit : book_eval_white_limit;
-			return book_pos->value < book_eval_limit;
+			return book_pos->value > book_eval_limit;
 		}
 		else {
 			StateInfo state_info = {};
