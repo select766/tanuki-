@@ -224,14 +224,14 @@ namespace {
 
 					// 現局面の手番を見て符号を決めないといけない。
 				return VMD_Pair(
-					(Value)(stm == BLACK ? -black_contempt : +black_contempt) /*先手のcomtempt */, draw_move, 0,
-					(Value)(stm == WHITE ? -white_contempt : +white_contempt) /*後手のcomtempt */, draw_move, 0
+						(Value)(stm == BLACK ? -black_contempt : +black_contempt) /*先手のcomtempt */, draw_move, 0,
+						(Value)(stm == WHITE ? -white_contempt : +white_contempt) /*後手のcomtempt */, draw_move, 0
 					);
 				}
 
-			case REPETITION_INFERIOR: return VMD_Pair(-VALUE_SUPERIOR  , MOVE_NONE, 0);
-			case REPETITION_SUPERIOR: return VMD_Pair(VALUE_SUPERIOR   , MOVE_NONE, 0);
-			case REPETITION_WIN     : return VMD_Pair(mate_in(MAX_PLY) , MOVE_NONE, 0);
+			case REPETITION_INFERIOR: return VMD_Pair(-VALUE_SUPERIOR, MOVE_NONE, 0);
+			case REPETITION_SUPERIOR: return VMD_Pair(VALUE_SUPERIOR, MOVE_NONE, 0);
+			case REPETITION_WIN     : return VMD_Pair(mate_in(MAX_PLY), MOVE_NONE, 0);
 			case REPETITION_LOSE    : return VMD_Pair(mated_in(MAX_PLY), MOVE_NONE, 0);
 
 					// これ入れておかないとclangで警告が出る。
@@ -346,7 +346,7 @@ namespace {
 						auto it = std::find_if(it_read->begin(), it_read->end(), [m](const auto& x) { return x.bestMove == m; });
 						if (it != it_read->end())
 						{
-						it->depth = 0; // depthはここがleafなので0扱い
+							it->depth = 0; // depthはここがleafなので0扱い
 							add_list(*it, color, update_list);
 						}
 					}
