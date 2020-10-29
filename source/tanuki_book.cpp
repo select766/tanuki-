@@ -1040,7 +1040,7 @@ bool Tanuki::AddTargetPositions() {
 	std::vector<std::string> lines;
 	std::ifstream ifs(target_sfens_file);
 	std::string line;
-	while (!std::getline(ifs, line)) {
+	while (std::getline(ifs, line)) {
 		lines.push_back(line);
 	}
 	int num_positions = lines.size();
