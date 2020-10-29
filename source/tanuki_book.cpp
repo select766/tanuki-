@@ -921,10 +921,15 @@ bool Tanuki::ExtractTargetPositions() {
 
 	std::ofstream ofs(target_sfens_file);
 
+	int counter = 0;
+	StateInfo state_info[1024] = {};
 	while (!frontier.empty()) {
+		if (++counter % 1000 == 0) {
+			sync_cout << counter << sync_endl;
+		}
+
 		auto moves = frontier.front();
 		Position position;
-		StateInfo state_info[1024] = {};
 		position.set_hirate(state_info, Threads[0]);
 		// 現局面まで指し手を進める
 		for (auto move : moves) {
@@ -955,15 +960,18 @@ bool Tanuki::ExtractTargetPositions() {
 				continue;
 			}
 
-			StateInfo state_info_next = {};
-			position.do_move(move, state_info_next);
+			position.do_move(move, state_info[position.game_ply()]);
 
 			// undo_move()を呼び出す必要があるので、continueとbreakを禁止する。
 			if (!explorered.count(position.sfen())) {
 				explorered.insert(position.sfen());
-				moves.push_back(move);
-				frontier.push_back(moves);
-				moves.pop_back();
+
+				// この局面が定跡データベースに含まれている場合は、キューに追加する。
+				if (book.GetMemoryBook().book_body.count(position.sfen())) {
+					moves.push_back(move);
+					frontier.push_back(moves);
+					moves.pop_back();
+				}
 
 				if (IsTargetPosition(book, position, multi_pv)) {
 					// 対象の局面を書き出す。
@@ -980,6 +988,8 @@ bool Tanuki::ExtractTargetPositions() {
 			position.undo_move(move);
 		}
 	}
+
+	sync_cout << "done..." << sync_endl;
 
 	return true;
 }
