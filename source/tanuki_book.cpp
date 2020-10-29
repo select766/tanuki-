@@ -246,7 +246,7 @@ bool Tanuki::CreateScoredBook() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(As16(best), As16(next), value, search_depth, 0);
+				BookPos book_pos(As16(best), As16(next), value, search_depth, 1);
 				{
 					std::lock_guard<std::mutex> lock(output_book_mutex);
 					output_book.insert(sfen, book_pos);
@@ -1115,7 +1115,7 @@ bool Tanuki::AddTargetPositions() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(As16(best), As16(next), value, thread.completedDepth, 0);
+				BookPos book_pos(As16(best), As16(next), value, thread.completedDepth, 1);
 				{
 					std::lock_guard<std::mutex> lock(output_book_mutex);
 					output_book.insert(pos.sfen(), book_pos, true);
