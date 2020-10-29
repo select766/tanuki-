@@ -969,6 +969,7 @@ bool Tanuki::ExtractTargetPositions() {
 					// 対象の局面を書き出す。
 					// 形式はmoveをスペース区切りで並べたものとする。
 					// これは、千日手等を認識させるため。
+
 					for (auto m : moves) {
 						ofs << m << " ";
 					}
@@ -981,5 +982,159 @@ bool Tanuki::ExtractTargetPositions() {
 	}
 
 	return true;
+}
+
+bool Tanuki::AddTargetPositions() {
+	int num_threads = (int)Options[kThreads];
+	std::string input_book_file = Options[kBookInputFile];
+	int search_depth = (int)Options[kBookSearchDepth];
+	int search_nodes = (int)Options[kBookSearchNodes];
+	int multi_pv = (int)Options[kMultiPV];
+	std::string output_book_file = Options[kBookOutputFile];
+	std::string target_sfens_file = Options[kBookTargetSfensFile];
+
+	omp_set_num_threads(num_threads);
+
+	sync_cout << "info string num_threads=" << num_threads << sync_endl;
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string search_depth=" << search_depth << sync_endl;
+	sync_cout << "info string search_nodes=" << search_nodes << sync_endl;
+	sync_cout << "info string multi_pv=" << multi_pv << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+	sync_cout << "info string target_sfens_file=" << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	MemoryBook input_book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	input_book.read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
+
+	// 対象の局面を読み込む
+	sync_cout << "Reading target positions: target_sfens_file=" << target_sfens_file << sync_endl;
+	std::vector<std::string> lines;
+	std::ifstream ifs(target_sfens_file);
+	std::string line;
+	while (!std::getline(ifs, line)) {
+		lines.push_back(line);
+	}
+	int num_positions = lines.size();
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|lines|=" << num_positions << sync_endl;
+
+	ProgressReport progress_report(num_positions, kShowProgressPerAtMostSec);
+	time_t last_save_time_sec = std::time(nullptr);
+
+	std::atomic<bool> need_wait = false;
+	std::atomic_int global_pos_index;
+	global_pos_index = 0;
+	std::atomic_int global_num_processed_positions;
+	global_num_processed_positions = 0;
+	std::mutex output_book_mutex;
+
+#pragma omp parallel
+	{
+		int thread_index = ::omp_get_thread_num();
+		WinProcGroup::bindThisThread(thread_index);
+
+		for (int position_index = global_pos_index++; position_index < num_positions;
+			position_index = global_pos_index++) {
+			Thread& thread = *Threads[thread_index];
+			StateInfo state_info[1024] = {};
+			Position& pos = thread.rootPos;
+			pos.set_hirate(state_info, &thread);
+
+			std::istringstream iss(lines[position_index]);
+			std::string move_string;
+			while (iss >> move_string) {
+				Move move = USI::to_move(move_string);
+				move = pos.move16_to_move(move);
+				pos.do_move(move, state_info[pos.game_ply()]);
+			}
+
+			if (pos.is_mated()) {
+				continue;
+			}
+
+			Learner::search(pos, search_depth, multi_pv, search_nodes);
+
+			int num_pv = std::min(multi_pv, static_cast<int>(thread.rootMoves.size()));
+			for (int pv_index = 0; pv_index < num_pv; ++pv_index) {
+				const auto& root_move = thread.rootMoves[pv_index];
+				Move best = Move::MOVE_NONE;
+				if (root_move.pv.size() >= 1) {
+					best = root_move.pv[0];
+				}
+				Move next = Move::MOVE_NONE;
+				if (root_move.pv.size() >= 2) {
+					next = root_move.pv[1];
+				}
+				int value = root_move.score;
+				BookPos book_pos(best, next, value, search_depth, 0);
+				{
+					std::lock_guard<std::mutex> lock(output_book_mutex);
+					output_book.insert(pos.sfen(), book_pos);
+				}
+			}
+
+			// 進捗状況を表示する
+			int num_processed_positions = ++global_num_processed_positions;
+			progress_report.Show(num_processed_positions);
+
+			// 一定時間ごとに保存する
+			{
+				std::lock_guard<std::mutex> lock(output_book_mutex);
+				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+					WriteBook(output_book, output_book_file);
+					last_save_time_sec = std::time(nullptr);
+				}
+			}
+
+			need_wait = need_wait ||
+				(progress_report.HasDataPerTime() &&
+					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
+
+			if (need_wait) {
+				// 処理速度が低下してきている。
+				// 全てのスレッドを待機する。
+#pragma omp barrier
+
+				// マスタースレッドでしばらく待機する。
+#pragma omp master
+				{
+					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
+						progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
+						progress_report.GetMaxDataPerTime() << sync_endl;
+
+					std::this_thread::sleep_for(std::chrono::minutes(10));
+					progress_report.Reset();
+					need_wait = false;
+				}
+
+				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
+#pragma omp barrier
+			}
+		}
+
+		WriteBook(output_book, output_book_file);
+
+		return true;
+	}
+
 }
 #endif
