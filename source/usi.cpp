@@ -823,11 +823,6 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
 
-		else if (token == "extend_book") {
-			Tanuki::ExtendBook();
-			break;
-		}
-
 		else if (token == "merge_book") {
 			Tanuki::MergeBook();
 			break;
@@ -845,21 +840,6 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "propagate_leaf_node_values_to_root_one") {
 			Tanuki::PropagateLeafNodeValuesToRootOne();
-			break;
-		}
-
-		else if (token == "extend_tera_shock") {
-			Tanuki::ExtendTeraShock();
-			break;
-		}
-
-		else if (token == "extend_tera_shock_bfs") {
-			Tanuki::ExtendTeraShockBfs();
-			break;
-		}
-
-		else if (token == "remove_bad_moves") {
-			Tanuki::RemoveBadMoves();
 			break;
 		}
 

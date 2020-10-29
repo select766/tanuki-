@@ -11,14 +11,10 @@ namespace Tanuki {
 	bool InitializeBook(USI::OptionsMap& o);
 	bool CreateRawBook();
 	bool CreateScoredBook();
-	bool ExtendBook();
 	bool MergeBook();
 	bool SetScoreToMove();
 	bool PropagateLeafNodeValuesToRoot();
 	bool PropagateLeafNodeValuesToRootOne();
-	bool ExtendTeraShock();
-	bool ExtendTeraShockBfs();
-	bool RemoveBadMoves();
 	bool ExtractTargetPositions();
 }
 
