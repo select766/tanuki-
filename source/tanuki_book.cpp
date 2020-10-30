@@ -165,17 +165,15 @@ bool Tanuki::CreateRawBook() {
 	std::string line;
 
 	MemoryBook memory_book;
-	StateInfo state_info[4096] = {};
-	StateInfo* state = state_info + 8;
+	std::vector<StateInfo> state_info(1024);
 	int num_records = 0;
 	while (std::getline(ifs, line)) {
 		std::istringstream iss(line);
 		Position pos;
-		pos.set_hirate(state, Threads[0]);
+		pos.set_hirate(&state_info[0], Threads[0]);
 
 		std::string token;
-		int num_moves = 0;
-		while (num_moves < max_moves && iss >> token) {
+		while (pos.game_ply() < max_moves && iss >> token) {
 			if (token == "startpos" || token == "moves") {
 				continue;
 			}
@@ -186,8 +184,7 @@ bool Tanuki::CreateRawBook() {
 
 			UpsertBookMove(memory_book, pos.sfen(), move, Move::MOVE_NONE, 0, 0, 1);
 
-			pos.do_move(move, state[num_moves]);
-			++num_moves;
+			pos.do_move(move, state_info[pos.game_ply()]);
 		}
 
 		++num_records;
@@ -301,11 +298,11 @@ bool Tanuki::CreateScoredBook() {
 				UpsertBookMove(output_book, sfen, best, next, value, thread.completedDepth, 1);
 			}
 
+			int num_processed_positions = ++global_num_processed_positions;
 			// 念のため、I/Oはマスタースレッドでのみ行う
 #pragma omp master
 			{
 				// 進捗状況を表示する
-				int num_processed_positions = ++global_num_processed_positions;
 				progress_report.Show(num_processed_positions);
 
 				// 一定時間ごとに保存する
@@ -545,11 +542,11 @@ bool Tanuki::SetScoreToMove() {
 			// 指し手を出力先の定跡に登録する
 			UpsertBookMove(output_book, sfen, best_move, next_move, value, depth, 1);
 
+			int num_processed_positions = ++global_num_processed_positions;
 			// 念のため、I/Oはマスタースレッドでのみ行う
 #pragma omp master
 			{
 				// 進捗状況を表示する
-				int num_processed_positions = ++global_num_processed_positions;
 				progress_report.Show(num_processed_positions);
 
 				// 定跡をストレージに書き出す。
@@ -559,31 +556,31 @@ bool Tanuki::SetScoreToMove() {
 					last_save_time_sec = std::time(nullptr);
 				}
 			}
-		}
 
-		need_wait = need_wait ||
-			(progress_report.HasDataPerTime() &&
-				progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
+			need_wait = need_wait ||
+				(progress_report.HasDataPerTime() &&
+					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
-		if (need_wait) {
-			// 処理速度が低下してきている。
-			// 全てのスレッドを待機する。
+			if (need_wait) {
+				// 処理速度が低下してきている。
+				// 全てのスレッドを待機する。
 #pragma omp barrier
 
 			// マスタースレッドでしばらく待機する。
 #pragma omp master
-			{
-				sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
-					progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
-					progress_report.GetMaxDataPerTime() << sync_endl;
+				{
+					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
+						progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
+						progress_report.GetMaxDataPerTime() << sync_endl;
 
-				std::this_thread::sleep_for(std::chrono::minutes(10));
-				progress_report.Reset();
-				need_wait = false;
-			}
+					std::this_thread::sleep_for(std::chrono::minutes(10));
+					progress_report.Reset();
+					need_wait = false;
+				}
 
-			// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
+				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
 #pragma omp barrier
+			}
 		}
 	}
 
@@ -974,7 +971,7 @@ bool Tanuki::ExtractTargetPositions() {
 	std::ofstream ofs(target_sfens_file);
 
 	int counter = 0;
-	StateInfo state_info[1024] = {};
+	std::vector<StateInfo> state_info(1024);
 	while (!frontier.empty()) {
 		if (++counter % 1000 == 0) {
 			sync_cout << counter << sync_endl;
@@ -982,7 +979,7 @@ bool Tanuki::ExtractTargetPositions() {
 
 		auto moves = frontier.front();
 		Position position;
-		position.set_hirate(state_info, Threads[0]);
+		position.set_hirate(&state_info[0], Threads[0]);
 		// 現局面まで指し手を進める
 		for (auto move : moves) {
 			position.do_move(move, state_info[position.game_ply()]);
@@ -1113,9 +1110,9 @@ bool Tanuki::AddTargetPositions() {
 		for (int position_index = global_pos_index++; position_index < num_positions;
 			position_index = global_pos_index++) {
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_info[1024] = {};
+			std::vector<StateInfo> state_info(1024);
 			Position& pos = thread.rootPos;
-			pos.set_hirate(state_info, &thread);
+			pos.set_hirate(&state_info[0], &thread);
 
 			std::istringstream iss(lines[position_index]);
 			std::string move_string;
@@ -1146,11 +1143,11 @@ bool Tanuki::AddTargetPositions() {
 				UpsertBookMove(output_book, pos.sfen(), best, next, value, thread.completedDepth, 1);
 			}
 
+			int num_processed_positions = ++global_num_processed_positions;
 			// 念のため、I/Oはマスタースレッドでのみ行う
 #pragma omp master
 			{
 				// 進捗状況を表示する
-				int num_processed_positions = ++global_num_processed_positions;
 				progress_report.Show(num_processed_positions);
 
 				// 一定時間ごとに保存する
