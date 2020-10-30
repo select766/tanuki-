@@ -72,8 +72,62 @@ namespace {
 		WriteBook(book.GetMemoryBook(), output_book_file_path);
 	}
 
+	/// <summary>
+	/// Moveを16ビット形式に変換する
+	/// </summary>
+	/// <param name="move"></param>
+	/// <returns></returns>
 	Move As16(Move move) {
 		return static_cast<Move>(move & 0xffff);
+	}
+
+	std::mutex UPSERT_BOOK_MOVE_MUTEX;
+
+	/// <summary>
+	/// 定跡データベースに指し手を登録する。
+	/// すでに指し手が登録されている場合、情報を上書きする。
+	/// 内部的に大域的なロックを取って処理する。
+	/// 指し手情報は16ビットに変換してから保存する。
+	/// </summary>
+	/// <param name="book"></param>
+	/// <param name="sfen"></param>
+	/// <param name="best_move"></param>
+	/// <param name="next_move"></param>
+	/// <param name="value"></param>
+	/// <param name="depth"></param>
+	/// <param name="num"></param>
+	void UpsertBookMove(MemoryBook& book, const std::string& sfen, Move best_move, Move next_move, int value, int depth, uint64_t num)
+	{
+		std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
+
+		best_move = As16(best_move);
+		next_move = As16(next_move);
+
+		auto book_moves = book.book_body.find(sfen);
+		if (book_moves == book.book_body.end()) {
+			// 局面が定跡データベースに登録されていない場合。
+			// MemoryBook::insert()に処理を移譲する。
+			book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, num));
+			return;
+		}
+
+		// すでに指し手が登録されているかどうか調べる。
+		for (auto& book_move : *book_moves->second) {
+			if (book_move.bestMove != best_move) {
+				continue;
+			}
+
+			// 指し手がすでに登録されている場合、指し手の情報を上書きする。
+			book_move.nextMove = next_move;
+			book_move.value = value;
+			book_move.depth = depth;
+			book_move.num = num;
+			return;
+		}
+
+		// 指し手が見つからなかった場合、
+		// MemoryBook::insert()に処理を移譲する。
+		book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, num));
 	}
 }
 
@@ -130,8 +184,7 @@ bool Tanuki::CreateRawBook() {
 				continue;
 			}
 
-			BookPos book_pos(As16(move), As16(Move::MOVE_NONE), 0, 0, 1);
-			memory_book.insert(pos.sfen(), book_pos);
+			UpsertBookMove(memory_book, pos.sfen(), move, Move::MOVE_NONE, 0, 0, 1);
 
 			pos.do_move(move, state[num_moves]);
 			++num_moves;
@@ -206,7 +259,6 @@ bool Tanuki::CreateScoredBook() {
 
 	std::atomic_int global_position_index;
 	global_position_index = 0;
-	std::mutex output_book_mutex;
 	ProgressReport progress_report(num_sfens, kShowProgressPerAtMostSec);
 	time_t last_save_time_sec = std::time(nullptr);
 
@@ -246,11 +298,7 @@ bool Tanuki::CreateScoredBook() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(As16(best), As16(next), value, search_depth, 1);
-				{
-					std::lock_guard<std::mutex> lock(output_book_mutex);
-					output_book.insert(sfen, book_pos);
-				}
+				UpsertBookMove(output_book, sfen, best, next, value, thread.completedDepth, 1);
 			}
 
 			// 進捗状況を表示する
@@ -259,7 +307,7 @@ bool Tanuki::CreateScoredBook() {
 
 			// 一定時間ごとに保存する
 			{
-				std::lock_guard<std::mutex> lock(output_book_mutex);
+				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
 					WriteBook(output_book, output_book_file);
 					last_save_time_sec = std::time(nullptr);
@@ -434,7 +482,6 @@ bool Tanuki::SetScoreToMove() {
 	// マルチスレッド処理準備のため、インデックスを初期化する
 	std::atomic_int global_sfen_and_move_index;
 	global_sfen_and_move_index = 0;
-	std::mutex output_book_mutex;
 
 	// 進捗状況表示の準備
 	ProgressReport progress_report(num_sfen_and_moves, kShowProgressPerAtMostSec);
@@ -492,9 +539,9 @@ bool Tanuki::SetScoreToMove() {
 			Depth depth = pos.this_thread()->completedDepth;
 
 			// 指し手を出力先の定跡に登録する
+			UpsertBookMove(output_book, sfen, best_move, next_move, value, depth, 1);
 			{
-				std::lock_guard<std::mutex> lock(output_book_mutex);
-				output_book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, 1));
+				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 
 				// 進捗状況を表示する
 				int num_processed_positions = ++global_num_processed_positions;
@@ -568,16 +615,12 @@ namespace {
 		}
 	}
 
-	Move To16Bit(Move move) {
-		return static_cast<Move>(static_cast<int>(move) & 0xffff);
-	}
-
 	// Nega-Max法で末端局面の評価値をroot局面に向けて伝搬する
 	// book 定跡データベース
 	// pos 現在の局面
 	// value_and_depth_without_nega_max_parent SetScoreToMove()で設定した評価値と探索深さ
 	//                                         現局面から見た評価値になるよう、符号を反転してから渡すこと
-	ValueMoveDepth NegaMax(MemoryBook& book, Position& pos, const ValueMoveDepth vmd_without_nega_max_parent, int& counter) {
+	ValueMoveDepth NegaMax(MemoryBook& book, Position& pos, int& counter) {
 		if (++counter % 1000000 == 0) {
 			sync_cout << counter << " |memo|=" << memo.size() << sync_endl;
 		}
@@ -585,13 +628,9 @@ namespace {
 		// この局面に対してのキーとして使用するsfen文字列。
 		// 必要に応じて末尾のplyを取り除いておく。
 		std::string sfen = RemovePlyIfIgnoreBookPly(pos.sfen());
-		auto book_moves = book.book_body.find(sfen);
 
-		if (book_moves == book.book_body.end()) {
-			// この局面が定跡データベースに登録されていない=末端局面である。
-			// SetScoreToMove()による探索の結果を返す。
-			return vmd_without_nega_max_parent;
-		}
+		// NegaMax()は定跡データベースに登録されている局面についてのみ処理を行う。
+		ASSERT_LV3(book.book_body.count(sfen));
 
 		auto& vmd = memo[sfen];
 		if (vmd.depth != DEPTH_NONE) {
@@ -616,7 +655,7 @@ namespace {
 		auto repetition_state = pos.is_repetition();
 		switch (repetition_state) {
 		case REPETITION_WIN:
-			// 連続王手の千日手により価値の場合
+			// 連続王手の千日手により勝ちの場合
 			vmd.value = mate_in(MAX_PLY);
 			vmd.depth = 0;
 			return vmd;
@@ -629,6 +668,8 @@ namespace {
 
 		case REPETITION_DRAW:
 			// 引き分けの場合
+			// やねうら王では先手後手に別々の評価値を付加している。
+			// ここでは簡単のため、同じ評価値を付加する。
 			vmd.value = static_cast<Value>(Options["Contempt"] * Eval::PawnValue / 100);
 			vmd.depth = 0;
 			return vmd;
@@ -653,47 +694,30 @@ namespace {
 		vmd.depth = 0;
 		// 全合法手について調べる
 		for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
-			auto book_move = std::find_if(book_moves->second->begin(), book_moves->second->end(),
-				[&move, &pos](const BookPos& book_move) {
-					// 定跡データベースに含まれているmoveは16ビットのため、32ビットに変換する。
-					Move move32 = pos.move16_to_move(book_move.bestMove);
-					return move.move == move32;
-				});
-
-			// 定跡データベースの指し手に登録されている評価値と探索深さを
-			// 子局面に渡すためのインスタンス
-			ValueMoveDepth vmd_without_nega_max_child;
-			if (book_move != book_moves->second->end()) {
-				// 指し手につけられている評価値は現局面から見た評価値なので、
-				// NegaMax()に渡すときに符号を反転する
-				vmd_without_nega_max_child.value = static_cast<Value>(-book_move->value);
-				vmd_without_nega_max_child.depth = static_cast<Depth>(book_move->depth);
-				// 子局面の指し手なのでnextMoveを代入する
-				vmd_without_nega_max_child.move = static_cast<Move>(book_move->nextMove);
-			}
-
 			StateInfo state_info = {};
 			pos.do_move(move, state_info);
-			auto value_and_depth_child = NegaMax(book, pos, vmd_without_nega_max_child, counter);
+			if (book.book_body.find(pos.sfen()) != book.book_body.end()) {
+				// 子局面が存在する場合のみ処理する。
+				ValueMoveDepth vmd_child = NegaMax(book, pos, counter);
+
+				// 指し手情報に探索の結果を格納する。
+				// 返ってきた評価値は次の局面から見た評価値なので、符号を反転する。
+				// また、探索深さを+1する。
+				UpsertBookMove(book, sfen, move, vmd_child.move, -vmd_child.value, vmd_child.depth + 1, 1);
+			}
 			pos.undo_move(move);
+		}
 
-			if (vmd_without_nega_max_child.depth == DEPTH_NONE) {
-				// 子局面が定跡データベースに登録されていなかった場合
-				continue;
+		// 現局面について、定跡データベースに子局面への指し手が登録された。
+		// 定跡データベースを調べ、この局面における最適な指し手を調べて返す。
+		auto book_moves = book.book_body.find(sfen);
+		ASSERT_LV3(book_moves != book.book_body.end());
+		for (const auto& book_move : *book_moves->second) {
+			if (vmd.value < book_move.value) {
+				vmd.value = static_cast<Value>(book_move.value);
+				vmd.move = book_move.bestMove;
+				vmd.depth = book_move.depth;
 			}
-
-			// 指し手情報に探索の結果を格納する
-			// 返ってきた評価値は次の局面から見た評価値なので、符号を反転する
-			BookPos new_book_move(To16Bit(move), To16Bit(value_and_depth_child.move), -value_and_depth_child.value,
-				value_and_depth_child.depth, 1);
-			book.insert(sfen, new_book_move);
-
-			if (vmd.value < new_book_move.value) {
-				vmd.value = static_cast<Value>(new_book_move.value);
-				vmd.move = move;
-			}
-			// 最も深い探索深さ+1を設定する
-			vmd.depth = std::max(vmd.depth, static_cast<Depth>(new_book_move.depth + 1));
 		}
 
 		return vmd;
@@ -724,20 +748,20 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	sync_cout << "|input_book_file|=" << book.book_body.size() << sync_endl;
 
 	// 平手の局面からたどれる局面について処理する
+	// メモをクリアするのを忘れない
+	memo.clear();
 	auto& pos = Threads[0]->rootPos;
 	StateInfo state_info = {};
 	pos.set_hirate(&state_info, Threads[0]);
-	ValueMoveDepth root_vmd = {};
 	int counter = 0;
-	NegaMax(book, pos, root_vmd, counter);
+	NegaMax(book, pos, counter);
 
 	// 平手の局面から辿れなかった局面を処理する
 	for (const auto& book_entry : book.book_body) {
 		auto& pos = Threads[0]->rootPos;
 		StateInfo state_info = {};
 		pos.set(book_entry.first, &state_info, Threads[0]);
-		ValueMoveDepth root_vmd = {};
-		NegaMax(book, pos, root_vmd, counter);
+		NegaMax(book, pos, counter);
 	}
 
 	WriteBook(book, "book/" + output_book_file);
@@ -831,8 +855,7 @@ bool Tanuki::PropagateLeafNodeValuesToRootOne() {
 				pos.undo_move(best_move);
 
 				// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
-				next_book.insert(RemovePlyIfIgnoreBookPly(pos.sfen()),
-					BookPos(As16(best_move), As16(next_move), -best_value, depth, 1));
+				UpsertBookMove(next_book, RemovePlyIfIgnoreBookPly(pos.sfen()), best_move, next_move, -best_value, depth, 1);
 			}
 		}
 
@@ -859,7 +882,7 @@ namespace {
 
 		auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
 			[move32](auto& m) {
-				return To16Bit(m.bestMove) == To16Bit(move32);
+				return As16(m.bestMove) == As16(move32);
 			});
 		if (book_move == book_moves->end()) {
 			// 定跡データベースに、この指し手が登録されていない場合。
@@ -1075,7 +1098,6 @@ bool Tanuki::AddTargetPositions() {
 	global_pos_index = 0;
 	std::atomic_int global_num_processed_positions;
 	global_num_processed_positions = 0;
-	std::mutex output_book_mutex;
 
 #pragma omp parallel
 	{
@@ -1115,11 +1137,7 @@ bool Tanuki::AddTargetPositions() {
 					next = root_move.pv[1];
 				}
 				int value = root_move.score;
-				BookPos book_pos(As16(best), As16(next), value, thread.completedDepth, 1);
-				{
-					std::lock_guard<std::mutex> lock(output_book_mutex);
-					output_book.insert(pos.sfen(), book_pos, true);
-				}
+				UpsertBookMove(output_book, pos.sfen(), best, next, value, thread.completedDepth, 1);
 			}
 
 			// 進捗状況を表示する
@@ -1128,7 +1146,7 @@ bool Tanuki::AddTargetPositions() {
 
 			// 一定時間ごとに保存する
 			{
-				std::lock_guard<std::mutex> lock(output_book_mutex);
+				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
 					WriteBook(output_book, output_book_file);
 					last_save_time_sec = std::time(nullptr);
