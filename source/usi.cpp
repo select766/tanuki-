@@ -888,12 +888,15 @@ void USI::loop(int argc, char* argv[])
 
 			for (;;) {
 				// ループするため、出力ファイルをextract_target_positionsの入力ファイルにコピーする
+				sync_cout << "Tanuki::ExtractTargetPositions();" << sync_endl;
 				if (fs::exists(output_book_file_path)) {
 					fs::copy_file(output_book_file_path, extract_target_positions_book_input_file, fs::copy_options::overwrite_existing);
 				}
 				Options["BookInputFile"] = kExtractTargetPositionsBookInputFile;
 				Tanuki::ExtractTargetPositions();
+				sync_cout << sync_endl;
 
+				sync_cout << "Tanuki::AddTargetPositions();" << sync_endl;
 				if (fs::exists(extract_target_positions_book_input_file)) {
 					fs::copy_file(extract_target_positions_book_input_file, add_target_positions_book_input_file, fs::copy_options::overwrite_existing);
 					fs::copy_file(extract_target_positions_book_input_file, add_target_positions_book_output_file, fs::copy_options::overwrite_existing);
@@ -901,12 +904,15 @@ void USI::loop(int argc, char* argv[])
 				Options["BookInputFile"] = kAddTargetPositionsBookInputFile;
 				Options["BookOutputFile"] = kAddTargetPositionsBookOutputFile;
 				Tanuki::AddTargetPositions();
+				sync_cout << sync_endl;
 
+				sync_cout << "Tanuki::PropagateLeafNodeValuesToRoot();" << sync_endl;
 				fs::copy_file(add_target_positions_book_output_file, propagate_leaf_node_values_to_root_book_input_file, fs::copy_options::overwrite_existing);
 				Options["BookInputFile"] = kPropagateLeafNodeValuesToRootBookInputFile;
 				Options["BookOutputFile"] = kPropagateLeafNodeValuesToRootBookOutputFile;
 				Tanuki::PropagateLeafNodeValuesToRoot();
 				fs::copy_file(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path, fs::copy_options::overwrite_existing);
+				sync_cout << sync_endl;
 			}
 		}
 
