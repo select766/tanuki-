@@ -1178,11 +1178,10 @@ bool Tanuki::AddTargetPositions() {
 #pragma omp barrier
 			}
 		}
-
-		WriteBook(output_book, output_book_file);
-
-		return true;
 	}
 
+	WriteBook(output_book, output_book_file);
+
+	return true;
 }
 #endif

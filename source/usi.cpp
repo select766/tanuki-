@@ -878,7 +878,7 @@ void USI::loop(int argc, char* argv[])
 			fs::path propagate_leaf_node_values_to_root_book_input_file = book_folder / kPropagateLeafNodeValuesToRootBookInputFile;
 			fs::path propagate_leaf_node_values_to_root_book_output_file = book_folder / kPropagateLeafNodeValuesToRootBookOutputFile;
 
-			Options["BookTargetSfensFile"] = kExtractTargetPositionsTxt;
+			Options["BookTargetSfensFile"] = std::string(kExtractTargetPositionsTxt);
 
 			// ループの初めに出力ファイルをextract_target_positionsの入力とするため、
 			// 入力ファイルを出力ファイルにコピーしておく。
@@ -892,7 +892,7 @@ void USI::loop(int argc, char* argv[])
 				if (fs::exists(output_book_file_path)) {
 					fs::copy_file(output_book_file_path, extract_target_positions_book_input_file, fs::copy_options::overwrite_existing);
 				}
-				Options["BookInputFile"] = kExtractTargetPositionsBookInputFile;
+				Options["BookInputFile"] = std::string(kExtractTargetPositionsBookInputFile);
 				Tanuki::ExtractTargetPositions();
 				sync_cout << sync_endl;
 
@@ -901,15 +901,15 @@ void USI::loop(int argc, char* argv[])
 					fs::copy_file(extract_target_positions_book_input_file, add_target_positions_book_input_file, fs::copy_options::overwrite_existing);
 					fs::copy_file(extract_target_positions_book_input_file, add_target_positions_book_output_file, fs::copy_options::overwrite_existing);
 				}
-				Options["BookInputFile"] = kAddTargetPositionsBookInputFile;
-				Options["BookOutputFile"] = kAddTargetPositionsBookOutputFile;
+				Options["BookInputFile"] = std::string(kAddTargetPositionsBookInputFile);
+				Options["BookOutputFile"] = std::string(kAddTargetPositionsBookOutputFile);
 				Tanuki::AddTargetPositions();
 				sync_cout << sync_endl;
 
 				sync_cout << "Tanuki::PropagateLeafNodeValuesToRoot();" << sync_endl;
 				fs::copy_file(add_target_positions_book_output_file, propagate_leaf_node_values_to_root_book_input_file, fs::copy_options::overwrite_existing);
-				Options["BookInputFile"] = kPropagateLeafNodeValuesToRootBookInputFile;
-				Options["BookOutputFile"] = kPropagateLeafNodeValuesToRootBookOutputFile;
+				Options["BookInputFile"] = std::string(kPropagateLeafNodeValuesToRootBookInputFile);
+				Options["BookOutputFile"] = std::string(kPropagateLeafNodeValuesToRootBookOutputFile);
 				Tanuki::PropagateLeafNodeValuesToRoot();
 				fs::copy_file(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path, fs::copy_options::overwrite_existing);
 				sync_cout << sync_endl;
