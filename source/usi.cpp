@@ -896,6 +896,9 @@ void USI::loop(int argc, char* argv[])
 				Tanuki::ExtractTargetPositions();
 				sync_cout << sync_endl;
 
+				// AMD Ryzen Threadripper 3990Xにおいて、カーネル時間が全体の80%を占める問題に対するハック。
+				std::this_thread::sleep_for(std::chrono::minutes(1));
+
 				sync_cout << "Tanuki::AddTargetPositions();" << sync_endl;
 				if (Tanuki::IsRegularFile(extract_target_positions_book_input_file)) {
 					Tanuki::CopyFile(extract_target_positions_book_input_file, add_target_positions_book_input_file);
@@ -906,6 +909,8 @@ void USI::loop(int argc, char* argv[])
 				Tanuki::AddTargetPositions();
 				sync_cout << sync_endl;
 
+				std::this_thread::sleep_for(std::chrono::minutes(1));
+
 				sync_cout << "Tanuki::PropagateLeafNodeValuesToRoot();" << sync_endl;
 				Tanuki::CopyFile(add_target_positions_book_output_file, propagate_leaf_node_values_to_root_book_input_file);
 				Options["BookInputFile"] = std::string(kPropagateLeafNodeValuesToRootBookInputFile);
@@ -913,6 +918,8 @@ void USI::loop(int argc, char* argv[])
 				Tanuki::PropagateLeafNodeValuesToRoot();
 				Tanuki::CopyFile(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path);
 				sync_cout << sync_endl;
+
+				std::this_thread::sleep_for(std::chrono::minutes(1));
 			}
 		}
 
