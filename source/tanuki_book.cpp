@@ -301,16 +301,20 @@ bool Tanuki::CreateScoredBook() {
 				UpsertBookMove(output_book, sfen, best, next, value, thread.completedDepth, 1);
 			}
 
-			// 進捗状況を表示する
-			int num_processed_positions = ++global_num_processed_positions;
-			progress_report.Show(num_processed_positions);
-
-			// 一定時間ごとに保存する
+			// 念のため、I/Oはマスタースレッドでのみ行う
+#pragma omp master
 			{
-				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
-				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-					WriteBook(output_book, output_book_file);
-					last_save_time_sec = std::time(nullptr);
+				// 進捗状況を表示する
+				int num_processed_positions = ++global_num_processed_positions;
+				progress_report.Show(num_processed_positions);
+
+				// 一定時間ごとに保存する
+				{
+					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
+					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+						WriteBook(output_book, output_book_file);
+						last_save_time_sec = std::time(nullptr);
+					}
 				}
 			}
 
@@ -540,15 +544,17 @@ bool Tanuki::SetScoreToMove() {
 
 			// 指し手を出力先の定跡に登録する
 			UpsertBookMove(output_book, sfen, best_move, next_move, value, depth, 1);
-			{
-				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 
+			// 念のため、I/Oはマスタースレッドでのみ行う
+#pragma omp master
+			{
 				// 進捗状況を表示する
 				int num_processed_positions = ++global_num_processed_positions;
 				progress_report.Show(num_processed_positions);
 
 				// 定跡をストレージに書き出す。
 				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 					WriteBook(output_book, output_book_file);
 					last_save_time_sec = std::time(nullptr);
 				}
@@ -1140,16 +1146,20 @@ bool Tanuki::AddTargetPositions() {
 				UpsertBookMove(output_book, pos.sfen(), best, next, value, thread.completedDepth, 1);
 			}
 
-			// 進捗状況を表示する
-			int num_processed_positions = ++global_num_processed_positions;
-			progress_report.Show(num_processed_positions);
-
-			// 一定時間ごとに保存する
+			// 念のため、I/Oはマスタースレッドでのみ行う
+#pragma omp master
 			{
-				std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
-				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
-					WriteBook(output_book, output_book_file);
-					last_save_time_sec = std::time(nullptr);
+				// 進捗状況を表示する
+				int num_processed_positions = ++global_num_processed_positions;
+				progress_report.Show(num_processed_positions);
+
+				// 一定時間ごとに保存する
+				{
+					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
+					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+						WriteBook(output_book, output_book_file);
+						last_save_time_sec = std::time(nullptr);
+					}
 				}
 			}
 
