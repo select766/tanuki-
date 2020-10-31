@@ -23,6 +23,7 @@
 #include "position.h"
 #include "tanuki_progress_report.h"
 #include "thread.h"
+#include "tt.h"
 
 using Book::BookMoveSelector;
 using Book::BookPos;
@@ -1184,6 +1185,12 @@ bool Tanuki::AddTargetPositions() {
 				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
 #pragma omp barrier
 			}
+
+			// 置換表の世代を進める
+			// ほとんどのスレッドで処理時間が等しくなるはずなので、
+			// バリアを使ってもロスは少ないはず
+#pragma omp barrier
+			TT.new_search();
 		}
 	}
 
