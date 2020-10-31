@@ -1190,7 +1190,11 @@ bool Tanuki::AddTargetPositions() {
 			// ほとんどのスレッドで処理時間が等しくなるはずなので、
 			// バリアを使ってもロスは少ないはず
 #pragma omp barrier
-			TT.new_search();
+#pragma omp master
+			{
+				TT.new_search();
+			}
+#pragma omp barrier
 		}
 	}
 
