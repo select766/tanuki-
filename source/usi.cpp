@@ -917,6 +917,7 @@ void USI::loop(int argc, char* argv[])
 				Options["BookOutputFile"] = std::string(kPropagateLeafNodeValuesToRootBookOutputFile);
 				Tanuki::PropagateLeafNodeValuesToRoot();
 				Tanuki::CopyFile(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path);
+				Tanuki::CopyFile(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
 				sync_cout << sync_endl;
 
 				std::this_thread::sleep_for(std::chrono::minutes(1));
