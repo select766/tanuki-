@@ -920,6 +920,8 @@ void USI::loop(int argc, char* argv[])
 				sync_cout << sync_endl;
 
 				std::this_thread::sleep_for(std::chrono::minutes(1));
+
+				TT.new_search();
 			}
 		}
 
