@@ -1187,14 +1187,11 @@ bool Tanuki::AddTargetPositions() {
 			}
 
 			// 置換表の世代を進める
-			// ほとんどのスレッドで処理時間が等しくなるはずなので、
-			// バリアを使ってもロスは少ないはず
-#pragma omp barrier
+			// バリアを張るとかなり遅くなるので、張らない
 #pragma omp master
 			{
 				TT.new_search();
 			}
-#pragma omp barrier
 		}
 	}
 
