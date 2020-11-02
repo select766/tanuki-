@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "4.91"
+#define ENGINE_VERSION "5.00"
 
 // --------------------
 //  思考エンジンの種類
@@ -289,7 +289,9 @@
 #define USE_SHARED_MEMORY_IN_EVAL
 
 // 学習機能を有効にするオプション。
-#define EVAL_LEARN
+// 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
+// 有効化してコンパイルしなければならない。
+// #define EVAL_LEARN
 
 // デバッグ絡み
 //#define ASSERT_LV 3

@@ -107,6 +107,13 @@ void ThreadPool::set(size_t requested)
 		// →　新しいthreadpoolのサイズで置換表用のメモリを確保しなおしたほうが
 		//  良いらしいのだが、大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
 	}
+
+#if defined(EVAL_LEARN)
+	// 学習用の実行ファイルでは、スレッド数が変更になったときに各ThreadごとのTTに
+	// メモリを再割り当てする必要がある。
+	TT.init_tt_per_thread();
+#endif
+
 }
 
 // ThreadPool::clear()は、threadPoolのデータを初期値に設定する。
