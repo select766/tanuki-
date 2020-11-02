@@ -1062,11 +1062,7 @@ bool Tanuki::AddTargetPositions() {
 			}
 
 			// 置換表の世代を進める
-			// バリアを張るとかなり遅くなるので、張らない
-#pragma omp master
-			{
-				TT.new_search();
-			}
+			Threads[thread_index]->tt.new_search();
 		}
 	}
 
