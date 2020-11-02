@@ -283,7 +283,7 @@ Move MovePicker::next_move(bool skipQuiets) {
 top:
 	switch (stage) {
 
-		// 置換表の指し手を返すフェーズ
+	// 置換表の指し手を返すフェーズ
 	case MAIN_TT:
 	case EVASION_TT:
 	case QSEARCH_TT:
@@ -291,7 +291,7 @@ top:
 		++stage;
 		return ttMove;
 
-		// 置換表の指し手を返したあとのフェーズ
+	// 置換表の指し手を返したあとのフェーズ
 	case CAPTURE_INIT:
 	case PROBCUT_INIT:
 	case QCAPTURE_INIT:
@@ -309,14 +309,14 @@ top:
 		++stage;
 		goto top;
 
-		// 置換表の指し手を返したあとのフェーズ
-		// (killer moveの前のフェーズなのでkiller除去は不要)
-		// SSEの値が悪いものはbad captureのほうに回す。
+	// 置換表の指し手を返したあとのフェーズ
+	// (killer moveの前のフェーズなのでkiller除去は不要)
+	// SSEの値が悪いものはbad captureのほうに回す。
 	case GOOD_CAPTURE:
 		if (select<Best>([&]() {
-			// moveは駒打ちではないからsee()の内部での駒打ちは判定不要だが…。
+				// moveは駒打ちではないからsee()の内部での駒打ちは判定不要だが…。
 				return pos.see_ge(*cur, Value(-55 * cur->value / 1024)) ?
-				// 損をする捕獲する指し手はあとのほうで試行されるようにendBadCapturesに移動させる
+						// 損をする捕獲する指し手はあとのほうで試行されるようにendBadCapturesに移動させる
 						true : (*endBadCaptures++ = *cur, false); }))
 			return *(cur -1);
 
@@ -326,7 +326,7 @@ top:
 
 			// countermoveがkillerと同じならばそれをskipする。
 			// ※　killer[]は32bit化されている(上位に移動後の駒が格納されている)と仮定している。
-			if (refutations[0].move == refutations[2].move
+			if (   refutations[0].move == refutations[2].move
 				|| refutations[1].move == refutations[2].move)
 				--endMoves;
 

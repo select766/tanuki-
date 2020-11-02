@@ -16,9 +16,6 @@
 
 // NNUE評価関数のデフォルトは、halfKP256
 #include "architectures/halfkp_256x2-32-32.h"
-
-// NNUE-HalfKPE9
-//#include "architectures/halfkpe9_256x2-32-32.h"
 #endif
 
 namespace Eval {

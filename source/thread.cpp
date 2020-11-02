@@ -106,6 +106,12 @@ void ThreadPool::set(size_t requested)
 
 		// →　新しいthreadpoolのサイズで置換表用のメモリを確保しなおしたほうが
 		//  良いらしいのだが、大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
+
+		// スレッド数に依存する探索パラメーターの初期化
+		// →　やねうら王ではそんなのないのでコメントアウト
+
+		// Init thread number dependent search params.
+		//Search::init();
 	}
 
 #if defined(EVAL_LEARN)
@@ -187,8 +193,8 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 	auto sfen = pos.sfen();
 	for (Thread* th : *this)
 	{
-		/* th->shuffleExts = */ th->nodes = /* th->tbHits = */ th->nmpMinPly = 0;
-		th->rootDepth = th->completedDepth = DEPTH_ZERO;
+		th->nodes = /* th->tbHits = */ th->nmpMinPly = 0;
+		th->rootDepth = th->completedDepth = 0;
 		th->rootMoves = rootMoves;
 
 		// setupStatesを渡して、これをコピーしておかないと局面を遡れない。

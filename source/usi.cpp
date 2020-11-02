@@ -1,6 +1,4 @@
-﻿//#pragma optimize( "", off )
-
-#include "types.h"
+﻿#include "types.h"
 #include "usi.h"
 #include "position.h"
 #include "search.h"
@@ -95,10 +93,10 @@ namespace USI
 			// この指し手のpvの更新が終わっているのか
 			bool updated = (i <= pvIdx && rootMoves[i].score != -VALUE_INFINITE);
 
-			if (depth == ONE_PLY && !updated)
+			if (depth == 1 && !updated)
 				continue;
 
-			Depth d = updated ? depth : depth - ONE_PLY;
+			Depth d = updated ? depth : depth - 1;
 			Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
 			// multi pv時、例えば3個目の候補手までしか評価が終わっていなくて(PVIdx==2)、このとき、
@@ -115,7 +113,7 @@ namespace USI
 				ss << endl;
 
 			ss  << "info"
-				<< " depth "    << d / ONE_PLY
+				<< " depth "    << d
 				<< " seldepth " << rootMoves[i].selDepth
 				<< " score "    << USI::value(v);
 

@@ -329,40 +329,26 @@ static bool aligned(Square sq1, Square sq2, Square sq3/* is ksq */)
 // 通常探索時の最大探索深さ
 constexpr int MAX_PLY = MAX_PLY_NUM;
 
-// 探索深さを表現するためのenum
-enum Depth: int32_t
-{
-	// Depthは1手をONE_PLY倍にスケーリングする。
-#if defined(ONE_PLY_EQ_1)
-	ONE_PLY = 1,
-#else
-	ONE_PLY = 2,
-#endif
+// 探索深さを表現する型
+typedef int Depth;
 
-	// 探索深さ0
-	DEPTH_ZERO = 0 * ONE_PLY,
+enum : int {
 
 	// 静止探索で王手がかかっているときにこれより少ない残り探索深さでの探索した結果が置換表にあってもそれは信用しない
-	DEPTH_QS_CHECKS = 0 * (int)ONE_PLY,
+	DEPTH_QS_CHECKS = 0,
 
 	// 静止探索で王手がかかっていないとき。
-	DEPTH_QS_NO_CHECKS = -1 * (int)ONE_PLY,
+	DEPTH_QS_NO_CHECKS = -1,
 
 	// 静止探索でこれより深い(残り探索深さが少ない)ところではRECAPTURESしか生成しない。
-	DEPTH_QS_RECAPTURES = -5 * (int)ONE_PLY,
+	DEPTH_QS_RECAPTURES = -5,
 
 	// DEPTH_NONEは探索せずに値を求めたという意味に使う。
-	DEPTH_NONE = -6 * (int)ONE_PLY,
+	DEPTH_NONE = -6,
 
 	// TTの下駄履き用
 	DEPTH_OFFSET = DEPTH_NONE,
-
-	// 最大深さ
-	DEPTH_MAX = MAX_PLY * (int)ONE_PLY,
 };
-
-// ONE_PLYは2のべき乗でないといけない。
-static_assert(!(ONE_PLY & (ONE_PLY - 1)), "ONE_PLY is not a power of 2");
 
 // --------------------
 //     評価値の性質
@@ -725,34 +711,34 @@ constexpr bool hand_is_equal_or_superior(Hand h1, Hand h2) { return ((h1-h2) & H
 std::ostream& operator<<(std::ostream& os, Hand hand);
 
 
-// --------------------
-// 手駒情報を直列化したもの
-// --------------------
+// --------------------	
+// 手駒情報を直列化したもの	
+// --------------------	
 #if defined(LONG_EFFECT_LIBRARY)
 
 // LONG_EFFECT_LIBRARYのmateルーチンで使用している。
 // 修正してこのenumは削除すべきだが、わりと面倒なので出来ていない。
 
-// 特定種の手駒を持っているかどうかをbitで表現するクラス
-// bit0..歩を持っているか , bit1..香 , bit2..桂 , bit3..銀 , bit4..角 , bit5..飛 , bit6..金 , bit7..玉(フラグとして用いるため)
+// 特定種の手駒を持っているかどうかをbitで表現するクラス	
+// bit0..歩を持っているか , bit1..香 , bit2..桂 , bit3..銀 , bit4..角 , bit5..飛 , bit6..金 , bit7..玉(フラグとして用いるため)	
 enum HandKind : uint32_t {
 	HAND_KIND_PAWN = 1 << (PAWN - 1), HAND_KIND_LANCE = 1 << (LANCE - 1), HAND_KIND_KNIGHT = 1 << (KNIGHT - 1),
-	HAND_KIND_SILVER = 1 << (SILVER-1), HAND_KIND_BISHOP = 1 << (BISHOP-1), HAND_KIND_ROOK = 1 << (ROOK-1) , HAND_KIND_GOLD = 1 << (GOLD-1) ,
+	HAND_KIND_SILVER = 1 << (SILVER - 1), HAND_KIND_BISHOP = 1 << (BISHOP - 1), HAND_KIND_ROOK = 1 << (ROOK - 1), HAND_KIND_GOLD = 1 << (GOLD - 1),
 	HAND_KIND_KING = 1 << (KING - 1), HAND_KIND_ZERO = 0,
 };
 
-// Hand型からHandKind型への変換子
-// 例えば歩の枚数であれば5bitで表現できるが、011111bを加算すると1枚でもあれば桁あふれしてbit5が1になる。
-// これをPEXT32で回収するという戦略。
+// Hand型からHandKind型への変換子	
+// 例えば歩の枚数であれば5bitで表現できるが、011111bを加算すると1枚でもあれば桁あふれしてbit5が1になる。	
+// これをPEXT32で回収するという戦略。	
 static HandKind toHandKind(Hand h) { return (HandKind)PEXT32(h + HAND_BIT_MASK, HAND_BORROW_MASK); }
 
-// 特定種類の駒を持っているかを判定する
+// 特定種類の駒を持っているかを判定する	
 constexpr bool hand_exists(HandKind hk, Piece pt) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pt && pt < PIECE_HAND_NB); */ return static_cast<bool>(hk & (1 << (pt - 1))); }
 
-// 歩以外の手駒を持っているかを判定する
+// 歩以外の手駒を持っているかを判定する	
 constexpr bool hand_exceptPawnExists(HandKind hk) { return hk & ~HAND_KIND_PAWN; }
 
-// 手駒の有無を表示する(USI形式ではない) デバッグ用
+// 手駒の有無を表示する(USI形式ではない) デバッグ用	
 //std::ostream& operator<<(std::ostream& os, HandKind hk);
 
 #endif

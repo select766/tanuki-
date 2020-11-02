@@ -6,9 +6,6 @@
 #include <vector>
 #include <functional>	// function
 
-#include "extra/bitop.h"
-#include "types.h"
-
 // --------------------
 //     USI関連
 // --------------------

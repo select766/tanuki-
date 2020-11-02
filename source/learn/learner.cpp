@@ -2670,7 +2670,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "eval_limit") is >> eval_limit;
 		else if (option == "save_only_once") save_only_once = true;
 		else if (option == "no_shuffle") no_shuffle = true;
-		
+
 #if defined(EVAL_NNUE)
 		else if (option == "nn_batch_size") is >> nn_batch_size;
 		else if (option == "newbob_decay") is >> newbob_decay;

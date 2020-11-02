@@ -112,13 +112,13 @@ namespace Book
 		// book_bodyに対してBookType::insert()を呼び出すwrapper。
 		std::pair<BookType::iterator,bool> insert(const std::pair<std::string/*sfen*/, Book::PosMoveListPtr>& p) { return book_body.insert(p);  };
 
+	protected:
+
 		// メモリ上に読み込まれた定跡本体
 		// book_body.find()の直接呼び出しは禁止
 		// (Options["IgnoreBookPly"]==trueのときにplyの部分を削ってメモリに読み込んでいるため、一致しないから)
 		// このクラス(MemoryBookクラス)のfind()メソッドを用いること。
 		BookType book_body;
-
-	protected:
 
 		// 末尾のスペース、"\t","\r","\n"を除去する。
 		// Options["IgnoreBookPly"] == trueのときは、さらに数字も除去する。
@@ -189,8 +189,6 @@ namespace Book
 		// 　ただし、on_the_flyのときは、ディスクアクセスが必要で、その部分がthread safeではないので
 		//   on_the_fly == falseでなければ、非同期にこの関数を呼び出してはならない。
 		Move probe(Position& pos);
-
-		MemoryBook& GetMemoryBook() { return memory_book; }
 
 	protected:
 		// メモリに読み込んだ定跡ファイル

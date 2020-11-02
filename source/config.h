@@ -283,7 +283,6 @@
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
-#define ONE_PLY_EQ_1
 
 // 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
 #define USE_SHARED_MEMORY_IN_EVAL
@@ -307,8 +306,6 @@
 
 // パラメーターの自動調整絡み
 #define USE_GAMEOVER_HANDLER
-
-// NNUE-HalfKPE9
 //#define LONG_EFFECT_LIBRARY
 
 // GlobalOptionsは有効にしておく。
