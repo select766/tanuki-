@@ -95,10 +95,10 @@ namespace USI
 			// この指し手のpvの更新が終わっているのか
 			bool updated = (i <= pvIdx && rootMoves[i].score != -VALUE_INFINITE);
 
-			if (depth == 1 && !updated)
+			if (depth == ONE_PLY && !updated)
 				continue;
 
-			Depth d = updated ? depth : depth - 1;
+			Depth d = updated ? depth : depth - ONE_PLY;
 			Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
 			// multi pv時、例えば3個目の候補手までしか評価が終わっていなくて(PVIdx==2)、このとき、
@@ -115,7 +115,7 @@ namespace USI
 				ss << endl;
 
 			ss  << "info"
-				<< " depth "    << d
+				<< " depth "    << d / ONE_PLY
 				<< " seldepth " << rootMoves[i].selDepth
 				<< " score "    << USI::value(v);
 
