@@ -290,7 +290,7 @@
 // 学習機能を有効にするオプション。
 // 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
 // 有効化してコンパイルしなければならない。
-// #define EVAL_LEARN
+#define EVAL_LEARN
 
 // デバッグ絡み
 //#define ASSERT_LV 3

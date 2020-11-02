@@ -14,7 +14,6 @@ namespace Tanuki {
 	bool MergeBook();
 	bool SetScoreToMove();
 	bool PropagateLeafNodeValuesToRoot();
-	bool PropagateLeafNodeValuesToRootOne();
 	bool ExtractTargetPositions();
 	bool AddTargetPositions();
 }

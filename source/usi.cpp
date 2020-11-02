@@ -838,11 +838,6 @@ void USI::loop(int argc, char* argv[])
 			break;
 		}
 
-		else if (token == "propagate_leaf_node_values_to_root_one") {
-			Tanuki::PropagateLeafNodeValuesToRootOne();
-			break;
-		}
-
 		else if (token == "extract_target_positions") {
 			Tanuki::ExtractTargetPositions();
 			break;

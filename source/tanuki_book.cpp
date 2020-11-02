@@ -66,20 +66,11 @@ namespace {
 		}
 
 		book.write_book(output_book_file_path);
-		sync_cout << "|output_book_file_path|=" << book.book_body.size() << sync_endl;
+		sync_cout << "|output_book_file_path|=" << book.get_body()->size() << sync_endl;
 	}
 
 	void WriteBook(BookMoveSelector& book, const std::string output_book_file_path) {
-		WriteBook(book.GetMemoryBook(), output_book_file_path);
-	}
-
-	/// <summary>
-	/// Moveを16ビット形式に変換する
-	/// </summary>
-	/// <param name="move"></param>
-	/// <returns></returns>
-	Move As16(Move move) {
-		return static_cast<Move>(move & 0xffff);
+		WriteBook(book.get_body(), output_book_file_path);
 	}
 
 	std::mutex UPSERT_BOOK_MOVE_MUTEX;
@@ -101,34 +92,8 @@ namespace {
 	{
 		std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 
-		best_move = As16(best_move);
-		next_move = As16(next_move);
-
-		auto book_moves = book.book_body.find(sfen);
-		if (book_moves == book.book_body.end()) {
-			// 局面が定跡データベースに登録されていない場合。
-			// MemoryBook::insert()に処理を移譲する。
-			book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, num));
-			return;
-		}
-
-		// すでに指し手が登録されているかどうか調べる。
-		for (auto& book_move : *book_moves->second) {
-			if (book_move.bestMove != best_move) {
-				continue;
-			}
-
-			// 指し手がすでに登録されている場合、指し手の情報を上書きする。
-			book_move.nextMove = next_move;
-			book_move.value = value;
-			book_move.depth = depth;
-			book_move.num = num;
-			return;
-		}
-
-		// 指し手が見つからなかった場合、
 		// MemoryBook::insert()に処理を移譲する。
-		book.insert(sfen, BookPos(As16(best_move), As16(next_move), value, depth, num));
+		book.insert(sfen, BookPos(Move16::from_move(best_move), Move16::from_move(next_move), value, depth, num));
 	}
 }
 
@@ -232,19 +197,19 @@ bool Tanuki::CreateScoredBook() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
 
 	std::vector<std::string> sfens;
-	for (const auto& sfen_and_count : input_book.book_body) {
+	for (const auto& sfen_and_count : *input_book.get_body()) {
 		if (!overwrite_existing_positions &&
-			output_book.book_body.find(sfen_and_count.first) != output_book.book_body.end()) {
+			output_book.get_body()->find(sfen_and_count.first) != output_book.get_body()->end()) {
 			continue;
 		}
 		sfens.push_back(sfen_and_count.first);
@@ -360,9 +325,9 @@ bool Tanuki::MergeBook() {
 
 	BookMoveSelector output_book;
 	sync_cout << "Reading output book file: " << output_file << sync_endl;
-	output_book.GetMemoryBook().read_book("book/" + output_file);
+	output_book.get_body().read_book("book/" + output_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.GetMemoryBook().book_body.size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().get_body()->size() << sync_endl;
 
 	std::vector<std::string> input_files;
 	{
@@ -379,11 +344,11 @@ bool Tanuki::MergeBook() {
 		const auto& input_file = input_files[input_file_index];
 		BookMoveSelector input_book;
 		sync_cout << "Reading input book file: " << input_file << sync_endl;
-		input_book.GetMemoryBook().read_book(input_file);
+		input_book.get_body().read_book(input_file);
 		sync_cout << "done..." << sync_endl;
-		sync_cout << "|input_book|=" << input_book.GetMemoryBook().book_body.size() << sync_endl;
+		sync_cout << "|input_book|=" << input_book.get_body().get_body()->size() << sync_endl;
 
-		for (const auto& book_type : input_book.GetMemoryBook().book_body) {
+		for (const auto& book_type : *input_book.get_body().get_body()) {
 			const auto& sfen = book_type.first;
 			const auto& pos_move_list = book_type.second;
 
@@ -399,7 +364,7 @@ bool Tanuki::MergeBook() {
 					// そのような手はスキップする。
 					continue;
 				}
-				output_book.GetMemoryBook().insert(sfen, pos_move, false);
+				output_book.get_body().insert(sfen, pos_move, false);
 			}
 		}
 	}
@@ -439,27 +404,34 @@ bool Tanuki::SetScoreToMove() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
 
 	std::vector<SfenAndMove> sfen_and_moves;
 
 	// 未処理の局面をキューに登録する
-	for (const auto& input_sfen_and_pos_move_list : input_book.book_body) {
+	for (const auto& input_sfen_and_pos_move_list : *input_book.get_body()) {
 		const auto& input_sfen = input_sfen_and_pos_move_list.first;
 
-		auto output_book_moves_it = output_book.book_body.find(input_sfen);
-		if (output_book_moves_it == output_book.book_body.end()) {
+		Position position;
+		StateInfo state_info;
+		position.set(input_sfen, &state_info, Threads[0]);
+
+		auto output_book_moves_it = output_book.get_body()->find(input_sfen);
+		if (output_book_moves_it == output_book.get_body()->end()) {
 			// 出力定跡データベースに局面が登録されていなかった場合
 			for (const auto& input_book_move : *input_sfen_and_pos_move_list.second) {
-				sfen_and_moves.push_back({ input_sfen, input_book_move.bestMove,
-					input_book_move.nextMove });
+				sfen_and_moves.push_back({
+					input_sfen,
+					position.to_move(input_book_move.bestMove),
+					position.to_move(input_book_move.nextMove)
+					});
 			}
 			continue;
 		}
@@ -468,14 +440,17 @@ bool Tanuki::SetScoreToMove() {
 		for (const auto& input_book_move : *input_sfen_and_pos_move_list.second) {
 			if (std::find_if(output_book_moves.begin(), output_book_moves.end(),
 				[&input_book_move](const auto& x) {
-					return USI::move(input_book_move.bestMove) == USI::move(x.bestMove);
+					return input_book_move.bestMove == x.bestMove;
 				}) != output_book_moves.end()) {
 				continue;
 			}
 
 			// 出力定跡データベースに指し手が登録されていなかった場合
-			sfen_and_moves.push_back({ input_sfen, input_book_move.bestMove,
-				input_book_move.nextMove });
+			sfen_and_moves.push_back({
+				input_sfen,
+				position.to_move(input_book_move.bestMove),
+				position.to_move(input_book_move.nextMove)
+				});
 		}
 	}
 	int num_sfen_and_moves = sfen_and_moves.size();
@@ -508,7 +483,7 @@ bool Tanuki::SetScoreToMove() {
 			StateInfo state_info = {};
 			Position& pos = thread.rootPos;
 			pos.set(sfen, &state_info, &thread);
-			Move best_move = pos.move16_to_move(sfen_and_move.best_move);
+			Move best_move = sfen_and_move.best_move;
 			Move next_move = MOVE_NONE;
 
 			if (pos.is_mated()) {
@@ -634,7 +609,7 @@ namespace {
 		std::string sfen = RemovePlyIfIgnoreBookPly(pos.sfen());
 
 		// NegaMax()は定跡データベースに登録されている局面についてのみ処理を行う。
-		ASSERT_LV3(book.book_body.count(sfen));
+		ASSERT_LV3(book.get_body()->count(sfen));
 
 		auto& vmd = memo[sfen];
 		if (vmd.depth != DEPTH_NONE) {
@@ -700,7 +675,7 @@ namespace {
 		for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
 			StateInfo state_info = {};
 			pos.do_move(move, state_info);
-			if (book.book_body.find(pos.sfen()) != book.book_body.end()) {
+			if (book.get_body()->find(pos.sfen()) != book.get_body()->end()) {
 				// 子局面が存在する場合のみ処理する。
 				ValueMoveDepth vmd_child = NegaMax(book, pos, counter);
 
@@ -714,12 +689,12 @@ namespace {
 
 		// 現局面について、定跡データベースに子局面への指し手が登録された。
 		// 定跡データベースを調べ、この局面における最適な指し手を調べて返す。
-		auto book_moves = book.book_body.find(sfen);
-		ASSERT_LV3(book_moves != book.book_body.end());
+		auto book_moves = book.get_body()->find(sfen);
+		ASSERT_LV3(book_moves != book.get_body()->end());
 		for (const auto& book_move : *book_moves->second) {
 			if (vmd.value < book_move.value) {
 				vmd.value = static_cast<Value>(book_move.value);
-				vmd.move = book_move.bestMove;
+				vmd.move = pos.to_move(book_move.bestMove);
 				vmd.depth = book_move.depth;
 			}
 		}
@@ -749,7 +724,7 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book_file|=" << book.book_body.size() << sync_endl;
+	sync_cout << "|input_book_file|=" << book.get_body()->size() << sync_endl;
 
 	// 平手の局面からたどれる局面について処理する
 	// メモをクリアするのを忘れない
@@ -761,7 +736,7 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	NegaMax(book, pos, counter);
 
 	// 平手の局面から辿れなかった局面を処理する
-	for (const auto& book_entry : book.book_body) {
+	for (const auto& book_entry : *book.get_body()) {
 		auto& pos = Threads[0]->rootPos;
 		StateInfo state_info = {};
 		pos.set(book_entry.first, &state_info, Threads[0]);
@@ -769,107 +744,7 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	}
 
 	WriteBook(book, "book/" + output_book_file);
-	sync_cout << "|output_book|=" << book.book_body.size() << sync_endl;
-
-	return true;
-}
-
-// 定跡データベースの各局面の評価値を親局面に伝搬するのを繰り返す
-bool Tanuki::PropagateLeafNodeValuesToRootOne() {
-	std::string input_book_file = Options[kBookInputFile];
-	std::string output_book_file = Options[kBookOutputFile];
-	bool ignore_book_ply = Options["IgnoreBookPly"];
-
-	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
-	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
-	sync_cout << "info string ignore_book_ply=" << ignore_book_ply << sync_endl;
-
-	Search::LimitsType limits;
-	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
-	limits.max_game_ply = 1 << 16;
-	limits.depth = MAX_PLY;
-	limits.silent = true;
-	limits.enteringKingRule = EKR_27_POINT;
-	Search::Limits = limits;
-
-	MemoryBook current_book;
-	input_book_file = "book/" + input_book_file;
-	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
-	current_book.read_book(input_book_file);
-	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book_file|=" << current_book.book_body.size() << sync_endl;
-
-	// 1手ずつ伝搬させていく
-	for (int depth = 1; depth <= 16; ++depth) {
-		sync_cout << "depth:" << depth << sync_endl;
-
-		// このMemoryBookに処理結果を追加していく
-		MemoryBook next_book;
-
-		int counter = 0;
-		for (const auto& current_sfen_and_book_moves : current_book.book_body) {
-			if (++counter % 100000 == 0) {
-				sync_cout << counter << sync_endl;
-			}
-
-			const auto& current_sfen = current_sfen_and_book_moves.first;
-			const auto& current_book_moves = *current_sfen_and_book_moves.second;
-
-			Position& pos = Threads[0]->rootPos;
-			StateInfo state_info0;
-			pos.set(current_sfen, &state_info0, Threads[0]);
-
-			for (auto& current_book_move : current_book_moves) {
-				Move best_move = pos.move16_to_move(current_book_move.bestMove);
-				if (!pos.pseudo_legal(best_move) ||
-					!pos.legal(best_move)) {
-					continue;
-				}
-
-				StateInfo state_info1;
-				pos.do_move(best_move, state_info1);
-
-				// MemoryBook::find()はIgnoreBookPlyに対応していないため、
-				// MemoryBook::book_body::find()を直接呼び出す
-				auto current_child_book_moves = current_book.book_body.find(
-					RemovePlyIfIgnoreBookPly(pos.sfen()));
-				if (current_child_book_moves == current_book.book_body.end()) {
-					// 子局面が定跡データベースに含まれていなかった。
-					// この指し手はそのまま追加する。
-					pos.undo_move(best_move);
-
-					// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
-					next_book.insert(RemovePlyIfIgnoreBookPly(pos.sfen()), current_book_move);
-					continue;
-				}
-
-				// 子局面の指し手の中で最も評価値の高い指し手を選び
-				// その評価値を現在の局面の指し手に伝搬する
-				int best_value = -VALUE_MATE;
-				Move next_move = MOVE_NONE;
-				int depth = 0;
-				for (const auto& current_child_book_move : *current_child_book_moves->second) {
-					if (best_value < current_child_book_move.value) {
-						best_value = current_child_book_move.value;
-						next_move = current_child_book_move.bestMove;
-					}
-					depth = std::max(depth, current_child_book_move.depth);
-				}
-
-				pos.undo_move(best_move);
-
-				// 現在の局面に対して指し手を登録するため、undo_move()してから登録する
-				UpsertBookMove(next_book, RemovePlyIfIgnoreBookPly(pos.sfen()), best_move, next_move, -best_value, depth, 1);
-			}
-		}
-
-		std::swap(current_book, next_book);
-
-		char output_book_file_for_this_depth[_MAX_PATH];
-		sprintf(output_book_file_for_this_depth, "book/%s.%02d", output_book_file.c_str(), depth);
-		WriteBook(current_book, output_book_file_for_this_depth);
-		sync_cout << "|output_book|=" << current_book.book_body.size() << sync_endl;
-	}
+	sync_cout << "|output_book|=" << book.get_body()->size() << sync_endl;
 
 	return true;
 }
@@ -878,15 +753,15 @@ namespace {
 	// 与えられた局面における、与えられた指し手が定跡データベースに含まれているかどうかを返す。
 	// 含まれている場合は、その指し手へのポインターを返す。
 	// 含まれていない場合は、nullptrを返す。
-	BookPos* IsBookMoveExist(BookMoveSelector& book, Position& position, Move move32) {
-		auto book_moves = book.GetMemoryBook().find(position);
+	BookPos* IsBookMoveExist(BookMoveSelector& book, Position& position, Move move) {
+		auto book_moves = book.get_body().find(position);
 		if (book_moves == nullptr) {
 			return nullptr;
 		}
 
 		auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
-			[move32](auto& m) {
-				return As16(m.bestMove) == As16(move32);
+			[move](auto& m) {
+				return m.bestMove == Move16::from_move(move);
 			});
 		if (book_move == book_moves->end()) {
 			// 定跡データベースに、この指し手が登録されていない場合。
@@ -911,7 +786,7 @@ namespace {
 		else {
 			StateInfo state_info = {};
 			position.do_move(move32, state_info);
-			bool exist = book.GetMemoryBook().book_body.find(position.sfen()) != book.GetMemoryBook().book_body.end();
+			bool exist = book.get_body().get_body()->find(position.sfen()) != book.get_body().get_body()->end();
 			position.undo_move(move32);
 			return exist;
 		}
@@ -919,7 +794,7 @@ namespace {
 
 	// 与えられた局面を延長すべきかどうか判断する
 	bool IsTargetPosition(BookMoveSelector& book, Position& position, int multi_pv) {
-		auto book_moves = book.GetMemoryBook().find(position);
+		auto book_moves = book.get_body().find(position);
 		if (book_moves == nullptr) {
 			// 定跡データベースに、この局面が登録されていない場合、延長する。
 			return true;
@@ -958,9 +833,9 @@ bool Tanuki::ExtractTargetPositions() {
 	BookMoveSelector book;
 	input_book_file = "book/" + input_book_file;
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
-	book.GetMemoryBook().read_book(input_book_file);
+	book.get_body().read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book_file|=" << book.GetMemoryBook().book_body.size() << sync_endl;
+	sync_cout << "|input_book_file|=" << book.get_body().get_body()->size() << sync_endl;
 
 	std::set<std::string> explorered;
 	explorered.insert(SFEN_HIRATE);
@@ -1073,14 +948,14 @@ bool Tanuki::AddTargetPositions() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.book_body.size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.book_body.size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
 
 	// 対象の局面を読み込む
 	sync_cout << "Reading target positions: target_sfens_file=" << target_sfens_file << sync_endl;
@@ -1118,8 +993,8 @@ bool Tanuki::AddTargetPositions() {
 			std::istringstream iss(lines[position_index]);
 			std::string move_string;
 			while (iss >> move_string) {
-				Move move = USI::to_move(move_string);
-				move = pos.move16_to_move(move);
+				Move16 move16 = USI::to_move(move_string);
+				Move move = pos.to_move(move16);
 				pos.do_move(move, state_info[pos.game_ply()]);
 			}
 
