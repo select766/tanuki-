@@ -22,6 +22,11 @@
 template<typename T, int D>
 class StatsEntry {
 
+	// Tが整数型(16bitであろうと)ならIsIntはtrueになる。
+	// IsIntがtrueであるとき、operator ()の返し値はint型としたいのでそのためのもの。
+	static const bool IsInt = std::is_integral<T>::value;
+	typedef typename std::conditional<IsInt, int, T>::type TT;
+
 	T entry;
 
 public:
@@ -36,7 +41,7 @@ public:
 		ASSERT_LV3(abs(bonus) <= D); // 範囲が[-D,D]であるようにする。
 		// オーバーフローしないことを保証する。
 		static_assert(D <= std::numeric_limits<T>::max(), "D overflows T");
-
+		
 		entry += bonus - entry * abs(bonus) / D;
 
 		ASSERT_LV3(abs(entry) <= D);
@@ -50,34 +55,38 @@ public:
 template <typename T, int D, int Size, int... Sizes>
 struct Stats : public std::array<Stats<T, D, Sizes...>, Size>
 {
-	typedef Stats<T, D, Size, Sizes...> stats;
+	T* get() { return this->at(0).get(); }
 
 	void fill(const T& v) {
-
-		// For standard-layout 'this' points to first struct member
-		ASSERT_LV3(std::is_standard_layout<stats>::value);
-		
-		typedef StatsEntry<T, D> entry;
-		entry* p = reinterpret_cast<entry*>(this);
-		std::fill(p, p + sizeof(*this) / sizeof(entry), v);
+		T* p = get();
+		std::fill(p, p + sizeof(*this) / sizeof(*p), v);
 	}
 };
 
 template <typename T, int D, int Size>
-struct Stats<T, D, Size> : public std::array<StatsEntry<T, D>, Size> {};
+struct Stats<T, D, Size> : public std::array<StatsEntry<T, D>, Size> {
+	T* get() { return &this->at(0); }
+};
 
 // stats tableにおいて、Dを0にした場合、このtemplate parameterは用いないという意味。
 enum StatsParams { NOT_USED = 0 };
 
+enum StatsType { NoCaptures, Captures };
+
 // ButterflyHistoryは、 現在の探索中にquietな指し手がどれくらい成功/失敗したかを記録し、
 // reductionと指し手オーダリングの決定のために用いられる。
-// 添字は[from_to][color]の順。
 // cf. http://chessprogramming.wikispaces.com/Butterfly+Boards
 // 簡単に言うと、fromの駒をtoに移動させることに対するhistory。
 // やねうら王では、ここで用いられるfromは、駒打ちのときに特殊な値になっていて、盤上のfromとは区別される。
 // そのため、(SQ_NB + 7)まで移動元がある。
 // ※　Stockfishとは、添字の順番を入れ替えてあるので注意。
-typedef Stats<int16_t, 10692, int(SQ_NB + 7) * int(SQ_NB) , COLOR_NB> ButterflyHistory;
+typedef Stats<int16_t, 10692, int(SQ_NB + 7) * int(SQ_NB), COLOR_NB> ButterflyHistory;
+
+/// LowPlyHistory at higher depths records successful quiet moves on plies 0 to 3
+/// and quiet moves which are/were in the PV (ttPv)
+/// It get cleared with each new search and get filled during iterative deepening
+constexpr int MAX_LPH = 4;
+typedef Stats<int16_t, 10692, MAX_LPH, int(SQ_NB + 7) * int(SQ_NB)> LowPlyHistory;
 
 /// CounterMoveHistoryは、直前の指し手の[to][piece]によってindexされるcounter moves(応手)を格納する。
 /// cf. http://chessprogramming.wikispaces.com/Countermove+Heuristic
@@ -112,13 +121,12 @@ typedef Stats<PieceToHistory, NOT_USED, SQ_NB , PIECE_NB> ContinuationHistory;
 // alpha beta探索の効率を改善するために、MovePickerは最初に(早い段階のnext_move()で)カットオフ(beta cut)が
 // 最も出来そうな指し手を返そうとする。
 //
-class MovePicker
+struct MovePicker
 {
 	// 生成順に次の1手を取得するのか、オーダリング上、ベストな指し手を取得するのかの定数
 	// (このクラスの内部で用いる。)
 	enum PickType { Next, Best };
 
-public:
 	// このクラスは指し手生成バッファが大きいので、コピーして使うような使い方は禁止。
 	MovePicker(const MovePicker&) = delete;
 	MovePicker& operator=(const MovePicker&) = delete;
@@ -131,17 +139,12 @@ public:
 	// 静止探索(qsearch)から呼び出される時用。
 	// recapSq = 直前に動かした駒の行き先の升(取り返される升)
 	MovePicker(const Position& pos_, Move ttMove_, Depth depth_, const ButterflyHistory* mh ,
-		const CapturePieceToHistory* cph , 
-		const PieceToHistory** ch,
-		Square recapSq);
+		const CapturePieceToHistory* cph , const PieceToHistory** ch, Square recapSq);
 
 	// 通常探索(search)から呼び出されるとき用。
 	// cm = counter move , killers_p = killerの指し手へのポインタ
-	MovePicker(const Position& pos_, Move ttMove_, Depth depth_, const ButterflyHistory* mh,
-		const CapturePieceToHistory* cph ,
-		const PieceToHistory** ch,
-		Move cm,
-		Move* killers_p);
+	MovePicker(const Position& pos_, Move ttMove_, Depth depth_, const ButterflyHistory* mh, const LowPlyHistory*,
+		const CapturePieceToHistory* cph , const PieceToHistory** ch, Move cm, Move* killers_p, int);
 
 
 	// 呼び出されるごとに新しいpseudo legalな指し手をひとつ返す。
@@ -159,7 +162,6 @@ private:
 	template<MOVE_GEN_TYPE> void score();
 
 	// range-based forを使いたいので。
-	// 現在の指し手から終端までの指し手が返る。
 	ExtMove* begin() { return cur; }
 	ExtMove* end() { return endMoves; }
 
@@ -167,6 +169,7 @@ private:
 
 	// コンストラクタで渡されたhistroyのポインタを保存しておく変数。
 	const ButterflyHistory* mainHistory;
+	const LowPlyHistory* lowPlyHistory;
 	const CapturePieceToHistory* captureHistory;
 	const PieceToHistory** continuationHistory;
 
@@ -178,7 +181,7 @@ private:
 	// refutations[2] : counter move(コンストラクタで渡された、前の局面の指し手に対する応手)
 	// cur           : 次に返す指し手
 	// endMoves      : 生成された指し手の末尾
-	// endBadCapture : BadCaptureの終端(captureの指し手を試すフェイズでのendMovesから後方に向かって悪い捕獲の指し手を移動させていく時に用いる)
+	// endBadCapture : BadCaptureの終端(これは、movesの先頭から再利用していく)
 	ExtMove refutations[3] , *cur, *endMoves, *endBadCaptures;
 
 	// 指し手生成の段階
@@ -193,10 +196,11 @@ private:
 	// コンストラクタで渡された探索深さ
 	Depth depth;
 
+	// LowPlyHistory
+	int ply;
+
 	// 指し手生成バッファ
-	// 最大合法手の数 = 593 , これを要素数が16の倍数になるようにpaddingすると608。
-	// メモリアドレスが32byteの倍数になるようにcurを使いたいので+3して、611。
-	ExtMove moves[MAX_MOVES + 11];
+	ExtMove moves[MAX_MOVES];
 };
 
 #endif // #ifndef MOVEPICK_H_INCLUDED
