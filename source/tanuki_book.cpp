@@ -135,7 +135,7 @@ bool Tanuki::CreateRawBook() {
 	int num_records = 0;
 	while (std::getline(ifs, line)) {
 		std::istringstream iss(line);
-		Position pos;
+		Position& pos = Threads[0]->rootPos;
 		pos.set_hirate(&state_info[0], Threads[0]);
 
 		std::string token;
@@ -419,7 +419,7 @@ bool Tanuki::SetScoreToMove() {
 	for (const auto& input_sfen_and_pos_move_list : *input_book.get_body()) {
 		const auto& input_sfen = input_sfen_and_pos_move_list.first;
 
-		Position position;
+		Position& position = Threads[0]->rootPos;
 		StateInfo state_info;
 		position.set(input_sfen, &state_info, Threads[0]);
 
@@ -854,7 +854,7 @@ bool Tanuki::ExtractTargetPositions() {
 		}
 
 		auto moves = frontier.front();
-		Position position;
+		Position& position = Threads[0]->rootPos;
 		position.set_hirate(&state_info[0], Threads[0]);
 		// Œ»‹Ç–Ê‚Ü‚Åw‚µè‚ği‚ß‚é
 		for (auto move : moves) {
