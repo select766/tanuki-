@@ -131,8 +131,8 @@ void TranspositionTable::clear()
 
 	// 進捗を表示しながら並列化してゼロクリア
 	// Stockfishのここにあったコードは、独自の置換表を実装した時にも使いたいため、tt.cppに移動させた。
-	Tools::memclear("Hash" , table, size);
-
+	//Tools::memclear("Hash" , table, size);
+	std::memset(table, 0, size);
 }
 
 TTEntry* TranspositionTable::probe(const Key key, bool& found) const
