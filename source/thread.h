@@ -78,9 +78,7 @@ public:
 	// pvIdx    : このスレッドでMultiPVを用いているとして、rootMovesの(0から数えて)何番目のPVの指し手を
 	//      探索中であるか。MultiPVでないときはこの変数の値は0。
 	// pvLast   : tbRank絡み。将棋では関係ないので用いない。
-	size_t pvIdx /*,pvLast*/;
-
-	uint64_t ttHitAverage;
+	size_t pvIdx /*,pvLast*/ /* ,shuffleExts */;
 
 	// selDepth  : rootから最大、何手目まで探索したか(選択深さの最大)
 	// nmpMinPly : null moveの前回の適用ply
@@ -115,12 +113,12 @@ public:
 	CounterMoveHistory counterMoves;
 	LowPlyHistory lowPlyHistory;
 	ButterflyHistory mainHistory;
-	LowPlyHistory lowPlyHistory;
 	CapturePieceToHistory captureHistory;
 
 	// コア数が多いか、長い持ち時間においては、ContinuationHistoryもスレッドごとに確保したほうが良いらしい。
 	// cf. https://github.com/official-stockfish/Stockfish/commit/5c58d1f5cb4871595c07e6c2f6931780b5ac05b5
-	// continuationHistory[inCheck][Capture]
+	// 添字の[2][2]は、[inCheck(王手がかかっているか)][captureOrPawnPromotion]
+	// →　この改造、レーティングがほぼ上がっていない。悪い改造のような気がする。
 	ContinuationHistory continuationHistory[2][2];
 
 	// Stockfish10ではスレッドごとにcontemptを保持するように変わった。
@@ -160,9 +158,7 @@ struct MainThread: public Thread
 
 	// 前回の探索時のスコア。
 	// 次回の探索のときに何らか使えるかも。
-	Value bestPreviousScore;
-
-	Value iterValue[4];
+	Value previousScore;
 
 	// check_time()で用いるカウンター。
 	// デクリメントしていきこれが0になるごとに思考をストップするのか判定する。
@@ -221,7 +217,7 @@ struct ThreadPool: public std::vector<Thread*>
 	void wait_for_search_finished() const;
 
 	// stop   : 探索中にこれがtrueになったら探索を即座に終了すること。
-	std::atomic_bool stop, increaseDepth;
+	std::atomic_bool stop;
 	
 private:
 

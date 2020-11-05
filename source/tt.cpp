@@ -58,12 +58,14 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 		/*|| g != generation() // probe()において非0のkeyとマッチした場合、その瞬間に世代はrefreshされている。　*/
 		)
 	{
-		key16 = (uint16_t)(k >> 48);
+		ASSERT_LV3(d >= DEPTH_NONE);
+		ASSERT_LV3(d < 256 + DEPTH_OFFSET);
+
+		key16     = pos_key;
+		depth8    = (uint8_t)(d - DEPTH_OFFSET); // DEPTH_OFFSETだけ下駄履きさせてある。
+		genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
 		value16 = (int16_t)v;
 		eval16    = (int16_t)ev;
-		genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
-		ASSERT_LV3(d >= DEPTH_OFFSET);
-		depth8 = (uint8_t)(d - DEPTH_OFFSET); // DEPTH_OFFSETだけ下駄履きさせてある。
 	}
 }
 
@@ -132,8 +134,8 @@ void TranspositionTable::clear()
 
 	// 進捗を表示しながら並列化してゼロクリア
 	// Stockfishのここにあったコードは、独自の置換表を実装した時にも使いたいため、tt.cppに移動させた。
-	//Tools::memclear("Hash" , table, size);
-	std::memset(table, 0, size);
+	Tools::memclear("Hash" , table, size);
+
 }
 
 TTEntry* TranspositionTable::probe(const Key key, bool& found) const
@@ -231,13 +233,17 @@ int TranspositionTable::hashfull() const
 {
 	// すべてのエントリーにアクセスすると時間が非常にかかるため、先頭から1000エントリーだけ
 	// サンプリングして使用されているエントリー数を返す。
+
+	// Stockfish11では、1000 Cluster(3000 TTEntry)についてサンプリングするように変更されたが、
+	// 計測時間がもったいないので、古いコードのままにしておく。
+	
 	int cnt = 0;
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 1000 / ClusterSize; ++i)
 		for (int j = 0; j < ClusterSize; ++j)
 			cnt += table[i].entry[j].depth8 && (table[i].entry[j].genBound8 & 0xF8) == generation8;
 
 	// return cnt;でも良いが、そうすると最大で999しか返らず、置換表使用率が100%という表示にならない。
-	return cnt / ClusterSize;
+	return cnt * 1000 / (ClusterSize * (1000 / ClusterSize));
 }
 
 #if defined(EVAL_LEARN)

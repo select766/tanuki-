@@ -271,7 +271,7 @@ constexpr int MAX_PLY_NUM = 246;
 // 探索部は通常のやねうら王エンジンを用いる。
 #define YANEURAOU_ENGINE
 
-//#define USE_EVAL_HASH
+#define USE_EVAL_HASH
 #define USE_SEE
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
@@ -284,7 +284,7 @@ constexpr int MAX_PLY_NUM = 246;
 // 学習機能を有効にするオプション。
 // 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
 // 有効化してコンパイルしなければならない。
-#define EVAL_LEARN
+// #define EVAL_LEARN
 
 // デバッグ絡み
 //#define ASSERT_LV 3

@@ -57,7 +57,18 @@ COMPILER = g++
 # COMPILER = clang++
 
 
-# 標準的なコンパイルオプション
+# エンジンの表示名 (engine displayname)
+# ("usi"コマンドに対して出力される)
+#ENGINE_NAME =
+
+
+# developing branch // 現状、非公開 (currently private)
+# dev : 開発中のbranchならdevと指定する (developing branch) : 
+# abe : abe
+#ENGINE_BRANCH = dev
+
+
+# 標準的なコンパイルオプション (standard compile options)
 CPPFLAGS   = -std=c++17 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
 WCPPFLAGS  =
 LDFLAGS  =
@@ -155,7 +166,7 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 			OPENMP_LDFLAGS =
 		else
 			# Other (normal clang++/libomp env)
-			OPENMP = -fopenmp=libgomp
+			OPENMP = -fopenmp
 			OPENMP_LDFLAGS = -lomp
 		endif
 	endif
@@ -163,7 +174,7 @@ endif
 
 # NNUE評価関数 学習バイナリ用 OpenBLAS
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
-	BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -IC:\msys64\mingw64\include\OpenBLAS
+	BLAS = -DUSE_BLAS
 	BLAS_LDFLAGS = -lopenblas
 	ifeq ($(MSYSTEM),MINGW64)
 		BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)

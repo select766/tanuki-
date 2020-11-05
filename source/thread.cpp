@@ -33,14 +33,15 @@ void Thread::clear()
 
 	// ここは、未初期化のときに[SQ_ZERO][NO_PIECE]を指すので、ここを-1で初期化しておくことによって、
 	// history > 0 を条件にすれば自ずと未初期化のときは除外されるようになる。
+
 	for (bool inCheck : { false, true })
 		for (StatsType c : { NoCaptures, Captures })
 		{
 			for (auto& to : continuationHistory[inCheck][c])
-				for (auto& h : to)
-					h->fill(0);
-			continuationHistory[inCheck][c][SQ_ZERO][NO_PIECE]->fill(Search::CounterMovePruneThreshold - 1);
-		}	
+		for (auto& h : to)
+			h->fill(0);
+			continuationHistory[inCheck][c][NO_PIECE][0]->fill(Search::CounterMovePruneThreshold - 1);
+		}
 }
 
 // 待機していたスレッドを起こして探索を開始させる
@@ -108,14 +109,24 @@ void ThreadPool::set(size_t requested)
 		clear();
 
 		// Reallocate the hash with the new threadpool size
-		//TT.resize(Options["Hash"]);
+		//TT.resize(Options["USI_Hash"]);
 
 		// →　新しいthreadpoolのサイズで置換表用のメモリを確保しなおしたほうが
 		//  良いらしいのだが、大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
-	  
+
+		// スレッド数に依存する探索パラメーターの初期化
+		// →　やねうら王ではそんなのないのでコメントアウト
+
 		// Init thread number dependent search params.
-		Search::init();
+		//Search::init();
 	}
+
+#if defined(EVAL_LEARN)
+	// 学習用の実行ファイルでは、スレッド数が変更になったときに各ThreadごとのTTに
+	// メモリを再割り当てする必要がある。
+	TT.init_tt_per_thread();
+#endif
+
 }
 
 // ThreadPool::clear()は、threadPoolのデータを初期値に設定する。
@@ -125,7 +136,7 @@ void ThreadPool::clear() {
 		th->clear();
 
 	main()->callsCnt = 0;
-	main()->bestPreviousScore = VALUE_INFINITE;
+	main()->previousScore = VALUE_INFINITE;
 	main()->previousTimeReduction = 1.0;
 }
 
@@ -139,7 +150,6 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 
 	// ponderに関して、StockfishではstopOnPonderhitというのがあるが、やねうら王にはこのフラグはない。
 	/* main()->stopOnPonderhit = */ stop = false;
-	increaseDepth = true;
 	main()->ponder = ponderMode;
 	Search::Limits = limits;
 	Search::RootMoves rootMoves;
@@ -197,20 +207,27 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 
 		th->rootDepth = th->completedDepth = 0;
 		th->rootMoves = rootMoves;
-
-		// setupStatesを渡して、これをコピーしておかないと局面を遡れない。
-		th->rootPos.set(sfen, &setupStates->back(),th);
-		th->lowPlyHistory.fill(0);
+		th->rootPos.set(sfen, &th->rootState,th);
+		th->rootState = setupStates->back();
 	}
 
-#if defined(USE_FV_VAR)
-	// Position::set()によって、dirtyPieceはevalListに反映されていることになるのだが、
-	// 次にst->previousを復元してしまうと、その更新したことを示すフラグを潰してしまう。ここでフラグを立て直す。
-	tmp.dirtyPiece.updated_ = true;
-#endif
+	main()->start_searching();
+}
 
-	// Position::set()によってクリアされていた、st->previousを復元する。
-	setupStates->back() = tmp;
+
+// 探索を開始する(main thread以外)
+
+void ThreadPool::start_searching() {
+
+	for (Thread* th : *this)
+		if (th != front())
+			th->start_searching();
+}
+
+
+// main threadがそれ以外の探索threadの終了を待つ。
+
+void ThreadPool::wait_for_search_finished() const {
 
 	for (Thread* th : *this)
 		if (th != front())

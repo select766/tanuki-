@@ -329,11 +329,11 @@ static bool aligned(Square sq1, Square sq2, Square sq3/* is ksq */)
 // 通常探索時の最大探索深さ
 constexpr int MAX_PLY = MAX_PLY_NUM;
 
-// 探索深さを表現するためのenum
+// 探索深さを表現する型
 typedef int Depth;
 
-enum : int
-{
+enum : int {
+
 	// 静止探索で王手がかかっているときにこれより少ない残り探索深さでの探索した結果が置換表にあってもそれは信用しない
 	DEPTH_QS_CHECKS = 0,
 
@@ -393,6 +393,9 @@ enum Value: int32_t
 
 
 	// 勝ち手順が何らか証明されているときのスコア下限値
+	// Stockfishでは10000に設定されているが、あまり低い数字にすると、
+	// 評価値(evaluate()の返し値)がこれを超えてしまい、誤動作する。
+	// やねうら王では、ぎりぎりの値にしておきたい。
 	VALUE_KNOWN_WIN = int(VALUE_MATE_IN_MAX_PLY) - 1000,
 
 	// 千日手による優等局面への突入したときのスコア
@@ -436,7 +439,7 @@ enum PieceType : uint32_t
 	PIECE_HAND_NB = KING,   // 手駒になる駒種の最大+1
 
 	PIECE_TYPE_PROMOTE = 8, // 成り駒と非成り駒との差(この定数を足すと成り駒になる)
-	PIECE_TYPE_NB = 16,// 駒種の数。(成りを含める)
+	PIECE_TYPE_NB = 16, // 駒種の数。(成りを含める)
 
 	// --- 特殊用途
 
@@ -591,7 +594,13 @@ constexpr Move make_move(Square from, Square to) { return (Move)(to + (from << 7
 constexpr Move make_move_promote(Square from, Square to) { return (Move)(to + (from << 7) + MOVE_PROMOTE); }
 
 // Pieceをtoに打つ指し手を生成して返す(16bitの指し手)
-constexpr Move make_move_drop(Piece pt, Square to) { return (Move)(to + (pt << 7) + MOVE_DROP); }
+// 打つ指し手は、移動先の升と駒種
+constexpr Move make_move_drop(PieceType pt, Square to) { return (Move)(to + (pt << 7) + MOVE_DROP); }
+
+// 移動元の升と移動先の升を逆転させた指し手を生成する。探索部で用いる。
+constexpr Move reverse_move(Move m) {
+	return make_move(to_sq(m), from_sq(m));
+}
 
 // 指し手がおかしくないかをテストする
 // ただし、盤面のことは考慮していない。MOVE_NULLとMOVE_NONEであるとfalseが返る。
@@ -693,34 +702,56 @@ enum Hand : uint32_t { HAND_ZERO = 0, };
 // 手駒のbit位置
 constexpr int PIECE_BITS[PIECE_HAND_NB] = { 0, 0 /*歩*/, 8 /*香*/, 12 /*桂*/, 16 /*銀*/, 20 /*角*/, 24 /*飛*/ , 28 /*金*/ };
 
-// Piece(歩,香,桂,銀,金,角,飛)を手駒に変換するテーブル
-constexpr Hand PIECE_TO_HAND[PIECE_HAND_NB] = { (Hand)0, (Hand)(1 << PIECE_BITS[PAWN]) /*歩*/, (Hand)(1 << PIECE_BITS[LANCE]) /*香*/, (Hand)(1 << PIECE_BITS[KNIGHT]) /*桂*/,
-(Hand)(1 << PIECE_BITS[SILVER]) /*銀*/,(Hand)(1 << PIECE_BITS[BISHOP]) /*角*/,(Hand)(1 << PIECE_BITS[ROOK]) /*飛*/,(Hand)(1 << PIECE_BITS[GOLD]) /*金*/ };
+// PieceType(歩,香,桂,銀,金,角,飛)を手駒に変換するテーブル
+constexpr Hand PIECE_TO_HAND[PIECE_HAND_NB] = {
+	(Hand)0,
+	(Hand)(1 << PIECE_BITS[PAWN])   /*歩*/,
+	(Hand)(1 << PIECE_BITS[LANCE])  /*香*/,
+	(Hand)(1 << PIECE_BITS[KNIGHT]) /*桂*/,
+	(Hand)(1 << PIECE_BITS[SILVER]) /*銀*/,
+	(Hand)(1 << PIECE_BITS[BISHOP]) /*角*/,
+	(Hand)(1 << PIECE_BITS[ROOK])   /*飛*/,
+	(Hand)(1 << PIECE_BITS[GOLD])   /*金*/
+};
 
 // その持ち駒を表現するのに必要なbit数のmask(例えば3bitなら2の3乗-1で7)
 constexpr int PIECE_BIT_MASK[PIECE_HAND_NB] = { 0,31/*歩は5bit*/,7/*香は3bit*/,7/*桂*/,7/*銀*/,3/*角*/,3/*飛*/,7/*金*/ };
 
-constexpr int PIECE_BIT_MASK2[PIECE_HAND_NB] = { 0,
-	PIECE_BIT_MASK[PAWN]   << PIECE_BITS[PAWN]  , PIECE_BIT_MASK[LANCE]  << PIECE_BITS[LANCE] , PIECE_BIT_MASK[KNIGHT] << PIECE_BITS[KNIGHT],
-	PIECE_BIT_MASK[SILVER] << PIECE_BITS[SILVER], PIECE_BIT_MASK[BISHOP] << PIECE_BITS[BISHOP], PIECE_BIT_MASK[ROOK]   << PIECE_BITS[ROOK]  ,
-	PIECE_BIT_MASK[GOLD]   << PIECE_BITS[GOLD] };
+constexpr u32 PIECE_BIT_MASK2[PIECE_HAND_NB] = {
+	0,
+	PIECE_BIT_MASK[PAWN]   << PIECE_BITS[PAWN]  ,
+	PIECE_BIT_MASK[LANCE]  << PIECE_BITS[LANCE] ,
+	PIECE_BIT_MASK[KNIGHT] << PIECE_BITS[KNIGHT],
+	PIECE_BIT_MASK[SILVER] << PIECE_BITS[SILVER],
+	PIECE_BIT_MASK[BISHOP] << PIECE_BITS[BISHOP],
+	PIECE_BIT_MASK[ROOK]   << PIECE_BITS[ROOK]  ,
+	PIECE_BIT_MASK[GOLD]   << PIECE_BITS[GOLD]
+};
 
 // 駒の枚数が格納されているbitが1となっているMASK。(駒種を得るときに使う)
-constexpr int32_t HAND_BIT_MASK = PIECE_BIT_MASK2[PAWN] | PIECE_BIT_MASK2[LANCE] | PIECE_BIT_MASK2[KNIGHT] | PIECE_BIT_MASK2[SILVER]
-          | PIECE_BIT_MASK2[BISHOP] | PIECE_BIT_MASK2[ROOK] | PIECE_BIT_MASK2[GOLD];
+constexpr u32 HAND_BIT_MASK =
+	PIECE_BIT_MASK2[PAWN]   |
+	PIECE_BIT_MASK2[LANCE]  |
+	PIECE_BIT_MASK2[KNIGHT] |
+	PIECE_BIT_MASK2[SILVER] |
+	PIECE_BIT_MASK2[BISHOP] |
+	PIECE_BIT_MASK2[ROOK]   |
+	PIECE_BIT_MASK2[GOLD];
 
 // 余らせてあるbitの集合。
-constexpr int32_t HAND_BORROW_MASK = (HAND_BIT_MASK << 1) & ~HAND_BIT_MASK;
+constexpr u32 HAND_BORROW_MASK = (HAND_BIT_MASK << 1) & ~HAND_BIT_MASK;
 
 
 // 手駒pcの枚数を返す。
-constexpr int hand_count(Hand hand, Piece pr) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); */ return (hand >> PIECE_BITS[pr]) & PIECE_BIT_MASK[pr]; }
+// このASSERTを有効化するとconstexprにならないのでコメントアウトしておく。
+// 返し値は引き算するときに符号を意識したくないのでintにしておく。
+constexpr int hand_count(Hand hand, PieceType pr) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); */ return (int)(hand >> PIECE_BITS[pr]) & PIECE_BIT_MASK[pr]; }
 
 // 手駒pcを持っているかどうかを返す。
-constexpr int hand_exists(Hand hand, Piece pr) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); */ return hand & PIECE_BIT_MASK2[pr]; }
+constexpr u32 hand_exists(Hand hand, PieceType pr) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pr && pr < PIECE_HAND_NB); */ return hand & PIECE_BIT_MASK2[pr]; }
 
 // 歩以外の手駒を持っているか
-constexpr int hand_except_pawn_exists(Hand hand) { return hand & (HAND_BIT_MASK ^ PIECE_BIT_MASK2[PAWN]); }
+constexpr u32 hand_except_pawn_exists(Hand hand) { return hand & (HAND_BIT_MASK ^ PIECE_BIT_MASK2[PAWN]); }
 
 // 手駒にpcをc枚加える
 constexpr void add_hand(Hand &hand, PieceType pr, int c = 1) { hand = (Hand)(hand + PIECE_TO_HAND[pr] * c); }
@@ -737,29 +768,38 @@ constexpr bool hand_is_equal_or_superior(Hand h1, Hand h2) { return ((h1-h2) & H
 // 手駒を表示する(USI形式ではない) デバッグ用
 std::ostream& operator<<(std::ostream& os, Hand hand);
 
-// --------------------
-// 手駒情報を直列化したもの
-// --------------------
 
-// 特定種の手駒を持っているかどうかをbitで表現するクラス
-// bit0..歩を持っているか , bit1..香 , bit2..桂 , bit3..銀 , bit4..角 , bit5..飛 , bit6..金 , bit7..玉(フラグとして用いるため)
-enum HandKind : uint32_t { HAND_KIND_PAWN = 1 << (PAWN-1), HAND_KIND_LANCE=1 << (LANCE-1) , HAND_KIND_KNIGHT = 1 << (KNIGHT-1),
-	HAND_KIND_SILVER = 1 << (SILVER-1), HAND_KIND_BISHOP = 1 << (BISHOP-1), HAND_KIND_ROOK = 1 << (ROOK-1) , HAND_KIND_GOLD = 1 << (GOLD-1) ,
-	HAND_KIND_KING = 1 << (KING-1) , HAND_KIND_ZERO = 0,};
+// --------------------	
+// 手駒情報を直列化したもの	
+// --------------------	
+#if defined(LONG_EFFECT_LIBRARY)
 
-// Hand型からHandKind型への変換子
-// 例えば歩の枚数であれば5bitで表現できるが、011111bを加算すると1枚でもあれば桁あふれしてbit5が1になる。
-// これをPEXT32で回収するという戦略。
+// LONG_EFFECT_LIBRARYのmateルーチンで使用している。
+// 修正してこのenumは削除すべきだが、わりと面倒なので出来ていない。
+
+// 特定種の手駒を持っているかどうかをbitで表現するクラス	
+// bit0..歩を持っているか , bit1..香 , bit2..桂 , bit3..銀 , bit4..角 , bit5..飛 , bit6..金 , bit7..玉(フラグとして用いるため)	
+enum HandKind : uint32_t {
+	HAND_KIND_PAWN = 1 << (PAWN - 1), HAND_KIND_LANCE = 1 << (LANCE - 1), HAND_KIND_KNIGHT = 1 << (KNIGHT - 1),
+	HAND_KIND_SILVER = 1 << (SILVER - 1), HAND_KIND_BISHOP = 1 << (BISHOP - 1), HAND_KIND_ROOK = 1 << (ROOK - 1), HAND_KIND_GOLD = 1 << (GOLD - 1),
+	HAND_KIND_KING = 1 << (KING - 1), HAND_KIND_ZERO = 0,
+};
+
+// Hand型からHandKind型への変換子	
+// 例えば歩の枚数であれば5bitで表現できるが、011111bを加算すると1枚でもあれば桁あふれしてbit5が1になる。	
+// これをPEXT32で回収するという戦略。	
 static HandKind toHandKind(Hand h) { return (HandKind)PEXT32(h + HAND_BIT_MASK, HAND_BORROW_MASK); }
 
-// 特定種類の駒を持っているかを判定する
+// 特定種類の駒を持っているかを判定する	
 constexpr bool hand_exists(HandKind hk, Piece pt) { /* ASSERT_LV2(PIECE_HAND_ZERO <= pt && pt < PIECE_HAND_NB); */ return static_cast<bool>(hk & (1 << (pt - 1))); }
 
-// 歩以外の手駒を持っているかを判定する
+// 歩以外の手駒を持っているかを判定する	
 constexpr bool hand_exceptPawnExists(HandKind hk) { return hk & ~HAND_KIND_PAWN; }
 
-// 手駒の有無を表示する(USI形式ではない) デバッグ用
-std::ostream& operator<<(std::ostream& os, HandKind hk);
+// 手駒の有無を表示する(USI形式ではない) デバッグ用	
+//std::ostream& operator<<(std::ostream& os, HandKind hk);
+
+#endif
 
 // --------------------
 //    指し手生成器
