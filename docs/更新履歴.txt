@@ -7,7 +7,213 @@
 		ちゃんと検証してからMakefile書き直す。
 
 
+■　2020/11/05
+
+
+
+- やねうら王V5.20
+
+
+・やねうら王V5.10とV5.20との比較
+engine1 = YaneuraOu2018NNUE_clang_20201104_V510.exe , eval = tanuki2018_nnue
+engine2 = YaneuraOu2018NNUE_clang_20201105_V520.exe , eval = tanuki2018_nnue
+T2,b1000,523 - 61 - 656(44.36% R-39.36[-56.1,-22.62]) winrate black , white = 51.15% , 48.85%
+
+
+・Mizarさんの2020年5月のmブランチとの比較
+engine1 = YaneuraOu_NNUE-m-202005-mizar.exe , eval = tanuki2018_nnue
+engine2 = YaneuraOu2018NNUE_clang_20201105_V520.exe , eval = tanuki2018_nnue
+T2,b1000,369 - 39 - 492(42.86% R-49.98[-69.64,-30.31]) winrate black , white = 48.2% , 51.8%
+T2,b2000,345 - 40 - 395(46.62% R-23.51[-44.55,-2.47]) winrate black , white = 52.84% , 47.16%
+
+
+・たまさんの最新のmブランチとの比較
+engine1 = YaneuraOu_NNUE-m-202008-tama.exe , eval = tanuki2018_nnue
+engine2 = YaneuraOu2018NNUE_clang_20201105_V520.exe , eval = tanuki2018_nnue
+T2,b1000,551 - 53 - 606(47.62% R-16.53[-33.34,0.29]) winrate black , white = 51.86% , 48.14%
+
+
+// どのmブランチに対しても有意に強い。
+// 計測には公開されている 2018年のtanuki-評価関数を使用。
+
+
+・mブランチ＋2020年5月時点のStockfishをマージしたもの(Mizarさん)
+	https://github.com/mizar/YaneuraOu/releases/tag/v4.89-test20200505
+
+・mブランチ + 2020年8月ぐらい時点のStockfishをマージしたもの(たまさん)
+	https://github.com/Tama4649/etc/tree/master/JKishi18gou_m
+
+
+
+
+- Reductions配列の初期値変更。(+R25)
+- Learner::search()がコンパイル通らなくなってたの修正。
+- null moveの条件更新。
+- VALUE_TB_LOSS_IN_MAX_PLY, VALUE_TB_WIN_IN_MAX_PLY導入。
+- Step 13. Pruning at shallow depth (~200 Elo)のコード刷新。(+R15)
+- LowPlyHistory、添字逆順にしたほうが掛け算がシフトで済むので高速化するが、コピーするコードがあってちょっと書き換え嫌だな…。
+
+
+- continuationHistoryに[inCheck][captureOrPawnPromotion]の[2][2]を追加。
+- Search::Stackに inCheck,ttPv追加。これを利用した枝刈り追加。
+- ThreadPool::start_searching(),wait_for_search_finished()追加。
+- update_continuation_histories(),条件変更。
+
+
+engine1 = YaneuraOu2018NNUE_clang_20201104_V510.exe , eval = tanuki2018_nnue
+engine2 = YaneuraOu2018NNUE_clang_20201104_V510c.exe , eval = tanuki2018_nnue
+T2,r100,1435 - 57 - 1508(48.76% R-8.62[-19.16,1.92]) winrate black , white = 51.51% , 48.49%
+T2,b1000,1408 - 150 - 1442(49.4% R-4.15[-14.85,6.56]) winrate black , white = 51.54% , 48.46%
+// デグレはしてないが強くもなってないような…。
+
+
+■　2020/11/04
+
+
+- やねうら王 V5.10
+	- LowPlyHistoryの導入まわりでR70ほど上がったのでバージョンナンバーを0.1あげる。
+	- Move16導入したことで、Aperyの定跡読み込みまわりにあったバグやMateルーチンにあった開始時に
+		PV指定した時のバグが自然消滅した。
+
+engine1 = YaneuraOu2018NNUE_clang_20201102_V500.exe , eval = tanuki2018_nnue
+engine2 = YaneuraOu2018NNUE_clang_20201104_V510.exe , eval = tanuki2018_nnue
+T2,b1000,920 - 105 - 1345(40.62% R-65.97[-78.2,-53.75]) winrate black , white = 52.58% , 47.42%
+T2,b2000,371 - 50 - 569(39.47% R-74.3[-93.35,-55.24]) winrate black , white = 53.62% , 46.38%
+
+
+- LowPlyHistory導入
+	- LowPlyHistory導入
+	- move ordering改善
+	- update_all_stats追加
+	- Search::Stack::ttHit追加
+	- R70ぐらい上がってる模様。
+
+
+- FV_VAR機能の削除
+	- KPPTの差分計算を高速化するために導入したが、KPPT自体、もう使っていないし、
+	　この機能のためにソースコードが複雑化する＆保守するの大変なので残しておけない。
+	- BonaPieceExpansionなど削除。これもはや使うこともなかろう…。
+
+
+- PieceType導入
+	- ソースコード大幅に修正になった。
+	- 探索ノード数は変わっていないので機能的には等価。
+	- コンパイル通らないところがあったら報告ください。
+
+
+===========================
+Total time (ms) : 10725
+Nodes searched  : 5785406
+Nodes/second    : 539431
+
+
+■　2020/11/03
+
+
+- VisualStudioのプロジェクト設定の
+	Release-NNUE-LEARN | x64
+	のビルド時にEVAL_LEARNが指定されていなかったので追加。
+- EVAL_LEARNをつけてコンパイルしたときにエンジン名に EVAL_LEARNの文字が入るようにした。
+
+
+
+- やねうら王 V5.01
+	engine1 = YaneuraOu2018NNUE_clang_20201102_V500.exe , eval = tanuki2018_nnue
+	engine2 = YaneuraOu2018NNUE_clang_20201103_V501.exe , eval = tanuki2018_nnue
+	T2,b1000,609 - 58 - 623(49.43% R-3.95[-20.22,12.33]) winrate black , white = 52.03% , 47.97%
+	T2,b2000,267 - 26 - 277(49.08% R-6.39[-30.87,18.1]) winrate black , white = 48.71% , 51.29%
+	デグレはしてなさそうなのでこれでV5.01にしておく。
+
+
+- 置換表サイズ128GB制限の撤廃。
+	- USI_Hashの新しい上限値は33554432MB(約33TB)
+	- メモリが潤沢にある環境でのテストができていないので、誰かAWSで512GBぐらい確保した状態の動作テストをして欲しい😥
+	- mul_hi64()導入。
+	- 128bitの掛け算を行うのに、gccではgccの拡張を用いているので新しめのgcc/clangでないと
+	  これがサポートされていないかも。
+	- excluded_keyを含めたhash keyを生成するときにkeyの下位bitのみにxorをかけると、
+		新しいTT.first_entry()の実装ではkeyの上位bitを用いるので
+		同一TTEntryを指すことになってしまい探索性能が劇的に落ちる。
+		Stockfishで導入されたmake_key()を改良して導入。
+		// mブランチの作者、たぶんこれに気づかなかったので、このpatch導入できなかったのだと思う。
+		types.hのmake_key()
+		// 探索で、excludedMoveを考慮した局面のhash keyが欲しいので、それを生成するために
+		// excludedMoveをseedとする擬似乱数を発生させる必要があり、そこで用いられる。
+		// cf. https://github.com/official-stockfish/Stockfish/commit/de24fcebc873ce2d65b30e039745dbc2e851f443
+	- mul_hi64()が正常に作動しない場合、
+		"Error! : failed mul_hi() , please update gcc."と起動時に出力するようにした。
+		→　このメッセージが表示されたなら、gcc/clangを最新版にしてください。
+	- 上のため、Msys2のpacmanのupdateをしようとしたらエラーになった件。
+		- Msys2 pacman PGP鍵の更新
+			cf. 久々にMsys2のパッケージを更新しようとするとエラーが発生したのでその対処法 :  https://udon.little-pear.net/msys2-pacman-pgp-update/
+	- "x & ~1"みたいなコードでxのbit0をマスクしてるつもりが、1はint32_tなので~1は32bitで、xの上位32bitを
+	　0クリアしてた件について
+
+
+- EVAL_LEARNを有効にしたときのコードのMove16の修正忘れ。
+	- Move16にto_u16()追加。Move16::to_move()削除。
+	- ↑に伴い、その周辺コード修正。
+
+
+- tanuki-詰将棋、Move16を導入してエラーになっていたのを修正。
+	- Move16まわり比較演算子追加。
+	- USI::to_move()をto_move16()とrename。
+	- MoveからMove16は暗黙の変換をサポート。逆の変換は暗黙にできるとバグの原因になる。
+		(このときは普通、Position::to_move()を呼び出す必要があるので)
+	- Limits.pv_checkはvector<Move>だが16bit MoveなのにこのままPosition::do_move()してるところがあったので
+		vector<Move16>に変更して、その周辺のコードを合わせて修正した。
+	
+
 ■　2020/11/02
+
+
+- (2つ前のcommitで)EVAL_LEARNを指定したときにコンパイルエラーになっていたの修正。
+- LearnerThink::calc_loss()でTT.new_search()を呼び出していたの、不要なので削除。
+
+
+- 16bitの指し手表現クラス、Move16を導入。
+	- MemoryBook::insert()、32bitと16bitのMoveが混在しているとバグの原因となりやすい。
+
+		- cf. https://twitter.com/nodchip/status/1321848707378106373
+		> やねうら王のMemoryBook:insert()、overwriteにtrueを指定しても、
+		> 予想手・評価値・探索深さの情報が更新iされない事に気づいた。
+		> 少し前に作ったtanuki-定跡、テラショックになってなかったっぽい…。
+
+		// たぬきさんより。
+
+		> Moveの形式が定跡データベース中のものと引数で与えたものとで、16ビット版と32ビット版で異なる場合、
+		> bool operator == (const BookPos& rhs) const { return bestMove == rhs.bestMove; }
+		> でfalseとなり、エントリを置き換えずに追加する、というバグのようです。
+		> 使用側が注意していれば起きない問題なのですが、ガードがあるとありがたいです。
+
+	- Aperyの定跡読み込み部をMove16で書き直す。
+		- 32bit Moveに直し忘れていて、定跡にhitしなかった局面がhitするようになった(気がする)
+	- TTEntry::move()はMove16を返すように変更。(パフォーマンスダウンしてたら戻すかも)
+	- 入玉宣言勝ち、定跡読み込み部等、すべてMove16で書き直した。
+	- Position::move_to_move32(Move)をto_move(Move16)に変更。
+	- Position::to_move()にis_ok()のチェック追加。
+		- MOVE_WIN、置換表に書いてあることを想定してなかった。
+	- USI::to_move()の返し値をMove16に変更。
+	- テラショック定跡の生成部もMove16を使うようにした。
+
+	- 何かデグレしてるかも。レビュー待ち。
+
+		// 弱くはなってはなさげ。
+		engine1 = YaneuraOu2018NNUE_clang_20201102_V500.exe , eval = tanuki2018_nnue
+		engine2 = YaneuraOu2018NNUE_clang_20201102_V500a.exe , eval = tanuki2018_nnue  ←今回の
+
+		T2,r100,1529 - 67 - 1404(52.13% R14.82[4.26,25.38]) winrate black , white = 50.39% , 49.61%
+		T2,b1000,377 - 29 - 384(49.54% R-3.2[-23.9,17.51]) winrate black , white = 52.17% , 47.83%
+
+
+
+- 学習用の実行ファイルでは置換表を探索スレッドごとに持つように変更。
+	- これをしないと時々、hash衝突して他の局面の値を拾ってくることがある。
+		- TTEntry::depth()の大きな値のエントリーがどんどん残っていくことになる。これがまずい。
+	- スレッドごとに置換表の世代カウンターを持つ。
+	- Learner::search(),qsearch()で自分のスレッド用のTTの世代カウンターを回すように。
+	- これで教師生成の質が少し上がるはず。
+	- Visual Studioでビルドするとき、デフォルトでEVAL_LEARNはundefに変更。
 
 
 - やねうら王 V5.00

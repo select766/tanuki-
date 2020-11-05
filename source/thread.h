@@ -96,6 +96,10 @@ public:
 	// 探索開始局面
 	Position rootPos;
 
+	// rootでのStateInfo
+	// Position::set()で書き換えるのでスレッドごとに保持していないといけない。
+	StateInfo rootState;
+
 	// 探索開始局面で思考対象とする指し手の集合。
 	// goコマンドで渡されていなければ、全合法手(ただし歩の不成などは除く)とする。
 	Search::RootMoves rootMoves;
@@ -107,8 +111,9 @@ public:
 	//
 	Depth rootDepth, completedDepth;
 
-	// 近代的なMovePickerではオーダリングのために、スレッドごとにhistoryとcounter movesのtableを持たないといけない。
+	// 近代的なMovePickerではオーダリングのために、スレッドごとにhistoryとcounter movesなどのtableを持たないといけない。
 	CounterMoveHistory counterMoves;
+	LowPlyHistory lowPlyHistory;
 	ButterflyHistory mainHistory;
 	LowPlyHistory lowPlyHistory;
 	CapturePieceToHistory captureHistory;
@@ -208,6 +213,12 @@ struct ThreadPool: public std::vector<Thread*>
 
 	// 今回、goコマンド以降に探索したノード数
 	uint64_t nodes_searched() { return accumulate(&Thread::nodes); }
+
+	// 探索を開始する(main thread以外)
+	void start_searching();
+
+	// main threadがそれ以外の探索threadの終了を待つ。
+	void wait_for_search_finished() const;
 
 	// stop   : 探索中にこれがtrueになったら探索を即座に終了すること。
 	std::atomic_bool stop, increaseDepth;

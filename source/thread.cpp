@@ -1,4 +1,6 @@
-﻿#include "thread.h"
+﻿#include <algorithm> // For std::count
+
+#include "thread.h"
 #include "usi.h"
 
 ThreadPool Threads;		// Global object
@@ -182,13 +184,17 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 		setupStates = std::move(states);
 
 	// Position::set()によってst->previosがクリアされるので事前にコピーして保存する。
+	// これは、rootStateの役割。これはスレッドごとに持っている。
 	// cf. Fix incorrect StateInfo : https://github.com/official-stockfish/Stockfish/commit/232c50fed0b80a0f39322a925575f760648ae0a5
-	StateInfo tmp = setupStates->back();
 
 	auto sfen = pos.sfen();
 	for (Thread* th : *this)
 	{
-		th->nodes = /* th->tbHits = */ th->nmpMinPly = 0;
+		// th->nodes = th->tbHits = th->nmpMinPly = th->bestMoveChanges = 0;
+		// Stockfish12のこのコード、bestMoveChangesがatomic型なのでそこからint型に代入してることになってコンパイラが警告を出す。
+		// ↓のように書いたほうが良い。
+		th->nodes = th->bestMoveChanges = /* th->tbHits = */ th->nmpMinPly = 0;
+
 		th->rootDepth = th->completedDepth = 0;
 		th->rootMoves = rootMoves;
 
@@ -206,5 +212,7 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 	// Position::set()によってクリアされていた、st->previousを復元する。
 	setupStates->back() = tmp;
 
-	main()->start_searching();
+	for (Thread* th : *this)
+		if (th != front())
+			th->wait_for_search_finished();
 }

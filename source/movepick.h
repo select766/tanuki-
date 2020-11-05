@@ -100,6 +100,7 @@ typedef Stats<int16_t, 10692, SQ_NB, PIECE_NB , PIECE_TYPE_NB> CapturePieceToHis
 
 /// PieceToHistoryは、ButterflyHistoryに似たものだが、指し手の[to][piece]で示される。
 // ※　Stockfishとは、添字の順番を入れ替えてあるので注意。
+//     Stockfishでは[piece][to]の順。
 typedef Stats<int16_t, 29952, SQ_NB , PIECE_NB> PieceToHistory;
 
 /// ContinuationHistoryは、与えられた2つの指し手のhistoryを組み合わせたもので、
@@ -186,6 +187,7 @@ private:
 
 	// 指し手生成の段階
 	int stage;
+
 
 	// RECAPUTREの指し手で移動させる先の升
 	Square recaptureSquare;

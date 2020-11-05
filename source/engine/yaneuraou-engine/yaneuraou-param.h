@@ -25,9 +25,15 @@ PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA2 = 50;
 
 // 
 
+<<<<<<< HEAD
 // 元の値 = 172
 // [PARAM] min:100,max:240,step:2,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA = 172;
+=======
+// 元の値 = 170
+// [PARAM] min:100,max:240,step:2,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA = 170;
+>>>>>>> f86f8b818ea3466bd69f29705c6f72d37720514a
 
 
 // 静止探索でのfutility pruning
@@ -37,7 +43,11 @@ PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET = 154;
 
 // futility pruningの適用depth。
 // この制限自体が要らない可能性がある。→　そうでもなかった。
+<<<<<<< HEAD
 // 元の値 = 6
+=======
+// 元の値 = 8
+>>>>>>> f86f8b818ea3466bd69f29705c6f72d37720514a
 // [PARAM] min:5,max:15,step:1,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 6;
 
@@ -45,6 +55,7 @@ PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 6;
 // この枝刈り、depthの制限自体が要らないような気がする。→　そうでもなかった。
 // 元の値 = 6
 // [PARAM] min:5,max:20,step:1,interval:1,time_rate:1,fixed
+<<<<<<< HEAD
 PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = 6;
 
 // 親nodeでのfutility margin
@@ -66,6 +77,28 @@ PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = 32;
 // 元の値 = 35
 // [PARAM] min:20,max:60,step:3,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 51;
+=======
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = 7;
+
+// 親nodeでのfutility margin
+// 元の値 = 283
+// [PARAM] min:100,max:300,step:5,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = 283;
+
+// 元の値 = 29
+// [PARAM] min:20,max:50,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = 29;
+
+// lmrのときのdepthの上限値。(これを超えるdepthは、↓この値とみなす)
+// 元の値 = 18
+// [PARAM] min:10,max:30,step:3,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 18;
+
+// lmrのときのseeの値。
+// 元の値 = 221
+// [PARAM] min:0,max:300,step:10,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_LMR_SEE_MARGIN1 = 221;
+>>>>>>> f86f8b818ea3466bd69f29705c6f72d37720514a
 
 //
 // null move dynamic pruning
@@ -74,6 +107,7 @@ PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 51;
 // null move dynamic pruningのときの
 //  Reduction = (α + β * depth ) / 256 + ...みたいなαとβ
 
+<<<<<<< HEAD
 // 元の値 = 854
 // [PARAM] min:500,max:1500,step:5,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA = 854;
@@ -85,6 +119,42 @@ PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA = 68;
 // 元の値 = 32
 // [PARAM] min:10,max:60,step:1,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_NULL_MOVE_MARGIN = 32;
+=======
+// 元の値 = 982
+// [PARAM] min:500,max:1500,step:5,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_ALPHA = 982;
+
+// 元の値 = 85
+// [PARAM] min:50,max:100,step:8,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_BETA = 85;
+
+// 元の値 = 192
+// [PARAM] min:50,max:400,step:50,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_DYNAMIC_GAMMA = 192;
+
+
+// 元の値 = 22977
+// [PARAM] min:0,max:50000,step:5000,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN0 = 22977;
+
+// 元の値 = 30
+// [PARAM] min:10,max:60,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN1 = 30;
+
+// 元の値 = 28
+// [PARAM] min:10,max:60,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN2 = 28;
+
+// 元の値 = 84
+// [PARAM] min:10,max:60,step:1,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN3 = 84;
+
+// 元の値 = 182
+// [PARAM] min:0,max:400,step:30,interval:1,time_rate:1,fixed
+PARAM_DEFINE PARAM_NULL_MOVE_MARGIN4 = 182;
+
+
+>>>>>>> f86f8b818ea3466bd69f29705c6f72d37720514a
 
 // null moveでbeta値を上回ったときに、これ以下ならreturnするdepth。適用depth。
 // 元の値 = 13
@@ -146,9 +216,15 @@ PARAM_DEFINE PARAM_SINGULAR_SEARCH_DEPTH_ALPHA = 16;
 PARAM_DEFINE PARAM_PRUNING_BY_MOVE_COUNT_DEPTH = 16;
 
 // historyによる枝刈りをする深さ。適用depth。
+<<<<<<< HEAD
 // これ、将棋ではそこそこ上げたほうが長い時間では良さげ。
 // 元の値 = 4
 // [PARAM] min:2,max:32,step:1,interval:1,time_rate:1,fixed
+=======
+// Stockfish10からこの値を大きくしすぎると良くないようだ。
+// 元の値 = 4
+// [PARAM] min:2,max:16,step:1,interval:1,time_rate:1,fixed
+>>>>>>> f86f8b818ea3466bd69f29705c6f72d37720514a
 PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH = 4;
 
 

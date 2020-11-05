@@ -14,7 +14,7 @@ constexpr Value LVATable[PIECE_WHITE] = {
   Value(0), Value(1) /*歩*/, Value(2)/*香*/, Value(3)/*桂*/, Value(4)/*銀*/, Value(7)/*角*/, Value(8)/*飛*/, Value(6)/*金*/,
   Value(10000)/*王*/, Value(5)/*と*/, Value(5)/*杏*/, Value(5)/*圭*/, Value(5)/*全*/, Value(9)/*馬*/, Value(10)/*龍*/,Value(11)/*成金*/
 };
-constexpr Value LVA(const Piece pt) { return LVATable[pt]; }
+constexpr Value LVA(const PieceType pt) { return LVATable[pt]; }
   
 // -----------------------
 //   指し手オーダリング
@@ -299,7 +299,7 @@ top:
 	case GOOD_CAPTURE:
 		if (select<Best>([&]() {
 			// moveは駒打ちではないからsee()の内部での駒打ちは判定不要だが…。
-			return pos.see_ge(*cur, Value(-55 * cur->value / 1024)) ?
+				return pos.see_ge(*cur, Value(-69 * cur->value / 1024)) ?
 				// 損をする捕獲する指し手はあとのほうで試行されるようにendBadCapturesに移動させる
 				true : (*endBadCaptures++ = *cur, false); }))
 			return *(cur - 1);
@@ -315,7 +315,7 @@ top:
 				--endMoves;
 
 			++stage;
-			/* fallthrough */
+			[[fallthrough]];
 
 	// killer move , counter moveを返すフェーズ
 	case REFUTATION:
@@ -330,7 +330,7 @@ top:
 			return *(cur - 1);
 
 		++stage;
-		/* fallthrough */
+		[[fallthrough]];
 
 	// 駒を捕獲しない指し手を生成してオーダリング
 	case QUIET_INIT:
@@ -353,7 +353,7 @@ top:
 		}
 
 		++stage;
-		/* fallthrough */
+		[[fallthrough]];
 
 	// 駒を捕獲しない指し手を返す。
 	// (置換表の指し手とkillerの指し手は返したあとなのでこれらの指し手は除外する必要がある)
@@ -391,7 +391,7 @@ top:
 		score<EVASIONS>();
 
 		++stage;
-		/* fallthrough */
+		[[fallthrough]];
 
 	// 王手回避の指し手を返す
 	case EVASION_:
@@ -416,7 +416,7 @@ top:
 			return MOVE_NONE;
 
 		++stage;
-		/* fallthrough */
+		[[fallthrough]];
 
 	// 王手となる指し手の生成
 	case QCHECK_INIT:
@@ -432,7 +432,7 @@ top:
 #endif
 
 		++stage;
-		/* fallthrough */
+		[[fallthrough]];
 
 	// 王手になる指し手を一手ずつ返すフェーズ
 	case QCHECK_:

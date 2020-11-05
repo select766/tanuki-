@@ -36,13 +36,13 @@ namespace Book
 		const bool is_drop = ((apery_move >> 7) & 0x7f) >= SQ_NB;
 		if (is_drop) {
 			const uint16_t piece = from - SQ_NB + 1;
-				m = make_move_drop(static_cast<Piece>(piece), static_cast<Square>(to));
+				m = make_move_drop(static_cast<PieceType>(piece), static_cast<Square>(to));
 		}
 			else
 				m = make_move(static_cast<Square>(from), static_cast<Square>(to));
 		}
 
-		return Move16::from_move(m);
+		return Move16(m);
 	};
 
 #if defined (ENABLE_MAKEBOOK_CMD)
@@ -110,7 +110,7 @@ namespace Book
 				Move nextMove = (rootMoves.pv.size() >= 1) ? rootMoves.pv[1] : MOVE_NONE;
 
 				// 出現頻度は、バージョンナンバーを100倍したものにしておく)
-				BookPos bp(Move16::from_move(rootMoves.pv[0]), Move16::from_move(nextMove), rootMoves.score
+				BookPos bp(rootMoves.pv[0], nextMove , rootMoves.score
 					, search_depth, int(atof(ENGINE_VERSION) * 100));
 
 				// MultiPVで思考しているので、手番側から見て評価値の良い順に並んでいることは保証される。
@@ -478,7 +478,7 @@ namespace Book
 					if (from_sfen)
 					{
 						// この場合、m[i + 1]が必要になるので、m.size()-1までしかループできない。
-						BookPos bp(Move16::from_move(m[i]), Move16::from_move(m[i + 1]), VALUE_ZERO, 32, 1);
+						BookPos bp(m[i] , m[i + 1] , VALUE_ZERO, 32, 1);
 						book.insert(sfen, bp);
 					}
 					else if (from_thinking)
@@ -913,14 +913,14 @@ namespace Book
 
 				// 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
 				if (bestMove == "none" || bestMove == "resign")
-					best = Move16::from_move(MOVE_NONE);
+					best = MOVE_NONE;
 				else
-					best = USI::to_move(bestMove);
+					best = USI::to_move16(bestMove);
 
 				if (nextMove == "none" || nextMove == "resign")
-					next = Move16::from_move(MOVE_NONE);
+					next = MOVE_NONE;
 				else
-					next = USI::to_move(nextMove);
+					next = USI::to_move16(nextMove);
 
 				BookPos bp(best , next, value, depth, num);
 				insert(sfen, bp);
@@ -1136,7 +1136,7 @@ namespace Book
 			// この場合、sum_count == 0になるので、採用率を当確率だとみなして、1.0 / entries.size() にしておく。
 
 			for (const auto& entry : entries) {
-				BookPos book_pos(convert_move_from_apery(entry.fromToPro), Move16::from_move(MOVE_NONE), entry.score, 256, entry.count);
+				BookPos book_pos(convert_move_from_apery(entry.fromToPro), MOVE_NONE , entry.score, 256, entry.count);
 				book_pos.prob = (sum_count != 0) ? (entry.count / static_cast<float>(sum_count) ) : (1.0f / entries.size());
 				insert_book_pos(pml_entry , book_pos);
 			}
@@ -1316,14 +1316,14 @@ namespace Book
 
 					// 起動時なので変換に要するオーバーヘッドは最小化したいので合法かのチェックはしない。
 					if (bestMove == "none" || bestMove == "resign")
-						best = Move16::from_move(MOVE_NONE);
+						best = MOVE_NONE;
 					else
-						best = USI::to_move(bestMove);
+						best = USI::to_move16(bestMove);
 
 					if (nextMove == "none" || nextMove == "resign")
-						next = Move16::from_move(MOVE_NONE);
+						next = MOVE_NONE;
 					else
-						next = USI::to_move(nextMove);
+						next = USI::to_move16(nextMove);
 
 					BookPos bp(best, next, value, depth, num);
 					insert_book_pos(pml_entry , bp);
@@ -1396,7 +1396,7 @@ namespace Book
 
 			for (const auto& entry : entries) {
 				const Move16 move = convert_move_from_apery(entry.fromToPro);
-				BookPos bp(move, Move16::from_move(MOVE_NONE) , entry.score, 1, entry.count);
+				BookPos bp(move, MOVE_NONE , entry.score, 1, entry.count);
 				insert(sfen, bp);
 			}
 
@@ -1527,8 +1527,8 @@ namespace Book
 			if (depth > 0)
 				result = pv_builder(pos, bestMove16 , depth - 1); // さらにbestMoveで指し手を進める。
 
-			result = " " + to_usi_string(bestMove16.to_move()) + ((result == "" /* is leaf node? */) ? (" " 
-				+ to_usi_string(ponderMove16.to_move())) : result);
+			result = " " + bestMove16.to_usi_string()
+				+ ((result == "" /* is leaf node? */) ? (" " + ponderMove16.to_usi_string()) : result);
 
 		UNDO:;
 			pos.undo_move(m);
@@ -1784,7 +1784,7 @@ namespace Book
 				// これが合法手でなかったら将棋所が弾くと思う。
 				// (ただし、"ponder resign"などと出力してしまうと投了と判定されてしまうらしいので
 				//  普通の指し手でなければならない。これは、is_ok(Move)で判定できる。)
-				if (is_ok(ponderMove16.to_move()))
+				if (is_ok((Move)ponderMove16.to_u16()))
 				{
 					if (rootMoves[0].pv.size() <= 1)
 						rootMoves[0].pv.push_back(MOVE_NONE);

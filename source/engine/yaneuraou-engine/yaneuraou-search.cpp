@@ -540,15 +540,8 @@ void MainThread::search()
 	// 各スレッドがsearch()を実行する
 	// ---------------------
 
-	for (Thread* th : Threads)
-	{
-		th->bestMoveChanges = 0;
-			if (th != this)
-				th->start_searching();
-	}
-
-	// 自分(main thread)も探索に加わる。
-		Thread::search();
+	Threads.start_searching(); // main以外のthreadを開始する
+	Thread::search();          // main thread(このスレッド)も探索に参加する。
 
 	// -- 探索の終了
 
@@ -577,9 +570,7 @@ SKIP_SEARCH:;
 	Threads.stop = true;
 
 	// 各スレッドが終了するのを待機する(開始していなければいないで構わない)
-	for (Thread* th : Threads)
-		if (th != this)
-			th->wait_for_search_finished();
+	Threads.wait_for_search_finished();
 
 #if 0
 	// nodes as time(時間としてnodesを用いるモード)のときは、利用可能なノード数から探索したノード数を引き算する。
@@ -1320,9 +1311,7 @@ namespace {
 		// statScoreは孫nodeの間でshareされるので、最初の孫だけがstatScore = 0で開始する。
 		// そのあと、孫は前の孫が計算したstatScoreから計算していく。
 		// このように計算された親局面のstatScoreは、LMRにおけるreduction rulesに影響を与える。
-		if (rootNode)
-			(ss + 4)->statScore = 0;
-		else
+		if (!rootNode)
 			(ss + 2)->statScore = 0;
 
 		// -----------------------
@@ -1351,7 +1340,7 @@ namespace {
 		// singular searchとIIDとのスレッド競合を考慮して、ttValue , ttMoveの順で取り出さないといけないらしい。
 		// cf. More robust interaction of singular search and iid : https://github.com/official-stockfish/Stockfish/commit/16b31bb249ccb9f4f625001f9772799d286e2f04
 
-		ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
+		ttValue = ss->ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
 		// 置換表の指し手
 		// 置換表にhitしなければMOVE_NONE
@@ -1373,7 +1362,7 @@ namespace {
 		// 置換表の値による枝刈り
 
 		if (  !PvNode        // PV nodeでは置換表の指し手では枝刈りしない(PV nodeはごくわずかしかないので..)
-			&& ttHit         // 置換表の指し手がhitして
+			&& ss->ttHit         // 置換表の指し手がhitして
 			&& tte->depth() >= depth   // 置換表に登録されている探索深さのほうが深くて
 			&& ttValue != VALUE_NONE   // (VALUE_NONEだとすると他スレッドからTTEntryが読みだす直前に破壊された可能性がある)
 			&& (ttValue >= beta ? (tte->bound() & BOUND_LOWER)
@@ -1415,7 +1404,7 @@ namespace {
 				// fails lowのときのquiet ttMoveに対するペナルティ
 				// 【計測資料 9.】capture_or_promotion(),capture_or_pawn_promotion(),capture()での比較
 #if 1
-				// Stockfish相当のコード
+			// Stockfish 10～12相当のコード
 				else if (!pos.capture_or_promotion(ttMove))
 #else
 				else if (!pos.capture_or_pawn_promotion(ttMove))
@@ -1458,7 +1447,7 @@ namespace {
 				if (m != MOVE_NONE)
 				{
 					bestValue = mate_in(ss->ply + 1); // 1手詰めなのでこの次のnodeで(指し手がなくなって)詰むという解釈
-					tte->save(posKey, value_to_tt(bestValue, ss->ply), ttPv, BOUND_EXACT,
+					tte->save(posKey, value_to_tt(bestValue, ss->ply), ss->ttPv, BOUND_EXACT,
 						MAX_PLY, m, ss->staticEval);
 
 					// 読み筋にMOVE_WINも出力するためには、このときpv配列を更新したほうが良いが
@@ -1494,7 +1483,7 @@ namespace {
 						bestValue = mate_in(ss->ply + 1);
 
 						// staticEvalの代わりに詰みのスコア書いてもいいのでは..
-						tte->save(posKey, value_to_tt(bestValue, ss->ply), ttPv, BOUND_EXACT,
+						tte->save(posKey, value_to_tt(bestValue, ss->ply), ss->ttPv, BOUND_EXACT,
 							MAX_PLY, move, /* ss->staticEval */ bestValue);
 
 						return bestValue;
@@ -1506,7 +1495,7 @@ namespace {
 						// N手詰めかも知れないのでPARAM_WEAK_MATE_PLY手詰めのスコアを返す。
 						bestValue = mate_in(ss->ply + PARAM_WEAK_MATE_PLY);
 
-						tte->save(posKey, value_to_tt(bestValue, ss->ply), ttPv, BOUND_EXACT,
+						tte->save(posKey, value_to_tt(bestValue, ss->ply), ss->ttPv, BOUND_EXACT,
 							MAX_PLY, move, /* ss->staticEval */ bestValue);
 
 						return bestValue;
@@ -1530,6 +1519,8 @@ namespace {
 
 		// 【計測資料 23.】moves_loopに入る前に毎回evaluate()を呼ぶかどうか。
 
+		CapturePieceToHistory& captureHistory = thisThread->captureHistory;
+
 		// どうせ差分計算のためにevaluate()は呼び出す必要がある。
 		ss->staticEval = eval = evaluate(pos);
 
@@ -1542,7 +1533,7 @@ namespace {
 			improving = false;
 			goto moves_loop; // 王手がかかっているときは、early pruning(早期枝刈り)を実施しない。
 		}
-		else if (ttHit)
+		else if (ss->ttHit)
 		{
 			// Never assume anything about values stored in TT
 			//ss->staticEval = eval = tte->eval();
@@ -1651,7 +1642,7 @@ namespace {
 			&& eval >= ss->staticEval
 			&& ss->staticEval >= beta - PARAM_NULL_MOVE_MARGIN * depth - 30 * improving + 120 * ttPv + 292
 			&& !excludedMove
-			//&&  pos.non_pawn_material(us)
+			//		&&  pos.non_pawn_material(us)  // これ終盤かどうかを意味する。将棋でもこれに相当する条件が必要かも。
 			&& (ss->ply >= thisThread->nmpMinPly || us != thisThread->nmpColor)
 			)
 		{
@@ -1676,7 +1667,7 @@ namespace {
 				// これをもう少しちゃんと検証しなおす。
 
 				// 証明されていないmate scoreはreturnで返さない。
-				if (nullValue >= VALUE_MATE_IN_MAX_PLY)
+				if (nullValue >= VALUE_TB_WIN_IN_MAX_PLY)
 					nullValue = beta;
 
 				if (thisThread->nmpMinPly || (abs(beta) < VALUE_KNOWN_WIN && depth < PARAM_NULL_MOVE_RETURN_DEPTH))
@@ -1718,6 +1709,8 @@ namespace {
 			// rbeta - ss->staticEvalを上回るcaptureの指し手のみを生成。
 			MovePicker mp(pos, ttMove, raisedBeta - ss->staticEval , &captureHistory);
 			int probCutCount = 0;
+			bool ttPv = ss->ttPv; // このあとの探索でss->ttPvを潰してしまうのでtte->save()のときはこっちを用いる。
+			ss->ttPv = false;
 
 			// 試行回数は3回までとする。(よさげな指し手を3つ試して駄目なら駄目という扱い)
 			// cf. Do move-count pruning in probcut : https://github.com/official-stockfish/Stockfish/commit/b87308692a434d6725da72bbbb38a38d3cac1d5f
@@ -1751,6 +1744,7 @@ namespace {
 						return value;
 				}
 			}
+			ss->ttPv = ttPv;
 		}
 
 		// -----------------------
@@ -1767,9 +1761,9 @@ namespace {
 		{
 			search<NT>(pos, ss, alpha, beta, depth - 7, cutNode);
 
-			tte = TT.probe(posKey, ttHit);
-			ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
-			ttMove = ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
+			tte = TT.probe(posKey, ss->ttHit);
+			ttValue = ss->ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
+			ttMove  = ss->ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
 		}
 
 
@@ -2278,7 +2272,7 @@ namespace {
 
 			// Full depth search。LMRがskipされたか、LMRにおいてfail highを起こしたなら元の探索深さで探索する。
 
-			// ※　静止探索は残り探索深さはDEPTH_ZEROとして開始されるべきである。(端数があるとややこしいため)
+			// ※　静止探索は残り探索深さはdepth = 0として開始されるべきである。(端数があるとややこしいため)
 			if (doFullDepthSearch)
 			{
 				value = -search<NonPV>(pos, ss + 1, -(alpha + 1), -alpha, newDepth, !cutNode);
@@ -2579,15 +2573,15 @@ namespace {
 													  : DEPTH_QS_NO_CHECKS;
 
 		posKey = pos.key();
-		tte = TT.probe(posKey, ttHit);
-		ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
-		ttMove = ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
-		pvHit = ttHit && tte->is_pv();
+		tte = TT.probe(posKey, ss->ttHit);
+		ttValue = ss->ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
+		ttMove = ss->ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
+		pvHit = ss->ttHit && tte->is_pv();
 
 		// nonPVでは置換表の指し手で枝刈りする
 		// PVでは置換表の指し手では枝刈りしない(前回evaluateした値は使える)
 		if (!PvNode
-			&& ttHit
+			&& ss->ttHit
 			&& tte->depth() >= ttDepth
 			&& ttValue != VALUE_NONE // 置換表から取り出したときに他スレッドが値を潰している可能性があるのでこのチェックが必要
 			&& (ttValue >= beta ? (tte->bound() & BOUND_LOWER)
@@ -2622,7 +2616,7 @@ namespace {
 
 			// 置換表にhitした場合は、すでに詰みを調べたはずなので
 			// 置換表にhitしなかったときにのみ調べる。
-			if (PARAM_QSEARCH_MATE1 && !ttHit)
+			if (PARAM_QSEARCH_MATE1 && !ss->ttHit)
 			{
 				// いまのところ、入れたほうが良いようだ。
 				// play_time = b1000 ,  1631 - 55 - 1314(55.38% R37.54) [2016/08/19]
@@ -2646,7 +2640,7 @@ namespace {
 
 			// 王手がかかっていないなら置換表の指し手を持ってくる
 
-			if (ttHit)
+			if (ss->ttHit)
 			{
 
 				// 置換表に評価値が格納されているとは限らないのでその場合は評価関数の呼び出しが必要
@@ -2875,10 +2869,11 @@ namespace {
 	// ply : root node からの手数。(ply_from_root)
 	Value value_to_tt(Value v, int ply) {
 
+		//		assert(v != VALUE_NONE);
 		ASSERT_LV3(-VALUE_INFINITE < v && v < VALUE_INFINITE);
 
-		return  v >= VALUE_MATE_IN_MAX_PLY ? v + ply
-			: v <= VALUE_MATED_IN_MAX_PLY ? v - ply : v;
+		return  v >= VALUE_TB_WIN_IN_MAX_PLY ? v + ply
+			  : v <= VALUE_TB_LOSS_IN_MAX_PLY ? v - ply : v;
 	}
 
 	// value_to_tt()の逆関数
@@ -3110,7 +3105,6 @@ void init_param()
 			
 			"PARAM_FUTILITY_AT_PARENT_NODE_DEPTH",
 			"PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1",
-			"PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2",
 			"PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1" ,
 			"PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2" ,
 
@@ -3146,7 +3140,6 @@ void init_param()
 			
 			&PARAM_FUTILITY_AT_PARENT_NODE_DEPTH,
 			&PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1,
-			&PARAM_FUTILITY_AT_PARENT_NODE_MARGIN2,
 			&PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1,
 			&PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2,
 
