@@ -1112,6 +1112,8 @@ bool Tanuki::CreateFromTanukiColiseum()
 			continue;
 		}
 
+		std::cout << entry.path() << std::endl;
+
 		std::fstream iss(entry.path());
 		std::string line;
 		while (std::getline(iss, line)) {
