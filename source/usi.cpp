@@ -918,6 +918,8 @@ void USI::loop(int argc, char* argv[])
 			}
 		}
 
+		else if (token == "create_from_tanuki_coliseum") Tanuki::CreateFromTanukiColiseum();
+
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();

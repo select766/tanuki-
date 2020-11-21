@@ -16,6 +16,7 @@ namespace Tanuki {
 	bool PropagateLeafNodeValuesToRoot();
 	bool ExtractTargetPositions();
 	bool AddTargetPositions();
+	bool CreateFromTanukiColiseum();
 }
 
 #endif

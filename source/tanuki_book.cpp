@@ -37,6 +37,7 @@ namespace {
 	constexpr const char* kBookSearchDepth = "BookSearchDepth";
 	constexpr const char* kBookSearchNodes = "BookSearchNodes";
 	constexpr const char* kBookInputFile = "BookInputFile";
+	constexpr const char* kBookInputFolder = "BookInputFolder";
 	constexpr const char* kBookOutputFile = "BookOutputFile";
 	constexpr const char* kThreads = "Threads";
 	constexpr const char* kMultiPV = "MultiPV";
@@ -93,7 +94,7 @@ namespace {
 		std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 
 		// MemoryBook::insert()に処理を移譲する。
-		book.insert(sfen, BookPos(Move16::from_move(best_move), Move16::from_move(next_move), value, depth, num));
+		book.insert(sfen, BookPos(Move16(best_move), Move16(next_move), value, depth, num));
 	}
 }
 
@@ -103,6 +104,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookSearchDepth] << Option(64, 0, 256);
 	o[kBookSearchNodes] << Option(500000 * 60, 0, INT_MAX);
 	o[kBookInputFile] << Option("user_book1.db");
+	o[kBookInputFolder] << Option("");
 	o[kBookOutputFile] << Option("user_book2.db");
 	o[kBookOverwriteExistingPositions] << Option(false);
 	o[kBookTargetSfensFile] << Option("");
@@ -761,7 +763,7 @@ namespace {
 
 		auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
 			[move](auto& m) {
-				return m.bestMove == Move16::from_move(move);
+				return m.bestMove == Move16(move);
 			});
 		if (book_move == book_moves->end()) {
 			// 定跡データベースに、この指し手が登録されていない場合。
@@ -993,7 +995,7 @@ bool Tanuki::AddTargetPositions() {
 			std::istringstream iss(lines[position_index]);
 			std::string move_string;
 			while (iss >> move_string) {
-				Move16 move16 = USI::to_move(move_string);
+				Move16 move16 = USI::to_move16(move_string);
 				Move move = pos.to_move(move16);
 				pos.do_move(move, state_info[pos.game_ply()]);
 			}
@@ -1070,4 +1072,167 @@ bool Tanuki::AddTargetPositions() {
 
 	return true;
 }
+
+bool Tanuki::CreateFromTanukiColiseum()
+{
+	std::string input_book_file = Options[kBookInputFile];
+	std::string input_book_folder = Options[kBookInputFolder];
+	std::string output_book_file = Options[kBookOutputFile];
+
+	sync_cout << "info string input_book_file=" << input_book_file << sync_endl;
+	sync_cout << "info string input_book_folder=" << input_book_folder << sync_endl;
+	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
+
+	MemoryBook input_book;
+	input_book_file = "book/" + input_book_file;
+	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
+	input_book.read_book(input_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
+
+	// TanukiColiseu
+	for (const auto& entry : std::filesystem::recursive_directory_iterator(input_book_folder)) {
+		const auto& file_name = entry.path().filename();
+		if (file_name != "sfen.txt") {
+			continue;
+		}
+
+		std::fstream iss(entry.path());
+		std::string line;
+		while (std::getline(iss, line)) {
+			auto& pos = Threads[0]->rootPos;
+			std::vector<StateInfo> state_info(1024);
+			pos.set_hirate(&state_info[0], Threads[0]);
+
+			std::istringstream iss_line(line);
+			std::string move_string;
+			std::vector<std::pair<std::string, Move16>> moves;
+			// 先手が勝った場合は0、後手が勝った場合は1
+			// 引き分けの場合は-1
+			int winner_offset = -1;
+			while (iss_line >> move_string) {
+				if (move_string == "startpos" || move_string == "moves") {
+					continue;
+				}
+
+				auto move = USI::to_move(pos, move_string);
+				pos.do_move(move, state_info[pos.game_ply()]);
+
+				auto move16 = USI::to_move16(move_string);
+				moves.emplace_back(pos.sfen(), move16);
+
+				auto repetition = pos.is_repetition();
+				if (pos.is_mated()) {
+					if (moves.size() % 2 == 0) {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					else {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					break;
+				}
+				else if (pos.DeclarationWin()) {
+					if (moves.size() % 2 == 0) {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					else {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					break;
+				}
+				else if (repetition == REPETITION_WIN) {
+					// 連続王手の千日手による勝ち
+					if (moves.size() % 2 == 0) {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					else {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					break;
+				}
+				else if (repetition == REPETITION_LOSE) {
+					// 連続王手の千日手による負け
+					if (moves.size() % 2 == 0) {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					else {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					break;
+				}
+				else if (repetition == REPETITION_DRAW) {
+					// 連続王手ではない普通の千日手
+					break;
+				}
+				else if (repetition == REPETITION_SUPERIOR) {
+					// 優等局面(盤上の駒が同じで手駒が相手より優れている)
+					if (moves.size() % 2 == 0) {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					else {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					break;
+				}
+				else if (repetition == REPETITION_INFERIOR) {
+					// 劣等局面(盤上の駒が同じで手駒が相手より優れている)
+					if (moves.size() % 2 == 0) {
+						// 後手勝ち
+						winner_offset = 1;
+					}
+					else {
+						// 先手勝ち
+						winner_offset = 0;
+					}
+					break;
+				}
+			}
+
+			if (winner_offset == -1) {
+				continue;
+			}
+
+			for (int move_index = winner_offset; move_index < moves.size(); move_index += 2) {
+				const auto& sfen = moves[move_index].first;
+				Move16 best = moves[move_index].second;
+				Move16 next = MOVE_NONE;
+				if (move_index + 1 < moves.size()) {
+					next = moves[move_index + 1].second;
+				}
+
+				output_book.insert(sfen, BookPos(best, next, 0, 0, 1));
+			}
+		}
+	}
+
+	WriteBook(output_book, output_book_file);
+
+	return true;
+}
+
 #endif
