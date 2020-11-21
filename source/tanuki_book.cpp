@@ -1132,11 +1132,12 @@ bool Tanuki::CreateFromTanukiColiseum()
 					continue;
 				}
 
+				auto sfen = pos.sfen();
 				auto move = USI::to_move(pos, move_string);
 				pos.do_move(move, state_info[pos.game_ply()]);
 
 				auto move16 = USI::to_move16(move_string);
-				moves.emplace_back(pos.sfen(), move16);
+				moves.emplace_back(sfen, move16);
 
 				auto repetition = pos.is_repetition();
 				if (pos.is_mated()) {
