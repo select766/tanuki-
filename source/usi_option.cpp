@@ -42,17 +42,18 @@ namespace USI {
 		// 並列探索するときのスレッド数
 		// CPUの搭載コア数をデフォルトとすべきかも知れないが余計なお世話のような気もするのでしていない。
 
-		o["Threads"] << Option(4, 1, 512, [](const Option& o) { Threads.set(o); });
+		// ※　やねうら王独自改良
+		// スレッド数の変更やUSI_Hashのメモリ確保をそのハンドラでやってしまうと、
+		// そのあとThreadIdOffsetや、LargePageEnableを送られても困ることになる。
+		// ゆえにこれらは、"isready"に対する応答で行うことにする。
+		// そもそもで言うとsetoptionに対してそんなに時間のかかることをするとGUI側がtimeoutになる懸念もある。
+		// Stockfishもこうすべきだと思う。
 
-		// USIプロトコルでは、"USI_Hash"なのだが、
-		// 置換表サイズを変更しての自己対戦などをさせたいので、
-		// 片方だけ変更できなければならない。
-		// ゆえにGUIでの対局設定は無視して、思考エンジンの設定ダイアログのところで
-		// 個別設定が出来るようにする。
+		o["Threads"] << Option(4, 1, 512, [](const Option& o) { /* Threads.set(o); */ });
 
 #if !defined(MATE_ENGINE)
 		// 置換表のサイズ。[MB]で指定。
-		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
+		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { /* TT.resize(o); */ });
 
 #if defined(USE_EVAL_HASH)
 		// 評価値用のcacheサイズ。[MB]で指定。
@@ -172,9 +173,17 @@ namespace USI {
 		// 指定できるようにしておく。
 		// 例) 128スレッドあって、4つ思考エンジンを起動してそれぞれにThreads = 32を指定する場合、
 		// それぞれの思考エンジンにはThreadIdOffset = 0,32,64,96をそれぞれ指定する。
+		// (プロセッサグループは64論理コアごとに1つ作られる。上のケースでは、ThreadIdOffset = 0,0,64,64でも同じ意味。)
 		//	※　1つのPCで複数の思考エンジンを同時に起動して対局させる場合はこれを適切に設定すべき。
 
 		o["ThreadIdOffset"] << Option(0, 0, std::thread::hardware_concurrency() - 1);
+#endif
+
+#if defined(_WIN64)
+		// LargePageを有効化するか。
+		// これを無効化できないと自己対局の時に片側のエンジンだけがLargePageを使うことがあり、
+		// 不公平になるため、無効化する方法が必要であった。
+		o["LargePageEnable"] << Option(true);
 #endif
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。

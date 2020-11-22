@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "5.20"
+#define ENGINE_VERSION "5.32"
 
 // --------------------
 //  思考エンジンの種類
@@ -38,6 +38,7 @@
 
 #if !defined(USE_MAKEFILE)
 
+// USE_AVX512VNNI : AVX-512かつ、VNNI命令対応(Cascade Lake以降)でサポートされた命令を使うか。
 // USE_AVX512 : AVX-512(サーバー向けSkylake以降)でサポートされた命令を使うか。
 // USE_AVX2   : AVX2(Haswell以降)でサポートされた命令を使うか。pextなど。
 // USE_SSE42  : SSE4.2でサポートされた命令を使うか。popcnt命令など。
@@ -52,6 +53,7 @@
 
 // ターゲットCPUのところだけdefineしてください。(残りは自動的にdefineされます。)
 
+//#define USE_AVX512VNNI
 //#define USE_AVX512
 #define USE_AVX2
 //#define USE_SSE42
@@ -211,6 +213,11 @@ constexpr int MAX_PLY_NUM = 246;
 // 置換表のなかでevalを持たない
 // #define NO_EVAL_IN_TT
 
+// 評価関数で金と小駒の成りを区別する
+// 駒の特徴量はBonaPiece。これはBonanzaに倣っている。
+// このオプションを有効化すると、金と小駒の成りを区別する。(Bonanzaとは異なる特徴量になる)
+// #define DISTINGUISH_GOLDS
+
 // オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
 // #define USE_DROPBIT_IN_STATS
 
@@ -256,6 +263,19 @@ constexpr int MAX_PLY_NUM = 246;
 // GUI側が、何らかの都合で"rep_draw"のみしか処理できないときに用いる。
 // #define PV_OUTPUT_DRAW_ONLY
 
+// "Threads"オプション が 8以下の設定の時でも強制的に bindThisThread()を呼び出して、指定されたNUMAで動作するようにする。
+// "ThreadIdOffset"オプションと併用して、狙ったNUMAで動作することを強制することができる。
+//#define FORCE_BIND_THIS_THREAD
+
+// ---------------------
+// 探索パラメーターの自動調整用
+// ---------------------
+
+// 探索パラメーターのチューニングを行うモード
+//
+// 実行時に"param/yaneuraou-param.h" からパラメーターファイルを読み込むので
+// "source/engine/yaneuraou-engine/yaneuraou-param.h"をそこに配置すること。
+//#define TUNING_SEARCH_PARAMETERS
 
 
 // --------------------
@@ -271,7 +291,11 @@ constexpr int MAX_PLY_NUM = 246;
 // 探索部は通常のやねうら王エンジンを用いる。
 #define YANEURAOU_ENGINE
 
+// EvalHashを用いるのは3駒型のみ。それ以外は差分計算用の状態が大きすぎてhitしたところでどうしようもない。
+#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT)
 #define USE_EVAL_HASH
+#endif
+
 #define USE_SEE
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
@@ -284,7 +308,7 @@ constexpr int MAX_PLY_NUM = 246;
 // 学習機能を有効にするオプション。
 // 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
 // 有効化してコンパイルしなければならない。
-// #define EVAL_LEARN
+//#define EVAL_LEARN
 
 // デバッグ絡み
 //#define ASSERT_LV 3
@@ -332,9 +356,15 @@ constexpr int MAX_PLY_NUM = 246;
 // "../openblas/lib/libopenblas.dll.a"をlibとして追加すること。
 //#define USE_BLAS
 
-// KP256を用いる場合これをdefineする。
-// ※　これをdefineしていなければNNUE標準のhalfKP256になる。
+// NNUEの使いたい評価関数アーキテクチャの選択
+//
+// EVAL_NNUE_HALFKP256  : 標準NNUE型(評価関数ファイル60MB程度)
+// EVAL_NNUE_KP256      : KP256(評価関数1MB未満)
+// EVAL_NNUE_HALFKPE9   : 標準NNUE型のおよそ9倍(540MB程度)
+
+// #define EVAL_NNUE_HALFKP256
 // #define EVAL_NNUE_KP256
+// #define EVAL_NNUE_HALFKPE9
 #endif
 
 #endif // defined(YANEURAOU_ENGINE_KPPT) || ...
@@ -520,29 +550,39 @@ constexpr bool Is64Bit = true;
 constexpr bool Is64Bit = false;
 #endif
 
-#if defined(USE_BMI2)
-#define BMI2_STR "BMI2"
-#else
-#define BMI2_STR ""
-#endif
+// TARGET_CPU、Makefileのほうで"ZEN2"のようにダブルコーテーション有りの文字列として定義されているはずだが、
+// それが定義されていないならここでUSE_XXXオプションから推定する。
+#if !defined(TARGET_CPU)
+	#if defined(USE_BMI2)
+	#define BMI2_STR "BMI2"
+	#else
+	#define BMI2_STR ""
+	#endif
 
-#if defined(USE_AVX512)
-#define TARGET_CPU "AVX512" BMI2_STR
-#elif defined(USE_AVX2)
-#define TARGET_CPU "AVX2" BMI2_STR
-#elif defined(USE_SSE42)
-#define TARGET_CPU "SSE4.2"
-#elif defined(USE_SSE41)
-#define TARGET_CPU "SSE4.1"
-#elif defined(USE_SSSE3)
-#define TARGET_CPU "SSSE3"
-#elif defined(USE_SSE2)
-#define TARGET_CPU "SSE2"
-#else
-#define TARGET_CPU "noSSE"
+	#if defined(USE_AVX512VNNI)
+	#define TARGET_CPU "AVX512VNNI" BMI2_STR
+	#elif defined(USE_AVX512)
+	#define TARGET_CPU "AVX512" BMI2_STR
+	#elif defined(USE_AVX2)
+	#define TARGET_CPU "AVX2" BMI2_STR
+	#elif defined(USE_SSE42)
+	#define TARGET_CPU "SSE4.2"
+	#elif defined(USE_SSE41)
+	#define TARGET_CPU "SSE4.1"
+	#elif defined(USE_SSSE3)
+	#define TARGET_CPU "SSSE3"
+	#elif defined(USE_SSE2)
+	#define TARGET_CPU "SSE2"
+	#else
+	#define TARGET_CPU "noSSE"
+	#endif
 #endif
 
 // 上位のCPUをターゲットとするなら、その下位CPUの命令はすべて使えるはずなので…。
+
+#if defined (USE_AVX512VNNI)
+#define USE_AVX512
+#endif
 
 #if defined (USE_AVX512)
 #define USE_AVX2
@@ -589,13 +629,23 @@ constexpr bool Is64Bit = false;
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
 #if defined(EVAL_MATERIAL)
 #define EVAL_TYPE_NAME "Material"
+
 #elif defined(EVAL_KPPT)
 #define EVAL_TYPE_NAME "KPPT"
+
 #elif defined(EVAL_KPP_KKPT)
 #define EVAL_TYPE_NAME "KPP_KKPT"
+
 #elif defined(EVAL_NNUE_KP256)
 #define EVAL_TYPE_NAME "NNUE KP256"
-#elif defined(EVAL_NNUE) // 標準NNUE halfKP256
+
+#elif defined(EVAL_NNUE_HALFKPE9)
+#define EVAL_TYPE_NAME "NNUE halfKPE9"
+// hafeKPE9には利きが必要
+#define LONG_EFFECT_LIBRARY
+#define USE_BOARD_EFFECT_PREV
+
+#elif defined(EVAL_NNUE) // それ以外のNNUEなので標準NNUE halfKP256だと思われる。
 #define EVAL_TYPE_NAME "NNUE"
 #else
 #define EVAL_TYPE_NAME ""

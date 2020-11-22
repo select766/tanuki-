@@ -1,4 +1,5 @@
-﻿#include "misc.h"
+﻿#include <cstring>	// std::memset()
+#include "misc.h"
 #include "thread.h"
 #include "tt.h"
 
@@ -58,7 +59,7 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 		/*|| g != generation() // probe()において非0のkeyとマッチした場合、その瞬間に世代はrefreshされている。　*/
 		)
 	{
-		ASSERT_LV3(d >= DEPTH_NONE);
+		ASSERT_LV3(d > DEPTH_OFFSET);
 		ASSERT_LV3(d < 256 + DEPTH_OFFSET);
 
 		key16     = pos_key;
@@ -132,10 +133,18 @@ void TranspositionTable::clear()
 
 	auto size = clusterCount * sizeof(Cluster);
 
+#if !defined(EVAL_LEARN)
 	// 進捗を表示しながら並列化してゼロクリア
 	// Stockfishのここにあったコードは、独自の置換表を実装した時にも使いたいため、tt.cppに移動させた。
-	Tools::memclear("Hash" , table, size);
-
+	Tools::memclear("USI_Hash" , table, size);
+#else
+	// LEARN版のときは、
+	// 単一スレッドでメモリをクリアする。(他のスレッドは仕事をしているので..)
+	// 教師生成を行う時は、対局の最初にスレッドごとのTTに対して、
+	// このclear()が呼び出されるものとする。
+	// 例) th->tt.clear();
+	std::memset(table, 0, size);
+#endif
 }
 
 TTEntry* TranspositionTable::probe(const Key key, bool& found) const
@@ -253,6 +262,12 @@ void TranspositionTable::init_tt_per_thread()
 {
 	// スレッド数
 	size_t thread_size = Threads.size();
+
+	// エンジン終了時にThreads.set(0)で全スレッド終了させるコードが書いてあるので、
+	// そのときに、Threads.size() == 0の状態で呼び出される。
+	// ここで抜けないと、このあとゼロ除算することになる。
+	if (thread_size == 0)
+		return;
 
 	// 1スレッドあたりのクラスター数(端数切捨て)
 	// clusterCountは2の倍数でないと駄目なので、端数を切り捨てるためにLSBを0にする。

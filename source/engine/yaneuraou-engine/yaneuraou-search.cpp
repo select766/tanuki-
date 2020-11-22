@@ -8,15 +8,6 @@
 
 // 計測資料置き場 : https://github.com/yaneurao/YaneuraOu/blob/master/docs/%E8%A8%88%E6%B8%AC%E8%B3%87%E6%96%99.txt
 
-
-// パラメーターを自動調整するのか(パラメーターを調整するフレームワーク等を利用する場合)
-// 自動調整が終われば、値を固定して、パラメーターファイルをincludeしたほうが良い。
-//#define USE_AUTO_TUNE_PARAMETERS
-
-// 探索パラメーターにstep分のランダム値を加えて対戦させるとき用。
-// 試合が終わったときに勝敗と、そのときに用いたパラメーター一覧をファイルに出力する。
-//#define USE_RANDOM_PARAMETERS
-
 // -----------------------
 //   includes
 // -----------------------
@@ -41,33 +32,35 @@
 // やねうら王独自追加
 // -------------------
 
-#if defined (USE_AUTO_TUNE_PARAMETERS) || defined(USE_RANDOM_PARAMETERS) || defined(ENABLE_OUTPUT_GAME_RESULT)
-#define INCLUDE_PARAMETERS
-// 試合が終わったときに勝敗と、そのときに用いたパラメーター一覧をファイルに出力する。
-// パラメーターのランダム化は行わない。
-#undef ENABLE_OUTPUT_GAME_RESULT
-#define ENABLE_OUTPUT_GAME_RESULT
-#endif
+// パラメーターの調整を行うのか
+#if defined(TUNING_SEARCH_PARAMETERS)
+	// ハイパーパラメーターを調整するときは終了時にその時のパラメーターを書き出す。
+	#define ENABLE_OUTPUT_GAME_RESULT
 
+	// パラメーターをランダムに少し変化させる。
+	// 探索パラメーターにstep分のランダム値を加えて対戦させるとき用。
+	// 試合が終わったときに勝敗と、そのときに用いたパラメーター一覧をファイルに出力する。
+	#define USE_RANDOM_PARAMETERS
 
-// ハイパーパラメーターを自動調整するときはstatic変数にしておいて変更できるようにする。
-#if defined(INCLUDE_PARAMETERS)
-#define PARAM_DEFINE static int
+	#define PARAM_DEFINE int
+	#include "yaneuraou-param.h"
 #else
-#define PARAM_DEFINE constexpr int
+	// 変更しないとき
+	#define PARAM_DEFINE constexpr int
+	#include "yaneuraou-param.h"
+
 #endif
 
-// 実行時に読み込むパラメーターファイルの名前
-#define PARAM_FILE "yaneuraou-param.h"
-#include "yaneuraou-param.h"
-
-// 定跡の指し手を選択するモジュール
-Book::BookMoveSelector book;
+// 実行時に読み込むパラメーターファイルを配置するフォルダとその名前
+#define PARAM_FILE "param/yaneuraou-param.h"
 
 #if defined(ENABLE_OUTPUT_GAME_RESULT)
 // 変更したパラメーター一覧と、リザルト(勝敗)を書き出すためのファイルハンドル
 static std::fstream result_log;
 #endif
+
+// 定跡の指し手を選択するモジュール
+Book::BookMoveSelector book;
 
 // USIに追加オプションを設定したいときは、この関数を定義すること。
 // USI::init()のなかからコールバックされる。
@@ -104,8 +97,8 @@ void USI::extra_option(USI::OptionsMap & o)
 
 #if defined(ENABLE_OUTPUT_GAME_RESULT)
 
-#if defined(USE_AUTO_TUNE_PARAMETERS)
-	sync_cout << "info string warning!! USE_AUTO_TUNE_PARAMETERS." << sync_endl;
+#if defined(TUNING_SEARCH_PARAMETERS)
+	sync_cout << "info string warning!! TUNING_SEARCH_PARAMETERS." << sync_endl;
 #elif defined(USE_RANDOM_PARAMETERS)
 	sync_cout << "info string warning!! USE_RANDOM_PARAMETERS." << sync_endl;
 #else
@@ -158,6 +151,10 @@ namespace {
 	// Rootはここでは用意しない。Rootに特化した関数を用意するのが少し無駄なので。
 	enum NodeType { NonPV, PV };
 
+	// 置換表にどれくらいhitしているかという統計情報
+	constexpr uint64_t TtHitAverageWindow = 4096;
+	constexpr uint64_t TtHitAverageResolution = 1024;
+
 	// Razor and futility margins
 
 	// Razor marginはdepthに依存しない形で良いことが証明された。(Stockfish10)
@@ -166,7 +163,7 @@ namespace {
 
 	// depth(残り探索深さ)に応じたfutility margin。
 	Value futility_margin(Depth d, bool improving) {
-		return Value((PARAM_FUTILITY_MARGIN_ALPHA1/*175*/ - PARAM_FUTILITY_MARGIN_ALPHA2/*50*/ * improving) * d);
+		return Value(PARAM_FUTILITY_MARGIN_ALPHA1/*223*/ * (d - improving));
 	}
 
 	// 【計測資料 30.】　Reductionのコード、Stockfish 9と10での比較
@@ -179,7 +176,7 @@ namespace {
 	// 悪化していく局面なので深く読んでも仕方ないからreduction量を心もち増やす。
 	Depth reduction(bool i, Depth d, int mn) {
 		int r = Reductions[d] * Reductions[mn];
-		return (r + 512) / 1024 + (!i && r > 1024);
+		return (r + 509) / 1024 + (!i && r > 894);
 	}
 
 	// 【計測資料 29.】　Move CountベースのFutiliy Pruning、Stockfish 9と10での比較
@@ -189,34 +186,36 @@ namespace {
 	// improving : 1手前の局面から評価値が上昇しているのか
 	// depth     : 残り探索depth
 	// 返し値    : 返し値よりmove_countが大きければfutility pruningを実施
-	// TODO : この " 5 + "のところ、パラメーター調整をしたほうが良いかも。
+	//
+	// この " 3 + "のところ、パラメーター調整をしたほうが良いかも知れないが、
+	// こんな細かいところいじらないほうがよさげ。(他のところでバランスを取ることにする)
 	constexpr int futility_move_count(bool improving, int depth) {
-		return (5 + depth * depth) * (1 + improving) / 2;
+		return (3 + depth * depth) / (2 - improving);
 	}
 
 	// depthに基づく、historyとstatsのupdate bonus
 	int stat_bonus(Depth depth) {
 		int d = depth;
-		// Stockfish 9になって、move_picker.hのupdateで32倍していたのをやめたので、
-		// ここでbonusの計算のときに32倍しておくことになった。
 
-		// 32倍より少し小さいほうが良いらしい。調整するに値しないと思うので
-		// ここはStockfish10のコードそのままにしておく。
-		return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
+		// historyとstatsの更新時のボーナス値。depthに基づく。
 
-		// TODO : depth 17超えだとstat_bonusが0になるのたが、これが本当に良いのかどうかはよくわからない。
+		// [Stockfish10]
+		//return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
+
+		// [Stockfish12]
+		return d > 13 ? 29 : 17 * d * d + 134 * d - 134;
 	}
 
 	// チェスでは、引き分けが0.5勝扱いなので引き分け回避のための工夫がしてあって、
 	// 以下のようにvalue_drawに揺らぎを加算することによって探索を固定化しない(同じnodeを
 	// 探索しつづけて千日手にしてしまうのを回避)工夫がある。
+	// 将棋の場合、普通の千日手と連続王手の千日手と劣等局面による千日手(循環？)とかあるので
+	// これ導入するのちょっと嫌。
 
-	//// Add a small random component to draw evaluations to keep search dynamic
-	//// and to avoid 3fold-blindness.
-	//Value value_draw(Depth depth, Thread* thisThread) {
-	//	return depth < 4 ? VALUE_DRAW
-	//		: VALUE_DRAW + Value(2 * (thisThread->nodes.load(std::memory_order_relaxed) % 2) - 1);
-	//}
+	// // Add a small random component to draw evaluations to avoid 3fold-blindness
+	//	Value value_draw(Thread* thisThread) {
+	//	  return VALUE_DRAW + Value(2 * (thisThread->nodes & 1) - 1);
+	//  }
 
 	// Skill構造体は強さの制限の実装に用いられる。
 	// (わざと手加減して指すために用いる)
@@ -240,6 +239,54 @@ namespace {
 
 		Move best = MOVE_NONE;
 	};
+
+
+	// Breadcrumbs(パンくず)は、指定されたスレッドで探索されたノードをマークするために使用される。
+	// スレッドが極めて多い時に同一ノードを探索するのを回避するためのhack。
+	// スレッド競合でTTが破壊されるのを防ぐため？
+
+	struct Breadcrumb {
+		std::atomic<Thread*> thread;
+		std::atomic<Key> key;
+	};
+	std::array<Breadcrumb, 1024> breadcrumbs;
+
+	// ThreadHolding構造体は、指定されたノードでどのスレッドがパンくずを残したかを追跡する。
+	// フリーノードはコンストラクタによって moves ループに入るとマークされ、デストラクタに
+	// よってそのループから出るとマークされなくなる。
+	struct ThreadHolding {
+		explicit ThreadHolding(Thread* thisThread, Key posKey, int ply) {
+			location = ply < 8 ? &breadcrumbs[posKey & (breadcrumbs.size() - 1)] : nullptr;
+			otherThread = false;
+			owning = false;
+			if (location)
+			{
+				// See if another already marked this location, if not, mark it ourselves
+				Thread* tmp = (*location).thread.load(std::memory_order_relaxed);
+				if (tmp == nullptr)
+				{
+					(*location).thread.store(thisThread, std::memory_order_relaxed);
+					(*location).key.store(posKey, std::memory_order_relaxed);
+					owning = true;
+				}
+				else if (tmp != thisThread
+					&& (*location).key.load(std::memory_order_relaxed) == posKey)
+					otherThread = true;
+			}
+		}
+
+		~ThreadHolding() {
+			if (owning) // Free the marked location
+				(*location).thread.store(nullptr, std::memory_order_relaxed);
+		}
+
+		bool marked() { return otherThread; }
+
+	private:
+		Breadcrumb* location;
+		bool otherThread, owning;
+	};
+
 
 	template <NodeType NT>
 	Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
@@ -284,11 +331,17 @@ namespace {
 		}
 		return nodes;
 	}
+
 } // namespace 
 
 
 // 起動時に呼び出される。時間のかからない探索関係の初期化処理はここに書くこと。
-void Search::init() {}
+// スレッド数が変更された時にも呼び出される。
+void Search::init()
+{
+	// Stockfishでは、ここにReduction配列の初期化コードがあるが、
+	// そういうのは、"isready"応答(Search::clear())でやるべき。
+}
 
 // isreadyコマンドの応答中に呼び出される。時間のかかる処理はここに書くこと。
 void Search::clear()
@@ -323,8 +376,18 @@ void Search::clear()
 	// Threads.size()が式に含まれているのは、スレッド数が少ない時は枝刈りを甘くしたほうが得であるため。
 	// スレッド数が多い時に枝刈りが甘いと同じnodeを探索するスレッドばかりになって非効率。
 
+	// スレッド数の取得
+	const size_t thread_size =
+#if !defined(EVAL_LEARN)
+		Threads.size();
+#else
+		// EVAL_LEARN版では1スレッドで探索を行うので、スレッド数は1の時の基準の枝刈りであって欲しい。
+		// ゆえに、EVAL_LEARN版ではスレッド数を1とみなす。
+		1;
+#endif
+
 	for (int i = 1; i < MAX_MOVES; ++i)
-		Reductions[i] = int((22.0 + 2 * std::log(Threads.size())) * std::log(i + 0.25 * std::log(i)));
+		Reductions[i] = int((22.0 + 2 * std::log(thread_size)) * std::log(i + 0.25 * std::log(i)));
 
 	// -----------------------
 	//   定跡の読み込み
@@ -502,6 +565,10 @@ void MainThread::search()
 
 	TT.new_search();
 
+	// Stockfishでは評価関数の正常性のチェック、ここにあるが…。
+	// isreadyに対する応答でやっているのでここはコメントアウトしておく。
+	//Eval::NNUE::verify();
+
 	// ---------------------
 	// 各スレッドがsearch()を実行する
 	// ---------------------
@@ -566,37 +633,12 @@ SKIP_SEARCH:;
 		// アクセスしてはならない。
 		// search_skipped のときは、bestThread == mainThreadとしておき、
 		// bestThread->rootMoves[0].pv[0]とpv[1]の指し手を出力すれば良い。
-	{
 
-		// 深くまで探索できていて、かつそっちの評価値のほうが優れているならそのスレッドの指し手を採用する
-		// 単にcompleteDepthが深いほうのスレッドを採用しても良さそうだが、スコアが良いほうの探索深さのほうが
-		// いい指し手を発見している可能性があって楽観合議のような効果があるようだ。
+		bestThread = Threads.get_best_thread();
 
-		std::map<Move, int64_t> votes;
-		Value minScore = this->rootMoves[0].score;
-
-		// Find out minimum score and reset votes for moves which can be voted
-		for (Thread* th : Threads)
-			minScore = std::min(minScore, th->rootMoves[0].score);
-
-		// Vote according to score and depth, and select the best thread
-		int64_t bestVote = 0;
-		for (Thread* th : Threads)
-		{
-			// ワーカースレッドのなかで最小を記録したスコアからの増分
-			votes[th->rootMoves[0].pv[0]] +=
-				(th->rootMoves[0].score - minScore + 14) * int(th->completedDepth);
-
-			if (votes[th->rootMoves[0].pv[0]] > bestVote)
-			{
-				bestVote = votes[th->rootMoves[0].pv[0]];
-				bestThread = th;
-			}
-		}
-	}
 
 	// 次回の探索のときに何らか使えるのでベストな指し手の評価値を保存しておく。
-	previousScore = bestThread->rootMoves[0].score;
+	bestPreviousScore = bestThread->rootMoves[0].score;
 
 	// ベストな指し手として返すスレッドがmain threadではないのなら、
 	// その読み筋は出力していなかったはずなのでここで読み筋を出力しておく。
@@ -681,18 +723,32 @@ void Thread::search()
 	// この局面の手番側
 	Color us = rootPos.side_to_move();
 
+	// 反復深化の時に1回ごとのbest valueを保存するための配列へのindex
+	// 0から3までの値をとる。
+	int iterIdx = 0;
+
 	// 先頭10個を初期化しておけば十分。そのあとはsearch()の先頭でss+1,ss+2を適宜初期化していく。
 	memset(ss - 7, 0, 10 * sizeof(Stack));
 
 	// counterMovesをnullptrに初期化するのではなくNO_PIECEのときの値を番兵として用いる。
 	for (int i = 7; i > 0; i--)
-		(ss - i)->continuationHistory = &this->continuationHistory[0][0][SQ_ZERO][NO_PIECE];
+		(ss - i)->continuationHistory = &this->continuationHistory[0][0][SQ_ZERO][NO_PIECE]; // Use as a sentinel
 	ss->pv = pv;
 
 	// 反復深化のiterationが浅いうちはaspiration searchを使わない。
 	// 探索窓を (-VALUE_INFINITE , +VALUE_INFINITE)とする。
 	bestValue = delta = alpha = -VALUE_INFINITE;
 	beta = VALUE_INFINITE;
+
+	if (mainThread)
+	{
+		if (mainThread->bestPreviousScore == VALUE_INFINITE)
+			for (int i = 0; i < 4; ++i)
+				mainThread->iterValue[i] = VALUE_ZERO;
+		else
+			for (int i = 0; i < 4; ++i)
+				mainThread->iterValue[i] = mainThread->bestPreviousScore;
+	}
 
 	// lowPlyHistoryのコピー(世代を一つ新しくする)
 	std::copy(&lowPlyHistory[2][0], &lowPlyHistory.back().back() + 1, &lowPlyHistory[0][0]);
@@ -715,6 +771,9 @@ void Thread::search()
 	// この局面での指し手の数を上回ってはいけない
 	multiPV = std::min(multiPV, rootMoves.size());
 
+	// 最近の置換表の平均ヒット率の初期化。
+	ttHitAverage = TtHitAverageWindow * TtHitAverageResolution / 2;
+
 	// Contemptの処理は、やねうら王ではMainThread::search()で行っているのでここではやらない。
 	// Stockfishもそうすべきだと思う。
 	//int ct = int(Options["Contempt"]) * PawnValueEg / 100; // From centipawns
@@ -723,11 +782,15 @@ void Thread::search()
 	//   反復深化のループ
 	// ---------------------
 
+	// 反復深化の探索深さが深くなって行っているかのチェック用のカウンター
+	// これが増えていない時、同じ深さを再度探索する。
+	int searchAgainCounter = 0;
+
 	// 1つ目のrootDepthはこのthreadの反復深化での探索中の深さ。
 	// 2つ目のrootDepth (Threads.main()->rootDepth)は深さで探索量を制限するためのもの。
 	// main threadのrootDepthがLimits.depthを超えた時点で、
 	// slave threadはこのループを抜けて良いのでこういう書き方になっている。
-	while ((rootDepth += 1) < MAX_PLY
+	while (++rootDepth < MAX_PLY
 		&& !Threads.stop
 		&& !(Limits.depth && mainThread && rootDepth > Limits.depth))
 	{
@@ -761,6 +824,10 @@ void Thread::search()
 		//size_t pvFirst = 0;
 		//pvLast = 0;
 
+		// 探索深さが増えているかのフラグがfalseならカウンターを1増やす
+		if (!Threads.increaseDepth)
+			searchAgainCounter++;
+
 		// MultiPVのためにこの局面の候補手をN個選出する。
 		for (pvIdx = 0; pvIdx < multiPV && !Threads.stop; ++pvIdx)
 		{
@@ -789,10 +856,13 @@ void Thread::search()
 			// 探索深さが一定以上あるなら前回の反復深化のiteration時の最小値と最大値
 			// より少し幅を広げたぐらいの探索窓をデフォルトとする。
 
-			// この値は 5～10ぐらいがベスト？ Stockfish7～10では、5。
-			if (rootDepth >= 5)
+			// Reset aspiration window starting size
+			// aspiration windowの開始サイズをリセットする			
+
+			// この値は 5～10ぐらいがベスト？ Stockfish7～10では、5。Stockfish 12では4
+			if (rootDepth >= 4)
 			{
-				Value previousScore = rootMoves[pvIdx].previousScore;
+				Value prev = rootMoves[pvIdx].previousScore;
 
 				// aspiration windowの幅
 				// 精度の良い評価関数ならばこの幅を小さくすると探索効率が上がるのだが、
@@ -801,15 +871,22 @@ void Thread::search()
 				// やねうら王のKPPT(Apery WCSC26)ではStockfishのまま(18付近)がベスト。
 				// もっと精度の高い評価関数を用意すべき。
 				// この値はStockfish10では20に変更された。
+				// Stockfish 12(NNUEを導入した)では17に変更された。
 				delta = Value(PARAM_ASPIRATION_SEARCH_DELTA);
 
-				alpha = std::max(previousScore - delta, -VALUE_INFINITE);
-				beta = std::min(previousScore + delta, VALUE_INFINITE);
+				alpha = std::max(prev - delta, -VALUE_INFINITE);
+				beta  = std::min(prev + delta, VALUE_INFINITE);
 
-				//				// Adjust contempt based on root move's previousScore (dynamic contempt)
-				//				int dct = ct + 88 * previousScore / (abs(previousScore) + 200);
-				//
-				//				contempt = (us == WHITE ? make_score(dct, dct / 2)
+				// Adjust contempt based on root move's previousScore (dynamic contempt)
+				// contemptの値をrootの指し手のpreviousScoreを基に調整する。(動的なcontempt)
+
+				// ※　contemptは千日手を受け入れるスコア。
+				//     勝ってるほうは千日手にはしたくないし、負けてるほうは千日手やむなしという…。
+
+				//int dct = ct + (105 - ct / 2) * prev / (abs(prev) + 149);
+				//contempt = (us == WHITE ? make_score(dct, dct / 2)
+				//	                      : -make_score(dct, dct / 2));
+
 			}
 
 			// 小さなaspiration windowで開始して、fail high/lowのときに、fail high/lowにならないようになるまで
@@ -817,12 +894,12 @@ void Thread::search()
 
 			// fail highした回数
 			// fail highした回数分だけ探索depthを下げてやるほうが強いらしい。
-			int failedHighCnt = 0;
+			failedHighCnt = 0;
 
 			while (true)
 			{
 				// fail highするごとにdepthを下げていく処理
-				Depth adjustedDepth = std::max(1, rootDepth - failedHighCnt );
+				Depth adjustedDepth = std::max(1, rootDepth - failedHighCnt - searchAgainCounter);
 				bestValue = ::search<PV>(rootPos, ss, alpha, beta, adjustedDepth, false);
 
 				// それぞれの指し手に対するスコアリングが終わったので並べ替えおく。
@@ -870,11 +947,13 @@ void Thread::search()
 
 					failedHighCnt = 0;
 					// fail lowを起こしていて、いま探索を中断するのは危険。
-					if (mainThread)
-					{
+
+					// やねうら王ではstopOnPonderhit使ってないのでこれはコメントアウト。
+#if 0
+					//if (mainThread)
 						//	mainThread->stopOnPonderhit = false;
 						// →　探索終了時刻が確定していてもこの場合、延長できるなら延長したい気はするが…。
-					}
+#endif
 
 				}
 				else if (bestValue >= beta)
@@ -997,12 +1076,15 @@ void Thread::search()
 			{
 				// 1つしか合法手がない(one reply)であるだとか、利用できる時間を使いきっているだとか、
 
-				double fallingEval = (314 + 9 * (mainThread->previousScore - bestValue)) / 581.0;
-				fallingEval = Math::clamp(fallingEval , 0.5 , 1.5);
+				double fallingEval = (318 + 6 * (mainThread->bestPreviousScore - bestValue)
+					+ 6 * (mainThread->iterValue[iterIdx] - bestValue)) / 825.0;
+				fallingEval = std::clamp(fallingEval, 0.5, 1.5);
 
 				// If the bestMove is stable over several iterations, reduce time accordingly
-				timeReduction = lastBestMoveDepth + 10 < completedDepth ? 1.95 : 1.0;
-				double reduction = std::pow(mainThread->previousTimeReduction, 0.528) / timeReduction;
+				// もしbestMoveが何度かのiterationにおいて安定しているならば、思考時間もそれに応じて減らす
+
+				timeReduction = lastBestMoveDepth + 9 < completedDepth ? 1.92 : 0.95;
+				double reduction = (1.47 + mainThread->previousTimeReduction) / (2.32 * timeReduction);
 
 				// Use part of the gained time from a previous stable move for the current move
 				for (Thread* th : Threads)
@@ -1011,13 +1093,17 @@ void Thread::search()
 					th->bestMoveChanges = 0;
 				}
 
-				double bestMoveInstability = 1 + totBestMoveChanges / Threads.size();
+				double bestMoveInstability = 1 + 2 * totBestMoveChanges / Threads.size();
+
+				// 合法手が1手しかないときはtotalTime = 0となり、即指しする計算式。
+				double totalTime = rootMoves.size() == 1 ? 0 :
+					Time.optimum() * fallingEval * reduction * bestMoveInstability;
 
 				// bestMoveが何度も変更になっているならunstablePvFactorが大きくなる。
 				// failLowが起きてなかったり、1つ前の反復深化から値がよくなってたりするとimprovingFactorが小さくなる。
 				// Stop the search if we have only one legal move, or if available time elapsed
-				if (rootMoves.size() == 1
-					|| Time.elapsed() > Time.optimum() * fallingEval * reduction * bestMoveInstability)
+
+				if (Time.elapsed() > totalTime)
 				{
 					// 停止条件を満たした
 
@@ -1035,10 +1121,23 @@ void Thread::search()
 						Time.search_end = std::max(Time.round_up(Time.elapsed_from_ponderhit()), Time.minimum());
 					}
 				}
+				// 前回からdepthが増えたかのチェック。
+				// depthが増えて行っていないなら、同じ深さで再度探索する。
+				else if (Threads.increaseDepth
+					&& !mainThread->ponder
+					&&  Time.elapsed() > totalTime * 0.58)
+					Threads.increaseDepth = false;
+				else
+					Threads.increaseDepth = true;
 			}
 		}
 
-	} // iterative deeping
+		// ここで、反復深化の1回前のスコアをiterValueに保存しておく。
+		// iterIdxは0..3の値をとるようにローテーションする。
+		mainThread->iterValue[iterIdx] = bestValue;
+		iterIdx = (iterIdx + 1) & 3;
+
+	} // iterative deeping , 反復深化の1回分の終了
 
 	if (!mainThread)
 		return;
@@ -1070,6 +1169,12 @@ namespace {
 
 		// root nodeであるか
 		const bool rootNode = PvNode && ss->ply == 0;
+
+		// 次の最大探索深さ。
+		// これを超える深さでsearch()を再帰的に呼び出さない。
+		// 延長されすぎるのを回避する。
+		const Depth maxNextDepth = rootNode ? depth : depth + 1;
+
 
 		// 【計測資料 34.】cuckooコード Stockfishの2倍のサイズのcuckoo配列で実験
 
@@ -1145,7 +1250,8 @@ namespace {
 		// ttValue				: 置換表上のスコア
 		// eval					: このnodeの静的評価値(の見積り)
 		// maxValue             : table base probeに用いる。将棋だと関係ない。
-		Value bestValue, value, ttValue, eval /*, maxValue */;
+		// probCutBeta          : prob cutする時のbetaの値。
+		Value bestValue, value, ttValue, eval /*, maxValue */, probCutBeta;
 
 		// formerPv				: このnode、以前は(置換表を見る限りは)PV nodeだったのに、今回はPV nodeではない。
 		// givesCheck			: moveによって王手になるのか
@@ -1302,15 +1408,20 @@ namespace {
 		ttMove = rootNode ? thisThread->rootMoves[thisThread->pvIdx].pv[0]
 				: ss->ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
 
+		// 置換表にhitしなかった時は、PV nodeのときだけttPvとして扱う。
+		// これss->ttPVに保存してるけど、singularの判定等でsearchをss+1ではなくssで呼び出すことがあり、
+		// そのときにss->ttPvが破壊される。なので、破壊しそうなときは直前にローカル変数に保存するコードが書いてある。
+
 		if (!excludedMove)
 			ss->ttPv = PvNode || (ss->ttHit && tte->is_pv());
 
 		formerPv = ss->ttPv && !PvNode;
 
-		// 置換表にhitしなかった時は、PV nodeでかつdepthが4超えのときだけttPvとして扱う。
-		ss->ttPv = (ss->ttHit && tte->is_pv()) || (PvNode && depth > 4);
-		// これss->ttPVに保存してるけど、singularの判定等でsearchをss+1ではなくssで呼び出すことがあり、
-		// そのときにss->ttPvが破壊される。なので、破壊しそうなときは直前にローカル変数に保存するコードが書いてある。
+
+		// thisThread->ttHitAverageは、ttHit(置換表にhitしたかのフラグ)の実行時の平均を近似するために用いられる。
+		// 移動平均のようなものを算出している。
+		thisThread->ttHitAverage = (TtHitAverageWindow - 1) * thisThread->ttHitAverage / TtHitAverageWindow
+			+ TtHitAverageResolution * ss->ttHit;
 
 		// 置換表の値による枝刈り
 
@@ -1333,35 +1444,26 @@ namespace {
 				if (ttValue >= beta)
 				{
 					// 【計測資料 8.】 capture()とcaputure_or_pawn_promotion()の比較
-#if 1
+
 					if (!pos.capture(ttMove))
-#else
-					if (!pos.capture_or_pawn_promotion(ttMove))
-#endif
 						update_quiet_stats(pos, ss, ttMove, stat_bonus(depth), depth);
 
-					// 反駁された1手前の置換表のquietな指し手に対する追加ペナルティを課す。
+					// Extra penalty for early quiet moves of the previous ply
+					// 1手前の早い時点のquietの指し手に対する追加のペナルティ
 					// 1手前は置換表の指し手であるのでNULL MOVEではありえない。
 
-					// 【計測資料 6.】 captured_piece()にするかcapture_or_pawn_promotion()にするかの比較。
-
-					// TODO: あとで比較しなおす[2020/11/05]
-#if 0
 					// Stockfish 10～12相当のコード
-					// Extra penalty for early quiet moves of the previous ply
+					// prioirCaptureのとこは、"pos.capture_or_pawn_promotion((ss - 1)->currentMove"
+					// とするほうが正しい気がするが、強さは変わらず。
+
 					if ((ss - 1)->moveCount <= 2 && !priorCapture)
-#else
-					// こうなっていてもおかしくはないはずのコード
-					// 1手前の早めのquietな指し手が反駁されたなら追加でpenaltyを課す 
-					if ((ss - 1)->moveCount <= 2 && !pos.capture_or_pawn_promotion((ss - 1)->currentMove))
-#endif
 						update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + 1));
 
 				}
 				// fails lowのときのquiet ttMoveに対するペナルティ
 				// 【計測資料 9.】capture_or_promotion(),capture_or_pawn_promotion(),capture()での比較
 #if 1
-			// Stockfish 10～12相当のコード
+				// Stockfish 10～12相当のコード
 				else if (!pos.capture_or_promotion(ttMove))
 #else
 				else if (!pos.capture_or_pawn_promotion(ttMove))
@@ -1373,6 +1475,9 @@ namespace {
 					update_continuation_histories(ss, pos.moved_piece_after(ttMove), to_sq(ttMove), penalty);
 				}
 			}
+
+			//if (pos.rule50_count() < 90)
+			//	return ttValue;
 
 			return ttValue;
 		}
@@ -1558,7 +1663,7 @@ namespace {
 
 		if (!rootNode // The required rootNode PV handling is not available in qsearch
 			&&  depth == 1
-			&&  eval <= alpha - PARAM_RAZORING_MARGIN /* == RazorMargin == 600 */)
+			&&  eval <= alpha - PARAM_RAZORING_MARGIN /* == RazorMargin == 510 */)
 			return qsearch<NT>(pos, ss, alpha, beta);
 
 		// 残り探索深さが1,2手のときに、alpha - razor_marginを上回るかだけ簡単に
@@ -1672,19 +1777,49 @@ namespace {
 		// Step 10. ProbCut (skipped when in check) : ~10 Elo
 		// -----------------------
 
+		// probCutに使うbeta値。TODO : 調整すべき。
+		probCutBeta = beta + PARAM_PROBCUT_MARGIN1/*176*/ - PARAM_PROBCUT_MARGIN2/*49*/ * improving;
+
 		// ProbCut(王手のときはスキップする)
 
 		// もし、このnodeで非常に良いcaptureの指し手があり(例えば、SEEの値が動かす駒の価値を上回るようなもの)
 		// 探索深さを減らしてざっくり見てもbetaを非常に上回る値を返すようなら、このnodeをほぼ安全に枝刈りすることが出来る。
 
 		if (!PvNode
-			&&  depth >= PARAM_PROBCUT_DEPTH/*5*/
-			&&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
-		{
-			Value raisedBeta = std::min(beta + PARAM_PROBCUT_MARGIN1/*216*/ - PARAM_PROBCUT_MARGIN2/*48*/ * improving, VALUE_INFINITE);
+			&&  depth > PARAM_PROBCUT_DEPTH/*4*/
+			&&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY
+			
+			// if value from transposition table is lower than probCutBeta, don't attempt probCut
+			// there and in further interactions with transposition table cutoff depth is set to depth - 3
+			// because probCut search has depth set to depth - 4 but we also do a move before it
+			// so effective depth is equal to depth - 3
 
-			// rbeta - ss->staticEvalを上回るcaptureの指し手のみを生成。
-			MovePicker mp(pos, ttMove, raisedBeta - ss->staticEval, &thisThread->captureHistory);
+			// もし置換表から取り出したvalueがprobCutBetaより小さいなら、そこではprobCutを試みず、
+			// 置換表との相互作用では、cutoff depthをdepth - 3に設定されます。
+			// なぜなら、probCut searchはdepth - 4に設定されていますが、我々はその前に指すので、
+			// 実効的な深さはdepth - 3と同じになるからです。
+
+			&& !(ss->ttHit
+				&& tte->depth() >= depth - (PARAM_PROBCUT_DEPTH-1)
+				&& ttValue != VALUE_NONE
+				&& ttValue < probCutBeta))
+		{
+			// if ttMove is a capture and value from transposition table is good enough produce probCut
+			// cutoff without digging into actual probCut search
+			// もしttMoveが捕獲する指し手であり、置換表から取り出した値が十分に良い場合、実際のprobCut searchをせずに
+			// probCutしてしまう。
+
+			if (ss->ttHit
+				&& tte->depth() >= depth - (PARAM_PROBCUT_DEPTH - 1)
+				&& ttValue != VALUE_NONE
+				&& ttValue >= probCutBeta
+				&& ttMove
+				&& pos.capture_or_promotion(ttMove))
+				return probCutBeta;
+
+			ASSERT_LV3(probCutBeta < VALUE_INFINITE);
+
+			MovePicker mp(pos, ttMove, probCutBeta - ss->staticEval, &captureHistory);
 			int probCutCount = 0;
 			bool ttPv = ss->ttPv; // このあとの探索でss->ttPvを潰してしまうのでtte->save()のときはこっちを用いる。
 			ss->ttPv = false;
@@ -1696,49 +1831,68 @@ namespace {
 			{
 				if (move != excludedMove && pos.legal(move))
 				{
+					ASSERT_LV3(pos.capture_or_pawn_promotion(move));
+					ASSERT_LV3(depth > PARAM_PROBCUT_DEPTH);
+					// Stockfish 12のコード、ここ"depth >= 5"と書いてある。
+					// なぜにifの条件式に倣って"depth > 4"と書かないのか…。
+
 					captureOrPawnPromotion = true;
 					probCutCount++;
 
 					ss->currentMove = move;
-					ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck][captureOrPawnPromotion][to_sq(move)][pos.moved_piece_after(move)];
-
-					ASSERT_LV3(depth >= PARAM_PROBCUT_DEPTH/*5*/ );
+					ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck]
+																			  [captureOrPawnPromotion]
+																			  [to_sq(move)]
+																			  [pos.moved_piece_after(move)];
 
 					pos.do_move(move, st);
 
+					// Perform a preliminary qsearch to verify that the move holds
 					// この指し手がよさげであることを確認するための予備的なqsearch
-					value = -qsearch<NonPV>(pos, ss + 1, -raisedBeta, -raisedBeta + 1);
 
-					if (value >= raisedBeta)
-						value = -search<NonPV>(pos, ss + 1, -raisedBeta, -raisedBeta + 1, depth - (PARAM_PROBCUT_DEPTH - 1)/*4*/ , !cutNode);
+					value = -qsearch<NonPV>(pos, ss + 1, -probCutBeta, -probCutBeta + 1);
+
+					// If the qsearch held, perform the regular search
+					// よさげであったので、普通に探索する
+
+					if (value >= probCutBeta)
+						value = -search<NonPV>(pos, ss + 1, -probCutBeta, -probCutBeta + 1, depth - PARAM_PROBCUT_DEPTH, !cutNode);
 
 					pos.undo_move(move);
 
-					if (value >= raisedBeta)
+					if (value >= probCutBeta)
+					{
+						// if transposition table doesn't have equal or more deep info write probCut data into it
+						// もし置換表が、等しいかより深く探索した情報ではないなら、probCutの情報をそこに書く
+
+						if (!(ss->ttHit
+							&& tte->depth() >= depth - (PARAM_PROBCUT_DEPTH - 1)
+							&& ttValue != VALUE_NONE))
+							tte->save(posKey, value_to_tt(value, ss->ply), ttPv,
+								BOUND_LOWER,
+								depth - (PARAM_PROBCUT_DEPTH - 1), move, ss->staticEval);
 						return value;
 				}
 			}
+			}
+
+			// ss->ttPvはprobCutの探索で書き換えてしまったかも知れないので復元する。
 			ss->ttPv = ttPv;
 		}
 
 		// -----------------------
-		// Step 11. Internal iterative deepening (skipped when in check) : ~2 Elo
+		// Step 11. If the position is not in TT, decrease depth by 2
 		// -----------------------
 
-		// 多重反復深化 (王手のときはこの処理はスキップする)
+		// 局面がTTになかったのなら、探索深さを2下げる。
+		// ※　このあとも置換表にヒットしないであろうから、ここを浅めで探索しておく。
+		// (次に他のスレッドがこの局面に来たときには置換表にヒットするのでそのときにここの局面の
+		//   探索が完了しているほうが助かるため)
 
-		// 残り探索深さがある程度あるのに置換表に指し手が登録されていないとき
-		// (たぶん置換表のエントリーを上書きされた)、浅い探索をして、その指し手を置換表の指し手として用いる。
-		// 置換表用のメモリが潤沢にあるときはこれによる効果はほとんどないはずではあるのだが…。
-
-		if (depth >= 8 && !ttMove)
-		{
-			search<NT>(pos, ss, alpha, beta, depth - 7 , cutNode);
-
-			tte = TT.probe(posKey, ss->ttHit);
-			ttValue = ss->ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
-			ttMove  = ss->ttHit ? pos.to_move(tte->move()) : MOVE_NONE;
-		}
+		if (PvNode
+			&& depth >= 6
+			&& !ttMove)
+			depth -= 2;
 
 		// 王手がかかっている局面では、探索はここから始まる。
 	moves_loop:
@@ -1750,7 +1904,9 @@ namespace {
 												nullptr						, (ss - 4)->continuationHistory ,
 												nullptr						, (ss - 6)->continuationHistory };
 
+		// 直前の指し手で動かした(移動後の)駒 : やねうら王独自
 		Piece prevPc = pos.piece_on(prevSq);
+
 		Move countermove = thisThread->counterMoves[prevSq][prevPc];
 
 		MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory,
@@ -1761,10 +1917,7 @@ namespace {
 			ss->killers,
 			ss->ply);
 
-#if defined(__GNUC__)
-		// gccでコンパイルするときにvalueが未初期化かも知れないという警告が出るのでその回避策。
 		value = bestValue;
-#endif
 
 		moveCountPruning = false;
 
@@ -1774,17 +1927,9 @@ namespace {
 
 		ttCapture = ttMove && pos.capture_or_pawn_promotion(ttMove);
 
-		// 【計測資料 31.】singularExtensionLMRmultiplierの導入
-
-# if 0
-		// このnodeでSingular判定のときにvalueがSingulerBetaを下回った回数
-		int singularExtensionLMRmultiplier = 0;
-#endif
-
-		// このあとnodeを展開していくので、evaluate()の差分計算ができないと速度面で損をするから、
-		// evaluate()を呼び出していないなら呼び出しておく。
-		// evaluate_with_no_return(pos);
-		// →　ここに来るまでに呼び出しているはず…。
+		// このnodeを探索中であると印をつけておく。
+		// (極めて多いスレッドで探索するときに同一ノードを探索するのを回避するため)
+		ThreadHolding th(thisThread, posKey, ss->ply);
 
 		// -----------------------
 		// Step 12. Loop through moves
@@ -1806,9 +1951,16 @@ namespace {
 				thisThread->rootMoves.end(), move))
 				continue;
 
+			// Check for legality
+			// moveの合法性をチェック。
+
+			// root nodeはlegal()だとわかっているのでこのチェックは不要。
+			// 非合法手はほとんど含まれていないから、以前はこの判定はdo_move()の直前まで遅延させたほうが得だったが、
+			// do_move()するまでの枝刈りが増えてきたので、ここでやったほうが良いようだ。
+			if (!rootNode && !pos.legal(move))
+				continue;
+
 			// do_move()した指し手の数のインクリメント
-			// このあとdo_move()の前で枝刈りのためにsearchを呼び出す可能性があるので
-			// このタイミングでやっておき、legalでなければ、この値を減らす
 			ss->moveCount = ++moveCount;
 
 			// Stockfish本家のこの読み筋の出力、細かすぎるので時間をロスする。しないほうがいいと思う。
@@ -1836,7 +1988,14 @@ namespace {
 
 			// 指し手で捕獲する指し手、もしくは歩の成りである。
 			// 【検証資料 12.】extend checksのときのcaptureOrPawnPromotionをどう扱うか。
+
+			// Stockfish12のコード
+			//captureOrPawnPromotion = pos.capture(move);
+
+			// こう変えるほうが強いようだ。
 			captureOrPawnPromotion = pos.capture_or_pawn_promotion(move);
+			//captureOrPawnPromotion = pos.capture_or_promotion(move);
+
 
 			// 今回移動させる駒(移動後の駒)
 			movedPiece = pos.moved_piece_after(move);
@@ -1869,7 +2028,10 @@ namespace {
 				if (!captureOrPawnPromotion
 					&& !givesCheck)
 				{
+
+					// Countermoves based pruning (~20 Elo)
 					// Countermovesに基づいた枝刈り(historyの値が悪いものに関してはskip) : ~20 Elo
+
 					if (lmrDepth < PARAM_PRUNING_BY_HISTORY_DEPTH/*4*/ + ((ss - 1)->statScore > 0 || (ss - 1)->moveCount == 1)
 						&& (*contHist[0])[to_sq(move)][movedPiece] < CounterMovePruneThreshold
 						&& (*contHist[1])[to_sq(move)][movedPiece] < CounterMovePruneThreshold)
@@ -1878,6 +2040,7 @@ namespace {
 
 					// Futility pruning: parent node (~5 Elo)
 					// 親nodeの時点で子nodeを展開する前にfutilityの対象となりそうなら枝刈りしてしまう。
+
 					if (lmrDepth < PARAM_FUTILITY_AT_PARENT_NODE_DEPTH/*7*/
 						&& !ss->inCheck
 						&& ss->staticEval + PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1/*283*/ + PARAM_FUTILITY_MARGIN_BETA/*170*/ * lmrDepth <= alpha
@@ -1901,12 +2064,12 @@ namespace {
 				else
 				{
 					// Capture history based pruning when the move doesn't give check
-					if (!givesCheck
+					if (  !givesCheck
 						&& lmrDepth < 1
 						&& captureHistory[to_sq(move)][movedPiece][type_of(pos.piece_on(to_sq(move)))] < 0)
 						continue;
 
-					// See based pruning
+					// SEE based pruning
 					if (!pos.see_ge(move, - Value(PARAM_LMR_SEE_MARGIN1 /*221*/) * depth)) // (~25 Elo)
 						continue;
 				}
@@ -1939,15 +2102,14 @@ namespace {
 			// 2番目にベストな指し手のスコアを小さなコストで求めることは出来ないので…。
 
 			// singular延長をするnodeであるか。
-			if (depth >= PARAM_SINGULAR_EXTENSION_DEPTH/*8*/
+			if (depth >= PARAM_SINGULAR_EXTENSION_DEPTH/*7*/
 				&& move == ttMove
 				&& !rootNode
 				&& !excludedMove // 再帰的なsingular延長を除外する。
 		   /* &&  ttValue != VALUE_NONE Already implicit in the next condition */
 				&& abs(ttValue) < VALUE_KNOWN_WIN // 詰み絡みのスコアはsingular extensionはしない。(Stockfish 10～)
 				&& (tte->bound() & BOUND_LOWER)
-				&& tte->depth() >= depth - 3
-				&&  pos.legal(move))
+				&& tte->depth() >= depth - 3)
 				// このnodeについてある程度調べたことが置換表によって証明されている。(ttMove == moveなのでttMove != MOVE_NONE)
 				// (そうでないとsingularの指し手以外に他の有望な指し手がないかどうかを調べるために
 				// null window searchするときに大きなコストを伴いかねないから。)
@@ -2043,15 +2205,6 @@ namespace {
 			//const Key nextKey = pos.key_after(move);
 			//prefetch(TT.first_entry(nextKey));
 			//Eval::prefetch_evalhash(nextKey);
-
-			// legal()のチェック。root nodeだとlegal()だとわかっているのでこのチェックは不要。
-			// 非合法手はほとんど含まれていないからこの判定はdo_move()の直前まで遅延させたほうが得。
-			if (!rootNode && !pos.legal(move))
-			{
-				// 足してしまったmoveCountを元に戻す。
-				ss->moveCount = --moveCount;
-				continue;
-			}
 
 			// 現在このスレッドで探索している指し手を保存しておく。
 			ss->currentMove = move;
@@ -2199,8 +2352,8 @@ namespace {
 				(ss + 1)->pv[0] = MOVE_NONE;
 
 				// full depthで探索するときはcutNodeにしてはいけない。
-				value = -search<PV>(pos, ss + 1, -beta, -alpha, newDepth, false);
-
+				value = -search<PV>(pos, ss + 1, -beta, -alpha,
+									std::min(maxNextDepth, newDepth), false);
 			}
 
 			// -----------------------
@@ -2252,6 +2405,8 @@ namespace {
 					for (Move* m = (ss + 1)->pv; *m != MOVE_NONE; ++m)
 						rm.pv.push_back(*m);
 
+					// bestMoveが何度変更されたかを記録しておく。
+					// これが頻繁に行われるのであれば、思考時間を少し多く割り当てる。
 					if (moveCount > 1)
 						++thisThread->bestMoveChanges;
 
@@ -2349,17 +2504,30 @@ namespace {
 
 		// bestMoveがない == fail lowしているケース。
 		// fail lowを引き起こした前nodeでのcounter moveに対してボーナスを加点する。
-
 		// 【計測資料 15.】search()でfail lowしているときにhistoryのupdateを行なう条件
 
 		else if ((depth >= 3 || PvNode)
-			//			&& is_ok((ss - 1)->currentMove)) // Stockfish9以前はここでnull moveを除外していたが…
-			&& !pos.captured_piece())
+				&& !priorCapture)
 			update_continuation_histories(ss - 1, /*pos.piece_on(prevSq)*/prevPc, prevSq, stat_bonus(depth));
 
 		// 将棋ではtable probe使っていないのでmaxValue関係ない。
 		//if (PvNode)
 		//	bestValue = std::min(bestValue, maxValue);
+
+		// もし良い指し手が見つからず(bestValueがalphaを更新せず)、前の局面はttPvを選んでいた場合は、
+		// 前の相手の手がおそらく良い手であり、新しい局面が探索木に追加される。
+		// (ttPvをtrueに変更してTTEntryに保存する)
+
+		if (bestValue <= alpha)
+			ss->ttPv = ss->ttPv || ((ss - 1)->ttPv && depth > 3);
+
+		// それ以外の場合は、カウンターの手が見つかり、その局面が探索木のleafであれば、
+		// その局面を探索木から削除する。
+		// (ttPvをfalseに変更してTTEntryに保存する)
+
+		else if (depth > 3)
+			ss->ttPv = ss->ttPv && (ss + 1)->ttPv;
+
 
 		// -----------------------
 		//  置換表に保存する
@@ -2372,7 +2540,7 @@ namespace {
 		// ただし、指し手がない場合は、詰まされているスコアなので、これより短い/長い手順の詰みがあるかも知れないから、
 		// すなわち、スコアは変動するかも知れないので、BOUND_UPPERという扱いをする。
 
-		if (!excludedMove)
+		if (!excludedMove && !(rootNode && thisThread->pvIdx))
 			tte->save(posKey, value_to_tt(bestValue, ss->ply), ss->ttPv,
 				bestValue >= beta ? BOUND_LOWER :
 				PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
@@ -2388,8 +2556,8 @@ namespace {
 	//      静止探索
 	// -----------------------
 
-	// search()で残り探索深さが0以下になったときに呼び出される。
-	// (より正確に言うなら、残り探索深さが1未満になったときに呼び出される)
+	// qsearch()は静止探索を行う関数で、search()でdepth(残り探索深さ)が0になったときに呼び出されるか、
+	// このqseach()自身から再帰的にもっと低いdepthで呼び出される。
 
 	template <NodeType NT>
 	Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth)
@@ -2436,9 +2604,8 @@ namespace {
 
 		// pvHit			: PV nodeでかつ置換表にhitした
 		// givesCheck		: MovePickerから取り出した指し手で王手になるか
-		// evasionPrunable	: 枝刈り候補となる回避手であるか
 		// captureOrPawnPromotion : 駒を捕獲する指し手か、歩を成る指し手であるか
-		bool pvHit, givesCheck, evasionPrunable , captureOrPawnPromotion;
+		bool pvHit, givesCheck , captureOrPawnPromotion;
 
 		// このnodeで何手目の指し手であるか
 		int moveCount;
@@ -2599,7 +2766,7 @@ namespace {
 			{
 				// Stockfishではここ、pos.key()になっているが、posKeyを使うべき。
 				if (!ss->ttHit)
-					tte->save(posKey, value_to_tt(bestValue, ss->ply), pvHit, BOUND_LOWER,
+					tte->save(posKey, value_to_tt(bestValue, ss->ply), false /* ss->ttHit == false */, BOUND_LOWER,
 						DEPTH_NONE, MOVE_NONE, ss->staticEval);
 
 				return bestValue;
@@ -2663,6 +2830,7 @@ namespace {
 			//	&& !pos.advanced_pawn_push(move))
 				)
 			{
+				//assert(type_of(move) != ENPASSANT); // Due to !pos.advanced_pawn_push
 				// moveが成りの指し手なら、その成ることによる価値上昇分もここに乗せたほうが正しい見積りになるはず。
 				// 【計測資料 14.】 futility pruningのときにpromoteを考慮するかどうか。
 				futilityValue = futilityBase + (Value)CapturePieceValue[pos.piece_on(to_sq(move))]
@@ -2693,32 +2861,19 @@ namespace {
 			// 駒を取らない王手回避の指し手はよろしくない可能性が高いのでこれは枝刈りしてしまう。
 			// 成りでない && seeが負の指し手はNG。王手回避でなくとも、同様。
 
-			// ただし、王手されている局面の場合、王手の回避手を1つ以上見つけていないのに
-			// これの指し手を枝刈りしてしまうと回避手がないかのように錯覚してしまうので、
-			// bestValue > VALUE_MATED_IN_MAX_PLY
-			// (実際は-VALUE_INFINITEより大きければ良い)
-			// という条件を追加してある。
+			// ここ、わりと棋力に影響する。下手なことするとR30ぐらい変わる。
 
-			// 枝刈りの候補となりうる捕獲しない回避手を検出する。
-			// 【計測資料 2.】moveCountを利用するかしないか
-			evasionPrunable =	   ss->inCheck
-								&& (depth != 0 || moveCount > 2)
-								&& bestValue > VALUE_MATED_IN_MAX_PLY
-								&& !pos.capture(move);
-
-			if ((!ss->inCheck || evasionPrunable)
-				// 【計測資料 5.】!is_promote()と!pawn_promotion()との比較。
-#if 0
-			// Stockfish 8相当のコード
-			// Stockfish 9では、see_ge()でpromoteならすぐにreturnするからこの判定は不要だということで、このコードは消された。
-			// Simplify away redundant SEE pruning condition : cf. https://github.com/official-stockfish/Stockfish/commit/b61759e907e508d436b7c0b7ff8ab866454f7ca6
-				&& !is_promote(move)
-#else
-			// 成る手ではなく、歩が成る手のみを除外
-				&& !pos.pawn_promotion(move)
-#endif
+			// Stockfish 12のコード
+			// Do not search moves with negative SEE values
+			if (!ss->inCheck
+				&& !(givesCheck && pos.is_discovery_check_on_king(~pos.side_to_move(), move))
 				&& !pos.see_ge(move))
 				continue;
+
+
+			// TODO : prefetchは、入れると遅くなりそうだが、many coreだと違うかも。
+			// Speculative prefetch as early as possible
+			//prefetch(TT.first_entry(pos.key_after(move)));
 
 			// -----------------------
 			//     局面を1手進める
@@ -2735,7 +2890,10 @@ namespace {
 			// 現在このスレッドで探索している指し手を保存しておく。
 			ss->currentMove = move;
 
-			ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck][captureOrPawnPromotion][to_sq(move)][pos.moved_piece_after(move)];
+			ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck]
+																	  [captureOrPawnPromotion]
+																	  [to_sq(move)]
+																	  [pos.moved_piece_after(move)];
 
 			// 1手動かして、再帰的にqsearch()を呼ぶ
 			pos.do_move(move, st, givesCheck);
@@ -2829,9 +2987,26 @@ namespace {
 	// ply : root node からの手数。(ply_from_root)
 	Value value_from_tt(Value v, int ply) {
 
-		return  v == VALUE_NONE ? VALUE_NONE
-			: v >= VALUE_MATE_IN_MAX_PLY ? v - ply
-			: v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
+		if (v == VALUE_NONE)
+			return VALUE_NONE;
+
+		if (v >= VALUE_TB_WIN_IN_MAX_PLY)
+		{
+			//if (v >= VALUE_MATE_IN_MAX_PLY && VALUE_MATE - v > 99 - r50c)
+			//	return VALUE_MATE_IN_MAX_PLY - 1; // do not return a potentially false mate score
+
+			return v - ply;
+		}
+
+		if (v <= VALUE_TB_LOSS_IN_MAX_PLY)
+		{
+			//if (v <= VALUE_MATED_IN_MAX_PLY && VALUE_MATE + v > 99 - r50c)
+			//	return VALUE_MATED_IN_MAX_PLY + 1; // do not return a potentially false mate score
+
+			return v + ply;
+		}
+
+		return v;
 	}
 
 	// PV lineをコピーする。
@@ -2847,23 +3022,6 @@ namespace {
 	// -----------------------
 	//     Statsのupdate
 	// -----------------------
-
-	// update_continuation_histories()は、1,2,4,6手前の指し手と現在の指し手との指し手ペアによって
-	// continuationHistoryを更新する。
-	// 1手前に対する現在の指し手 ≒ counterMove  (応手)
-	// 2手前に対する現在の指し手 ≒ followupMove (継続手)
-	// 4手前に対する現在の指し手 ≒ followupMove (継続手)
-	// ※　Stockfish 10で6手前も見るようになった。
-	void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus)
-	{
-		for (int i : {1, 2, 4, 6})
-		{
-			if (ss->inCheck && i > 2)
-				break;
-			if (is_ok((ss - i)->currentMove))
-				(*(ss - i)->continuationHistory)[to][pc] << bonus;
-	}
-	}
 
 	// update_all_stats()は、bestmoveが見つかったときにそのnodeの探索の終端で呼び出される。
 	// 統計情報一式を更新する。
@@ -2905,7 +3063,7 @@ namespace {
 			&& !pos.captured_piece())
 			update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq, -bonus1);
 
-		// Decrease all the non-best capture moves
+		// 捕獲する指し手でベストではなかったものをすべて減点する。
 		for (int i = 0; i < captureCount; ++i)
 		{
 			moved_piece = pos.moved_piece_after(capturesSearched[i]);
@@ -2915,7 +3073,24 @@ namespace {
 		}
 	}
 
-	// update_quiet_stats()は、新しいbest moveが見つかったときにmove soring heuristicsを更新する。
+	// update_continuation_histories() は、形成された手のペアの履歴を更新します。
+	// 1,2,4,6手前の指し手と現在の指し手との指し手ペアによってcontinuationHistoryを更新する。
+	// 1手前に対する現在の指し手 ≒ counterMove  (応手)
+	// 2手前に対する現在の指し手 ≒ followupMove (継続手)
+	// 4手前に対する現在の指し手 ≒ followupMove (継続手)
+	// ※　Stockfish 10で6手前も見るようになった。
+	void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus)
+	{
+		for (int i : {1, 2, 4, 6})
+		{
+			if (ss->inCheck && i > 2)
+				break;
+			if (is_ok((ss - i)->currentMove))
+				(*(ss - i)->continuationHistory)[to][pc] << bonus;
+		}
+	}
+
+	// update_quiet_stats()は、新しいbest moveが見つかったときに指し手の並べ替えheuristicsを更新する。
 	// 具体的には駒を取らない指し手のstat tables、killer等を更新する。
 
 	// move      = これが良かった指し手
@@ -3046,79 +3221,26 @@ void init_param()
 	//   parameters.hの動的な読み込み
 	// -----------------------
 
-#if defined (INCLUDE_PARAMETERS)
+#if defined (TUNING_SEARCH_PARAMETERS)
 	{
 		std::vector<std::string> param_names = {
-			"PARAM_FUTILITY_MARGIN_ALPHA1" ,"PARAM_FUTILITY_MARGIN_ALPHA2" ,
-			"PARAM_FUTILITY_MARGIN_BETA" ,
-			"PARAM_FUTILITY_MARGIN_QUIET" , "PARAM_FUTILITY_RETURN_DEPTH",
-
-			"PARAM_FUTILITY_AT_PARENT_NODE_DEPTH",
-			"PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1",
-			"PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1" ,
-			"PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2" ,
-			"PARAM_LMR_SEE_MARGIN1",
-
-			"PARAM_NULL_MOVE_DYNAMIC_ALPHA","PARAM_NULL_MOVE_DYNAMIC_BETA","PARAM_NULL_MOVE_DYNAMIC_GAMMA",
-			"PARAM_NULL_MOVE_MARGIN0","PARAM_NULL_MOVE_MARGIN1","PARAM_NULL_MOVE_MARGIN2",
-			"PARAM_NULL_MOVE_MARGIN3","PARAM_NULL_MOVE_MARGIN4",
-			
-			"PARAM_NULL_MOVE_RETURN_DEPTH",
-
-			"PARAM_PROBCUT_DEPTH","PARAM_PROBCUT_MARGIN1","PARAM_PROBCUT_MARGIN2",
-
-			"PARAM_SINGULAR_EXTENSION_DEPTH","PARAM_SINGULAR_MARGIN","PARAM_SINGULAR_SEARCH_DEPTH_ALPHA",
-
-			"PARAM_PRUNING_BY_HISTORY_DEPTH","PARAM_REDUCTION_BY_HISTORY",
-			"PARAM_RAZORING_MARGIN",
-
-			"PARAM_QSEARCH_MATE1","PARAM_SEARCH_MATE1","PARAM_WEAK_MATE_PLY",
-
-			"PARAM_ASPIRATION_SEARCH_DELTA",
-
-			"PARAM_EVAL_TEMPO",
+			// このheader fileは、yaneuraou-param.hからparam_conv.pyによって自動生成される。
+			#include "param/yaneuraou-param-string.h"
 		};
 
-#if defined(INCLUDE_PARAMETERS)
 		std::vector<int*> param_vars = {
-#else
-		std::vector<const int*> param_vars = {
-#endif
-			&PARAM_FUTILITY_MARGIN_ALPHA1 , &PARAM_FUTILITY_MARGIN_ALPHA2,
-			&PARAM_FUTILITY_MARGIN_BETA,
-			&PARAM_FUTILITY_MARGIN_QUIET , &PARAM_FUTILITY_RETURN_DEPTH,
-
-			&PARAM_FUTILITY_AT_PARENT_NODE_DEPTH,
-			&PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1,
-			&PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1,
-			&PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2,
-			&PARAM_LMR_SEE_MARGIN1,
-
-			&PARAM_NULL_MOVE_DYNAMIC_ALPHA, &PARAM_NULL_MOVE_DYNAMIC_BETA,&PARAM_NULL_MOVE_DYNAMIC_GAMMA,
-			&PARAM_NULL_MOVE_MARGIN0,&PARAM_NULL_MOVE_MARGIN1,&PARAM_NULL_MOVE_MARGIN2,
-			&PARAM_NULL_MOVE_MARGIN3,&PARAM_NULL_MOVE_MARGIN4,
-
-			&PARAM_NULL_MOVE_RETURN_DEPTH,
-
-			&PARAM_PROBCUT_DEPTH, &PARAM_PROBCUT_MARGIN1,&PARAM_PROBCUT_MARGIN2,
-
-			&PARAM_SINGULAR_EXTENSION_DEPTH, &PARAM_SINGULAR_MARGIN,&PARAM_SINGULAR_SEARCH_DEPTH_ALPHA,
-
-			&PARAM_PRUNING_BY_HISTORY_DEPTH,&PARAM_REDUCTION_BY_HISTORY,
-			&PARAM_RAZORING_MARGIN,
-
-			&PARAM_QSEARCH_MATE1,&PARAM_SEARCH_MATE1,&PARAM_WEAK_MATE_PLY,
-
-			&PARAM_ASPIRATION_SEARCH_DELTA,
-
-			&PARAM_EVAL_TEMPO,
+			// このheader fileは、yaneuraou-param.hからparam_conv.pyによって自動生成される。
+			#include "param/yaneuraou-param-array.h"
 		};
 
 		std::fstream fs;
-		fs.open("param\\" PARAM_FILE, std::ios::in);
+
+		std::string path = Path::Combine(Directory::GetCurrentFolder(), PARAM_FILE);
+		
+		fs.open( path.c_str(), std::ios::in);
 		if (fs.fail())
 		{
-			std::cout << "info string Error! : can't read " PARAM_FILE << std::endl;
+			std::cout << "info string Error! : can't read " << path << std::endl;
 			return;
 		}
 
@@ -3281,7 +3403,7 @@ namespace Learner
 			limits.max_game_ply = 1 << 16;
 
 			// 入玉ルールも入れておかないと引き分けになって決着つきにくい。
-			limits.enteringKingRule = EKR_27_POINT;
+			limits.enteringKingRule = EnteringKingRule::EKR_27_POINT;
 		}
 
 		// DrawValueの設定
@@ -3322,6 +3444,9 @@ namespace Learner
 			// 学習用の実行ファイルではスレッドごとに置換表を持っているので
 			// 探索前に自分(のスレッド用)の置換表の世代カウンターを回してやる。
 			th->tt.new_search();
+
+			// 最近の置換表の平均ヒット率の初期化。
+			th->ttHitAverage = TtHitAverageWindow * TtHitAverageResolution / 2;
 		}
 	}
 
@@ -3421,7 +3546,7 @@ namespace Learner
 		Value delta = -VALUE_INFINITE;
 		Value bestValue = -VALUE_INFINITE;
 
-		while ((rootDepth += 1) <= depth
+		while (++rootDepth <= depth
 			// node制限を超えた場合もこのループを抜ける
 			// 探索ノード数は、この関数の引数で渡されている。
 			&& !(nodesLimit /*node制限あり*/ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
@@ -3436,8 +3561,8 @@ namespace Learner
 				// それぞれのdepthとPV lineに対するUSI infoで出力するselDepth
 				selDepth = 0;
 
-				// depth 5以上においてはaspiration searchに切り替える。
-				if (rootDepth >= 5)
+				// depth 4以上においてはaspiration searchに切り替える。
+				if (rootDepth >= 4)
 				{
 					delta = Value(PARAM_ASPIRATION_SEARCH_DELTA);
 

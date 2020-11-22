@@ -91,23 +91,24 @@ namespace USI
 		for (size_t i = 0; i < multiPV; ++i)
 		{
 			// この指し手のpvの更新が終わっているのか
-			bool updated = (i <= pvIdx && rootMoves[i].score != -VALUE_INFINITE);
+			bool updated = rootMoves[i].score != -VALUE_INFINITE;
 
-			if (depth == 1 && !updated)
+			if (depth == 1 && !updated && i > 0)
 				continue;
 
-			Depth d = updated ? depth : depth - 1;
+			// 1より小さな探索depthで出力しない。
+			Depth d = updated ? depth : std::max(1, depth - 1);
 			Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
 			// multi pv時、例えば3個目の候補手までしか評価が終わっていなくて(PVIdx==2)、このとき、
 			// 3,4,5個目にあるのは前回のiterationまでずっと評価されていなかった指し手であるような場合に、
 			// これらのpreviousScoreが-VALUE_INFINITE(未初期化状態)でありうる。
 			// (multi pv状態で"go infinite"～"stop"を繰り返すとこの現象が発生する。おそらく置換表にhitしまくる結果ではないかと思う。)
-			// なので、このとき、その評価値を出力するわけにはいかないので、この場合、その出力処理を省略するのが正しいと思う。
-			// おそらく2017/09/09時点で最新のStockfishにも同様の問題があり、何らかの対策コードが必要ではないかと思う。
-			// (Stockfishのテスト環境がないため、試してはいない。)
 			if (v == -VALUE_INFINITE)
-				continue;
+				v = VALUE_ZERO; // この場合でもとりあえず出力は行う。
+
+			//bool tb = TB::RootInTB && abs(v) < VALUE_MATE_IN_MAX_PLY;
+			//v = tb ? rootMoves[i].tbScore : v;
 
 			if (ss.rdbuf()->in_avail()) // 1行目でないなら連結のための改行を出力
 				ss << endl;
@@ -291,22 +292,12 @@ void is_ready(bool skipCorruptCheck)
 
 	// --- Keep Alive的な処理ここまで ---
 
+	// スレッドを先に生成しないとUSI_Hashで確保したメモリクリアの並列化が行われなくて困る。
+	Threads.set(size_t(Options["Threads"]));
 
 #if defined (USE_EVAL_HASH)
 	Eval::EvalHash_Resize(Options["EvalHash"]);
 #endif
-
-	// 初回初期化
-	static bool init = false;
-	if (!init)
-	{
-		// eHashのクリアもこのタイミングで行うことにする。
-		// (大きめのものを確保していると時間がかかるため)
-#if defined (USE_EVAL_HASH)
-		Eval::EvalHash_Clear();
-#endif
-		init = true;
-	}
 
 	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
 	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
@@ -334,10 +325,13 @@ void is_ready(bool skipCorruptCheck)
 	// isreadyに対してはreadyokを返すまで次のコマンドが来ないことは約束されているので
 	// このタイミングで各種変数の初期化もしておく。
 
-	TT.resize(Options["USI_Hash"]);
+	TT.resize(size_t(Options["USI_Hash"]));
 
 	Search::clear();
-//	Time.availableNodes = 0;
+
+#if defined (USE_EVAL_HASH)
+	Eval::EvalHash_Clear();
+#endif
 
 	Threads.stop = false;
 }
@@ -345,9 +339,12 @@ void is_ready(bool skipCorruptCheck)
 // isreadyコマンド処理部
 void is_ready_cmd(Position& pos, StateListPtr& states)
 {
-	// 対局ごとに"isready","usinewgame"の両方が来るはずだが、
-	// "isready"は起動後に1度だけしか来ないGUI実装がありうるかも知れない。
-	// 将棋では、"isready"が毎回来るようなので、"usinewgame"のほうは無視して、
+	// 対局ごとに"isready","usinewgame"の両方が来る。
+	// "isready"が起動後に1度だけしか来ないようなGUI実装は、
+	// 実装上の誤りであるから修正すべきである。)
+
+	// 少なくとも将棋のGUI(将棋所、ShogiGUI、将棋神やねうら王)では、
+	// "isready"が毎回来るようなので、"usinewgame"のほうは無視して、
 	// "isready"に応じて評価関数、定跡、探索部を初期化する。
 
 	is_ready();
@@ -723,7 +720,10 @@ void USI::loop(int argc, char* argv[])
 		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
 		// 我々はこれに関知しないので単に無視すれば良い。
 		// やねうら王では、時間のかかる初期化はisreadyの応答でやっている。
-		// Stockfishでは、Search::clear()をここで呼び出しているようだが。
+		// Stockfishでは、Search::clear() (時間のかかる処理)をここで呼び出しているようだが。
+		// そもそもで言うと、"usinewgame"に対してはエンジン側は何ら応答を返さないので、
+		// GUI側は、エンジン側が処理中なのかどうかが判断できない。
+		// なのでここで長い時間のかかる処理はすべきではないと思うのだが。
 		else if (token == "usinewgame") continue;
 
 		// 思考エンジンの準備が出来たかの確認
@@ -747,6 +747,7 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "eval") cout << "eval = " << Eval::compute_eval(pos) << endl;
 		else if (token == "evalstat") Eval::print_eval_stat(pos);
 
+		// この実行ファイルをコンパイルしたコンパイラの情報を出力する。
 		else if (token == "compiler") sync_cout << compiler_info() << sync_endl;
 
 		// -- 以下、やねうら王独自拡張のカスタムコマンド

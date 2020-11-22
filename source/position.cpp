@@ -664,6 +664,7 @@ Bitboard Position::attackers_to(Color c, Square sq, const Bitboard& occ) const
 
 // sに利きのあるc側の駒を列挙する。先後両方。
 // (occが指定されていなければ現在の盤面において。occが指定されていればそれをoccupied bitboardとして)
+// sq == SQ_NBでの呼び出しは合法。ZERO_BBが返る。
 Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const
 {
 	ASSERT_LV3(sq <= SQ_NB);
@@ -1197,6 +1198,12 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 #if defined(EVAL_NNUE)
 	st->accumulator.computed_accumulation = false;
 	st->accumulator.computed_score = false;
+#endif
+
+#if defined(USE_BOARD_EFFECT_PREV)
+	// NNUE-HalfKPE9
+	// 現局面のboard_effectをコピー
+	std::memcpy(board_effect_prev, board_effect, sizeof(board_effect));
 #endif
 
 	// 直前の指し手を保存するならばここで行なう。
@@ -1736,8 +1743,17 @@ void Position::do_null_move(StateInfo& newSt) {
 	// この場合、StateInfo自体は丸ごとコピーしておかないといけない。(他の初期化をしないので)
 	// よく考えると、StateInfo、新しく作る必要もないのだが…。まあ、CheckInfoがあるので仕方ないか…。
 	std::memcpy(&newSt, st, sizeof(StateInfo));
+
+	// TODO : NNUEの場合、accumulatorのコピー不要なのでは…？
+	//std::memcpy(&newSt, st, offsetof(StateInfo, accumulator));
+
 	newSt.previous = st;
 	st = &newSt;
+
+#if defined(EVAL_NNUE)
+	// NNUEの場合、KPPT型と違って、手番が違う場合、計算なしに済ますわけにはいかない。
+	st->accumulator.computed_score = false;
+#endif
 
 	st->board_key_ ^= Zobrist::side;
 
@@ -1752,18 +1768,23 @@ void Position::do_null_move(StateInfo& newSt) {
 	// これは、さっきアクセスしたところのはずなので意味がない。
 	//  Eval::prefetch_evalhash(key);
 
-#if defined(EVAL_NNUE)
-#if defined(USE_EVAL_HASH)
+#if defined(EVAL_NNUE) && defined(USE_EVAL_HASH)
+	// NNUEのEvalHashの場合、手番が違うと異なるentry(のはず)
 	Eval::prefetch_evalhash(key);
 #endif
-	st->accumulator.computed_score = false;
-#endif
+
+	//++st->rule50;
 
 	st->pliesFromNull = 0;
 
 	sideToMove = ~sideToMove;
 
 	set_check_info<true>(st);
+
+	//st->repetition = 0;
+
+	//assert(pos_is_ok());
+
 }
 
 void Position::undo_null_move()

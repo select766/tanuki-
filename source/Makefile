@@ -12,6 +12,7 @@
 # やねうら王の使いたいエディションを指定する (select YaneuraOu Edition)
 # YANEURAOU_ENGINE_NNUE       : NNUE型評価関数(halfKP256),標準NNUE型
 # YANEURAOU_ENGINE_NNUE_KP256 : NNUE型評価関数(KP256)
+# YANEURAOU_ENGINE_NNUE_HALFKPE9 : NNUE型評価関数(halfKPE9)
 # YANEURAOU_ENGINE_KPPT       : KPPT型評価関数
 # YANEURAOU_ENGINE_KPP_KKPT   : KPP_KKPT型評価関数
 # YANEURAOU_ENGINE_MATERIAL   : 駒得のみの評価関数
@@ -20,6 +21,7 @@
 
 YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_KP256
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKPE9
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPP_KKPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIAL
@@ -29,12 +31,18 @@ YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 # ターゲットCPU (target cpu)
 
 # 利用できるCPU拡張命令を指定する。
+# 
 # AMDのRyzen(Zen/Zen2)はZEN1/ZEN2を選択するとBMI2命令が使わずに速くなる。(10%程度高速化)
+# Ryzen Zen3シリーズはZEN3を選択。こちらはAVX2用とたぶん変わらない。
+#
 # ARM系ならOTHERを指定する。
 # 32bit環境用はNO_SSEを指定する。
+#
+# AVX-512対応(サーバー向けSkylake以降)ならAVX512を指定する。
+# AVX-512対応でさらにVNNI命令対応(Cascade Lake以降)なら、AVX512VNNIを指定する。
 
-# TODO : AVX512、世代ごとにわける
 
+#TARGET_CPU = AVX512VNNI
 #TARGET_CPU = AVX512
 TARGET_CPU = AVX2
 #TARGET_CPU = SSE42
@@ -75,6 +83,8 @@ LDFLAGS  =
 LIBS     =
 INCLUDE  = # -I../include
 
+# makeするときにCPPFLAGSを追加で指定したいときはこれを用いる。
+EXTRA_CPPFLAGS = 
 
 # === implementations ===
 
@@ -256,15 +266,20 @@ endif
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE)
 	else
+		# YANEURAOU_EDITIONがYANEURAOU_ENGINE_NNUEの後ろに文字が入っている名前なら、これは
+		# 標準NNUE型の亜種なので、とりあえず"YANEURAOU_ENGINE_NNUE"というシンボルを定義してやる。
 		CPPFLAGS += -DYANEURAOU_ENGINE_NNUE
-	endif
+
 	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_KP256)
 		CPPFLAGS += -DEVAL_NNUE_KP256
-	else
-		ifeq ($(NNUE_EVAL_ARCH),KP256)
-			CPPFLAGS += -DEVAL_NNUE_KP256
-		endif
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKPE9)
+		CPPFLAGS += -DEVAL_NNUE_HALFKPE9
+
 	endif
+	endif
+
+	# 大して大きなファイルではないので全部してしまう。
 	SOURCES += \
 		eval/nnue/evaluate_nnue.cpp                                            \
 		eval/nnue/evaluate_nnue_learner.cpp                                    \
@@ -300,17 +315,22 @@ endif
 # abe
 ifeq ($(findstring abe,$(ENGINE_BRANCH)),abe)
 	SOURCES += extra/super_sort.cpp
-	CPPFLAGS += -DPV_OUTPUT_DRAW_ONLY
+	CPPFLAGS += -DDEV_BRANCH
+	CPPFLAGS += -DPV_OUTPUT_DRAW_ONLY -DFORCE_BIND_THIS_THREAD
 endif
 
 
 # CPU判別
+
+# TARGET_CPUシンボルを定義してやる。
+CPPFLAGS += -DTARGET_CPU=\"$(TARGET_CPU)\"
 
 # AMD Ryzenシリーズ
 
 # ZEN1/ZEN2はBMI2命令を使わずPEXTはSoftware Emulationしたほうが速い。
 # さらに、そのコードを使う代わりにMagic Bitboardを使うことで高速化を図る。
 # (USE_BMI2が定義されていない時、自動的にmagic bitboardが用いられる)
+# ZEN3でPEXTの速度がまともになったらしいのでZEN3以降ではBMI2命令を使うようにする。
 
 ifeq ($(TARGET_CPU),ZEN1)
 	CPPFLAGS += -DUSE_AVX2 -mbmi -mno-bmi2 -mavx2 -march=znver1
@@ -318,14 +338,26 @@ ifeq ($(TARGET_CPU),ZEN1)
 else ifeq ($(TARGET_CPU),ZEN2)
 	CPPFLAGS += -DUSE_AVX2 -mbmi -mno-bmi2 -mavx2 -march=znver2
 
+else ifeq ($(TARGET_CPU),ZEN3)
+	CPPFLAGS += -DUSE_AVX2 -DUSE_BMI2 -mbmi -mbmi2 -mavx2 -march=znver3
+
 # それ以外は、AVX512,AVX2,SSE4.2,SSE4.1,SSE2のように利用できるCPU拡張命令で振り分ける。
 # AVX2より上位のCPUなら普通は(Intel系なら)BMI2命令を使ったほうが速いので"USE_BMI2"を指定しておく。
 
+# メモ) AVX512について
+#   skylake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -march=skylake-avx512
+#   cascadelake : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_VNNI -march=cascadelake
+#   icelake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_VNNI -DUSE_AVX512VBMI -DUSE_AVX512IFMA -USE_GFNI -march=icelake-client
+
+else ifeq ($(TARGET_CPU),AVX512VNNI)
+
+	CPPFLAGS += -DUSE_AVX512 -DUSE_VNNI -march=cascadelake
+	# NNUEのコード、USE_VNNIが指定されているとVNNI対応のコードになる。
+	# cascadelakeとicelakeとの違いがあるのかは知らないので、cascadelakeのみでいいや。
+
 else ifeq ($(TARGET_CPU),AVX512)
-	# skylake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -march=skylake-avx512
-	# cascadelake : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_AVX512VNNI -march=cascadelake
-	# icelake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_AVX512VNNI -DUSE_AVX512VBMI -DUSE_AVX512IFMA -USE_GFNI -march=icelake-client
-	CPPFLAGS += -DUSE_AVX512 -DUSE_BMI2 -DUSE_AVX512VLBWDQ -march=skylake-avx512
+
+	CPPFLAGS += -DUSE_AVX512 -DUSE_BMI2 -march=skylake-avx512
 
 else ifeq ($(TARGET_CPU),AVX2)
 	CPPFLAGS += -DUSE_AVX2 -DUSE_BMI2 -mbmi -mbmi2 -mavx2 -march=corei7-avx
@@ -353,7 +385,7 @@ else ifeq ($(TARGET_CPU),OTHER)
 endif
 
 
-CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION)
+CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) $(EXTRA_CPPFLAGS)
 
 OBJECTS  = $(addprefix $(OBJDIR)/, $(SOURCES:.cpp=.o))
 DEPENDS  = $(OBJECTS:.o=.d)

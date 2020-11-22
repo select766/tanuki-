@@ -40,7 +40,7 @@ void Thread::clear()
 			for (auto& to : continuationHistory[inCheck][c])
 		for (auto& h : to)
 			h->fill(0);
-			continuationHistory[inCheck][c][NO_PIECE][0]->fill(Search::CounterMovePruneThreshold - 1);
+			continuationHistory[inCheck][c][SQ_ZERO][NO_PIECE]->fill(Search::CounterMovePruneThreshold - 1);
 		}
 }
 
@@ -66,13 +66,18 @@ void Thread::idle_loop() {
 	// ・8スレッド未満のときはOSに任せる
 	// ・8スレッド以上のときは、自前でbindThisThreadを行なう。
 	// cf. Upon changing the number of threads, make sure all threads are bound : https://github.com/official-stockfish/Stockfish/commit/1c50d8cbf554733c0db6ab423b413d75cc0c1928
+	// その後、
+	// ・fishtestを8スレッドで行うから、9以上にしてくれとのことらしい。
+	// cf. NUMA for 9 threads or more : https://github.com/official-stockfish/Stockfish/commit/bc3b148d5712ef9ea00e74d3ff5aea10a4d3cabe
 
-	if (Options["Threads"] >= 8)
+#if !defined(FORCE_BIND_THIS_THREAD)
+	if (Options["Threads"] > 8)
 		WinProcGroup::bindThisThread(idx);
 		// このifを有効にすると何故かNUMA環境のマルチスレッド時に弱くなることがある気がする。
 		// (長い時間対局させ続けると安定するようなのだが…)
 		// 上の投稿者と条件が何か違うのだろうか…。
 		// 前のバージョンのソフトが、こちらのNUMAの割当を阻害している可能性が微レ存。
+#endif
 
 	while (true)
 	{
@@ -109,16 +114,22 @@ void ThreadPool::set(size_t requested)
 		clear();
 
 		// Reallocate the hash with the new threadpool size
-		//TT.resize(Options["USI_Hash"]);
+		// 新しいスレッドプールのサイズで置換表用のメモリを再確保する。
 
-		// →　新しいthreadpoolのサイズで置換表用のメモリを確保しなおしたほうが
-		//  良いらしいのだが、大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
+		// →　大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
+		// 　　isreadyの応答でやるべき。
 
-		// スレッド数に依存する探索パラメーターの初期化
-		// →　やねうら王ではそんなのないのでコメントアウト
+		//TT.resize(size_t(Options["USI_Hash"]));
+
 
 		// Init thread number dependent search params.
-		//Search::init();
+		// スレッド数に依存する探索パラメーターの初期化
+
+		// →　Stockfish 12との互換性を保つために一応呼び出しておくが、
+		// 　　こんなところで初期化せずに、isreadyの応答として初期化すべきだと思う。
+
+		Search::init();
+
 	}
 
 #if defined(EVAL_LEARN)
@@ -136,7 +147,7 @@ void ThreadPool::clear() {
 		th->clear();
 
 	main()->callsCnt = 0;
-	main()->previousScore = VALUE_INFINITE;
+	main()->bestPreviousScore = VALUE_INFINITE;
 	main()->previousTimeReduction = 1.0;
 }
 
@@ -150,6 +161,7 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 
 	// ponderに関して、StockfishではstopOnPonderhitというのがあるが、やねうら王にはこのフラグはない。
 	/* main()->stopOnPonderhit = */ stop = false;
+	increaseDepth = true;
 	main()->ponder = ponderMode;
 	Search::Limits = limits;
 	Search::RootMoves rootMoves;
@@ -183,15 +195,24 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 				rootMoves.emplace_back(m);
 	}
 
+	// After ownership transfer 'states' becomes empty, so if we stop the search
+	// and call 'go' again without setting a new position states.get() == NULL.
 	// 所有権の移動後、statesが空になるので、探索を停止させ、
 	// "go"をstate.get() == NULLである新しいpositionをセットせずに再度呼び出す。
+
 	ASSERT_LV3(states.get() || setupStates.get());
 
 	// statesが呼び出し元から渡されているならこの所有権をSearch::SetupStatesに移しておく。
 	// このstatesは、positionコマンドに対して用いたStateInfoでなければならない。(CheckInfoが異なるため)
 	// 引数で渡されているstatesは、そうなっているものとする。
 	if (states.get())
-		setupStates = std::move(states);
+		setupStates = std::move(states);	// Ownership transfer, states is now empty
+
+	// We use Position::set() to set root position across threads. But there are
+	// some StateInfo fields (previous, pliesFromNull, capturedPiece) that cannot
+	// be deduced from a fen string, so set() clears them and they are set from
+	// setupStates->back() later. The rootState is per thread, earlier states are shared
+	// since they are read-only.
 
 	// Position::set()によってst->previosがクリアされるので事前にコピーして保存する。
 	// これは、rootStateの役割。これはスレッドごとに持っている。
@@ -215,6 +236,44 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 }
 
 
+// 探索終了時に、一番良い探索ができていたスレッドを選ぶ。
+Thread* ThreadPool::get_best_thread() const {
+
+	// 深くまで探索できていて、かつそっちの評価値のほうが優れているならそのスレッドの指し手を採用する
+	// 単にcompleteDepthが深いほうのスレッドを採用しても良さそうだが、スコアが良いほうの探索深さのほうが
+	// いい指し手を発見している可能性があって楽観合議のような効果があるようだ。
+
+	Thread* bestThread = front();
+	std::map<Move, int64_t> votes;
+	Value minScore = VALUE_NONE;
+
+	// Find minimum score of all threads
+	for (Thread* th : *this)
+		minScore = std::min(minScore, th->rootMoves[0].score);
+
+	// Vote according to score and depth, and select the best thread
+	for (Thread* th : *this)
+	{
+		votes[th->rootMoves[0].pv[0]] +=
+			(th->rootMoves[0].score - minScore + 14) * int(th->completedDepth);
+
+		if (abs(bestThread->rootMoves[0].score) >= VALUE_TB_WIN_IN_MAX_PLY)
+		{
+			// Make sure we pick the shortest mate / TB conversion or stave off mate the longest
+			if (th->rootMoves[0].score > bestThread->rootMoves[0].score)
+				bestThread = th;
+		}
+		else if (th->rootMoves[0].score >= VALUE_TB_WIN_IN_MAX_PLY
+			|| (th->rootMoves[0].score > VALUE_TB_LOSS_IN_MAX_PLY
+				&& votes[th->rootMoves[0].pv[0]] > votes[bestThread->rootMoves[0].pv[0]]))
+			bestThread = th;
+	}
+
+	return bestThread;
+}
+
+
+/// Start non-main threads
 // 探索を開始する(main thread以外)
 
 void ThreadPool::start_searching() {
@@ -225,6 +284,7 @@ void ThreadPool::start_searching() {
 }
 
 
+/// Wait for non-main threads
 // main threadがそれ以外の探索threadの終了を待つ。
 
 void ThreadPool::wait_for_search_finished() const {
