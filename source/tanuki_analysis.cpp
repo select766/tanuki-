@@ -19,8 +19,10 @@ void Tanuki::AnalyzeProgress()
 	KifuReader reader(kifu_folder_path, 1);
 
 	Progress progress;
-	progress.Load();
-	
+	if (!progress.Load()) {
+		std::exit(1);
+	}
+
 	int count[kNumBars] = {};
 
 	Learner::PackedSfenValue packed_sfen_value;

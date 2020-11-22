@@ -935,7 +935,9 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "progress_estimate") {
 			Tanuki::Progress progress;
-			progress.Load();
+			if (!progress.Load()) {
+				std::exit(1);
+			}
 			auto p = progress.Estimate(pos);
 			sync_cout << "info string progress = " << p << sync_endl;
 		}

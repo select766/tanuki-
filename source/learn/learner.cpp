@@ -1503,7 +1503,9 @@ struct LearnerThink: public MultiThink
 		latest_loss_sum = 0.0;
 		latest_loss_count = 0;
 
-		progress.Load();
+		if (!progress.Load()) {
+			std::exit(1);
+		}
 #endif
 	}
 
