@@ -60,9 +60,10 @@ DEBUG = OFF
 #DEBUG = ON
 
 
-# clangでコンパイルしたほうがgccより数%速いっぽい。
+# 使用するコンパイラ (compiler)
+# ※ clangでコンパイルしたほうがgccより数%速いっぽい。
 COMPILER = g++
-# COMPILER = clang++
+#COMPILER = clang++
 
 
 # エンジンの表示名 (engine displayname)
@@ -288,8 +289,8 @@ ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_
 		eval/nnue/features/p.cpp                                               \
 		eval/nnue/features/half_kp.cpp                                         \
 		eval/nnue/features/half_relative_kp.cpp                                \
-		eval/nnue/features/half_kpe9.cpp                                       \
-		eval/nnue/features/pe9.cpp                                             \
+		eval/nnue/features/half_kpe9.cpp								\
+		eval/nnue/features/pe9.cpp										\
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 endif
 

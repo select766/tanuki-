@@ -73,10 +73,6 @@
 #include <shared_mutex>
 #endif
 
-bool use_draw_in_training=false;
-bool use_draw_in_validation=false;
-bool use_hash_in_training=true;
-
 using namespace std;
 
 // これは探索部で定義されているものとする。
@@ -1235,8 +1231,11 @@ struct SfenReader
 			{
 				if (eval_limit < abs(p.score) || abs(p.score) == VALUE_SUPERIOR)
 					continue;
-				if (!use_draw_in_validation && p.game_result == 0)
+#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
+				if (p.game_result == 0)
 					continue;
+#endif
+
 				sfen_for_mse.push_back(p);
 			} else {
 				break;
@@ -1503,7 +1502,8 @@ struct LearnerThink: public MultiThink
 		best_loss = std::numeric_limits<double>::infinity();
 		latest_loss_sum = 0.0;
 		latest_loss_count = 0;
-			progress.Load();
+
+		progress.Load();
 #endif
 	}
 
@@ -1563,9 +1563,9 @@ struct LearnerThink: public MultiThink
 	double latest_loss_sum;
 	u64 latest_loss_count;
 	std::string best_nn_directory;
-		bool weight_by_progress;
+	bool weight_by_progress;
 
-		Tanuki::Progress progress;
+	Tanuki::Progress progress;
 #endif
 
 	u64 eval_save_interval;
@@ -1639,9 +1639,9 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 		// TaskDispatcherを用いて各スレッドに作業を振る。
 		// そのためのタスクの定義。
 		// ↑で使っているposをcaptureされるとたまらんのでcaptureしたい変数は一つずつ指定しておく。
-			auto weight_by_progress = this->weight_by_progress;
-			auto& progress = this->progress;
-			auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
+		auto weight_by_progress = this->weight_by_progress;
+		auto& progress = this->progress;
+		auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
 		{
 			// これ、C++ではループごとに新たなpsのインスタンスをちゃんとcaptureするのだろうか.. →　するようだ。
 			auto th = Threads[thread_id];
@@ -1698,15 +1698,15 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 			// 交差エントロピーを計算して表示させる。
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
-				// 進捗度に応じて学習率を調整する。
-				// WSCOC2020 elmo・水匠2
-				double progress_weight = weight_by_progress
-					? (1.0 - progress.Estimate(pos))
-					: 1.0;
+			// 進捗度に応じて学習率を調整する。
+			// WSCOC2020 elmo・水匠2
+			double progress_weight = weight_by_progress
+				? (1.0 - progress.Estimate(pos))
+				: 1.0;
 
 			double test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy;
 			double test_entropy_eval, test_entropy_win, test_entropy;
-				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
+			calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
 			// 交差エントロピーの合計は定義的にabs()をとる必要がない。
 			test_sum_cross_entropy_eval += test_cross_entropy_eval;
 			test_sum_cross_entropy_win += test_cross_entropy_win;
@@ -1932,10 +1932,10 @@ void LearnerThink::thread_worker(size_t thread_id)
 		if (eval_limit < abs(ps.score) || abs(ps.score) == VALUE_SUPERIOR)
 			goto RetryRead;
 
-
-		if (!use_draw_in_training && ps.game_result == 0)
+#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
+		if (ps.game_result == 0)
 			goto RetryRead;
-
+#endif
 
 		// 序盤局面に関する読み飛ばし
 		if (ps.gamePly < prng.rand(reduction_gameply))
@@ -1959,14 +1959,14 @@ void LearnerThink::thread_worker(size_t thread_id)
 		{
 			auto key = pos.key();
 			// rmseの計算用に使っている局面なら除外する。
-			if (sr.is_for_rmse(key) && use_hash_in_training)
-				goto RetryRead;
+			//if (sr.is_for_rmse(key))
+			//	goto RetryRead;
 
 			// 直近で用いた局面も除外する。
 			auto hash_index = size_t(key & (sr.READ_SFEN_HASH_SIZE - 1));
 			auto key2 = sr.hash[hash_index];
-			if (key == key2 && use_hash_in_training)
-				goto RetryRead;
+			//if (key == key2)
+			//	goto RetryRead;
 			sr.hash[hash_index] = key; // 今回のkeyに入れ替えておく。
 		}
 #endif
@@ -2038,11 +2038,11 @@ void LearnerThink::thread_worker(size_t thread_id)
 			Value shallow_value = (rootColor == pos.side_to_move()) ? Eval::evaluate(pos) : -Eval::evaluate(pos);
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
-				// 進捗度に応じて学習率を調整する。
-				// WSCOC2020 elmo・水匠2
-				double progress_weight = weight_by_progress
-					? (1.0 - progress.Estimate(pos))
-					: 1.0;
+			// 進捗度に応じて学習率を調整する。
+			// WSCOC2020 elmo・水匠2
+			double progress_weight = weight_by_progress
+				? (1.0 - progress.Estimate(pos))
+				: 1.0;
 
 			// 学習データに対するロスの計算
 			double learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy;
@@ -2070,12 +2070,12 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 勾配に基づくupdateはのちほど行なう。
 			Eval::add_grad(pos, rootColor, dj_dw, freeze);
 #else
-				double example_weight =
+			double example_weight =
 			    (discount_rate != 0 && ply != (int)pv.size()) ? discount_rate : 1.0;
 
-				// 進捗度に応じて学習率を調整する。
-				// WSCOC2020 elmo・水匠2
-				example_weight *= progress_weight;
+			// 進捗度に応じて学習率を調整する。
+			// WSCOC2020 elmo・水匠2
+			example_weight *= progress_weight;
 
 			Eval::NNUE::AddExample(pos, rootColor, ps, example_weight);
 #endif
@@ -2601,8 +2601,7 @@ void learn(Position&, istringstream& is)
 	double newbob_decay = 1.0;
 	int newbob_num_trials = 2;
 	string nn_options;
-		bool weight_by_progress = false;
-		double l2_regularization_parameter = 0.0;
+	bool weight_by_progress = false;
 #endif
 
 	u64 eval_save_interval = LEARN_EVAL_SAVE_INTERVAL;
@@ -2646,9 +2645,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "eta3")       is >> eta3;
 		else if (option == "eta1_epoch") is >> eta1_epoch;
 		else if (option == "eta2_epoch") is >> eta2_epoch;
-		else if (option == "use_draw_in_training") is >> use_draw_in_training;
-		else if (option == "use_draw_in_validation") is >> use_draw_in_validation;
-		else if (option == "use_hash_in_training") is >> use_hash_in_training;
+
 		// 割引率
 		else if (option == "discount_rate") is >> discount_rate;
 
@@ -2690,8 +2687,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "newbob_decay") is >> newbob_decay;
 		else if (option == "newbob_num_trials") is >> newbob_num_trials;
 		else if (option == "nn_options") is >> nn_options;
-			else if (option == "weight_by_progress") is >> weight_by_progress;
-			else if (option == "l2_regularization_parameter") is >> l2_regularization_parameter;
+		else if (option == "weight_by_progress") is >> weight_by_progress;
 #endif
 		else if (option == "eval_save_interval") is >> eval_save_interval;
 		else if (option == "loss_output_interval") is >> loss_output_interval;
@@ -2842,8 +2838,7 @@ void learn(Position&, istringstream& is)
 	Eval::init_grad(eta1,eta1_epoch,eta2,eta2_epoch,eta3);
 #else
 	cout << "init_training.." << endl;
-		Eval::NNUE::InitializeTraining(eta1, eta1_epoch, eta2, eta2_epoch, eta3,
-			l2_regularization_parameter);
+	Eval::NNUE::InitializeTraining(eta1,eta1_epoch,eta2,eta2_epoch,eta3);
 	Eval::NNUE::SetBatchSize(nn_batch_size);
 	Eval::NNUE::SetOptions(nn_options);
 	if (newbob_decay != 1.0 && !Options["SkipLoadingEval"]) {
@@ -2876,7 +2871,7 @@ void learn(Position&, istringstream& is)
 	learn_think.newbob_scale = 1.0;
 	learn_think.newbob_decay = newbob_decay;
 	learn_think.newbob_num_trials = newbob_num_trials;
-		learn_think.weight_by_progress = weight_by_progress;
+	learn_think.weight_by_progress = weight_by_progress;
 #endif
 	learn_think.eval_save_interval = eval_save_interval;
 	learn_think.loss_output_interval = loss_output_interval;
