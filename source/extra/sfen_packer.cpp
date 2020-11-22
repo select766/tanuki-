@@ -165,7 +165,7 @@ struct SfenPacker
 
     // 手駒をハフマン符号化して書き出し
     for (auto c : COLOR)
-      for (Piece pr = PAWN; pr < KING; ++pr)
+      for (PieceType pr = PAWN; pr < KING; ++pr)
       {
         int n = hand_count(pos.hand_of(c), pr);
 
@@ -239,7 +239,7 @@ struct SfenPacker
   void write_board_piece_to_stream(Piece pc)
   {
     // 駒種
-    Piece pr = raw_type_of(pc);
+    PieceType pr = raw_type_of(pc);
     auto c = huffman_table[pr];
     stream.write_n_bit(c.code, c.bits);
  
@@ -261,7 +261,7 @@ struct SfenPacker
     ASSERT_LV3(pc != NO_PIECE);
 
     // 駒種
-    Piece pr = raw_type_of(pc);
+    PieceType pr = raw_type_of(pc);
     auto c = huffman_table[pr];
     stream.write_n_bit(c.code >> 1, c.bits - 1);
 
@@ -276,7 +276,7 @@ struct SfenPacker
   // 盤面の駒を1枚streamから読み込む
   Piece read_board_piece_from_stream()
   {
-    Piece pr = NO_PIECE;
+    PieceType pr = NO_PIECE_TYPE;
     int code = 0, bits = 0;
     while (true)
     {
@@ -285,14 +285,14 @@ struct SfenPacker
 
       ASSERT_LV3(bits <= 6);
 
-      for (pr = NO_PIECE; pr < KING; ++pr)
+      for (pr = NO_PIECE_TYPE; pr < KING; ++pr)
         if (huffman_table[pr].code == code
           && huffman_table[pr].bits == bits)
           goto Found;
     }
   Found:;
-    if (pr == NO_PIECE)
-      return pr;
+    if (pr == NO_PIECE_TYPE)
+      return NO_PIECE;
 
     // 成りフラグ
     // (金はこのフラグはない)
@@ -301,13 +301,13 @@ struct SfenPacker
     // 先後フラグ
     Color c = (Color)stream.read_one_bit();
     
-    return make_piece(c, pr + (promote ? PIECE_PROMOTE : NO_PIECE));
+    return make_piece(c, pr + (promote ? PIECE_TYPE_PROMOTE : NO_PIECE_TYPE));
   }
 
   // 手駒を1枚streamから読み込む
   Piece read_hand_piece_from_stream()
   {
-    Piece pr = NO_PIECE;
+    PieceType pr = NO_PIECE_TYPE;
     int code = 0, bits = 0;
     while (true)
     {
@@ -322,7 +322,7 @@ struct SfenPacker
           goto Found;
     }
   Found:;
-    ASSERT_LV3(pr != NO_PIECE);
+    ASSERT_LV3(pr != NO_PIECE_TYPE);
 
     // 金以外であれば成りフラグを1bit捨てる
     if (pr != GOLD)
@@ -342,8 +342,7 @@ struct SfenPacker
 
 // 高速化のために直接unpackする関数を追加。かなりしんどい。
 // packer::unpack()とPosition::set()とを合体させて書く。
-// 渡された局面に問題があって、エラーのときは非0を返す。
-int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thread* th, bool mirror , int gamePly_ /* = 0 */)
+Tools::Result Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thread* th, bool mirror , int gamePly_ /* = 0 */)
 {
 	SfenPacker packer;
 	auto& stream = packer.stream;
@@ -431,7 +430,7 @@ int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thre
 		//cout << sq << ' ' << board[sq] << ' ' << stream.get_cursor() << endl;
 
 		if (stream.get_cursor() > 256)
-			return 1;
+			return Tools::Result(Tools::ResultCode::SomeError);
 		//ASSERT_LV3(stream.get_cursor() <= 256);
 	}
 
@@ -454,7 +453,7 @@ int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thre
 		lastPc = pc;
 
 		// FV38などではこの個数分だけpieceListに突っ込まないといけない。
-		Piece rpc = raw_type_of(pc);
+		PieceType rpc = raw_type_of(pc);
 #endif
 
 #if defined (USE_FV38)
@@ -473,7 +472,7 @@ int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thre
 		// こんな局面はおかしい。デバッグ用。
 		//cout << "Error : set_from_packed_sfen() , position = " << endl << *this << endl;
 		//ASSERT_LV1(false);
-		return 2;
+		return Tools::Result(Tools::ResultCode::SomeError);
 	}
 
 	gamePly = gamePly_;
@@ -487,7 +486,7 @@ int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thre
 
 	// --- effect
 
-#ifdef LONG_EFFECT_LIBRARY
+#if defined (LONG_EFFECT_LIBRARY)
 	// 利きの全計算による更新
 	LongEffect::calc_effect(*this);
 #endif
@@ -504,7 +503,7 @@ int Position::set_from_packed_sfen(const PackedSfen& sfen , StateInfo * si, Thre
 
 	thisThread = th;
 
-	return 0;
+	return Tools::Result::Ok();
 }
 
 // 盤面と手駒、手番を与えて、そのsfenを返す。

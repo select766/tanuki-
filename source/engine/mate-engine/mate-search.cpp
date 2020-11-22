@@ -18,7 +18,7 @@ using namespace Search;
 // TODO(someone): 優越関係の実装
 // TODO(someone): 証明駒の実装
 // TODO(someone): Source Node Detection Algorithm (SNDA)の実装
-// 
+//
 // リンク＆参考文献
 //
 // Ayumu Nagai , Hiroshi Imai , "df-pnアルゴリズムの詰将棋を解くプログラムへの応用",
@@ -40,10 +40,10 @@ using namespace Search;
 // proof-number search. In: Proceedings of the AAAI-10, pp. 108-113 (2010)
 //
 // A. Kishimoto, M. Winands, M. Müller and J. Saito. Game-Tree Search Using Proof Numbers: The First
-// Twenty Years. ICGA Journal 35(3), 131-156, 2012. 
+// Twenty Years. ICGA Journal 35(3), 131-156, 2012.
 //
 // A. Kishimoto and M. Mueller, Tutorial 4: Proof-Number Search Algorithms
-// 
+//
 // df-pnアルゴリズム学習記(1) - A Succulent Windfall
 // http://caprice-j.hatenablog.com/entry/2014/02/14/010932
 //
@@ -170,6 +170,10 @@ namespace MateEngine
 			for (auto& entry : entries.entries)
 				if (hash_high == entry.hash_high && entry.generation == generation)
 					return entry;
+				// TODO(yane) : ここ、優劣関係も見たほうが良いのでは..
+				// cf.
+				//	https://tadaoyamaoka.hatenablog.com/entry/2018/05/20/150355
+				//  https://github.com/TadaoYamaoka/ElmoTeacherDecoder/blob/6c8d476d251e72627e98708bf82b6f307933dc21/extract_mated_hcp/dfpn.cpp
 
 			// 合致するTTEntryが見つからなかったので空きエントリーを探して返す
 
@@ -210,10 +214,10 @@ namespace MateEngine
 		}
 
 		// 置換表を確保する。
-		// 現在のOptions["Hash"]の値だけ確保する。
+		// 現在のOptions["USI_Hash"]の値だけ確保する。
 		void Resize()
 		{
-			int64_t hash_size_mb = (int)Options["Hash"];
+			int64_t hash_size_mb = (int)Options["USI_Hash"];
 
 			// 作成するクラスターの数。2のべき乗にする。
 			int64_t new_num_clusters = 1LL << MSB64((hash_size_mb * 1024 * 1024) / sizeof(Cluster));
@@ -377,6 +381,23 @@ namespace MateEngine
 			return;
 		}
 
+		MovePicker move_picker(n, or_node);
+		bool has_loop=false;
+		bool avoid_loop = false;
+		// if (n has an unproven old child) inc flag = true;
+		for (const auto& move : move_picker) {
+		  // unproven old childの定義はminimum distanceがこのノードよりも小さいノードだと理解しているのだけど、
+		  // 合っているか自信ない
+		  const auto& child_entry = transposition_table.LookUpChildEntry(n, move, root_color);
+		  if (entry.minimum_distance > child_entry.minimum_distance &&
+		      child_entry.pn != kInfinitePnDn &&
+		      child_entry.dn != kInfinitePnDn) {
+		    has_loop = true;
+		    break;
+		  }
+		}
+
+		if(has_loop){
 		// 千日手のチェック
 		// 対局規定（抄録）｜よくある質問｜日本将棋連盟 https://www.shogi.or.jp/faq/taikyoku-kitei.html
 		// 第8条 反則
@@ -403,6 +424,9 @@ namespace MateEngine
 			return;
 
 		case REPETITION_LOSE:
+		  avoid_loop=true;
+		  // todo この処理本当に正しいの?
+		  break; 
 			// 連続王手の千日手による負け
 			if (or_node) {
 				entry.pn = kInfinitePnDn;
@@ -428,8 +452,8 @@ namespace MateEngine
 		default:
 			break;
 		}
+		}
 
-		MovePicker move_picker(n, or_node);
 		if (move_picker.empty()) {
 			// nが先端ノード
 
@@ -479,22 +503,41 @@ namespace MateEngine
 			if (or_node) {
 				entry.pn = kInfinitePnDn;
 				entry.dn = 0;
+				bool is_mate = false;
 				for (const auto& move : move_picker) {
 					const auto& child_entry = transposition_table.LookUpChildEntry(n, move, root_color);
+					if (child_entry.pn == 0){
+						is_mate = true;
+					}
+					if(avoid_loop && entry.minimum_distance > child_entry.minimum_distance && child_entry.pn != 0){
+					  continue;
+					}
 					entry.pn = std::min(entry.pn, child_entry.pn);
 					entry.dn += child_entry.dn;
 				}
-				entry.dn = std::min(entry.dn, kInfinitePnDn);
+				if (is_mate){
+					entry.dn = kInfinitePnDn;
+				}else{
+					entry.dn = std::min(entry.dn, kInfinitePnDn-1);
+				}
 			}
 			else {
 				entry.pn = 0;
 				entry.dn = kInfinitePnDn;
+				bool is_nomate = false;
 				for (const auto& move : move_picker) {
 					const auto& child_entry = transposition_table.LookUpChildEntry(n, move, root_color);
+					if(child_entry.dn == 0){
+						is_nomate = true;
+					}
 					entry.pn += child_entry.pn;
 					entry.dn = std::min(entry.dn, child_entry.dn);
 				}
-				entry.pn = std::min(entry.pn, kInfinitePnDn);
+				if(is_nomate){
+					entry.pn = kInfinitePnDn;
+				}else{
+					entry.pn = std::min(entry.pn, kInfinitePnDn-1);
+				}
 			}
 
 			// if (first time && inc flag) {
@@ -526,7 +569,7 @@ namespace MateEngine
 			//   thpn child = thpn - pn(n) + pn(n1);
 			//   thdn child = min(thdn, dn(n2) + 1);
 			// }
-			Move best_move;
+			Move best_move = MOVE_NONE; // gccで初期化していないという警告がでるのでその回避
 			int thpn_child;
 			int thdn_child;
 			if (or_node) {
@@ -537,6 +580,9 @@ namespace MateEngine
 				uint32_t best_num_search = UINT32_MAX;
 				for (const auto& move : move_picker) {
 					const auto& child_entry = transposition_table.LookUpChildEntry(n, move, root_color);
+					if(avoid_loop && entry.minimum_distance > child_entry.minimum_distance && child_entry.pn != 0){
+					  continue;
+					}
 					if (child_entry.pn < best_pn ||
 						(child_entry.pn == best_pn && best_num_search > child_entry.num_searched)) {
 						second_best_pn = best_pn;
@@ -549,7 +595,6 @@ namespace MateEngine
 						second_best_pn = child_entry.pn;
 					}
 				}
-
 				thpn_child = std::min(thpn, second_best_pn + 1);
 				thdn_child = std::min(thdn - entry.dn + best_dn, kInfinitePnDn);
 			}
@@ -577,6 +622,11 @@ namespace MateEngine
 				thdn_child = std::min(thdn, second_best_dn + 1);
 			}
 
+			if (best_move == MOVE_NONE && or_node){
+			  entry.pn = kInfinitePnDn;
+			  entry.dn = 0;
+			  return;
+			}
 			StateInfo state_info;
 			n.do_move(best_move, state_info);
 			DFPNwithTCA(n, thpn_child, thdn_child, inc_flag, !or_node, depth + 1, root_color,
@@ -585,6 +635,50 @@ namespace MateEngine
 		}
 	}
 
+	void pv_check_from_table(Position &pos, vector<Move16> pv_check){
+		Color root_color = pos.side_to_move();
+		const auto& entry0 = transposition_table.LookUp(pos, root_color);
+		cout<<pos<<endl;
+		cout<<"pn-dn"<<entry0.pn<<","<<entry0.dn<<endl;
+		cout<<"key-gen"<<entry0.hash_high<<","<<entry0.generation<<endl;
+
+		for(auto m : pv_check){
+			StateInfo state_info;
+			Move move = pos.to_move(m);
+			pos.do_move(move, state_info);
+			const auto& entry = transposition_table.LookUp(pos, root_color);
+			cout<<pos<<endl;
+			cout<<"pn,dn = "<<entry.pn<<","<<entry.dn<<endl;
+			cout<<"key-gen = "<<entry.hash_high<<endl;
+			if(entry.pn != 0 && entry.dn != 0){
+			  continue;
+			}
+			bool or_node = (entry.minimum_distance % 2 == 0);
+			if (or_node && entry.pn == 0){
+			  cout<<"example of mate moves : ";
+			  MovePicker move_picker(pos, or_node);
+			  for (const auto& move : move_picker) {
+			    auto entry_child = transposition_table.LookUpChildEntry(pos, move, root_color);
+			    if(entry_child.pn == 0){
+			      cout<<move<<" ";
+			    }
+			  }
+			  cout<<endl;
+			}else if(!or_node && entry.dn == 0){
+			  MovePicker move_picker(pos, or_node);
+			  cout<<"example of escape moves : ";
+			  for (const auto& move : move_picker) {
+			    auto entry_child = transposition_table.LookUpChildEntry(pos, move, root_color);
+			    if(entry_child.pn == 0){
+			      cout<<move<<" ";
+			    }
+			  }
+			  cout<<endl;
+			}
+		}
+	}
+
+  
 	// 詰み手順を1つ返す
 	// 最短の詰み手順である保証はない
 	bool SearchMatePvFast(bool or_node, Color root_color, Position& pos, std::vector<Move>& moves, std::unordered_set<Key>& visited) {
@@ -826,7 +920,7 @@ namespace MateEngine
 		//    また、このときThreads.stop == trueにはならない。(この点、Stockfishとは異なる。)
 		// "go infinite"に対してはstopが送られてくるまで待つ。
 		while (!Threads.stop && (Threads.main()->ponder || Limits.infinite))
-			sleep(1);
+			Tools::sleep(1);
 		//	こちらの思考は終わっているわけだから、ある程度細かく待っても問題ない。
 		// (思考のためには計算資源を使っていないので。)
 
@@ -869,7 +963,7 @@ void Search::clear()
 #if defined(FOR_TOURNAMENT)
 
 	// 進捗を表示しながら並列化してゼロクリア
-	memclear(MateEngine::transposition_table.tt , MateEngine::transposition_table.Size());
+	Tools::memclear("USI_Hash" , MateEngine::transposition_table.tt , MateEngine::transposition_table.Size());
 
 #endif
 
@@ -878,12 +972,17 @@ void MainThread::search() { Thread::search(); }
 
 void Thread::search()
 {
+
+    	if (Search::Limits.pv_check.size() != 0){
+	  MateEngine::pv_check_from_table(rootPos, Limits.pv_check);
+	  return;
+	}
 	// 通常のgoコマンドで呼ばれたときは、resignを返す。
 	// 詰み用のworkerでそれだと支障がある場合は適宜変更する。
 	if (Search::Limits.mate == 0) {
 		// "go infinite"に対してはstopが送られてくるまで待つ。
 		while (!Threads.stop && Limits.infinite)
-			sleep(1);
+			Tools::sleep(1);
 		sync_cout << "bestmove resign" << sync_endl;
 		return;
 	}

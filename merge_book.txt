@@ -1,0 +1,7 @@
+usi
+setoption name EvalDir value C:\home\nodchip\hakubishin-private\book\tanuki-wcsc29-2019-05-06\eval
+setoption name BookInputFile value C:\home\nodchip\hakubishin-private\book\C-book\C-book_2017.db;C:\home\nodchip\hakubishin-private\book\C-book\C-book_20180720.db;C:\home\nodchip\hakubishin-private\book\C-book\C-book_20180802.db;C:\home\nodchip\hakubishin-private\book\C-book\C-book_20190529.db;C:\home\nodchip\hakubishin-private\book\C-book\C-book_furibisha.db;C:\home\nodchip\hakubishin-private\book\C-book\C-book_WCSC29.db
+setoption name BookOutputFile value merged.db
+isready
+usinewgame
+merge_book

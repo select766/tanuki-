@@ -113,9 +113,20 @@ IntType Round(double value) {
 // アライメント付きmake_shared
 template <typename T, typename... ArgumentTypes>
 std::shared_ptr<T> MakeAlignedSharedPtr(ArgumentTypes&&... arguments) {
-  const auto ptr = new(aligned_malloc(sizeof(T), alignof(T)))
+
+    // Trainerクラスのほうでゼロ初期化するのでここではゼロ初期化はされていないメモリで良い。
+
+    void* mem; // 開放すべきメモリアドレス
+    void* ptr_ = LargeMemory::static_alloc(sizeof(T), mem, alignof(T));
+    const auto ptr = new(ptr_)
       T(std::forward<ArgumentTypes>(arguments)...);
-  return std::shared_ptr<T>(ptr, AlignedDeleter<T>());
+    AlignedDeleter<T> deleter;
+    deleter.mem = mem;
+    
+    //sync_cout << "trainer.alloc(" << sizeof(T) << "," << alignof(T) << ")" << sync_endl;
+
+    return std::shared_ptr<T>(ptr,deleter);
+
 }
 
 }  // namespace NNUE

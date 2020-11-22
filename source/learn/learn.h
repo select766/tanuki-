@@ -167,8 +167,8 @@ typedef float LearnFloatType;
 // 引き分けに至ったとき、それを教師局面として書き出す
 // これをするほうが良いかどうかは微妙。
 // #define LEARN_GENSFEN_USE_DRAW_RESULT
-
-
+extern bool use_draw_in_training;
+extern bool use_hash_in_training;
 // ======================
 //       configure
 // ======================
@@ -216,18 +216,23 @@ namespace Learner
 
 		// 教師局面を書き出したファイルを他の人とやりとりするときに
 		// この構造体サイズが不定だと困るため、paddingしてどの環境でも必ず40bytesになるようにしておく。
-		// tanuki-棋譜生成ルーチンでは
-		// この変数を、各対局の最後の局面かどうかのフラグとして使う
-		u8 last_position;
+
+		// 各対局の最後の局面の場合は1、そうでない場合は0
+		u8 last_position : 1;
+
+		// 入玉宣言勝ちにより勝敗が決まった場合は1、そうでない場合は0
+		u8 entering_king : 1;
 
 		// 32 + 2 + 2 + 2 + 1 + 1 = 40bytes
 	};
+
+	static_assert(sizeof(PackedSfenValue) == 40);
 
 	// 読み筋とそのときの評価値を返す型
 	// Learner::search() , Learner::qsearch()で用いる。
 	typedef std::pair<Value, std::vector<Move> > ValueAndPV;
 
-	// いまのところ、やねうら王2018 Otafukuしか、このスタブを持っていないが
+	// いまのところ、YANEURAOU_ENGINEしか、このスタブを持っていないが
 	// EVAL_LEARNをdefineするなら、このスタブが必須。
 	extern Learner::ValueAndPV  search(Position& pos, int depth , size_t multiPV = 1 , u64 NodesLimit = 0);
 	extern Learner::ValueAndPV qsearch(Position& pos);

@@ -1,78 +1,117 @@
 #!/bin/bash
 # -*- coding: utf-8 -*-
 # Ubuntu 上で Windows バイナリのビルド (gcc)
-OS=Windows_NT
+# sudo apt install build-essential mingw-w64 libopenblas-dev
+
+# Example 1: 全パターンのビルド
+# mingw_gcc.sh
+
+# Example 2: 指定パターンのビルド(-e: エディション名, -t: ターゲット名)
+# mingw_gcc.sh -e YANEURAOU_ENGINE_NNUE
+
+# Example 3: 特定パターンのビルド(ワイルドカード使用時はシングルクォートで囲む)
+# mingw_gcc.sh -e '*KPPT*,*NNUE*'
+
 MAKE=make
 MAKEFILE=Makefile
 JOBS=`grep -c ^processor /proc/cpuinfo 2>/dev/null`
 
+ARCHCPUS='*'
+COMPILERS="x86_64-w64-mingw32-g++-posix,i686-w64-mingw32-g++-posix"
+EDITIONS='*'
+OS='Windows_NT'
+TARGETS='*'
+
+while getopts a:c:e:t: OPT
+do
+  case $OPT in
+    a) ARCHCPUS="$OPTARG"
+      ;;
+    c) COMPILERS="$OPTARG"
+      ;;
+    e) EDITIONS="$OPTARG"
+      ;;
+    o) OS="$OPTARG"
+      ;;
+    t) TARGETS="$OPTARG"
+      ;;
+  esac
+done
+
+set -f
+IFS=, eval 'ARCHCPUSARR=($ARCHCPUS)'
+IFS=, eval 'COMPILERSARR=($COMPILERS)'
+IFS=, eval 'EDITIONSARR=($EDITIONS)'
+IFS=, eval 'TARGETSARR=($TARGETS)'
+
 cd `dirname $0`
 cd ../source
 
-# sudo apt install build-essential mingw-w64
-COMPILER=x86_64-w64-mingw32-g++-posix
+ARCHCPUS=(
+  AVX512
+  AVX2
+  SSE42
+  SSE41
+  SSSE3
+  SSE2
+  OTHER
+  ZEN1
+)
 
-BUILDDIR=../build/2018otafuku-kppt
-mkdir -p ${BUILDDIR}
-EDITION=YANEURAOU_2018_OTAFUKU_ENGINE_KPPT
-TARGET=YaneuraOu-2018-otafuku-kppt-mingw-gcc
-declare -A TGTAIL=([avx2]=-avx2 [sse42]=-sse42 [tournament]=-tournament-avx2 [tournament-sse42]=-tournament-sse42 [evallearn]=-evallearn-avx2 [evallearn-sse42]=-evallearn-sse42 [sse41]=-sse41 [sse2]=-sse2)
-for key in ${!TGTAIL[*]}
-do
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-	${MAKE} -f ${MAKEFILE} -j${JOBS} ${key} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} OS=${OS} 2>&1 | tee $BUILDDIR/${TARGET}${TGTAIL[$key]}.log
-	cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TARGET}${TGTAIL[$key]}.exe
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-done
+EDITIONS=(
+  YANEURAOU_ENGINE_KPPT
+  YANEURAOU_ENGINE_KPP_KKPT
+  YANEURAOU_ENGINE_MATERIAL
+  YANEURAOU_ENGINE_NNUE
+  YANEURAOU_ENGINE_NNUE_KP256
+  MATE_ENGINE
+  USER_ENGINE
+)
 
-BUILDDIR=../build/2018otafuku-kpp_kkpt
-mkdir -p ${BUILDDIR}
-EDITION=YANEURAOU_2018_OTAFUKU_ENGINE_KPP_KKPT
-TARGET=YaneuraOu-2018-otafuku-kpp_kkpt-mingw-gcc
-declare -A TGTAIL=([avx2]=-avx2 [sse42]=-sse42 [tournament]=-tournament-avx2 [tournament-sse42]=-tournament-sse42 [evallearn]=-evallearn-avx2 [evallearn-sse42]=-evallearn-sse42 [sse41]=-sse41 [sse2]=-sse2)
-for key in ${!TGTAIL[*]}
-do
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-	${MAKE} -f ${MAKEFILE} -j${JOBS} ${key} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} OS=${OS} 2>&1 | tee $BUILDDIR/${TARGET}${TGTAIL[$key]}.log
-	cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TARGET}${TGTAIL[$key]}.exe
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-done
+TARGETS=(
+  normal
+  tournament
+  evallearn
+  gensfen
+)
 
-BUILDDIR=../build/2018otafuku-material
-mkdir -p ${BUILDDIR}
-EDITION=YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL
-TARGET=YaneuraOu-2018-otafuku-material-mingw-gcc
-declare -A TGTAIL=([avx2]=-avx2 [sse42]=-sse42 [tournament]=-tournament-avx2 [tournament-sse42]=-tournament-sse42 [sse41]=-sse41 [sse2]=-sse2)
-for key in ${!TGTAIL[*]}
-do
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-	${MAKE} -f ${MAKEFILE} -j${JOBS} ${key} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} OS=${OS} 2>&1 | tee $BUILDDIR/${TARGET}${TGTAIL[$key]}.log
-	cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TARGET}${TGTAIL[$key]}.exe
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-done
+declare -A FILESTR;
+FILESTR=(
+  ["YANEURAOU_ENGINE_KPPT"]="kppt"
+  ["YANEURAOU_ENGINE_KPP_KKPT"]="kpp_kkpt"
+  ["YANEURAOU_ENGINE_MATERIAL"]="material"
+  ["YANEURAOU_ENGINE_NNUE"]="nnue"
+  ["YANEURAOU_ENGINE_NNUE_KP256"]="nnue-k_p_256"
+  ["MATE_ENGINE"]="mate"
+  ["USER_ENGINE"]="user"
+);
 
-BUILDDIR=../build/2018tnk
-mkdir -p ${BUILDDIR}
-EDITION=YANEURAOU_2018_TNK_ENGINE
-TARGET=YaneuraOu-2018-tnk-mingw-gcc
-declare -A TGTAIL=([avx2]=-avx2 [sse42]=-sse42 [tournament]=-tournament-avx2 [tournament-sse42]=-tournament-sse42 [evallearn]=-evallearn-avx2 [evallearn-sse42]=-evallearn-sse42 [sse41]=-sse41 [sse2]=-sse2)
-for key in ${!TGTAIL[*]}
-do
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-	${MAKE} -f ${MAKEFILE} -j${JOBS} ${key} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} OS=${OS} 2>&1 | tee $BUILDDIR/${TARGET}${TGTAIL[$key]}.log
-	cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TARGET}${TGTAIL[$key]}.exe
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-done
-
-BUILDDIR=../build/mate
-mkdir -p ${BUILDDIR}
-EDITION=YANEURAOU_MATE_ENGINE
-TARGET=YaneuraOu-mate-mingw-gcc
-declare -A TGTAIL=([avx2]=-avx2 [sse42]=-sse42 [tournament]=-tournament-avx2 [tournament-sse42]=-tournament-sse42 [evallearn]=-evallearn-avx2 [evallearn-sse42]=-evallearn-sse42 [sse41]=-sse41 [sse2]=-sse2)
-for key in ${!TGTAIL[*]}
-do
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
-	${MAKE} -f ${MAKEFILE} -j${JOBS} ${key} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} OS=${OS} 2>&1 | tee $BUILDDIR/${TARGET}${TGTAIL[$key]}.log
-	cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TARGET}${TGTAIL[$key]}.exe
-	${MAKE} -f ${MAKEFILE} clean YANEURAOU_EDITION=${EDITION}
+for ARCHCPU in ${ARCHCPUSARR[@]}; do
+  for COMPILER in ${COMPILERSARR[@]}; do
+    echo "* compiler: ${COMPILER}"
+    CSTR=${COMPILER##*/}
+    CSTR=${CSTR##*\\}
+    for EDITION in ${EDITIONS[@]}; do
+      for EDITIONPTN in ${EDITIONSARR[@]}; do
+        if [[ $EDITION == $EDITIONPTN ]]; then
+          echo "* edition: ${EDITION}"
+          BUILDDIR=../build/windows/${FILESTR[$EDITION]}
+          mkdir -p ${BUILDDIR}
+          for TARGET in ${TARGETS[@]}; do
+            for TARGETPTN in ${TARGETSARR[@]}; do
+              if [[ $TARGET == $TARGETPTN ]]; then
+                echo "* target: ${TARGET}"
+                TGSTR=YaneuraOu-${FILESTR[$EDITION]}-windows-${CSTR}-${TARGET}-${ARCHCPU}
+                nice ${MAKE} -f ${MAKEFILE} -j${JOBS} ${TARGET} OS=${OS} TARGET_CPU=${ARCHCPU} YANEURAOU_EDITION=${EDITION} COMPILER=${COMPILER} > >(tee ${BUILDDIR}/${TGSTR}.log) || exit $?
+                cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TGSTR}.exe
+                ${MAKE} -f ${MAKEFILE} clean OS=${OS} YANEURAOU_EDITION=${EDITION}
+                break
+              fi
+            done
+          done
+          break
+        fi
+      done
+    done
+  done
 done

@@ -10,7 +10,12 @@
 #include "movepick.h"
 #include "position.h"
 #include "search.h"
-#include "thread_win32.h"
+#include "thread_win32_osx.h"
+
+#if defined(EVAL_LEARN)
+// 学習用の実行ファイルでは、スレッドごとに置換表を持ちたい。
+#include "tt.h"
+#endif
 
 // --------------------
 // 探索時に用いるスレッド
@@ -22,10 +27,10 @@
 class Thread
 {
 	// exitフラグやsearchingフラグの状態を変更するときのmutex
-	Mutex mutex;
+	std::mutex mutex;
 
 	// idle_loop()で待機しているときに待つ対象
-	ConditionVariable cv;
+	std::condition_variable cv;
 
 	// thread id。main threadなら0。slaveなら1から順番に値が割当てられる。
 	size_t idx;
@@ -34,8 +39,8 @@ class Thread
 	// searching : 探索中であるかを表すフラグ。プログラムを簡素化するため、事前にtrueにしてある。
 	bool exit = false , searching = true;
 
-	// wrapしているstd::thread
-	std::thread stdThread;
+	// stack領域を増やしたstd::thread
+	NativeThread stdThread;
 
 public:
 
@@ -73,7 +78,7 @@ public:
 	// pvIdx    : このスレッドでMultiPVを用いているとして、rootMovesの(0から数えて)何番目のPVの指し手を
 	//      探索中であるか。MultiPVでないときはこの変数の値は0。
 	// pvLast   : tbRank絡み。将棋では関係ないので用いない。
-	size_t pvIdx /*,pvLast*/;
+	size_t pvIdx /*,pvLast*/ /* ,shuffleExts */;
 
 	// selDepth  : rootから最大、何手目まで探索したか(選択深さの最大)
 	// nmpMinPly : null moveの前回の適用ply
@@ -89,6 +94,10 @@ public:
 	// 探索開始局面
 	Position rootPos;
 
+	// rootでのStateInfo
+	// Position::set()で書き換えるのでスレッドごとに保持していないといけない。
+	StateInfo rootState;
+
 	// 探索開始局面で思考対象とする指し手の集合。
 	// goコマンドで渡されていなければ、全合法手(ただし歩の不成などは除く)とする。
 	Search::RootMoves rootMoves;
@@ -100,14 +109,17 @@ public:
 	//
 	Depth rootDepth, completedDepth;
 
-	// 近代的なMovePickerではオーダリングのために、スレッドごとにhistoryとcounter movesのtableを持たないといけない。
+	// 近代的なMovePickerではオーダリングのために、スレッドごとにhistoryとcounter movesなどのtableを持たないといけない。
 	CounterMoveHistory counterMoves;
+	LowPlyHistory lowPlyHistory;
 	ButterflyHistory mainHistory;
 	CapturePieceToHistory captureHistory;
 
 	// コア数が多いか、長い持ち時間においては、ContinuationHistoryもスレッドごとに確保したほうが良いらしい。
 	// cf. https://github.com/official-stockfish/Stockfish/commit/5c58d1f5cb4871595c07e6c2f6931780b5ac05b5
-	ContinuationHistory continuationHistory;
+	// 添字の[2][2]は、[inCheck(王手がかかっているか)][captureOrPawnPromotion]
+	// →　この改造、レーティングがほぼ上がっていない。悪い改造のような気がする。
+	ContinuationHistory continuationHistory[2][2];
 
 	// Stockfish10ではスレッドごとにcontemptを保持するように変わった。
 	//Score contempt;
@@ -116,15 +128,15 @@ public:
 	//   やねうら王、独自追加
 	// ------------------------------
 
-	// PositionクラスのEvalListにalignasを指定されていて、Positionクラスを保持するこのThreadクラスをnewするが、
-	// そのときにalignasを無視されるのでcustom allocatorを定義しておいてやる。
-	void* operator new(std::size_t s);
-	void operator delete(void*p) noexcept;
-
 	// スレッドidが返る。Stockfishにはないメソッドだが、
 	// スレッドごとにメモリ領域を割り当てたいときなどに必要となる。
 	// MainThreadなら0、slaveなら1,2,3,...
 	size_t thread_id() const { return idx; }
+
+#if defined(EVAL_LEARN)
+	// 学習用の実行ファイルでは、スレッドごとに置換表を持ちたい。
+	TranspositionTable tt;
+#endif
 
 };
   
@@ -197,6 +209,12 @@ struct ThreadPool: public std::vector<Thread*>
 
 	// 今回、goコマンド以降に探索したノード数
 	uint64_t nodes_searched() { return accumulate(&Thread::nodes); }
+
+	// 探索を開始する(main thread以外)
+	void start_searching();
+
+	// main threadがそれ以外の探索threadの終了を待つ。
+	void wait_for_search_finished() const;
 
 	// stop   : 探索中にこれがtrueになったら探索を即座に終了すること。
 	std::atomic_bool stop;

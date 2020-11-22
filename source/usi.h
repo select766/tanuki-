@@ -2,7 +2,7 @@
 #define USI_H_INCLUDED
 
 #include <map>
-#include <string>
+//#include <string>
 #include <vector>
 #include <functional>	// function
 
@@ -123,6 +123,7 @@ namespace USI
 	// 局面posとUSIプロトコルによる指し手を与えて
 	// もし可能なら等価で合法な指し手を返す。(合法でないときはMOVE_NONEを返す。"resign"に対してはMOVE_RESIGNを返す。)
 	// Stockfishでは第二引数にconstがついていないが、これはつけておく。
+	// 32bit Moveが返る。
 	Move to_move(const Position& pos, const std::string& str);
 
 	// -- 以下、やねうら王、独自拡張。
@@ -131,7 +132,7 @@ namespace USI
 	// 返ってくるのは16bitのMoveなので、これを32bitのMoveに変換するには
 	// Position::move16_to_move()を呼び出す必要がある。
 	// Stockfishにはない関数だが、高速化を要求されるところで欲しいので追加する。
-	Move to_move(const std::string& str);
+	Move16 to_move16(const std::string& str);
 
 	// USIプロトコルで、idxの順番でoptionを出力する。(デバッグ用)
 	std::ostream& operator<<(std::ostream& os, const OptionsMap& om);
@@ -140,11 +141,13 @@ namespace USI
 	// USI::init()のなかからコールバックされる。
 	void extra_option(USI::OptionsMap& o);
 
-	// 入玉ルール
-	extern EnteringKingRule ekr;
-
 	// 評価関数を読み込んだかのフラグ。これはevaldirの変更にともなってfalseにする。
 	extern bool load_eval_finished; // = false;
+
+#if defined (USE_ENTERING_KING_WIN)
+	// 入玉ルール文字列をEnteringKingRule型に変換する。
+	extern EnteringKingRule to_entering_king_rule(const std::string& rule);
+#endif
 
 }
 

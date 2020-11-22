@@ -3,6 +3,12 @@
 #include "usi.h"
 #include "misc.h"
 
+#include "tanuki_book.h"
+#include "tanuki_kifu_generator.h"
+#include "tanuki_kifu_shuffler.h"
+#include "tanuki_lazy_cluster.h"
+#include "tanuki_progress.h"
+
 using std::string;
 
 // Option設定が格納されたglobal object。
@@ -12,10 +18,10 @@ namespace USI {
 
 	// --- やねうら王独自拡張分の前方宣言
 
-	extern std::vector<std::string> ekr_rules;
-	void set_entering_king_rule(const std::string& rule);
+	// 入玉ルールのUSI文字列
+	std::vector<std::string> ekr_rules = { "NoEnteringKing", "CSARule24" , "CSARule27" , "TryRule" };
+
 	void read_engine_options();
-	
 
 	// USIプロトコルで必要とされるcase insensitiveな less()関数
 	bool CaseInsensitiveLess::operator() (const string& s1, const string& s2) const {
@@ -24,11 +30,14 @@ namespace USI {
 			[](char c1, char c2) { return tolower(c1) < tolower(c2); });
 	}
 
+	// 前回のOptions["EvalDir"]
+	std::string last_eval_dir;
+
 	// optionのdefault値を設定する。
 	void init(OptionsMap& o)
 	{
-		// Hash上限。32bitモードなら2GB、64bitモードなら1024GB
-		const int MaxHashMB = Is64Bit ? 1024 * 1024 : 2048;
+		// Hash上限。32bitモードなら2GB、64bitモードなら33TB
+		constexpr int MaxHashMB = Is64Bit ? 33554432 : 2048;
 
 		// 並列探索するときのスレッド数
 		// CPUの搭載コア数をデフォルトとすべきかも知れないが余計なお世話のような気もするのでしていない。
@@ -42,16 +51,34 @@ namespace USI {
 		// 個別設定が出来るようにする。
 
 #if !defined(MATE_ENGINE)
-		o["Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
+		// 置換表のサイズ。[MB]で指定。
+		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { TT.resize(o); });
+
+#if defined(USE_EVAL_HASH)
+		// 評価値用のcacheサイズ。[MB]で指定。
+
+#if defined(FOR_TOURNAMENT)
+		// トーナメント用は少し大きなサイズ
+		o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+#else
+		o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+#endif // defined(FOR_TOURNAMENT)
+#endif // defined(USE_EVAL_HASH)
+
+		o["USI_Ponder"] << Option(false);
 
 		// その局面での上位N個の候補手を調べる機能
 		o["MultiPV"] << Option(1, 1, 800);
 
 		// 弱くするために調整する。20なら手加減なし。0が最弱。
 		o["SkillLevel"] << Option(20, 0, 20);
-#else
-		o["Hash"] << Option(4096, 1, MaxHashMB);
-#endif
+
+#else // !defined(MATE_ENGINE)
+
+		// MATE_ENGINEのとき
+		o["USI_Hash"] << Option(4096, 1, MaxHashMB);
+
+#endif // !defined(MATE_ENGINE)
 
 		// cin/coutの入出力をファイルにリダイレクトする
 		o["WriteDebugLog"] << Option(false, [](const Option& o) { start_logger(o); });
@@ -100,20 +127,27 @@ namespace USI {
 
 		o["ContemptFromBlack"] << Option(false);
 
-
 #if defined (USE_ENTERING_KING_WIN)
 		// 入玉ルール
-		o["EnteringKingRule"] << Option(USI::ekr_rules, USI::ekr_rules[EKR_27_POINT], [](const Option& o) { set_entering_king_rule(o); });
+		o["EnteringKingRule"] << Option(USI::ekr_rules, USI::ekr_rules[EKR_27_POINT]);
 #endif
+
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
-		o["EvalDir"] << Option("eval", [](const USI::Option&o) { load_eval_finished = false; });
+		last_eval_dir = "eval";
+		o["EvalDir"] << Option("eval", [](const USI::Option&o) {
+			if (last_eval_dir != string(o))
+			{
+				// 評価関数フォルダ名の変更に際して、評価関数ファイルの読み込みフラグをクリアする。
+				last_eval_dir = string(o);
+				load_eval_finished = false;
+			}
+		});
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
-	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_KPPPT) || defined(EVAL_KPPP_KKPT) || defined(EVAL_KKPP_KKPT) || \
-	defined(EVAL_KPP_KKPT_FV_VAR) || defined(EVAL_KKPPT) ||defined(EVAL_EXPERIMENTAL) || defined(EVAL_HELICES) || defined(EVAL_NABLA) )
-		// 評価関数パラメーターを共有するか
-		// 異種評価関数との自己対局のときにこの設定で引っかかる人が後を絶たないのでデフォルトでオフにする。
-		o["EvalShare"] << Option(false);
+	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) )
+		// 評価関数パラメーターを共有するか。
+		// デフォルトで有効に変更。(V4.90～)
+		o["EvalShare"] << Option(true);
 #endif
 
 #if defined(EVAL_LEARN)
@@ -125,17 +159,34 @@ namespace USI {
 		o["SkipLoadingEval"] << Option(false);
 #endif
 
-#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
+#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT)
 		// 読みの各局面ですべての合法手を生成する
 		// (普通、歩の2段目での不成などは指し手自体を生成しないのですが、これのせいで不成が必要な詰みが絡む問題が解けないことが
 		// あるので、このオプションを用意しました。トーナメントモードではこのオプションは無効化されます。)
 		o["GenerateAllLegalMoves"] << Option(false);
 #endif
 
+#if defined(_WIN32)
+		// 3990XのようなWindows上で複数のプロセッサグループを持つCPUで、思考エンジンを同時起動したときに
+		// 同じプロセッサグループに割り当てられてしまうのを避けるために、スレッドオフセットを
+		// 指定できるようにしておく。
+		// 例) 128スレッドあって、4つ思考エンジンを起動してそれぞれにThreads = 32を指定する場合、
+		// それぞれの思考エンジンにはThreadIdOffset = 0,32,64,96をそれぞれ指定する。
+		//	※　1つのPCで複数の思考エンジンを同時に起動して対局させる場合はこれを適切に設定すべき。
+
+		o["ThreadIdOffset"] << Option(0, 0, std::thread::hardware_concurrency() - 1);
+#endif
+
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
-		// カレントフォルダに"engine_option.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
+#ifdef EVAL_LEARN
+		Tanuki::InitializeBook(o);
+		Tanuki::InitializeGenerator(o);
+		Tanuki::InitializeShuffler(o);
+		Tanuki::Progress::Initialize(o);
+#endif
+		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options();
 	}
 
@@ -209,7 +260,9 @@ namespace USI {
 	}
 
 	Option::operator std::string() const {
-		ASSERT_LV1(type == "string" || type == "combo" /* 将棋用拡張*/);
+		//ASSERT_LV1(type == "string" || type == "combo" /* 将棋用拡張*/ );
+		// →　string化して保存しておいた内容をあとで復元したいことがあるのでこのassertないほうがいい。
+		// 代入しないとハンドラが起動しないので、そういう復元の仕方をしたいことがある。(ベンチマークなどで)
 		return currentValue;
 	}
 
@@ -258,23 +311,17 @@ namespace USI {
 
 	// 入玉ルール
 #if defined(USE_ENTERING_KING_WIN)
-// デフォルトでは27点法
-	EnteringKingRule ekr = EKR_27_POINT;
-	// 入玉ルールのUSI文字列
-	std::vector<std::string> ekr_rules = { "NoEnteringKing", "CSARule24" , "CSARule27" , "TryRule" };
 
-	// 入玉ルールがGUIから変更されたときのハンドラ
-	void set_entering_king_rule(const std::string& rule)
+	// 文字列に対応するEnteringKingRuleを取得する。
+	EnteringKingRule to_entering_king_rule(const std::string& rule)
 	{
 		for (size_t i = 0; i < ekr_rules.size(); ++i)
 			if (ekr_rules[i] == rule)
-			{
-				ekr = (EnteringKingRule)i;
-				break;
-			}
+				return (EnteringKingRule)i;
+
+		ASSERT(false);
+		return EnteringKingRule::EKR_NONE;
 	}
-#else
-	EnteringKingRule ekr = EKR_NONE;
 #endif
 
 	// 思考エンジンがGUIからの"usi"に対して返す"option ..."文字列から
@@ -283,6 +330,7 @@ namespace USI {
 	// Options[]の値を上書きするためにこの関数が必要。
 	// "option name USI_Hash type spin default 256"
 	// のような文字列が引数として渡される。
+	// このとき、Optionのhandlerとidxは書き換えない。
 	void build_option(string line)
 	{
 		LineScanner scanner(line);
@@ -291,7 +339,7 @@ namespace USI {
 		string name, value, option_type;
 		int64_t min_value = 0, max_value = 1;
 		std::vector<string> combo_list;
-		while (!scanner.eof())
+		while (!scanner.eol())
 		{
 			auto token = scanner.get_text();
 			if (token == "name") name = scanner.get_text();
@@ -321,14 +369,14 @@ namespace USI {
 
 	}
 
-	// カレントフォルダに"engine_option.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
+	// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 	void read_engine_options()
 	{
 		std::ifstream ifs("engine_options.txt");
 		if (!ifs.fail())
 		{
 			std::string str;
-			while (getline(ifs, str))
+			while (Tools::getline(ifs, str))
 				build_option(str);
 		}
 	}
@@ -336,9 +384,22 @@ namespace USI {
 	// idxの値を書き換えないoperator "<<"
 	void Option::overwrite(const Option& o)
 	{
-		auto idx_ = idx; // backup
+		// 値が書き換わるのか？
+		bool modified = this->currentValue != o.currentValue;
+
+		// backup
+		auto fn = this->on_change;
+		auto idx_ = idx;
+
 		*this = o;
-		idx = idx_; // restore
+
+		// restore
+		idx = idx_;
+		this->on_change = fn;
+
+		// 値が書き換わったならハンドラを呼び出してやる。
+		if (modified && fn)
+			fn(*this);
 	}
 
 } // namespace USI

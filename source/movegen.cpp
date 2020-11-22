@@ -10,7 +10,7 @@ using namespace std;
 //      移動による指し手
 // ----------------------------------
 
-#ifndef KEEP_PIECE_IN_GENERATE_MOVES
+#if !defined(KEEP_PIECE_IN_GENERATE_MOVES)
 
 // そのままの駒
 #define OurPt(Us,Pt)     Move(0)
@@ -100,7 +100,7 @@ using namespace std;
 
 // fromにあるpcをtargetの升に移動させる指し手の生成。
 // 遅いので駒王手の指し手生成のときにしか使わない。
-template <Piece Pt, Color Us, bool All> struct make_move_target {
+template <PieceType Pt, Color Us, bool All> struct make_move_target {
 	FORCE_INLINE ExtMove* operator()(const Position& pos, Square from, const Bitboard& target_, ExtMove* mlist)
 	{
 		Square to;
@@ -217,7 +217,7 @@ template <Piece Pt, Color Us, bool All> struct make_move_target {
 };
 
 // 指し手生成のうち、一般化されたもの。香・桂・銀はこの指し手生成を用いる。
-template <MOVE_GEN_TYPE GenType, Piece Pt, Color Us, bool All> struct GeneratePieceMoves {
+template <MOVE_GEN_TYPE GenType, PieceType Pt, Color Us, bool All> struct GeneratePieceMoves {
 	FORCE_INLINE ExtMove* operator()(const Position&pos, ExtMove*mlist, const Bitboard& target) {
 		// 盤上の駒pc(香・桂・銀)に対して
 		auto pieces = pos.pieces(Us, Pt);
@@ -353,12 +353,10 @@ template <Color Us> struct GenerateDropMoves {
 		if (hand == 0)
 			return mlist;
 
-		// 扱いにくいのでbit情報にしてしまう。
-		const HandKind hk = toHandKind(hand);
 		Square sq;
 
 		// --- 歩を打つ指し手生成
-		if (hand_exists(hk, PAWN))
+		if (hand_exists(hand, PAWN))
 		{
 			// 歩の駒打ちの基本戦略
 			// 1) 一段目以外に打てる
@@ -368,21 +366,17 @@ template <Color Us> struct GenerateDropMoves {
 			// ここでは2)のためにソフトウェア飽和加算に似たテクニックを用いる
 			// cf. http://yaneuraou.yaneu.com/2015/10/15/%E7%B8%A6%E5%9E%8Bbitboard%E3%81%AE%E5%94%AF%E4%B8%80%E3%81%AE%E5%BC%B1%E7%82%B9%E3%82%92%E5%85%8B%E6%9C%8D%E3%81%99%E3%82%8B/
 			// このときにテーブルを引くので、用意するテーブルのほうで先に1)の処理をしておく。
+			// →　この方法はPEXTが必要なので愚直な方法に変更する。
 
-			// 縦型Squareにおける二歩のmaskの取得。
-			// 各筋に1つしか歩はないので1～8段目が1になっているbitboardを歩の升のbitboardに加算すると9段目に情報が集まる。これをpextで回収する。
+			// 歩の打てる場所
+			Bitboard target2 = rank1_n_bb(~Us, RANK_8) & target;
 
-			// これにより、RANK9のところに歩の情報がかき集められた。
-			Bitboard a = pos.pieces(Us, PAWN) + rank1_n_bb(BLACK, RANK_8); // 1～8段目を意味するbitboard
-
-			// このRANK9に集まった情報をpextで回収。
-			u32 index1 = u32(PEXT64(     a.extract64<0>(),      RANK9_BB.p[0]));
-			u32 index2 = u32(PEXT32((u32)a.extract64<1>(), (u32)RANK9_BB.p[1]));
-
-			// 駒の打てる場所
-			Bitboard target2 = Bitboard(PAWN_DROP_MASK_BB[index1].p[0],PAWN_DROP_MASK_BB[index2].p[1])
-				& rank1_n_bb(~Us, RANK_8)
-				& target;
+			// 歩が二歩のために打てない筋を消していく(Aperyの手法)
+			Bitboard pawnBB = pos.pieces(Us, PAWN);
+			Square pawnSq;
+			foreachBB(pawnBB, pawnSq, [&](const int part) {
+				target2.p[part] &= PAWN_DROP_MASKS[pawnSq];
+			});
 
 			// 打ち歩詰めチェック
 			// 敵玉に敵の歩を置いた位置に打つ予定だったのなら、打ち歩詰めチェックして、打ち歩詰めならそこは除外する。
@@ -401,7 +395,7 @@ template <Color Us> struct GenerateDropMoves {
 		// --- 歩以外を打つ指し手生成
 
 		// 歩以外の手駒を持っているか
-		if (hand_exceptPawnExists(hk))
+		if (hand_except_pawn_exists(hand))
 		{
 			Move drops[6];
 
@@ -414,17 +408,17 @@ template <Color Us> struct GenerateDropMoves {
 			// そのため、手駒から香・桂を除いた駒と、桂を除いた駒が必要となる。
 
 			int num = 0;
-			if (hand_exists(hk, KNIGHT)) drops[num++] = make_move_drop(KNIGHT, SQ_ZERO) + OurDropPt(Us, KNIGHT);
+			if (hand_exists(hand, KNIGHT)) drops[num++] = make_move_drop(KNIGHT, SQ_ZERO) + OurDropPt(Us, KNIGHT);
 
 			int nextToKnight = num; // 桂を除いたdropsのindex
-			if (hand_exists(hk, LANCE) ) drops[num++] = make_move_drop(LANCE, SQ_ZERO)  + OurDropPt(Us, LANCE);
+			if (hand_exists(hand, LANCE) ) drops[num++] = make_move_drop(LANCE, SQ_ZERO)  + OurDropPt(Us, LANCE);
 
 			int nextToLance = num; // 香・桂を除いたdropsのindex
 
-			if (hand_exists(hk, SILVER)) drops[num++] = make_move_drop(SILVER, SQ_ZERO) + OurDropPt(Us, SILVER);
-			if (hand_exists(hk, GOLD)  ) drops[num++] = make_move_drop(GOLD  , SQ_ZERO) + OurDropPt(Us, GOLD);
-			if (hand_exists(hk, BISHOP)) drops[num++] = make_move_drop(BISHOP, SQ_ZERO) + OurDropPt(Us, BISHOP);
-			if (hand_exists(hk, ROOK)  ) drops[num++] = make_move_drop(ROOK  , SQ_ZERO) + OurDropPt(Us, ROOK);
+			if (hand_exists(hand, SILVER)) drops[num++] = make_move_drop(SILVER, SQ_ZERO) + OurDropPt(Us, SILVER);
+			if (hand_exists(hand, GOLD)  ) drops[num++] = make_move_drop(GOLD  , SQ_ZERO) + OurDropPt(Us, GOLD);
+			if (hand_exists(hand, BISHOP)) drops[num++] = make_move_drop(BISHOP, SQ_ZERO) + OurDropPt(Us, BISHOP);
+			if (hand_exists(hand, ROOK)  ) drops[num++] = make_move_drop(ROOK  , SQ_ZERO) + OurDropPt(Us, ROOK);
 
 
 			// 以下、コードが膨れ上がるが、dropは比較的、数が多く時間がわりとかかるので展開しておく価値があるかと思う。
@@ -668,7 +662,7 @@ template <Color Us, bool All> struct make_move_target_general {
 };
 
 // promoteかどうかを呼び出し元で選択できるmake_move_target
-template <Piece Pt, Color Us, bool All, bool Promote>
+template <PieceType Pt, Color Us, bool All, bool Promote>
 ExtMove* make_move_target_pro(Square from, const Bitboard& target, ExtMove* mlist)
 {
 	auto bb = target;
@@ -772,7 +766,7 @@ ExtMove* make_move_check(const Position& pos, Piece pc, Square from, Square ksq,
 
 // 王手になる駒打ち
 
-template <Color Us, Piece Pt> struct GenerateCheckDropMoves {
+template <Color Us, PieceType Pt> struct GenerateCheckDropMoves {
 	ExtMove* operator()(const Position& , const Bitboard& target, ExtMove* mlist)
 	{
 		auto bb = target;
@@ -841,7 +835,9 @@ ExtMove* generate_checks(const Position& pos, ExtMove* mlist)
 	// ここには王を敵玉の8近傍に移動させる指し手も含まれるが、王が近接する形はレアケースなので
 	// 指し手生成の段階では除外しなくても良いと思う。
 
-	const Bitboard y = pos.discovered_check_candidates();
+	// 移動させると(相手側＝非手番側)の玉に対して空き王手となる候補の(手番側)駒のbitboard。
+	const Bitboard y = pos.blockers_for_king(~Us) & pos.pieces(Us);
+
 	const Bitboard target =
 		(GenType == CHECKS || GenType == CHECKS_ALL) ? ~pos.pieces(Us) :                     // 自駒がない場所が移動対象升
 		(GenType == QUIET_CHECKS || GenType == QUIET_CHECKS_ALL) ? pos.empties() :           // 捕獲の指し手を除外するため駒がない場所が移動対象升

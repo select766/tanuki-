@@ -4,14 +4,16 @@
 #include "search.h"
 #include "thread.h"
 #include "tt.h"
-#include "misc.h" // こちらのgetline()を呼び出す必要がある。
 
-#include <sstream>
 #include <queue>
+#include <sstream>
 
+#include "tanuki_analysis.h"
 #include "tanuki_book.h"
+#include "tanuki_filesystem.h"
 #include "tanuki_kifu_generator.h"
 #include "tanuki_kifu_shuffler.h"
+#include "tanuki_progress.h"
 
 using namespace std;
 
@@ -91,10 +93,10 @@ namespace USI
 			// この指し手のpvの更新が終わっているのか
 			bool updated = (i <= pvIdx && rootMoves[i].score != -VALUE_INFINITE);
 
-			if (depth == ONE_PLY && !updated)
+			if (depth == 1 && !updated)
 				continue;
 
-			Depth d = updated ? depth : depth - ONE_PLY;
+			Depth d = updated ? depth : depth - 1;
 			Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
 			// multi pv時、例えば3個目の候補手までしか評価が終わっていなくて(PVIdx==2)、このとき、
@@ -111,7 +113,7 @@ namespace USI
 				ss << endl;
 
 			ss  << "info"
-				<< " depth "    << d / ONE_PLY
+				<< " depth "    << d
 				<< " seldepth " << rootMoves[i].selDepth
 				<< " score "    << USI::value(v);
 
@@ -135,6 +137,8 @@ namespace USI
 
 
 			// PV配列からPVを出力する。
+			// ※　USIの"info"で読み筋を出力するときは"pv"サブコマンドはサブコマンドの一番最後にしなければならない。
+
 			auto out_array_pv = [&]()
 			{
 				for (Move m : rootMoves[i].pv)
@@ -171,20 +175,21 @@ namespace USI
 					else
 					{
 						// 次の手を置換表から拾う。
+						// ただし置換表を破壊されるとbenchコマンドの時にシングルスレッドなのに探索内容の同一性が保証されなくて
+						// 困るのでread_probe()を用いる。
 						bool found;
-						auto* tte = TT.probe(pos.state()->key(), found);
+						auto* tte = TT.read_probe(pos.state()->key(), found);
 
 						// 置換表になかった
 						if (!found)
 							break;
 
-						m = tte->move();
+						m = pos.to_move(tte->move());
 
 						// 置換表にはpsudo_legalではない指し手が含まれるのでそれを弾く。
 						// 宣言勝ちでないならこれが合法手であるかのチェックが必要。
 						if (m != MOVE_WIN)
 						{
-							m = pos.move16_to_move(m);
 							if (!(pos.pseudo_legal(m) && pos.legal(m)))
 								break;
 						}
@@ -212,7 +217,6 @@ namespace USI
 					pos_->undo_move(moves[--ply]);
 			};
 
-#if !defined (USE_TT_PV)
 			// 検討用のPVを出力するモードなら、置換表からPVをかき集める。
 			// (そうしないとMultiPV時にPVが欠損することがあるようだ)
 			// fail-highのときにもPVを更新しているのが問題ではなさそう。
@@ -221,17 +225,6 @@ namespace USI
 				out_tt_pv();
 			else
 				out_array_pv();
-
-#else
-			// 置換表からPVを出力するモード。
-			// ただし、probe()するとTTEntryのgenerationが変わるので探索に影響する。
-			// benchコマンド時、これはまずいのでbenchコマンド時にはこのモードをオフにする。
-			if (Search::Limits.bench)
-				out_array_pv();
-			else
-				out_tt_pv();
-
-#endif
 		}
 
 		return ss.str();
@@ -249,26 +242,71 @@ u64 eval_sum;
 // 局面は初期化されないので注意。
 void is_ready(bool skipCorruptCheck)
 {
+
+	// --- Keep Alive的な処理 ---
+
 	// "isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。(keep alive的な処理)
-	//	USI2.0の仕様より。
-	//  -"isready"のあとのtime out時間は、30秒程度とする。これを超えて、評価関数の初期化、hashテーブルの確保をしたい場合、
-	//  思考エンジン側から定期的に何らかのメッセージ(改行可)を送るべきである。
-	//  -ShogiGUIではすでにそうなっているので、MyShogiもそれに追随する。
-	//  -また、やねうら王のエンジン側は、"isready"を受け取ったあと、"readyok"を返すまで5秒ごとに改行を送るように修正する。
-	 
-	auto ended = false;
-	auto th = std::thread([&ended] {
+	// →　これ、よくない仕様であった。
+	// cf. USIプロトコルでisready後の初期化に時間がかかる時にどうすれば良いのか？
+	//     http://yaneuraou.yaneu.com/2020/01/05/usi%e3%83%97%e3%83%ad%e3%83%88%e3%82%b3%e3%83%ab%e3%81%a7isready%e5%be%8c%e3%81%ae%e5%88%9d%e6%9c%9f%e5%8c%96%e3%81%ab%e6%99%82%e9%96%93%e3%81%8c%e3%81%8b%e3%81%8b%e3%82%8b%e6%99%82%e3%81%ab%e3%81%a9/
+	// cf. isready後のkeep alive用改行コードの送信について
+	//		http://yaneuraou.yaneu.com/2020/03/08/isready%e5%be%8c%e3%81%aekeep-alive%e7%94%a8%e6%94%b9%e8%a1%8c%e3%82%b3%e3%83%bc%e3%83%89%e3%81%ae%e9%80%81%e4%bf%a1%e3%81%ab%e3%81%a4%e3%81%84%e3%81%a6/
+
+	// これを送らないと、将棋所、ShogiGUIでタイムアウトになりかねない。
+	// ワーカースレッドを一つ生成して、そいつが5秒おきに改行を送信するようにする。
+	// このあと重い処理を行うのでスレッドの起動が遅延する可能性があるから、先にスレッドを生成して、そのスレッドが起動したことを
+	// 確認してから処理を行う。
+
+	// スレッドが起動したことを通知するためのフラグ
+	auto thread_started = false;
+
+	// この関数を抜ける時に立つフラグ(スレッドを停止させる用)
+	auto thread_end = false;
+
+	// 定期的な改行送信用のスレッド
+	auto th = std::thread([&] {
+		// スレッドが起動した
+		thread_started = true;
+
 		int count = 0;
-		while (!ended)
+		while (!thread_end)
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			if (++count >= 50 /* 5秒 */)
 			{
 				count = 0;
-				sync_cout << sync_endl; // 改行を送信する。
+				sync_cout << sync_endl; // 改行を送信する。	
+
+				// 定跡の読み込み部などで"info string.."で途中経過を出力する場合、
+				// sync_cout ～ sync_endlを用いて送信しないと、この改行を送るタイミングとかち合うと
+				// 変なところで改行されてしまうので注意。
 			}
 		}
-	});
+		});
+	SCOPE_EXIT({ thread_end = true; th.join(); });
+
+	// スレッド起動待ち
+	while (!thread_started)
+		Tools::sleep(100);
+
+	// --- Keep Alive的な処理ここまで ---
+
+
+#if defined (USE_EVAL_HASH)
+	Eval::EvalHash_Resize(Options["EvalHash"]);
+#endif
+
+	// 初回初期化
+	static bool init = false;
+	if (!init)
+	{
+		// eHashのクリアもこのタイミングで行うことにする。
+		// (大きめのものを確保していると時間がかかるため)
+#if defined (USE_EVAL_HASH)
+		Eval::EvalHash_Clear();
+#endif
+		init = true;
+	}
 
 	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
 	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
@@ -284,7 +322,6 @@ void is_ready(bool skipCorruptCheck)
 		Eval::print_softname(eval_sum);
 
 		USI::load_eval_finished = true;
-
 	}
 	else
 	{
@@ -297,15 +334,12 @@ void is_ready(bool skipCorruptCheck)
 	// isreadyに対してはreadyokを返すまで次のコマンドが来ないことは約束されているので
 	// このタイミングで各種変数の初期化もしておく。
 
-	TT.resize(Options["Hash"]);
+	TT.resize(Options["USI_Hash"]);
+
 	Search::clear();
-	Time.availableNodes = 0;
+//	Time.availableNodes = 0;
 
 	Threads.stop = false;
-
-	// keep aliveを送信するために生成したスレッドを終了させ、待機する。
-	ended = true;
-	th.join();
 }
 
 // isreadyコマンド処理部
@@ -385,12 +419,10 @@ void setoption_cmd(istringstream& is)
 
 	if (Options.count(name))
 		Options[name] = value;
-	else {
-		// USI_HashとUSI_Ponderは無視してやる。
-		if (name != "USI_Hash" && name != "USI_Ponder")
-			// この名前のoptionは存在しなかった
-			sync_cout << "Error! : No such option: " << name << sync_endl;
-	}
+	else
+		// この名前のoptionは存在しなかった
+		sync_cout << "Error! : No such option: " << name << sync_endl;
+
 }
 
 // getoptionコマンド応答(USI独自拡張)
@@ -407,7 +439,7 @@ void getoption_cmd(istringstream& is)
 	for (auto& o : Options)
 	{
 		// 大文字、小文字を無視して比較。また、nameが指定されていなければすべてのオプション設定の現在の値を表示。
-		if ((!stricmp(name, o.first)) || all)
+		if ((!StringExtension::stricmp(name, o.first)) || all)
 		{
 			sync_cout << "Options[" << o.first << "] == " << (string)Options[o.first] << sync_endl;
 			if (!all)
@@ -430,8 +462,10 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	// 思考開始時刻の初期化。なるべく早い段階でこれをしておかないとサーバー時間との誤差が大きくなる。
 	Time.reset();
 
+#if defined (USE_ENTERING_KING_WIN)
 	// 入玉ルール
-	limits.enteringKingRule = USI::ekr;
+	limits.enteringKingRule = to_entering_king_rule(Options["EnteringKingRule"]);
+#endif
 
 	// 終局(引き分け)になるまでの手数
 	// 引き分けになるまでの手数。(Options["MaxMovesToDraw"]として与えられる。エンジンによってはこのオプションを持たないこともある。)
@@ -500,6 +534,20 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 				// USIプロトコルでは、UCIと異なり、ここは手数ではなく、探索に使う時間[ms]が指定されている。
 				limits.mate = stoi(token);
 		}
+
+#if defined(MATE_ENGINE)
+		// MateEngineのデバッグ用コマンド: 詰将棋の特定の変化に対する解析を効率的に行うことが出来る。
+		//	cf.https ://github.com/yaneurao/YaneuraOu/pull/115
+			
+		else if (token == "matedebug") {
+		  string token="";
+			Move16 m;
+		  limits.pv_check.clear();
+			while (is >> token && (m = USI::to_move16(token)) != MOVE_NONE){
+		    limits.pv_check.push_back(m);
+		  }
+		}
+#endif
 
 		// パフォーマンステスト(Stockfishにある、合法手N手で到達できる局面を求めるやつ)
 		// このあとposition～goコマンドを使うとパフォーマンステストモードに突入し、ここで設定した手数で到達できる局面数を求める
@@ -581,7 +629,7 @@ void USI::loop(int argc, char* argv[])
 	if (argc >= 3 && string(argv[1]) == "file")
 	{
 		vector<string> cmds0;
-		read_all_lines(argv[2], cmds0);
+		FileOperator::ReadAllLines(argv[2], cmds0);
 
 		// queueに変換する。
 		for (auto c : cmds0)
@@ -616,7 +664,7 @@ void USI::loop(int argc, char* argv[])
 	{
 		if (cmds.size() == 0)
 		{
-			if (!getline(cin, cmd)) // 入力が来るかEOFがくるまでここで待機する。
+			if (!std::getline(cin, cmd)) // 入力が来るかEOFがくるまでここで待機する。
 				cmd = "quit";
 		} else {
 			// 積んであるコマンドがあるならそれを実行する。
@@ -631,7 +679,7 @@ void USI::loop(int argc, char* argv[])
 
 		istringstream is(cmd);
 
-		token = "";
+		token.clear(); // getlineが空を返したときのためのクリア
 		is >> skipws >> token;
 
 		if (token == "quit" || token == "stop" || token == "gameover")
@@ -643,7 +691,7 @@ void USI::loop(int argc, char* argv[])
 			// gameoverに対してbestmoveは返すべきではないのかも知れないが、
 			// それを言えばstopにだって…。
 
-#ifdef USE_GAMEOVER_HANDLER
+#if defined(USE_GAMEOVER_HANDLER)
 			// "gameover"コマンドに対するハンドラを呼び出したいのか？
 			if (token == "gameover")
 				gameover_handler(cmd);
@@ -659,12 +707,6 @@ void USI::loop(int argc, char* argv[])
 			Threads.main()->ponder = false; // 通常探索に切り替える。
 		}
 
-		// 与えられた局面について思考するコマンド
-		else if (token == "go") go_cmd(pos, is , states);
-
-		// (思考などに使うための)開始局面(root)を設定する
-		else if (token == "position") position_cmd(pos, is , states);
-
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
 		else if (token == "usi")
 			sync_cout << engine_info() << Options << "usiok" << sync_endl;
@@ -672,32 +714,54 @@ void USI::loop(int argc, char* argv[])
 		// オプションを設定する
 		else if (token == "setoption") setoption_cmd(is);
 
-		// オプションを取得する(USI独自拡張)
-		else if (token == "getoption") getoption_cmd(is);
+		// 与えられた局面について思考するコマンド
+		else if (token == "go") go_cmd(pos, is , states);
+
+		// (思考などに使うための)開始局面(root)を設定する
+		else if (token == "position") position_cmd(pos, is , states);
+
+		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
+		// 我々はこれに関知しないので単に無視すれば良い。
+		// やねうら王では、時間のかかる初期化はisreadyの応答でやっている。
+		// Stockfishでは、Search::clear()をここで呼び出しているようだが。
+		else if (token == "usinewgame") continue;
 
 		// 思考エンジンの準備が出来たかの確認
 		else if (token == "isready") is_ready_cmd(pos,states);
+
+		// 以下、デバッグのためのカスタムコマンド(非USIコマンド)
+		// 探索中には使わないようにすべし。
 
 #if defined(USER_ENGINE)
 		// ユーザーによる実験用コマンド。user.cppのuser()が呼び出される。
 		else if (token == "user") user_test(pos, is);
 #endif
 
+		// ベンチコマンド(これは常に使える)
+		else if (token == "bench") bench_cmd(pos, is);
+
 		// 現在の局面を表示する。(デバッグ用)
 		else if (token == "d") cout << pos << endl;
-
-		// 指し手生成祭りの局面をセットする。
-		else if (token == "matsuri") pos.set("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1",&states->back(),Threads.main());
-
-		// "position sfen"の略。
-		else if (token == "sfen") position_cmd(pos, is , states);
-
-		// ログファイルの書き出しのon
-		else if (token == "log") start_logger(true);
 
 		// 現在の局面について評価関数を呼び出して、その値を返す。
 		else if (token == "eval") cout << "eval = " << Eval::compute_eval(pos) << endl;
 		else if (token == "evalstat") Eval::print_eval_stat(pos);
+
+		else if (token == "compiler") sync_cout << compiler_info() << sync_endl;
+
+		// -- 以下、やねうら王独自拡張のカスタムコマンド
+
+		// オプションを取得する(USI独自拡張)
+		else if (token == "getoption") getoption_cmd(is);
+
+		// 指し手生成祭りの局面をセットする。
+		else if (token == "matsuri") pos.set("l6nl/5+P1gk/2np1S3/p1p4Pp/3P2Sp1/1PPb2P1P/P5GS1/R8/LN4bKL w GR5pnsg 1", &states->back(), Threads.main());
+
+		// "position sfen"の略。
+		else if (token == "sfen") position_cmd(pos, is, states);
+
+		// ログファイルの書き出しのon
+		else if (token == "log") start_logger(true);
 
 #if defined(EVAL_LEARN)
 		// テスト用にqsearch(),search()を直接呼ぶコマンド
@@ -712,6 +776,9 @@ void USI::loop(int argc, char* argv[])
 			cout << endl;
 		}
 
+		// この局面の手番側がどちらであるかを返す。BLACK or WHITE
+		else if (token == "side") cout << (pos.side_to_move() == BLACK ? "black":"white") << endl;
+
 		// この局面が詰んでいるかの判定
 		else if (token == "mated") cout << pos.is_mated() << endl;
 
@@ -722,9 +789,6 @@ void USI::loop(int argc, char* argv[])
 		// この局面での1手詰め判定
 		else if (token == "mate1") cout << pos.mate1ply() << endl;
 #endif
-
-		// ベンチコマンド(これは常に使える)
-		else if (token == "bench") bench_cmd(pos, is);
 		
 #if defined (ENABLE_TEST_CMD)
 		// 指し手生成のテスト
@@ -753,25 +817,131 @@ void USI::loop(int argc, char* argv[])
 #endif
 
 #endif
-		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
-		// 我々はこれに関知しないので単に無視すれば良い。
-		else if (token == "usinewgame") continue;
 
 #ifdef EVAL_LEARN
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
 
 		else if (token == "create_scored_book") Tanuki::CreateScoredBook();
 
-		else if (token == "extend_book") {
-			Tanuki::ExtendBook();
+		else if (token == "merge_book") {
+			Tanuki::MergeBook();
 			break;
 		}
+
+		else if (token == "set_score_to_move") {
+			Tanuki::SetScoreToMove();
+			break;
+		}
+
+		else if (token == "propagate_leaf_node_values_to_root") {
+			Tanuki::PropagateLeafNodeValuesToRoot();
+			break;
+		}
+
+		else if (token == "extract_target_positions") {
+			Tanuki::ExtractTargetPositions();
+			break;
+		}
+
+		else if (token == "add_target_positions") {
+			Tanuki::AddTargetPositions();
+			break;
+		}
+
+		else if (token == "endless_tera_shock") {
+			namespace fs = std::filesystem;
+			std::string input_book_file = Options["BookInputFile"];
+			std::string output_book_file = Options["BookOutputFile"];
+			constexpr const char* kExtractTargetPositionsBookInputFile = "extract_target_positions_book_input_file.db";
+			constexpr const char* kExtractTargetPositionsBookOutputFile = "extract_target_positions_book_output_file.db";
+			constexpr const char* kAddTargetPositionsBookInputFile = "add_target_positions_book_input_file.db";
+			constexpr const char* kAddTargetPositionsBookOutputFile = "add_target_positions_book_output_file.db";
+			constexpr const char* kPropagateLeafNodeValuesToRootBookInputFile = "propagate_leaf_node_values_to_root_book_input_file.db";
+			constexpr const char* kPropagateLeafNodeValuesToRootBookOutputFile = "propagate_leaf_node_values_to_root_book_output_file.db";
+			constexpr const char* kExtractTargetPositionsTxt = "extract_target_positions.txt";
+
+			std::string book_folder = "book/";
+			std::string input_book_file_path = book_folder + input_book_file;
+			std::string output_book_file_path = book_folder + output_book_file;
+			std::string extract_target_positions_book_input_file = book_folder + kExtractTargetPositionsBookInputFile;
+			std::string extract_target_positions_book_output_file = book_folder + kExtractTargetPositionsBookOutputFile;
+			std::string add_target_positions_book_input_file = book_folder + kAddTargetPositionsBookInputFile;
+			std::string add_target_positions_book_output_file = book_folder + kAddTargetPositionsBookOutputFile;
+			std::string propagate_leaf_node_values_to_root_book_input_file = book_folder + kPropagateLeafNodeValuesToRootBookInputFile;
+			std::string propagate_leaf_node_values_to_root_book_output_file = book_folder + kPropagateLeafNodeValuesToRootBookOutputFile;
+
+			Options["BookTargetSfensFile"] = std::string(kExtractTargetPositionsTxt);
+
+			// ループの初めに出力ファイルをextract_target_positionsの入力とするため、
+			// 入力ファイルを出力ファイルにコピーしておく。
+			if (Tanuki::IsRegularFile(input_book_file_path)) {
+				Tanuki::CopyFile(input_book_file_path, output_book_file_path);
+			}
+
+			for (;;) {
+				// ループするため、出力ファイルをextract_target_positionsの入力ファイルにコピーする
+				sync_cout << "Tanuki::ExtractTargetPositions();" << sync_endl;
+				if (Tanuki::IsRegularFile(output_book_file_path)) {
+					Tanuki::CopyFile(output_book_file_path, extract_target_positions_book_input_file);
+				}
+				Options["BookInputFile"] = std::string(kExtractTargetPositionsBookInputFile);
+				Tanuki::ExtractTargetPositions();
+				sync_cout << sync_endl;
+
+				// AMD Ryzen Threadripper 3990Xにおいて、カーネル時間が全体の80%を占める問題に対するハック。
+				std::this_thread::sleep_for(std::chrono::minutes(1));
+
+				sync_cout << "Tanuki::AddTargetPositions();" << sync_endl;
+				if (Tanuki::IsRegularFile(extract_target_positions_book_input_file)) {
+					Tanuki::CopyFile(extract_target_positions_book_input_file, add_target_positions_book_input_file);
+					Tanuki::CopyFile(extract_target_positions_book_input_file, add_target_positions_book_output_file);
+				}
+				Options["BookInputFile"] = std::string(kAddTargetPositionsBookInputFile);
+				Options["BookOutputFile"] = std::string(kAddTargetPositionsBookOutputFile);
+				Tanuki::AddTargetPositions();
+				sync_cout << sync_endl;
+
+				std::this_thread::sleep_for(std::chrono::minutes(1));
+
+				sync_cout << "Tanuki::PropagateLeafNodeValuesToRoot();" << sync_endl;
+				Tanuki::CopyFile(add_target_positions_book_output_file, propagate_leaf_node_values_to_root_book_input_file);
+				Options["BookInputFile"] = std::string(kPropagateLeafNodeValuesToRootBookInputFile);
+				Options["BookOutputFile"] = std::string(kPropagateLeafNodeValuesToRootBookOutputFile);
+				Tanuki::PropagateLeafNodeValuesToRoot();
+				Tanuki::CopyFile(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path);
+				Tanuki::CopyFile(propagate_leaf_node_values_to_root_book_output_file, output_book_file_path + std::to_string(std::chrono::system_clock::now().time_since_epoch().count()));
+				sync_cout << sync_endl;
+
+				std::this_thread::sleep_for(std::chrono::minutes(1));
+
+				TT.new_search();
+			}
+		}
+
+		else if (token == "create_from_tanuki_coliseum") Tanuki::CreateFromTanukiColiseum();
 
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
 		else if (token == "convert_sfen_to_learning_data") Tanuki::ConvertSfenToLearningData();
 
 		else if (token == "shuffle_kifu") Tanuki::ShuffleKifu();
+
+		else if (token == "progress_learn") {
+			Tanuki::Progress progress;
+			progress.Learn();
+			progress.Save();
+		}
+
+		else if (token == "progress_estimate") {
+			Tanuki::Progress progress;
+			progress.Load();
+			auto p = progress.Estimate(pos);
+			sync_cout << "info string progress = " << p << sync_endl;
+		}
+
+		else if (token == "analyze_progress") {
+			Tanuki::AnalyzeProgress();
+		}
 #endif
 
 		else
@@ -790,7 +960,7 @@ void USI::loop(int argc, char* argv[])
 				for (auto& o : Options)
 				{
 					// 大文字、小文字を無視して比較。
-					if (!stricmp(token, o.first))
+					if (!StringExtension::stricmp(token, o.first))
 					{
 						Options[o.first] = value;
 						sync_cout << "Options[" << o.first << "] = " << value << sync_endl;
@@ -908,10 +1078,7 @@ Move USI::to_move(const Position& pos, const std::string& str)
 		return MOVE_NULL;
 
 	// usi文字列を高速にmoveに変換するやつがいるがな..
-	Move move = USI::to_move(str);
-
-	// 上位bitに駒種を入れておかないとpseudo_legal()で引っかかる。
-	move = pos.move16_to_move(move);
+	Move move = pos.to_move(USI::to_move16(str));
 
 #if defined(MUST_CAPTURE_SHOGI_ENGINE)
 	// 取る一手将棋は合法手かどうかをGUI側でチェックしてくれないから、
@@ -933,35 +1100,39 @@ Move USI::to_move(const Position& pos, const std::string& str)
 // USI形式から指し手への変換。本来この関数は要らないのだが、
 // 棋譜を大量に読み込む都合、この部分をそこそこ高速化しておきたい。
 // やねうら王、独自追加。
-Move USI::to_move(const string& str)
+Move16 USI::to_move16(const string& str)
 {
-	// さすがに3文字以下の指し手はおかしいだろ。
-	if (str.length() <= 3)
-		return MOVE_NONE;
-
-	Square to = usi_to_sq(str[2], str[3]);
-	if (!is_ok(to))
-		return MOVE_NONE;
-
-	bool promote = str.length() == 5 && str[4] == '+';
-	bool drop = str[1] == '*';
-
 	Move move = MOVE_NONE;
-	if (!drop)
+
 	{
-		Square from = usi_to_sq(str[0], str[1]);
-		if (is_ok(from))
-			move = promote ? make_move_promote(from, to) : make_move(from, to);
-	}
-	else
-	{
-		for (int i = 1; i <= 7; ++i)
-			if (PieceToCharBW[i] == str[0])
-			{
-				move = make_move_drop((Piece)i, to);
-				break;
-			}
+		// さすがに3文字以下の指し手はおかしいだろ。
+		if (str.length() <= 3)
+				goto END;
+	
+		Square to = usi_to_sq(str[2], str[3]);
+		if (!is_ok(to))
+				goto END;
+	
+		bool promote = str.length() == 5 && str[4] == '+';
+		bool drop = str[1] == '*';
+	
+		if (!drop)
+		{
+			Square from = usi_to_sq(str[0], str[1]);
+			if (is_ok(from))
+				move = promote ? make_move_promote(from, to) : make_move(from, to);
+		}
+		else
+		{
+			for (int i = 1; i <= 7; ++i)
+				if (PieceToCharBW[i] == str[0])
+				{
+					move = make_move_drop((PieceType)i, to);
+					break;
+				}
+		}
 	}
 
-	return move;
+END:
+	return Move16(move);
 }

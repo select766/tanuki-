@@ -17,7 +17,7 @@ using USI::OptionsMap;
 using Learner::PackedSfenValue;
 
 namespace {
-	constexpr int kBufferSize = 1 << 30;  // 1GB
+	constexpr int kBufferSize = 1024 * 1024;
 }
 
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops)

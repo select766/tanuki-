@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "4.85"
+#define ENGINE_VERSION "5.20"
 
 // --------------------
 //  思考エンジンの種類
@@ -20,7 +20,7 @@
 
 #if !defined (USE_MAKEFILE)
 
-#define YANEURAOU_2018_OTAFUKU_ENGINE    // やねうら王2018 with お多福Lab。(開発中2018/01/01～)
+#define YANEURAOU_ENGINE_NNUE    // やねうら王2018 with お多福Lab。(開発中2018/01/01～)
 //#define MATE_ENGINE                      // 詰め将棋solverとしてリリースする場合。(開発中2017/05/06～)
 //#define USER_ENGINE                      // ユーザーの思考エンジン
 
@@ -56,14 +56,26 @@
 #define USE_AVX2
 //#define USE_SSE42
 //#define USE_SSE41
+//#define USE_SSSE3
 //#define USE_SSE2
 //#define NO_SSE
 
+// -- BMI2命令を使う/使わない
+
+// AVX2環境でBMI2が使えるときに、BMI2対応命令を使うのか(ZEN/ZEN2ではBMI2命令は使わないほうが速い)
+// AMDのRyzenシリーズ(ZEN1/ZEN2)では、BMI2命令遅いので、これを定義しないほうが速い。
+#define USE_BMI2
+
+// やねうら王の従来の遠方駒の利きを求めるコードを用いる。
+// これをundefするとApery型の利きのコードを用いる。(そっちのほうがPEXTが使えない環境だと速い)
+// 互換性維持および、55将棋のように盤面を変形させるときに、magic tableで用いるmagic numberを求めたくないときに用いる。
+
+// #define USE_OLD_YANEURAOU_EFFECT
+
+
 #else
 
-// Makefileを使ってbuildするときは、
-// $ make avx2
-// のようにしてビルドすれば自動的にAVX2用がビルドされます。
+// Makefileを使ってbuildする手順は docs/解説.txt を見ること。
 
 #endif
 
@@ -77,7 +89,7 @@
 
 
 // 通常探索時の最大探索深さ
-#define MAX_PLY_NUM 127
+constexpr int MAX_PLY_NUM = 246;
 
 // --- デバッグ時の標準出力への局面表示などに日本語文字列を用いる。
 
@@ -139,8 +151,6 @@
 // #define EVAL_PPET      // ×  技巧型 2駒+利き+手番(実装予定なし)
 // #define EVAL_KKPPT     // ○  KKPP型 4駒関係 手番あり。(55将棋、56将棋でも使えそう)※3
 // #define EVAL_KKPP_KKPT // ○  KKPP型 4駒関係 手番はKK,KKPTにのみあり。※3
-// #define EVAL_NABLA     // ○  ∇(ナブラ) 評価関数(現状、非公開)
-// #define EVAL_HELICES   // ？  螺旋評価関数
 
 // ※1 : KPP_PPTは、差分計算が面倒で割に合わないことが判明したのでこれを使うぐらいならKPP_KKPTで十分だという結論。
 // ※2 : 実装したけどいまひとつだったので差分計算実装せず。そのため遅すぎて、実質使い物にならない。ソースコードの参考用。
@@ -154,7 +164,7 @@
 
 
 // 評価関数を教師局面から学習させるときに使うときのモード
-// #define EVAL_LEARN
+//#define EVAL_LEARN
 
 // Eval::compute_eval()やLearner::add_grad()を呼び出す前にEvalListの組み換えを行なう機能を提供する。
 // 評価関数の実験に用いる。詳しくは、Eval::make_list_functionに書いてある説明などを読むこと。
@@ -187,6 +197,7 @@
 // かと言って、そのときにPVの出力をしないと、最後に出力されたPVとbest moveとは異なる可能性があるので、
 // それはよろしくない。検討モード用の思考オプションを用意すべき。
 // #define USE_TT_PV
+// →　ConsiderationMode というエンジンオプションを用意したので、この機能は無効化する。
 
 // 定跡を作るコマンド("makebook")を有効にする。
 // #define ENABLE_MAKEBOOK_CMD
@@ -199,9 +210,6 @@
 
 // 置換表のなかでevalを持たない
 // #define NO_EVAL_IN_TT
-
-// ONE_PLY == 1にするためのモード。これを指定していなければONE_PLY == 2
-// #define ONE_PLY_EQ_1
 
 // オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
 // #define USE_DROPBIT_IN_STATS
@@ -229,10 +237,6 @@
 // USIプロトコルでgameoverコマンドが送られてきたときに gameover_handler()を呼び出す。
 // #define USE_GAMEOVER_HANDLER
 
-// EVAL_HASHで使用するメモリとして大きなメモリを確保するか。
-// これをONすると数%高速化する代わりに、メモリ使用量が1GBほど増える。
-// #define USE_LARGE_EVAL_HASH
-
 // GlobalOptionという、EVAL_HASHを有効/無効を切り替えたり、置換表の有効/無効を切り替えたりする
 // オプションのための変数が使えるようになる。スピードが1%ぐらい遅くなるので大会用のビルドではオフを推奨。
 // #define USE_GLOBAL_OPTIONS
@@ -244,11 +248,15 @@
 // これをdefineすると、extra/kif_converter/ フォルダにある棋譜や指し手表現の変換を行なう関数群が使用できるようになる。
 // #define USE_KIF_CONVERT_TOOLS
 
-// 128GB超えの置換表を使いたいとき用。
-// このシンボルを定義するとOptions["Hash"]として131072(=128*1024[MB]。すなわち128GB)超えの置換表が扱えるようになる。
-// Stockfishのコミュニティではまだ議論中なのでデフォルトでオフにしておく。
-// cf. 128 GB TT size limitation : https://github.com/official-stockfish/Stockfish/issues/1349
-// #define USE_HUGE_HASH
+// ニコニコ生放送の電王盤用
+// 電王盤はMultiPV非対応なので定跡を送るとき、"multipv"をつけずに1番目の候補手を送信する必要がある。
+// #define NICONICO
+
+// PVの出力時の千日手に関する出力をすべて"rep_draw"に変更するオプション。
+// GUI側が、何らかの都合で"rep_draw"のみしか処理できないときに用いる。
+// #define PV_OUTPUT_DRAW_ONLY
+
+
 
 // --------------------
 // release configurations
@@ -256,54 +264,39 @@
 
 // --- 通常の思考エンジンとして実行ファイルを公開するとき用の設定集
 
-// やねうら王2018 with お多福ラボ
-#if defined(YANEURAOU_2018_OTAFUKU_ENGINE) || defined(YANEURAOU_2018_OTAFUKU_ENGINE_KPPT) || defined(YANEURAOU_2018_OTAFUKU_ENGINE_KPP_KKPT) || defined(YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL)
-#define ENGINE_NAME "YaneuraOu 2018 Otafuku"
-#if defined(YANEURAOU_2018_OTAFUKU_ENGINE)
-#define EVAL_KPPT
-//#define EVAL_KPP_KKPT
-#endif
-#if defined(YANEURAOU_2018_OTAFUKU_ENGINE_KPPT)
-#define EVAL_KPPT
-#endif
-#if defined(YANEURAOU_2018_OTAFUKU_ENGINE_KPP_KKPT)
-#define EVAL_KPP_KKPT
-#endif
-#if defined(YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL)
-#define EVAL_MATERIAL
-#endif
-#if !defined(YANEURAOU_2018_OTAFUKU_ENGINE)
-#define YANEURAOU_2018_OTAFUKU_ENGINE
-#endif
+#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT) || defined(YANEURAOU_ENGINE_NNUE) || defined(YANEURAOU_ENGINE_MATERIAL)
 
-#if !defined(YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL)
+#define ENGINE_NAME "YaneuraOu"
+
+// 探索部は通常のやねうら王エンジンを用いる。
+#define YANEURAOU_ENGINE
+
 #define USE_EVAL_HASH
-#endif
 #define USE_SEE
 #define USE_MATE_1PLY
 #define USE_ENTERING_KING_WIN
 #define USE_TIME_MANAGEMENT
 #define KEEP_PIECE_IN_GENERATE_MOVES
-#define ONE_PLY_EQ_1
+
+// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+#define USE_SHARED_MEMORY_IN_EVAL
+
+// 学習機能を有効にするオプション。
+// 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
+// 有効化してコンパイルしなければならない。
+// #define EVAL_LEARN
 
 // デバッグ絡み
 //#define ASSERT_LV 3
 //#define USE_DEBUG_ASSERT
 
+
 #define ENABLE_TEST_CMD
 // 学習絡みのオプション
 #define USE_SFEN_PACKER
-// 学習機能を有効にするオプション。
-#if !defined(YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL)
-#define EVAL_LEARN
-#endif
 
 // 定跡生成絡み
 #define ENABLE_MAKEBOOK_CMD
-// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-#if !defined(YANEURAOU_2018_OTAFUKU_ENGINE_MATERIAL)
-#define USE_SHARED_MEMORY_IN_EVAL
-#endif
 
 // パラメーターの自動調整絡み
 #define USE_GAMEOVER_HANDLER
@@ -311,50 +304,41 @@
 
 // GlobalOptionsは有効にしておく。
 #define USE_GLOBAL_OPTIONS
+
+// -- 各評価関数ごとのconfiguration
+
+#if defined(YANEURAOU_ENGINE_MATERIAL)
+#define EVAL_MATERIAL
+// 駒割のみの評価関数ではサポートされていない機能をundefする。
+#undef USE_EVAL_HASH
+#undef EVAL_LEARN
+#undef USE_SHARED_MEMORY_IN_EVAL
 #endif
 
-// NNUE評価関数を積んだtanuki-エンジン
-#if defined(YANEURAOU_2018_TNK_ENGINE)
-#define ENGINE_NAME "YaneuraOu 2018 T.N.K."
+#if defined(YANEURAOU_ENGINE_KPPT)
+#define EVAL_KPPT
+#endif
+
+#if defined(YANEURAOU_ENGINE_KPP_KKPT)
+#define EVAL_KPP_KKPT
+#endif
+
+#if defined(YANEURAOU_ENGINE_NNUE)
 #define EVAL_NNUE
-
-#define USE_EVAL_HASH
-#define USE_SEE
-#define USE_MATE_1PLY
-#define USE_ENTERING_KING_WIN
-#define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_GENERATE_MOVES
-#define ONE_PLY_EQ_1
-
-// デバッグ絡み
-//#define ASSERT_LV 3
-//#define USE_DEBUG_ASSERT
-
-#define ENABLE_TEST_CMD
-// 学習絡みのオプション
-#define USE_SFEN_PACKER
-// 学習機能を有効にするオプション。
-#define EVAL_LEARN
+// 現状、評価関数のメモリ共有はNNUEではサポートされていない。
+#undef USE_SHARED_MEMORY_IN_EVAL
 
 // 学習のためにOpenBLASを使う
 // "../openblas/lib/libopenblas.dll.a"をlibとして追加すること。
 //#define USE_BLAS
 
-
-// 定跡生成絡み
-#define ENABLE_MAKEBOOK_CMD
-// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-//#define USE_SHARED_MEMORY_IN_EVAL
-// パラメーターの自動調整絡み
-#define USE_GAMEOVER_HANDLER
-//#define LONG_EFFECT_LIBRARY
-
-// GlobalOptionsは有効にしておく。
-#define USE_GLOBAL_OPTIONS
-
-// 探索部はYANEURAOU_2018_OTAFUKU_ENGINEを使う。
-#define YANEURAOU_2018_OTAFUKU_ENGINE
+// KP256を用いる場合これをdefineする。
+// ※　これをdefineしていなければNNUE標準のhalfKP256になる。
+// #define EVAL_NNUE_KP256
 #endif
+
+#endif // defined(YANEURAOU_ENGINE_KPPT) || ...
+
 
 // --- 詰将棋エンジンとして実行ファイルを公開するとき用の設定集
 
@@ -375,7 +359,8 @@
 
 #if defined(USER_ENGINE)
 #define ENGINE_NAME "YaneuraOu user engine"
-#define EVAL_KPP
+#define USE_SEE
+#define EVAL_MATERIAL
 #endif
 
 // --------------------
@@ -387,7 +372,6 @@
 #undef ASSERT_LV
 #undef EVAL_LEARN
 #undef ENABLE_TEST_CMD
-#define USE_LARGE_EVAL_HASH
 #undef USE_GLOBAL_OPTIONS
 #undef KEEP_LAST_MOVE
 #endif
@@ -441,6 +425,9 @@ extern GlobalOptions_ GlobalOptions;
 #if !defined (USE_DEBUG_ASSERT)
 #define ASSERT(X) { if (!(X)) *(int*)1 = 0; }
 #else
+#include <iostream>
+#include <chrono>
+#include <thread>
 #define ASSERT(X) { if (!(X)) { std::cout << "\nError : ASSERT(" << #X << "), " << __FILE__ << "(" << __LINE__ << "): " << __func__ << std::endl; \
  std::this_thread::sleep_for(std::chrono::microseconds(3000)); *(int*)1 =0;} }
 #endif
@@ -505,7 +492,7 @@ constexpr bool pretty_jp = false;
 // --- Dropbit
 
 // USE_DROPBIT_IN_STATSがdefineされているときは、Moveの上位16bitに格納するPieceとして駒打ちは +32(PIECE_DROP)　にする。
-#ifdef USE_DROPBIT_IN_STATS
+#if defined (USE_DROPBIT_IN_STATS)
 #define PIECE_DROP 32
 #else
 #define PIECE_DROP 0
@@ -515,7 +502,7 @@ constexpr bool pretty_jp = false;
 
 // KIF形式に変換するときにPositionクラスにその局面へ至る直前の指し手が保存されていないと
 // "同"金のように出力できなくて困る。
-#ifdef USE_KIF_CONVERT_TOOLS
+#if defined (USE_KIF_CONVERT_TOOLS)
 #define KEEP_LAST_MOVE
 #endif
 
@@ -533,14 +520,22 @@ constexpr bool Is64Bit = true;
 constexpr bool Is64Bit = false;
 #endif
 
+#if defined(USE_BMI2)
+#define BMI2_STR "BMI2"
+#else
+#define BMI2_STR ""
+#endif
+
 #if defined(USE_AVX512)
-#define TARGET_CPU "AVX-512"
+#define TARGET_CPU "AVX512" BMI2_STR
 #elif defined(USE_AVX2)
-#define TARGET_CPU "AVX2"
+#define TARGET_CPU "AVX2" BMI2_STR
 #elif defined(USE_SSE42)
 #define TARGET_CPU "SSE4.2"
 #elif defined(USE_SSE41)
 #define TARGET_CPU "SSE4.1"
+#elif defined(USE_SSSE3)
+#define TARGET_CPU "SSSE3"
 #elif defined(USE_SSE2)
 #define TARGET_CPU "SSE2"
 #else
@@ -549,21 +544,26 @@ constexpr bool Is64Bit = false;
 
 // 上位のCPUをターゲットとするなら、その下位CPUの命令はすべて使えるはずなので…。
 
-#ifdef USE_AVX512
+#if defined (USE_AVX512)
 #define USE_AVX2
 #endif
 
-#ifdef USE_AVX2
+#if defined (USE_AVX2)
 #define USE_SSE42
 #endif
 
-#ifdef USE_SSE42
+#if defined (USE_SSE42)
 #define USE_SSE41
 #endif
 
-#ifdef USE_SSE41
+#if defined (USE_SSE41)
+#define USE_SSSE3
+#endif
+
+#if defined (USE_SSSE3)
 #define USE_SSE2
 #endif
+
 
 // --------------------
 //    for 32bit OS
@@ -593,7 +593,9 @@ constexpr bool Is64Bit = false;
 #define EVAL_TYPE_NAME "KPPT"
 #elif defined(EVAL_KPP_KKPT)
 #define EVAL_TYPE_NAME "KPP_KKPT"
-#elif defined(EVAL_NNUE)
+#elif defined(EVAL_NNUE_KP256)
+#define EVAL_TYPE_NAME "NNUE KP256"
+#elif defined(EVAL_NNUE) // 標準NNUE halfKP256
 #define EVAL_TYPE_NAME "NNUE"
 #else
 #define EVAL_TYPE_NAME ""
@@ -621,15 +623,10 @@ constexpr bool Is64Bit = false;
 // 7. FV_VAR方式のリファレンス実装として、EVAL_KPP_KKPT_FV_VARがあるので、そのソースコードを見ること。
 
 // あらゆる局面でP(駒)の数が増えないFV38と呼ばれる形式の差分計算用。
-#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_NNUE)
+#if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) || defined(EVAL_NNUE) || defined(EVAL_MATERIAL)
 #define USE_FV38
 #endif
 
-// P(駒)の数が増えたり減ったりするタイプの差分計算用
-// FV38とは異なり、可変長piece_list。
-#if defined(EVAL_MATERIAL)
-#define USE_FV_VAR
-#endif
 
 // -- 評価関数の種類により、盤面の利きの更新ときの処理が異なる。(このタイミングで評価関数の差分計算をしたいので)
 

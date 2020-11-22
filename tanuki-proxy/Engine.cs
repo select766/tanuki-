@@ -20,22 +20,24 @@ namespace tanuki_proxy
             public int score { get; set; }
             public List<string> pvCommand { get; set; }
             public long nps { get; set; }
+            public long nodes { get; set; }
         }
 
-        private const double showPvSupressionMs = 200.0;
         private const int mateScore = 32000;
+        private const int multiPVSearchTimeMs = 100;
+        private const int multiPVSearchTimeoutMs = 200;
 
         bool disposed = false;
         private readonly Program program;
         private readonly Process process = new Process();
-        private readonly Option[] optionOverrides;
+        private Thread readStandardOutputThread;
+        private Thread readStandardErrorThread;
+        private readonly List<Option> optionOverrides;
         public string ExpectedDownstreamPosition { get; set; } = null;
         public string ExpectedDownstreamGo { get; set; } = null;
         private string actualDownstreamPosition = "";
         private string actualDownstreamGo = "";
         private readonly object downstreamLockObject = new object();
-        private readonly BlockingCollection<string> commandQueue = new BlockingCollection<string>();
-        private Thread thread;
         public string name { get; }
         private readonly int id;
         public bool TimeKeeper { get; set; }
@@ -46,7 +48,7 @@ namespace tanuki_proxy
         private string[] multipvMoves;
         private readonly ManualResetEvent eventSearching = new ManualResetEvent(true);
 
-        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, Option[] optionOverrides, int id, bool mateEngine)
+        public Engine(Program program, string engineName, string fileName, string arguments, string workingDirectory, List<Option> optionOverrides, int id, bool mateEngine)
         {
             this.program = program;
             this.name = engineName;
@@ -57,12 +59,16 @@ namespace tanuki_proxy
             this.process.StartInfo.RedirectStandardInput = true;
             this.process.StartInfo.RedirectStandardOutput = true;
             this.process.StartInfo.RedirectStandardError = true;
-            this.process.OutputDataReceived += HandleStdout;
-            this.process.ErrorDataReceived += HandleStderr;
             this.optionOverrides = optionOverrides;
             this.id = id;
             this.TimeKeeper = false;
             this.MateEngine = mateEngine;
+            this.process.EnableRaisingEvents = true;
+            this.process.Exited += (sender, e) =>
+            {
+                Log("     [{0}] Exitted abnormally. e={1}", id, e.ToString());
+
+            };
         }
 
         public Engine(Program program, EngineOption opt, int id) : this(program, opt.engineName, opt.fileName, opt.arguments, opt.workingDirectory, opt.optionOverrides, id, opt.mateEngine)
@@ -71,67 +77,33 @@ namespace tanuki_proxy
 
         public void Start()
         {
-            thread = new Thread(ThreadRun);
-            thread.Start();
-        }
-
-        private void ThreadRun()
-        {
+            // プロセスを起動する。
             process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
 
-            while (!commandQueue.IsCompleted)
+            // 標準出力の読み込みを開始する。
+            // 非同期で標準出力を読むと、外部プロセスが行を出力してからC#プログラムに入力されるまでに
+            // 数秒遅延する場合がある。
+            // これを防ぐため、スレッド内で同期的に読み込むようにする。
+            readStandardOutputThread = new Thread(() =>
             {
-                string input = null;
-                try
+                string line;
+                while ((line = process.StandardOutput.ReadLine()) != null)
                 {
-                    input = commandQueue.Take();
+                    HandleStdout(line);
                 }
-                catch (InvalidOperationException)
-                {
-                    continue;
-                }
+            });
+            readStandardOutputThread.Start();
 
-                if (string.IsNullOrEmpty(input))
+            // 標準エラー出力の読み込みを開始する。
+            readStandardErrorThread = new Thread(() =>
+            {
+                string line;
+                while ((line = process.StandardError.ReadLine()) != null)
                 {
-                    continue;
+                    HandleStderr(line);
                 }
-
-                var command = Split(input);
-                if (command.Count == 0)
-                {
-                    continue;
-                }
-
-                // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
-                if (command.Contains("setoption"))
-                {
-                    HandleUpstreamSetoption(command);
-                }
-                else if (command.Contains("position"))
-                {
-                    HandleUpstreamPosition(command);
-                }
-                else if (command.Contains("go"))
-                {
-                    HandleUpstreamGo(command);
-                }
-                else if (command.Contains("ponderhit"))
-                {
-                    HandleUpstreamPonderhit(command);
-                }
-                else if (command.Contains("tt"))
-                {
-                    // ttコマンドは量が多いためログに出力しないようにする
-                    WriteLineAndFlush(process.StandardInput, Join(command));
-                }
-                else
-                {
-                    Log("  P> [{0}] {1}", id, Join(command));
-                    WriteLineAndFlush(process.StandardInput, Join(command));
-                }
-            }
+            });
+            readStandardErrorThread.Start();
         }
 
         public void Dispose()
@@ -146,10 +118,18 @@ namespace tanuki_proxy
             {
                 return;
             }
+            if (readStandardOutputThread != null)
+            {
+                readStandardOutputThread.Join();
+                readStandardOutputThread = null;
+            }
 
-            commandQueue.CompleteAdding();
-            thread.Join();
-            commandQueue.Dispose();
+            if (readStandardErrorThread != null)
+            {
+                readStandardErrorThread.Join();
+                readStandardErrorThread = null;
+            }
+
             process.Dispose();
 
             disposed = true;
@@ -161,9 +141,44 @@ namespace tanuki_proxy
         /// <param name="input"></param>
         public void Write(string input)
         {
-            // コマンドをBlockingCollectionに入れる。
-            // 入れられたコマンドは別のスレッドで処理される。
-            commandQueue.Add(input);
+            if (string.IsNullOrEmpty(input))
+            {
+                return;
+            }
+
+            var command = Split(input);
+            if (command.Count == 0)
+            {
+                return;
+            }
+
+            // 将棋所：USIプロトコルとは http://www.geocities.jp/shogidokoro/usi.html
+            if (command.Contains("setoption"))
+            {
+                HandleUpstreamSetoption(command);
+            }
+            else if (command.Contains("position"))
+            {
+                HandleUpstreamPosition(command);
+            }
+            else if (command.Contains("go"))
+            {
+                HandleUpstreamGo(command);
+            }
+            else if (command.Contains("ponderhit"))
+            {
+                HandleUpstreamPonderhit(command);
+            }
+            else if (command.Contains("tt"))
+            {
+                // ttコマンドは量が多いためログに出力しないようにする
+                WriteLineAndFlush(process.StandardInput, Join(command));
+            }
+            else
+            {
+                Log("  P> [{0}] {1}", id, Join(command));
+                WriteLineAndFlush(process.StandardInput, Join(command));
+            }
         }
 
         /// <summary>
@@ -236,24 +251,24 @@ namespace tanuki_proxy
         /// </summary>
         /// <param name="sender">出力を送ってきた思考エンジンのプロセス</param>
         /// <param name="e">思考エンジンの出力</param>
-        private void HandleStdout(object sender, DataReceivedEventArgs e)
+        private void HandleStdout(string line)
         {
-            if (string.IsNullOrEmpty(e.Data))
+            if (string.IsNullOrEmpty(line))
             {
                 return;
             }
 
-            var command = Split(e.Data);
+            var command = Split(line);
 
             if (!command.Contains("tt"))
             {
                 // ttコマンドは量が多いのでログに出力しないようにする
-                Log("  <D [{0}] {1}", id, e.Data);
+                Log("  <D [{0}] {1}", id, line);
             }
 
             if (command.Contains("tt"))
             {
-                program.WriteToOtherEngines(e.Data, this);
+                program.WriteToOtherEngines(line, this);
             }
             else if (command.Contains("readyok"))
             {
@@ -291,13 +306,13 @@ namespace tanuki_proxy
         /// </summary>
         /// <param name="sender">出力を送ってきた思考エンジンのプロセス</param>
         /// <param name="e">思考エンジンの出力</param>
-        private void HandleStderr(object sender, DataReceivedEventArgs e)
+        private void HandleStderr(string line)
         {
-            if (string.IsNullOrEmpty(e.Data))
+            if (string.IsNullOrEmpty(line))
             {
                 return;
             }
-            Log("  <D [{0}] {1}", id, e.Data);
+            Log("  <D [{0}] {1}", id, line);
         }
 
         private void HandleDownstreamReadyok(List<string> command)
@@ -387,35 +402,38 @@ namespace tanuki_proxy
                     return;
                 }
 
-                // Multi PV探索の結果を格納する
-                if (multipvIndex != -1)
+                // SearchWithMultiPv()の出力結果を保存する。
+                // Multi PV探索でタイムアウトした場合、SearchWithMultiPv()がmultipvMovesにnullを代入する。
+                // 処理中にタイムアウトすると、途中でnull参照を起こす可能性がある。
+                // これを避けるため、multipvMovesをローカルに保持しておく。
+                var localMultiPVMoves = multipvMoves;
+                if (localMultiPVMoves != null)
                 {
-                    //if (multipvMoves == null)
-                    //{
-                    //    Debugger.Launch();
-                    //}
-                    Debug.Assert(multipvMoves != null);
                     if (pvIndex + 1 == command.Count)
                     {
-                        // ここは通らないはず
+                        // pvが空の場合。おそらくここは通らない。
                         return;
                     }
 
-                    string move = command[pvIndex + 1];
-                    int multipv = int.Parse(command[multipvIndex + 1]);
-                    multipvMoves[multipv - 1] = move;
-                    return;
-                }
-                else if (multipvMoves != null && multipvMoves.Length == 1)
-                {
-                    // ノードが1個しかない場合の処理
-                    if (pvIndex + 1 < command.Count)
+                    if (multipvIndex != -1)
                     {
+                        // Multi PVで複数の指し手が出力された場合。
                         string move = command[pvIndex + 1];
-                        multipvMoves[0] = move;
+                        int multipv = int.Parse(command[multipvIndex + 1]);
+                        localMultiPVMoves[multipv - 1] = move;
+                        return;
+                    }
+                    else if (localMultiPVMoves.Length == 1)
+                    {
+                        // ノードが1個しかない場合の処理
+                        string move = command[pvIndex + 1];
+                        localMultiPVMoves[0] = move;
                         return;
                     }
                 }
+
+                // TODO(nodchip): Multi PV探索がタイムアウトした場合、ここより下が実行される。
+                //                問題ないかどうか調べる。
 
                 // Root局面のpv出力時に合算した値を出力できるように
                 // Root局面以外でもnpsの値を保持しておく
@@ -424,6 +442,13 @@ namespace tanuki_proxy
                 {
                     long nps = long.Parse(command[npsIndex + 1]);
                     Bestmove.nps = nps;
+                }
+
+                int nodesIndex = command.IndexOf("nodes");
+                if (nodesIndex != -1)
+                {
+                    long nodes = long.Parse(command[nodesIndex + 1]);
+                    Bestmove.nodes = nodes;
                 }
 
                 // Root局面の子局面を探索していた場合は投票しない
@@ -482,59 +507,62 @@ namespace tanuki_proxy
                     }
                 }
 
-                // Fail-low/Fail-highした探索結果は表示しない
                 lock (program.LastShowPvLockObject)
                 {
-                    // 深さ3未満のPVを出力するのは将棋所にmateの値を認識させるため
-                    if ((tempDepth < 3 || program.LastShowPv.AddMilliseconds(showPvSupressionMs) < DateTime.Now) &&
-                        !command.Contains("lowerbound") &&
-                        !command.Contains("upperbound") &&
-                        program.Depth < tempDepth)
+                    //// voteの表示
+                    //Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
+                    //foreach (var engine in program.engines)
+                    //{
+                    //    if (engine.Bestmove.move == null)
+                    //    {
+                    //        continue;
+                    //    }
+
+                    //    if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
+                    //    {
+                    //        bestmoveToCount.Add(engine.Bestmove.move, 0);
+                    //    }
+                    //    ++bestmoveToCount[engine.Bestmove.move];
+                    //}
+                    //List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
+                    //bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
+
+                    //string vote = "info string";
+                    //foreach (var p in bestmoveAndCount)
+                    //{
+                    //    vote += " ";
+                    //    vote += p.Key;
+                    //    vote += "=";
+                    //    vote += p.Value;
+                    //}
+                    //Log("<P   {0}", vote);
+                    //WriteLineAndFlush(Console.Out, vote);
+
+                    // info pvの表示
+                    var commandWithSum = new List<string>(command);
+
+                    long sumNps = program.engines
+                        .Select(x => x.Bestmove)
+                        .Sum(x => x.nps);
+                    int sumNpsIndex = commandWithSum.IndexOf("nps");
+                    if (sumNpsIndex != -1)
                     {
-                        //// voteの表示
-                        //Dictionary<string, int> bestmoveToCount = new Dictionary<string, int>();
-                        //foreach (var engine in program.engines)
-                        //{
-                        //    if (engine.Bestmove.move == null)
-                        //    {
-                        //        continue;
-                        //    }
-
-                        //    if (!bestmoveToCount.ContainsKey(engine.Bestmove.move))
-                        //    {
-                        //        bestmoveToCount.Add(engine.Bestmove.move, 0);
-                        //    }
-                        //    ++bestmoveToCount[engine.Bestmove.move];
-                        //}
-                        //List<KeyValuePair<string, int>> bestmoveAndCount = new List<KeyValuePair<string, int>>(bestmoveToCount);
-                        //bestmoveAndCount.Sort((KeyValuePair<string, int> lh, KeyValuePair<string, int> rh) => { return -(lh.Value - rh.Value); });
-
-                        //string vote = "info string";
-                        //foreach (var p in bestmoveAndCount)
-                        //{
-                        //    vote += " ";
-                        //    vote += p.Key;
-                        //    vote += "=";
-                        //    vote += p.Value;
-                        //}
-                        //Log("<P   {0}", vote);
-                        //WriteLineAndFlush(Console.Out, vote);
-
-                        // info pvの表示
-                        long sumNps = program.engines
-                            .Select(x => x.Bestmove)
-                            .Sum(x => x.nps);
-                        var commandWithNps = new List<string>(command);
-                        int sumNpsIndex = commandWithNps.IndexOf("nps");
-                        if (sumNpsIndex != -1)
-                        {
-                            commandWithNps[sumNpsIndex + 1] = sumNps.ToString();
-                        }
-                        Log("<P   {0}", Join(commandWithNps));
-                        WriteLineAndFlush(Console.Out, Join(commandWithNps));
-                        program.Depth = tempDepth;
-                        program.LastShowPv = DateTime.Now;
+                        commandWithSum[sumNpsIndex + 1] = sumNps.ToString();
                     }
+
+                    long sumNodes = program.engines
+                        .Select(x => x.Bestmove)
+                        .Sum(x => x.nodes);
+                    int sumNodesIndex = commandWithSum.IndexOf("nodes");
+                    if (sumNodesIndex != -1)
+                    {
+                        commandWithSum[sumNodesIndex + 1] = sumNodes.ToString();
+                    }
+
+                    Log("<P   {0}", Join(commandWithSum));
+                    WriteLineAndFlush(Console.Out, Join(commandWithSum));
+                    program.Depth = tempDepth;
+                    program.LastShowPv = DateTime.Now;
                 }
             }
         }
@@ -657,6 +685,7 @@ namespace tanuki_proxy
             // 現在の探索が終了するまで待機する
             eventSearching.WaitOne();
 
+            Write("setoption name USI_OwnBook value false");
             Write(string.Format("setoption name MultiPV value {0}", multiPv));
             multipvMoves = new string[multiPv];
 
@@ -667,11 +696,19 @@ namespace tanuki_proxy
             // multipv探索の結果を受け取らないまま進行してい舞う場合が考えられる
             eventMultipv.Reset();
 
-            Write("go byoyomi 100");
+            Write($"go byoyomi {multiPVSearchTimeMs}");
 
-            // multipv探索の結果が帰ってくるまで待機する
-            eventMultipv.WaitOne();
+            // multipv探索の結果が帰ってくるまで待機する。
+            // multiPVSearchTimeMsを大きく超えても出力が返ってこない場合がある。
+            // その場合、思考エンジンの処理全体が停止してしまう。
+            // これを避けるため、タイムアウトを設ける。
+            if (!eventMultipv.WaitOne(multiPVSearchTimeoutMs))
+            {
+                Log("     [{0}] Multi PV search timed out.", id);
+                WriteLineAndFlush(Console.Out, $"info string Multi PV search timed out. engineIndex={id}");
+            }
 
+            Write("setoption name USI_OwnBook value true");
             Write("setoption name MultiPV value 1");
 
             var result = multipvMoves;

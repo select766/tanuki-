@@ -1,10 +1,9 @@
-﻿#include "thread.h"
+﻿#include <algorithm> // For std::count
+
+#include "thread.h"
 #include "usi.h"
 
 ThreadPool Threads;		// Global object
-
-void* Thread::operator new(size_t s) { return aligned_malloc(s, alignof(Thread)); }
-void Thread::operator delete(void*p) noexcept { aligned_free(p); }
 
 Thread::Thread(size_t n) : idx(n) , stdThread(&Thread::idle_loop, this)
 {
@@ -29,21 +28,26 @@ void Thread::clear()
 {
 	counterMoves.fill(MOVE_NONE);
 	mainHistory.fill(0);
+	lowPlyHistory.fill(0);
 	captureHistory.fill(0);
 
 	// ここは、未初期化のときに[SQ_ZERO][NO_PIECE]を指すので、ここを-1で初期化しておくことによって、
 	// history > 0 を条件にすれば自ずと未初期化のときは除外されるようになる。
-	for (auto& to : continuationHistory)
+
+	for (bool inCheck : { false, true })
+		for (StatsType c : { NoCaptures, Captures })
+		{
+			for (auto& to : continuationHistory[inCheck][c])
 		for (auto& h : to)
 			h->fill(0);
-
-	continuationHistory[SQ_ZERO][NO_PIECE]->fill(Search::CounterMovePruneThreshold - 1);
+			continuationHistory[inCheck][c][NO_PIECE][0]->fill(Search::CounterMovePruneThreshold - 1);
+		}
 }
 
 // 待機していたスレッドを起こして探索を開始させる
 void Thread::start_searching()
 {
-	std::lock_guard<Mutex> lk(mutex);
+	std::lock_guard<std::mutex> lk(mutex);
 	searching = true;
 	cv.notify_one(); // idle_loop()で回っているスレッドを起こす。(次の処理をさせる)
 }
@@ -51,7 +55,7 @@ void Thread::start_searching()
 // 探索が終わるのを待機する。(searchingフラグがfalseになるのを待つ)
 void Thread::wait_for_search_finished()
 {
-	std::unique_lock<Mutex> lk(mutex);
+	std::unique_lock<std::mutex> lk(mutex);
 	cv.wait(lk, [&] { return !searching; });
 }
 
@@ -72,7 +76,7 @@ void Thread::idle_loop() {
 
 	while (true)
 	{
-		std::unique_lock<Mutex> lk(mutex);
+		std::unique_lock<std::mutex> lk(mutex);
 		searching = false;
 		cv.notify_one(); // 他のスレッドがこのスレッドを待機待ちしてるならそれを起こす
 		cv.wait(lk, [&] { return searching; });
@@ -105,11 +109,24 @@ void ThreadPool::set(size_t requested)
 		clear();
 
 		// Reallocate the hash with the new threadpool size
-		//TT.resize(Options["Hash"]);
+		//TT.resize(Options["USI_Hash"]);
 
 		// →　新しいthreadpoolのサイズで置換表用のメモリを確保しなおしたほうが
 		//  良いらしいのだが、大きなメモリの置換表だと確保に時間がかかるのでやりたくない。
+
+		// スレッド数に依存する探索パラメーターの初期化
+		// →　やねうら王ではそんなのないのでコメントアウト
+
+		// Init thread number dependent search params.
+		//Search::init();
 	}
+
+#if defined(EVAL_LEARN)
+	// 学習用の実行ファイルでは、スレッド数が変更になったときに各ThreadごとのTTに
+	// メモリを再割り当てする必要がある。
+	TT.init_tt_per_thread();
+#endif
+
 }
 
 // ThreadPool::clear()は、threadPoolのデータを初期値に設定する。
@@ -177,28 +194,42 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 		setupStates = std::move(states);
 
 	// Position::set()によってst->previosがクリアされるので事前にコピーして保存する。
+	// これは、rootStateの役割。これはスレッドごとに持っている。
 	// cf. Fix incorrect StateInfo : https://github.com/official-stockfish/Stockfish/commit/232c50fed0b80a0f39322a925575f760648ae0a5
-	StateInfo tmp = setupStates->back();
 
 	auto sfen = pos.sfen();
 	for (Thread* th : *this)
 	{
-		th->nodes = /* th->tbHits = */ th->nmpMinPly = 0;
-		th->rootDepth = th->completedDepth = DEPTH_ZERO;
-		th->rootMoves = rootMoves;
+		// th->nodes = th->tbHits = th->nmpMinPly = th->bestMoveChanges = 0;
+		// Stockfish12のこのコード、bestMoveChangesがatomic型なのでそこからint型に代入してることになってコンパイラが警告を出す。
+		// ↓のように書いたほうが良い。
+		th->nodes = th->bestMoveChanges = /* th->tbHits = */ th->nmpMinPly = 0;
 
-		// setupStatesを渡して、これをコピーしておかないと局面を遡れない。
-		th->rootPos.set(sfen, &setupStates->back(),th);
+		th->rootDepth = th->completedDepth = 0;
+		th->rootMoves = rootMoves;
+		th->rootPos.set(sfen, &th->rootState,th);
+		th->rootState = setupStates->back();
 	}
 
-#if defined(USE_FV_VAR)
-	// Position::set()によって、dirtyPieceはevalListに反映されていることになるのだが、
-	// 次にst->previousを復元してしまうと、その更新したことを示すフラグを潰してしまう。ここでフラグを立て直す。
-	tmp.dirtyPiece.updated_ = true;
-#endif
-
-	// Position::set()によってクリアされていた、st->previousを復元する。
-	setupStates->back() = tmp;
-
 	main()->start_searching();
+}
+
+
+// 探索を開始する(main thread以外)
+
+void ThreadPool::start_searching() {
+
+	for (Thread* th : *this)
+		if (th != front())
+			th->start_searching();
+}
+
+
+// main threadがそれ以外の探索threadの終了を待つ。
+
+void ThreadPool::wait_for_search_finished() const {
+
+	for (Thread* th : *this)
+		if (th != front())
+			th->wait_for_search_finished();
 }

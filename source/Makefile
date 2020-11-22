@@ -1,28 +1,98 @@
-# > Select YaneuraOu edition below.
 
-#YANEURAOU_EDITION = YANEURAOU_2018_OTAFUKU_ENGINE
+# === ビルドターゲット (build target) ===
+
+# normal     : 通常使用用
+# evallearn  : 教師局面からの学習用
+# tournament : 大会で使う用
+# gensfen    : 教師生成用     // 現状、非公開 (currently private)
+
+
+# === ビルドオプション (build options) ===
+
+# やねうら王の使いたいエディションを指定する (select YaneuraOu Edition)
+# YANEURAOU_ENGINE_NNUE       : NNUE型評価関数(halfKP256),標準NNUE型
+# YANEURAOU_ENGINE_NNUE_KP256 : NNUE型評価関数(KP256)
+# YANEURAOU_ENGINE_KPPT       : KPPT型評価関数
+# YANEURAOU_ENGINE_KPP_KKPT   : KPP_KKPT型評価関数
+# YANEURAOU_ENGINE_MATERIAL   : 駒得のみの評価関数
+# MATE_ENGINE                 : tanuki- 詰将棋エンジン
+# USER_ENGINE                 : USER定義エンジン
+
+YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_KP256
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_KPPT
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_KPP_KKPT
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIAL
 #YANEURAOU_EDITION = MATE_ENGINE
-YANEURAOU_EDITION = YANEURAOU_2018_TNK_ENGINE
+#YANEURAOU_EDITION = USER_ENGINE
+
+# ターゲットCPU (target cpu)
+
+# 利用できるCPU拡張命令を指定する。
+# AMDのRyzen(Zen/Zen2)はZEN1/ZEN2を選択するとBMI2命令が使わずに速くなる。(10%程度高速化)
+# ARM系ならOTHERを指定する。
+# 32bit環境用はNO_SSEを指定する。
+
+# TODO : AVX512、世代ごとにわける
+
+#TARGET_CPU = AVX512
+TARGET_CPU = AVX2
+#TARGET_CPU = SSE42
+#TARGET_CPU = SSE41
+#TARGET_CPU = SSSE3
+#TARGET_CPU = SSE2
+#TARGET_CPU = NO_SSE
+#TARGET_CPU = OTHER
+#TARGET_CPU = ZEN1
+#TARGET_CPU = ZEN2
+
+
+# デバッガーを使用するか (debugger)
+DEBUG = OFF
+#DEBUG = ON
 
 
 # clangでコンパイルしたほうがgccより数%速いっぽい。
 COMPILER = g++
-#COMPILER = clang++
+# COMPILER = clang++
 
-# 標準的なコンパイルオプション
-CFLAGS   = -std=c++14 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive -fopenmp
-WCFLAGS  =
+
+# エンジンの表示名 (engine displayname)
+# ("usi"コマンドに対して出力される)
+#ENGINE_NAME =
+
+
+# developing branch // 現状、非公開 (currently private)
+# dev : 開発中のbranchならdevと指定する (developing branch) : 
+# abe : abe
+#ENGINE_BRANCH = dev
+
+
+# 標準的なコンパイルオプション (standard compile options)
+CPPFLAGS   = -std=c++17 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
+WCPPFLAGS  =
 LDFLAGS  =
 LIBS     =
 INCLUDE  = # -I../include
 
-# clang用にCFLAGSなどを変更
+
+# === implementations ===
+
+# デバッガーを使わないなら、NDEBUGをdefineする。
+ifeq ($(DEBUG),OFF)
+	CPPFLAGS += -DNDEBUG
+endif
+
+# clang用にCPPFLAGSなどを変更
 ifeq ($(findstring clang++,$(COMPILER)),clang++)
 	# stdlib
-	CFLAGS += -stdlib=libstdc++
+	CPPFLAGS += -stdlib=libstdc++
+
+	# C++17のfilesystem
+	# LDFLAGS += -lstdc++fs
 
 	# 関数の引数が関数本体で使われていないときに警告出るのうざすぎるので抑制。
-	CFLAGS += -Wno-unused-parameter
+	CPPFLAGS += -Wno-unused-parameter
 
 	# static リンクを行う際に __cxa_guard_acquire __cxa_guard_release の生成を抑止
 	#   undefined reference to `__imp___cxa_guard_acquire'
@@ -30,72 +100,88 @@ ifeq ($(findstring clang++,$(COMPILER)),clang++)
 	# static 変数を初期化したかを pthread_mutex_t でロックを取って確認し、
 	# 最初の実行なら初期化するスレッドセーフなコードを生成するためのもの。
 	# → 本当に消してしまっても大丈夫か？
-	WCFLAGS += -fno-threadsafe-statics
+	WCPPFLAGS += -fno-threadsafe-statics
 
-	# msys2用のclangでは、OpenMP使えない？インスコ仕方がわからん。
+else
+	ifeq ($(findstring g++,$(COMPILER)),g++)
+		# mingw g++ で AVX512 向けビルドを行おうとするとエラーになる問題の回避
+		# https://stackoverflow.com/questions/43152633/invalid-register-for-seh-savexmm-in-cygwin
+		# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65782
+		WCPPFLAGS += -fno-asynchronous-unwind-tables
 
+		# C++17のfilesystem
+		# LDFLAGS += -lstdc++fs
+
+	endif
 endif
 
 ifeq ($(OS),Windows_NT)
-	CFLAGS += $(WCFLAGS)
+	CPPFLAGS += $(WCPPFLAGS)
 	LDFLAGS += -static -Wl,--stack,25000000
 	TARGET = YaneuraOu-by-gcc.exe
 else
-	CFLAGS += -D_LINUX
+	CPPFLAGS += -D_LINUX
 	TARGET = YaneuraOu-by-gcc
 endif
 
-# リンク時最適化。これをつけるとmsys2環境だとセグフォで落ちる。
-# 落ちない環境なら有効にしたほうが速い実行ファイルが生成されるはず。
-# CFLAGS += -flto
-
-# CFLAGSとLDFLAGSの両方で-fltoを指定する必要がある。
+# リンク時最適化。
+# CPPFLAGSとLDFLAGSの両方で-fltoを指定する必要がある。
 # cf. https://gcc.gnu.org/onlinedocs/gcc-6.3.0/gcc/Optimize-Options.html#Optimize-Options
 LTOFLAGS = -flto
 
 # wstringを使うためにこのシンボル定義が必要。
-CFLAGS  += -DUNICODE
+CPPFLAGS  += -DUNICODE
 
 # stripの指示。(実行ファイルのサイズを小さく)
 LDFLAGS += -Wl,-s
 
 # mingw64では-D_WIN64,-D_WIN32は環境に応じて自動で設定されるので指定すべきではない。
-# CFLAGS += -D_WIN64
+# CPPFLAGS += -D_WIN64
 
 # これを指定していると、各CPU向けの実行ファイルが生成されないので指定すべきではない。
-# CFLAGS   += -march=native
+# CPPFLAGS   += -march=native
 
 # デバッグ情報を付加
-# CFLAGS  += -g3 -ggdb
+# CPPFLAGS  += -g3 -ggdb
 
-# OpenMPを使うときにCFLAGSとして指定するオプション
+# OpenMPを使うときにCPPFLAGSとして指定するオプション
 # ※ 学習部ではOpenMpを用いるので、学習用のビルドではこのオプションを指定する。
 # clangでOPENMPを有効にしてビルドする方法については、解説.txtを参照のこと。
+
 
 ifeq ($(findstring g++,$(COMPILER)),g++)
 	OPENMP   = -fopenmp
 	OPENMP_LDFLAGS =
-	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
-		BLAS_LDFLAGS = -lopenblas
-		ifeq ($(MSYSTEM),MINGW64)
-			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
-		endif
-	endif
 endif
 ifeq ($(findstring clang++,$(COMPILER)),clang++)
-	OPENMP   = -fopenmp
-	OPENMP_LDFLAGS = -lomp
-	ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-		BLAS = -DUSE_BLAS -I/mingw64/include/OpenBLAS -I"C:\msys64\mingw64\include\OpenBLAS"
-		BLAS_LDFLAGS = -lopenblas
-		ifeq ($(MSYSTEM),MINGW64)
-			BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+	ifeq ($(MSYSTEM),MINGW64)
+		# MSYS2 MINGW64 env
+		# libgompを指定した場合、ビルドは通るがOpenMPは無効化される？
+		OPENMP = -fopenmp=libgomp
+		OPENMP_LDFLAGS =
+	else
+		ifeq ($(findstring w64-mingw32,$(COMPILER)),w64-mingw32)
+			# Ubuntu mingw-w64 clang++ env (experimental)
+			OPENMP = -fopenmp=libgomp
+			OPENMP_LDFLAGS =
+		else
+			# Other (normal clang++/libomp env)
+			OPENMP = -fopenmp
+			OPENMP_LDFLAGS = -lomp
 		endif
 	endif
 endif
 
-CFLAGS += -DNO_EXCEPTIONS
+# NNUE評価関数 学習バイナリ用 OpenBLAS
+ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
+	BLAS = -DUSE_BLAS
+	BLAS_LDFLAGS = -lopenblas
+	ifeq ($(MSYSTEM),MINGW64)
+		BLAS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+	endif
+endif
+
+CPPFLAGS += -DNO_EXCEPTIONS
 LDFLAGS += -lpthread
 LDFLAGS += -v
 
@@ -103,8 +189,10 @@ OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
 	OBJDIR = ..
 endif
+
 #SOURCES  = $(wildcard *.cpp)
-SOURCES  = main.cpp                                                            \
+SOURCES  = \
+	main.cpp                                                                   \
 	types.cpp                                                                  \
 	bitboard.cpp                                                               \
 	misc.cpp                                                                   \
@@ -116,30 +204,22 @@ SOURCES  = main.cpp                                                            \
 	tt.cpp                                                                     \
 	movepick.cpp                                                               \
 	timeman.cpp                                                                \
+	benchmark.cpp                                                              \
 	extra/book/apery_book.cpp                                                  \
 	extra/book/book.cpp                                                        \
 	extra/book/makebook2019.cpp                                                \
 	extra/bitop.cpp                                                            \
-	extra/entering_king_win.cpp                                                \
 	extra/long_effect.cpp                                                      \
 	extra/mate/mate1ply_with_effect.cpp                                        \
 	extra/mate/mate1ply_without_effect.cpp                                     \
 	extra/mate/mate_n_ply.cpp                                                  \
-	extra/benchmark.cpp                                                        \
 	extra/test_cmd.cpp                                                         \
-	extra/see.cpp                                                              \
 	extra/sfen_packer.cpp                                                      \
 	extra/kif_converter/kif_convert_tools.cpp                                  \
 	eval/evaluate_bona_piece.cpp                                               \
-	eval/kppt/evaluate_kppt.cpp                                                \
-	eval/kppt/evaluate_kppt_learner.cpp                                        \
-	eval/kpp_kkpt/evaluate_kpp_kkpt.cpp                                        \
-	eval/kpp_kkpt/evaluate_kpp_kkpt_learner.cpp                                \
 	eval/evaluate.cpp                                                          \
 	eval/evaluate_io.cpp                                                       \
 	eval/evaluate_mir_inv_tools.cpp                                            \
-	engine/user-engine/user-search.cpp                                         \
-	engine/2018-otafuku-engine/2018-otafuku-search.cpp                         \
 	learn/learner.cpp                                                          \
 	learn/learning_tools.cpp                                                   \
 	learn/multi_think.cpp                                                      \
@@ -148,96 +228,183 @@ SOURCES  = main.cpp                                                            \
 	tanuki_kifu_shuffler.cpp                                                   \
 	tanuki_progress_report.cpp                                                 \
 	tanuki_kifu_writer.cpp                                                     \
-	tanuki_kifu_reader.cpp
+	tanuki_kifu_reader.cpp                                                     \
+	tanuki_progress.cpp                                                        \
+	tanuki_analysis.cpp                                                        \
+	tanuki_filesystem.cpp
+
+ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
+	SOURCES += \
+		eval/kppt/evaluate_kppt.cpp                                            \
+		eval/kppt/evaluate_kppt_learner.cpp                                    \
+		engine/yaneuraou-engine/yaneuraou-search.cpp
+endif
+
+ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPP_KKPT)
+	SOURCES += \
+		eval/kppt/evaluate_kppt.cpp                                            \
+		eval/kpp_kkpt/evaluate_kpp_kkpt.cpp                                    \
+		eval/kpp_kkpt/evaluate_kpp_kkpt_learner.cpp                            \
+		engine/yaneuraou-engine/yaneuraou-search.cpp
+endif
+
+ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_MATERIAL)
+	SOURCES += \
+		engine/yaneuraou-engine/yaneuraou-search.cpp
+endif
+
+ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
+	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE)
+	else
+		CPPFLAGS += -DYANEURAOU_ENGINE_NNUE
+	endif
+	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_KP256)
+		CPPFLAGS += -DEVAL_NNUE_KP256
+	else
+		ifeq ($(NNUE_EVAL_ARCH),KP256)
+			CPPFLAGS += -DEVAL_NNUE_KP256
+		endif
+	endif
+	SOURCES += \
+		eval/nnue/evaluate_nnue.cpp                                            \
+		eval/nnue/evaluate_nnue_learner.cpp                                    \
+		eval/nnue/nnue_test_command.cpp                                        \
+		eval/nnue/features/k.cpp                                               \
+		eval/nnue/features/p.cpp                                               \
+		eval/nnue/features/half_kp.cpp                                         \
+		eval/nnue/features/half_relative_kp.cpp                                \
+		eval/nnue/features/half_kpe9.cpp                                       \
+		eval/nnue/features/pe9.cpp                                             \
+		engine/yaneuraou-engine/yaneuraou-search.cpp
+endif
 
 ifeq ($(YANEURAOU_EDITION),MATE_ENGINE)
 	SOURCES += engine/mate-engine/mate-search.cpp
 endif
 
-ifeq ($(YANEURAOU_EDITION),YANEURAOU_2018_TNK_ENGINE)
-	SOURCES += eval/nnue/evaluate_nnue.cpp                                     \
-	           eval/nnue/evaluate_nnue_learner.cpp                             \
-	           eval/nnue/nnue_test_command.cpp                                 \
-	           eval/nnue/features/k.cpp                                        \
-	           eval/nnue/features/p.cpp                                        \
-	           eval/nnue/features/half_kp.cpp                                  \
-	           eval/nnue/features/half_relative_kp.cpp
+ifeq ($(YANEURAOU_EDITION),USER_ENGINE)
+	SOURCES += engine/user-engine/user-search.cpp
 endif
+
+ifneq ($(ENGINE_NAME),)
+	CPPFLAGS += -DENGINE_NAME_FROM_MAKEFILE=$(ENGINE_NAME)
+endif
+
+# 開発用branch
+ifeq ($(findstring dev,$(ENGINE_BRANCH)),dev)
+	# SuperSort使ってみよう。
+	CPPFLAGS += -DDEV_BRANCH
+	SOURCES += extra/super_sort.cpp
+endif
+
+# abe
+ifeq ($(findstring abe,$(ENGINE_BRANCH)),abe)
+	SOURCES += extra/super_sort.cpp
+	CPPFLAGS += -DPV_OUTPUT_DRAW_ONLY
+endif
+
+
+# CPU判別
+
+# AMD Ryzenシリーズ
+
+# ZEN1/ZEN2はBMI2命令を使わずPEXTはSoftware Emulationしたほうが速い。
+# さらに、そのコードを使う代わりにMagic Bitboardを使うことで高速化を図る。
+# (USE_BMI2が定義されていない時、自動的にmagic bitboardが用いられる)
+
+ifeq ($(TARGET_CPU),ZEN1)
+	CPPFLAGS += -DUSE_AVX2 -mbmi -mno-bmi2 -mavx2 -march=znver1
+
+else ifeq ($(TARGET_CPU),ZEN2)
+	CPPFLAGS += -DUSE_AVX2 -mbmi -mno-bmi2 -mavx2 -march=znver2
+
+# それ以外は、AVX512,AVX2,SSE4.2,SSE4.1,SSE2のように利用できるCPU拡張命令で振り分ける。
+# AVX2より上位のCPUなら普通は(Intel系なら)BMI2命令を使ったほうが速いので"USE_BMI2"を指定しておく。
+
+else ifeq ($(TARGET_CPU),AVX512)
+	# skylake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -march=skylake-avx512
+	# cascadelake : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_AVX512VNNI -march=cascadelake
+	# icelake     : -DUSE_AVX512 -DUSE_AVX512VLBWDQ -DUSE_AVX512VNNI -DUSE_AVX512VBMI -DUSE_AVX512IFMA -USE_GFNI -march=icelake-client
+	CPPFLAGS += -DUSE_AVX512 -DUSE_BMI2 -DUSE_AVX512VLBWDQ -march=skylake-avx512
+
+else ifeq ($(TARGET_CPU),AVX2)
+	CPPFLAGS += -DUSE_AVX2 -DUSE_BMI2 -mbmi -mbmi2 -mavx2 -march=corei7-avx
+
+else ifeq ($(TARGET_CPU),SSE42)
+	CPPFLAGS += -DUSE_SSE42 -msse4.2 -march=corei7
+
+else ifeq ($(TARGET_CPU),SSE41)
+	CPPFLAGS += -DUSE_SSE41 -msse4.1 -march=core2
+
+else ifeq ($(TARGET_CPU),SSSE3)
+	CPPFLAGS += -DUSE_SSSE3 -msse3 -march=core2
+
+else ifeq ($(TARGET_CPU),SSE2)
+	CPPFLAGS += -DUSE_SSE2 -msse2 -march=core2
+
+else ifeq ($(TARGET_CPU),NO_SSE)
+	# 32bit用。-m32は、MSYS2 MinGW-64だと無視されるので、
+	# MinGW-64の32bit環境用でコンパイルする必要がある。
+	CPPFLAGS += -DNO_SSE -m32 -march=pentium3
+
+else ifeq ($(TARGET_CPU),OTHER)
+	CPPFLAGS += -DNO_SSE
+
+endif
+
+
+CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION)
 
 OBJECTS  = $(addprefix $(OBJDIR)/, $(SOURCES:.cpp=.o))
 DEPENDS  = $(OBJECTS:.o=.d)
 
+all: clean $(TARGET)
+.PHONY : all normal evallearn tournament prof profgen profuse pgo clean
+
 $(TARGET): $(OBJECTS) $(LIBS)
-	$(COMPILER) -o $@ $^ $(LDFLAGS) $(CFLAGS)
+	$(COMPILER) -o $@ $^ $(LDFLAGS) $(CPPFLAGS)
 
 $(OBJDIR)/%.o: %.cpp
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	$(COMPILER) $(CFLAGS) $(INCLUDE) -o $@ -c $<
+	$(COMPILER) $(CPPFLAGS) $(INCLUDE) -o $@ -c $<
 
-all: clean $(TARGET)
+# https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 
-# 学習用バイナリのときは、openmpを有効にする。
+
+# ビルドターゲット
+
+# 通常使用。
+normal:
+	$(MAKE) CPPFLAGS='$(CPPFLAGS)' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
+
+# 学習用。openmp , openblasなどを有効にする。
 evallearn:
-	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
-evallearn-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE42 -msse4.2 -march=corei7' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(OPENMP) $(BLAS) -DEVAL_LEARN' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
-# 教師棋譜生成用
-gensfen:
-	$(MAKE) CFLAGS='$(CFLAGS) $(OPENMP) $(BLAS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -DGENSFEN2019 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
+# トーナメント用
 tournament:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -DFOR_TOURNAMENT -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-tournament-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE42 -msse4.2 -DFOR_TOURNAMENT -march=corei7' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) -DFOR_TOURNAMENT' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
-avx2:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_AVX2 -mbmi -mbmi2 -mavx2 -march=corei7-avx' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
+# 教師棋譜生成用(開発用なので非公開) // currently private
+gensfen:
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(OPENMP) $(BLAS) -DEVAL_LEARN -DGENSFEN2019' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE42 -msse4.2 -march=corei7' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
-sse41:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE41 -msse4.1 -march=core2' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
-sse2:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DUSE_SSE2 -msse2 -march=core2' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
-# 32bit用。-m32は、MSYS2 MinGW-64だと無視されるので、
-# MinGW-64の32bit環境用でコンパイルする必要がある。
-nosse:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DNO_SSE -m32 -march=pentium3' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
-# ARMなどのCPU
-other:
-	$(MAKE) CFLAGS='$(CFLAGS) -DNDEBUG -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DNO_SSE' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
 
 #　とりあえずPGOはAVX2とSSE4.2専用
 prof:
-	$(MAKE) CFLAGS='$(CFLAGS) -pg' avx2
-prof-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) -pg' sse42
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) -pg' tournament
 
 profgen:
-	$(MAKE) CFLAGS='$(CFLAGS) -fprofile-generate -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-generate -lgcov' avx2
-profgen-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) -fprofile-generate -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-generate -lgcov' sse42
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) -fprofile-generate -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-generate -lgcov'
 
 profuse:
-	$(MAKE) CFLAGS='$(CFLAGS) -fprofile-use -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-use -lgcov $(LTOFLAGS)' avx2
-profuse-sse42:
-	$(MAKE) CFLAGS='$(CFLAGS) -fprofile-use -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-use -lgcov $(LTOFLAGS)' sse42
+	$(MAKE) CPPFLAGS='$(CPPFLAGS) -fprofile-use -lgcov' LDFLAGS='$(LDFLAGS) -fprofile-use -lgcov $(LTOFLAGS)'
 
 pgo:
 	$(MAKE) profgen
 	@./$(TARGET) EvalDir ../build/eval , bench , quit
 	@touch $(SOURCES)
 	$(MAKE) profuse
-pgo-sse42:
-	$(MAKE) profgen-sse42
-	@./$(TARGET) EvalDir ../build/eval , bench , quit
-	@touch $(SOURCES)
-	$(MAKE) profuse-sse42
 
 clean:
 	rm -f $(OBJECTS) $(DEPENDS) $(TARGET) ${OBJECTS:.o=.gcda}

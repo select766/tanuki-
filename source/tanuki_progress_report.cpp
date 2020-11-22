@@ -3,6 +3,7 @@
 
 #ifdef EVAL_LEARN
 
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 
@@ -44,19 +45,34 @@ void Tanuki::ProgressReport::Show(int64_t current_data) {
 		static_cast<time_t>(current_time + (total_data_ - current_data) * time_per_data);
 	struct tm current_tm = *std::localtime(&current_time);
 	struct tm expected_tm = *std::localtime(&expected_time);
+
+	data_per_time_ = exponential_moving_averaged_data_ / exponential_moving_averaged_time_;
+	max_data_per_time_ = std::max(max_data_per_time_, data_per_time_);
+	has_data_per_time_ = true;
+
 	std::printf(
 		"%lld / %lld\n"
 		"        elapsed time = %02d:%02d:%02d\n"
 		"   current date time = %04d-%02d-%02d %02d:%02d:%02d\n"
-		"    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n",
+		"    finish date time = %04d-%02d-%02d %02d:%02d:%02d\n"
+		"               speed = %.2f (data/sec)\n"
+		"           max speed = %.2f (data/sec)\n",
 		current_data, total_data_,
 		hour, minute, second,
 		current_tm.tm_year + 1900, current_tm.tm_mon + 1, current_tm.tm_mday, current_tm.tm_hour, current_tm.tm_min, current_tm.tm_sec,
-		expected_tm.tm_year + 1900, expected_tm.tm_mon + 1, expected_tm.tm_mday, expected_tm.tm_hour, expected_tm.tm_min, expected_tm.tm_sec);
+		expected_tm.tm_year + 1900, expected_tm.tm_mon + 1, expected_tm.tm_mday, expected_tm.tm_hour, expected_tm.tm_min, expected_tm.tm_sec,
+		data_per_time_,
+		max_data_per_time_);
 	std::fflush(stdout);
 
 	previous_data_ = current_data;
 	previous_time_ = current_time;
+}
+
+void Tanuki::ProgressReport::Reset() {
+	exponential_moving_averaged_data_ = 0.0;
+	exponential_moving_averaged_time_ = 0.0;
+	has_data_per_time_ = false;
 }
 
 #endif

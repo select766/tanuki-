@@ -40,6 +40,7 @@ namespace {
 		GameResultDraw = 0,
 	};
 
+	constexpr char* kOptionKifuDir = "KifuDir";
 	constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
 	constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
 	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
@@ -47,6 +48,7 @@ namespace {
 	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
 	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
 	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
+	constexpr char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -62,6 +64,8 @@ namespace {
 		std::string book_file_name = Options[kOptionGeneratorStartposFileName];
 		std::ifstream fs_book;
 		fs_book.open(book_file_name);
+
+		int start_position_max_play = Options[kOptionGeneratorStartPositionMaxPlay];
 
 		if (!fs_book.is_open()) {
 			sync_cout << "Error! : can't read " << book_file_name << sync_endl;
@@ -81,7 +85,7 @@ namespace {
 			std::getline(fs_book, line);
 			std::istringstream is(line);
 			std::string token;
-			for (;;) {
+			while (pos.game_ply() <= start_position_max_play) {
 				if (!(is >> token)) {
 					break;
 				}
@@ -122,6 +126,7 @@ namespace {
 }
 
 void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
+	o[kOptionKifuDir] << Option("");
 	o[kOptionGeneratorNumPositions] << Option("10000000000");
 	o[kOptionGeneratorSearchDepth] << Option(8, 1, MAX_PLY);
 	o[kOptionGeneratorKifuTag] << Option("default_tag");
@@ -129,6 +134,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionGeneratorMeasureDepth] << Option(false);
+	o[kOptionGeneratorStartPositionMaxPlay] << Option(320, 1, 320);
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
@@ -148,14 +154,14 @@ namespace {
 		if (mt() & 1) {
 			root_moves.erase(std::remove_if(root_moves.begin(), root_moves.end(),
 				[&pos](const auto& root_move) {
-				Move move = root_move.pv.front();
-				if (is_drop(move)) {
-					return true;
-				}
-				Square sq = from_sq(move);
-				return pos.king_square(BLACK) != sq &&
-					pos.king_square(WHITE) != sq;
-			}),
+					Move move = root_move.pv.front();
+					if (is_drop(move)) {
+						return true;
+					}
+					Square sq = from_sq(move);
+					return pos.king_square(BLACK) != sq &&
+						pos.king_square(WHITE) != sq;
+				}),
 				root_moves.end());
 		}
 
@@ -178,9 +184,11 @@ void Tanuki::GenerateKifu() {
 		return;
 	}
 
-	omp_set_num_threads((int)Options["Threads"]);
+	int num_threads = (int)Options["Threads"];
+	omp_set_num_threads(num_threads);
 
-	Eval::load_eval();
+	// ここでEval::load_eval()を呼ぶと、Large Pageを使用している場合にメモリの確保に失敗し、クラッシュする。
+	//Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
 	_mkdir(kifu_directory.c_str());
@@ -206,7 +214,6 @@ void Tanuki::GenerateKifu() {
 	limits.depth = MAX_PLY;
 	limits.silent = true;
 	limits.enteringKingRule = EKR_27_POINT;
-	limits.nodes_per_thread = optimum_nodes_searched;
 	Search::Limits = limits;
 
 	// 何手目 -> 探索深さ
@@ -219,15 +226,19 @@ void Tanuki::GenerateKifu() {
 	// スレッド間で共有する
 	std::atomic_int64_t global_position_index;
 	global_position_index = 0;
-	ProgressReport progress_report(num_positions, 10 * 60);
+	ProgressReport progress_report(num_positions, 60 * 60);
+	std::mutex mutex_game_play_to_depths;
+	std::atomic<bool> need_wait = false;
+
 #pragma omp parallel
 	{
 		int thread_index = ::omp_get_thread_num();
 		WinProcGroup::bindThisThread(thread_index);
 		char output_file_path[1024];
-		std::sprintf(output_file_path, "%s/kifu.%s.%d.%I64d.%03d.%I64d.bin", kifu_directory.c_str(),
-			output_file_name_tag.c_str(), search_depth, num_positions, thread_index,
-			start_time);
+		std::sprintf(output_file_path,
+			"%s/kifu.tag=%s.depth=%d.num_positions=%I64d.start_time=%I64d.thread_index=%03d.bin",
+			kifu_directory.c_str(), output_file_name_tag.c_str(), search_depth, num_positions,
+			start_time, thread_index);
 		// 各スレッドに持たせる
 		std::unique_ptr<KifuWriter> kifu_writer =
 			std::make_unique<KifuWriter>(output_file_path);
@@ -246,7 +257,7 @@ void Tanuki::GenerateKifu() {
 			Value last_value;
 			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
 				pos.DeclarationWin() == MOVE_NONE) {
-				Learner::search(pos, search_depth);
+				Learner::search(pos, search_depth, 1, optimum_nodes_searched);
 
 				const auto& root_moves = pos.this_thread()->rootMoves;
 				const auto& root_move = root_moves[0];
@@ -287,16 +298,15 @@ void Tanuki::GenerateKifu() {
 				// 何らかの形で勝ちが決まっている局面は
 				// 探索深さが極端に深くなるため除外する
 				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
-#pragma omp critical
-					{
-						game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
-					}
+					std::lock_guard<std::mutex> lock(mutex_game_play_to_depths);
+					game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
 				}
 			}
 
 			int game_result = GameResultDraw;
 			Color win;
 			RepetitionState repetition_state = pos.is_repetition(0);
+			u8 entering_king = 0;
 			if (pos.is_mated()) {
 				// 負け
 				// 詰まされた
@@ -308,6 +318,7 @@ void Tanuki::GenerateKifu() {
 				// 入玉勝利
 				// 最後の局面は相手局面なので負け
 				game_result = GameResultLose;
+				entering_king = 1;
 			}
 			else if (last_value > value_threshold) {
 				// 勝ち
@@ -325,6 +336,7 @@ void Tanuki::GenerateKifu() {
 
 			for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
 				rit->game_result = game_result;
+				rit->entering_king = entering_king;
 				game_result = -game_result;
 			}
 
@@ -340,6 +352,31 @@ void Tanuki::GenerateKifu() {
 			}
 
 			progress_report.Show(global_position_index += records.size());
+
+			need_wait = need_wait ||
+				(progress_report.HasDataPerTime() &&
+					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
+
+			if (need_wait) {
+				// 処理速度が低下してきている。
+				// 全てのスレッドを待機する。
+#pragma omp barrier
+
+				// マスタースレッドでしばらく待機する。
+#pragma omp master
+				{
+					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
+						progress_report.GetDataPerTime() << " GetMaxDataPerTime()=" <<
+						progress_report.GetMaxDataPerTime() << sync_endl;
+
+					std::this_thread::sleep_for(std::chrono::minutes(10));
+					progress_report.Reset();
+					need_wait = false;
+				}
+
+				// マスタースレッドの待機が終わるまで、再度全てのスレッドを待機する。
+#pragma omp barrier
+			}
 		}
 
 		// 必要局面数生成したら全スレッドの探索を停止する
@@ -377,7 +414,7 @@ void Tanuki::GenerateKifu() {
 }
 
 void Tanuki::ConvertSfenToLearningData() {
-	Eval::load_eval();
+	//Eval::load_eval();
 
 	omp_set_num_threads((int)Options["Threads"]);
 

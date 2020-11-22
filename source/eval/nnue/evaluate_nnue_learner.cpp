@@ -36,7 +36,7 @@ namespace {
 std::vector<Example> examples;
 
 // examplesの排他制御をするMutex
-Mutex examples_mutex;
+std::mutex examples_mutex;
 
 // ミニバッチのサンプル数
 u64 batch_size;
@@ -49,6 +49,11 @@ std::shared_ptr<Trainer<Network>> trainer;
 
 // 学習率のスケール
 double global_learning_rate_scale;
+
+// L2正規化パラメーター
+// 0.0 < l2_regularization_parameter
+// 大きいほど強く働く
+double l2_regularization_parameter;
 
 // 学習率のスケールを取得する
 double GetGlobalLearningRateScale() {
@@ -65,9 +70,15 @@ void SendMessages(std::vector<Message> messages) {
 
 }  // namespace
 
+// L2正規化パラメーターを返す
+double GetL2RegularizationParameter() {
+    return l2_regularization_parameter;
+}
+
 // 学習の初期化を行う
 void InitializeTraining(double eta1, u64 eta1_epoch,
-                        double eta2, u64 eta2_epoch, double eta3) {
+                        double eta2, u64 eta2_epoch, double eta3,
+                        double l2_regularization) {
   std::cout << "Initializing NN training for "
             << GetArchitectureString() << std::endl;
 
@@ -80,6 +91,7 @@ void InitializeTraining(double eta1, u64 eta1_epoch,
   }
 
   global_learning_rate_scale = 1.0;
+  l2_regularization_parameter = l2_regularization;
   EvalLearningTools::Weight::init_eta(eta1, eta2, eta3, eta1_epoch, eta2_epoch);
 }
 
@@ -159,7 +171,7 @@ void AddExample(Position& pos, Color rootColor,
     }
   }
 
-  std::lock_guard<Mutex> lock(examples_mutex);
+  std::lock_guard<std::mutex> lock(examples_mutex);
   examples.push_back(std::move(example));
 }
 
@@ -171,7 +183,7 @@ void UpdateParameters(u64 epoch) {
   const auto learning_rate = static_cast<LearnFloatType>(
       get_eta() / batch_size);
 
-  std::lock_guard<Mutex> lock(examples_mutex);
+  std::lock_guard<std::mutex> lock(examples_mutex);
   std::shuffle(examples.begin(), examples.end(), rng);
   while (examples.size() >= batch_size) {
     std::vector<Example> batch(examples.end() - batch_size, examples.end());
@@ -205,10 +217,10 @@ void save_eval(std::string dir_name) {
   auto eval_dir = Path::Combine(Options["EvalSaveDir"], dir_name);
   std::cout << "save_eval() start. folder = " << eval_dir << std::endl;
 
-  // すでにこのフォルダがあるならmkdir()に失敗するが、
+  // すでにこのフォルダがあるならCreateFolder()に失敗するが、
   // 別にそれは構わない。なければ作って欲しいだけ。
   // また、EvalSaveDirまでのフォルダは掘ってあるものとする。
-  MKDIR(eval_dir);
+  Directory::CreateFolder(eval_dir);
 
   if (Options["SkipLoadingEval"] && NNUE::trainer) {
     NNUE::SendMessages({{"clear_unobserved_feature_weights"}});
@@ -217,9 +229,14 @@ void save_eval(std::string dir_name) {
   const std::string file_name = Path::Combine(eval_dir, NNUE::kFileName);
   std::ofstream stream(file_name, std::ios::binary);
   const bool result = NNUE::WriteParameters(stream);
-  ASSERT(result);
 
-  std::cout << "save_eval() finished. folder = " << eval_dir << std::endl;
+  if (!result)
+  {
+      std::cout << "Error!! : save_eval() failed." << std::endl;
+      Tools::exit();
+  }
+
+  std::cout << "save_eval() finished." << std::endl;
 }
 
 // 現在のetaを取得する

@@ -54,7 +54,7 @@ namespace {
 
 	// 敵玉8近傍の利きに関係する自駒の候補のbitboardを返す。ここになければ玉周辺に利きをつけない。
 	// pt = PAWN～HDK
-	inline Bitboard check_around_bb(Color us, Piece pt, Square sq_king)
+	inline Bitboard check_around_bb(Color us, PieceType pt, Square sq_king)
 	{
 		return CHECK_AROUND_BB[sq_king][pt - 1][us];
 	}
@@ -204,7 +204,7 @@ namespace {
 				}
 
 
-		for (Piece p = PAWN; p <= KING; ++p)
+		for (PieceType p = PAWN; p <= KING; ++p)
 			for (auto sq : SQ)
 				for (auto c : COLOR)
 				{
@@ -694,13 +694,14 @@ Move is_mate_in_1ply_imp(const Position& pos)
 {
 	ASSERT_LV3(!pos.checkers());
 
-	Bitboard dcCandidates = pos.discovered_check_candidates();
-
 	Color them = ~Us;
 	Square sq_king = pos.king_square(them);
 
-	// 王側のpinされている駒の列挙(王側は、この駒を動かすと素抜きに遭う)
-	Bitboard pinned = pos.pinned_pieces(them);
+	// 移動させると(相手側＝非手番側)の玉に対して空き王手となる候補の(手番側)駒のbitboard。
+	Bitboard dcCandidates = pos.blockers_for_king(them) & pos.pieces(Us);
+
+	// 相手玉側のpinされている駒の列挙(相手玉側は、この駒を動かすと素抜きに遭う)
+	Bitboard pinned = pos.blockers_for_king(them) & pos.pieces(them);
 
 	Square from, to;
 
@@ -863,7 +864,7 @@ SILVER_DROP_END:;
 	Bitboard bb_check;
 
 	// 自分のpin駒
-	Bitboard our_pinned = pos.pinned_pieces(Us);
+	Bitboard our_pinned = pos.blockers_for_king(Us) & pos.pieces(Us);
 
 	// 自玉
 	Square our_king = pos.king_square(Us);
@@ -1188,7 +1189,7 @@ SILVER_DROP_END:;
 			if (type_of(pos.piece_on(to)) == PAWN && file_of(to) == file_of(one) && hand_count(themHand, PAWN) >= 1) continue;
 
 			auto dr = directions_of(sq_king, one);
-			Piece pt;
+			PieceType pt;
 			bool canLanceAttack = false;
 			if (dr & DIRECTIONS_DIAG)
 			{
@@ -1586,7 +1587,7 @@ DC_CHECK:;
 		while (bb)
 		{
 			from = bb.pop();
-			Piece pt = type_of(pos.piece_on(from));
+			PieceType pt = type_of(pos.piece_on(from));
 			switch (pt)
 			{
 				// 背後にいる駒は角が普通で、pinされているのは歩で成りとか、飛車で両王手とか、そんなのが
@@ -1858,8 +1859,8 @@ DC_CHECK:;
 				atk = around24_bb(sq_king) & bb_move; // 別にどこでも良いものとする
 			}
 
-			Piece pt = type_of(pos.piece_on(from));
-			switch ((int)pt)
+			PieceType pt = type_of(pos.piece_on(from));
+			switch ((int)pt) // intにcastしとかないとhandleしてない値に対して警告がでる。
 			{
 			case PAWN:
 			case LANCE:

@@ -25,6 +25,10 @@ namespace Search {
 		Value staticEval;			// 評価関数を呼び出して得た値。NULL MOVEのときに親nodeでの評価値が欲しいので保存しておく。
 		int statScore;				// 一度計算したhistoryの合計値をcacheしておくのに用いる。
 		int moveCount;				// このnodeでdo_move()した生成した何手目の指し手か。(1ならおそらく置換表の指し手だろう)
+
+		bool inCheck;				// この局面で王手がかかっていたかのフラグ
+		bool ttPv;					// 置換表にPV nodeで調べた値が格納されていたか(これは価値が高い)
+		bool ttHit;					// 置換表にhitしたかのフラグ
 	};
 
 	// root(探索開始局面)での指し手として使われる。それぞれのroot moveに対して、
@@ -61,6 +65,10 @@ namespace Search {
 		// このスレッドがrootから最大、何手目まで探索したか(選択深さの最大)
 		int selDepth = 0;
 
+		// チェスの定跡絡みの変数。将棋では未使用。
+		// int tbRank = 0;
+		// Value tbScore;
+
 		// この指し手で進めたときのpv
 		std::vector<Move> pv;
 	};
@@ -76,7 +84,6 @@ namespace Search {
 			time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = npmsec = movetime = TimePoint(0);
 			depth = mate = perft = infinite = 0;
 			nodes = 0;
-			nodes_per_thread = 0;
 
 			// やねうら王で、将棋用に追加したメンバーの初期化。
 
@@ -105,6 +112,7 @@ namespace Search {
 		// time[]   : 残り時間(ms換算で)
 		// inc[]    : 1手ごとに増加する時間(フィッシャールール)
 		// npmsec   : 探索node数を思考経過時間の代わりに用いるモードであるかのフラグ(from UCI)
+		// 　　→　将棋と相性がよくないのでこの機能をサポートしないことにする。
 		// movetime : 思考時間固定(0以外が指定してあるなら) : 単位は[ms]
 		TimePoint time[COLOR_NB] , inc[COLOR_NB] , npmsec , movetime;
 
@@ -158,9 +166,9 @@ namespace Search {
 		// 全合法手を生成するのか
 		bool generate_all_legal_moves;
 #endif
-
-        // スレッド毎の探索ノード数
-        uint64_t nodes_per_thread;
+#if defined(MATE_ENGINE)
+		std::vector<Move16> pv_check;
+#endif
 	};
 
 	extern LimitsType Limits;

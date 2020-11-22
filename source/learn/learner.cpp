@@ -54,18 +54,10 @@
 #include <iomanip>
 #include <list>
 #include <cmath>	// std::exp(),std::pow(),std::log()
+#include <cstring>	// memcpy()
 
 #if defined (_OPENMP)
 #include <omp.h>
-#endif
-
-#if defined(_MSC_VER)
-// C++のfilesystemは、C++17以降か、MSVCでないと使えないようだ。
-// windows.hを使うようにしたが、msys2のg++だとうまくフォルダ内のファイルが取得できない。
-// 仕方ないのでdirent.hを用いる。
-#include <filesystem>
-#elif defined(__GNUC__)
-#include <dirent.h>
 #endif
 
 #include "../misc.h"
@@ -77,8 +69,13 @@
 
 #if defined(EVAL_NNUE)
 #include "../eval/nnue/evaluate_nnue_learner.h"
+#include "../tanuki_progress.h"
 #include <shared_mutex>
 #endif
+
+bool use_draw_in_training=false;
+bool use_draw_in_validation=false;
+bool use_hash_in_training=true;
 
 using namespace std;
 
@@ -167,7 +164,7 @@ struct SfenWriter
 			// sfen_buffers_poolに積んでおけばあとはworkerがよきに計らってくれる。
 
 			// sfen_buffers_poolの内容を変更するときはmutexのlockが必要。
-			std::unique_lock<Mutex> lk(mutex);
+			std::unique_lock<std::mutex> lk(mutex);
 			sfen_buffers_pool.push_back(buf);
 
 			buf = nullptr;
@@ -178,7 +175,7 @@ struct SfenWriter
 	// 自分のスレッド用のバッファに残っている分をファイルに書き出すためのバッファに移動させる。
 	void finalize(size_t thread_id)
 	{
-		std::unique_lock<Mutex> lk(mutex);
+		std::unique_lock<std::mutex> lk(mutex);
 
 		auto& buf = sfen_buffers[thread_id];
 
@@ -201,7 +198,7 @@ struct SfenWriter
 		auto output_status = [&]()
 		{
 			// 現在時刻も出力
-			sync_cout << endl << sfen_write_count << " sfens , at " << now_string() << sync_endl;
+			sync_cout << endl << sfen_write_count << " sfens , at " << Tools::now_string() << sync_endl;
 
 			// flush()はこのタイミングで十分。
 			fs.flush();
@@ -211,7 +208,7 @@ struct SfenWriter
 		{
 			vector<PSVector*> buffers;
 			{
-				std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 
 				// まるごとコピー
 				buffers = sfen_buffers_pool;
@@ -220,7 +217,7 @@ struct SfenWriter
 
 			// 何も取得しなかったならsleep()
 			if (!buffers.size())
-				sleep(100);
+				Tools::sleep(100);
 			else
 			{
 				for (auto ptr : buffers)
@@ -296,7 +293,7 @@ private:
 	std::vector<PSVector*> sfen_buffers_pool;
 
 	// sfen_buffers_poolにアクセスするときに必要なmutex
-	Mutex mutex;
+	std::mutex mutex;
 
 	// 書きだした局面の数
 	u64 sfen_write_count = 0;
@@ -369,7 +366,7 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
 	const int MAX_PLY2 = write_maxply;
 
 	// StateInfoを最大手数分 + SearchのPVでleafにまで進めるbuffer
-	std::vector<StateInfo,AlignedAllocator<StateInfo>> states(MAX_PLY2 + MAX_PLY /* == search_depth + α */);
+	std::vector<StateInfo> states((size_t)MAX_PLY2 + MAX_PLY /* == search_depth + α */);
 	StateInfo si;
 
 	// 今回の指し手。この指し手で局面を進める。
@@ -565,7 +562,7 @@ void MultiThinkGenSfen::thread_worker(size_t thread_id)
 
 				s8 is_win = 0;
 				bool game_end = false;
-				auto draw_type = pos.is_repetition(0);
+				auto draw_type = pos.is_repetition();
 				switch (draw_type)
 				{
 				case REPETITION_WIN      : is_win =  1; game_end = true; break;
@@ -1128,7 +1125,8 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 
 // 学習時の交差エントロピーの計算
 // elmo式の勝敗項と勝率項との個別の交差エントロピーが引数であるcross_entropy_evalとcross_entropy_winに返る。
-void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv,
+	// 進行度による学習率の調整についても考慮する。
+	void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv, double weight,
 	double& cross_entropy_eval, double& cross_entropy_win, double& cross_entropy,
 	double& entropy_eval, double& entropy_win, double& entropy)
 {
@@ -1144,18 +1142,18 @@ void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv,
 	const double m = (1.0 - lambda) * t + lambda * p;
 
 	cross_entropy_eval =
-		(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon));
+			(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon)) * weight;
 	cross_entropy_win =
-		(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon));
+			(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon)) * weight;
 	entropy_eval =
-		(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon));
+			(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon)) * weight;
 	entropy_win =
-		(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon));
+			(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon)) * weight;
 
 	cross_entropy =
-		(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon));
+			(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon)) * weight;
 	entropy =
-		(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon));
+			(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon)) * weight;
 }
 
 #endif
@@ -1234,11 +1232,8 @@ struct SfenReader
 			{
 				if (eval_limit < abs(p.score) || abs(p.score) == VALUE_SUPERIOR)
 					continue;
-#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
-				if (p.game_result == 0)
+				if (!use_draw_in_validation && p.game_result == 0)
 					continue;
-#endif
-
 				sfen_for_mse.push_back(p);
 			} else {
 				break;
@@ -1288,7 +1283,7 @@ struct SfenReader
 		while (true)
 		{
 			{
-				std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 				// ファイルバッファから充填できたなら、それで良し。
 				if (packed_sfens_pool.size() != 0)
 				{
@@ -1309,7 +1304,7 @@ struct SfenReader
 
 			// file workerがpacked_sfens_poolに充填してくれるのを待っている。
 			// mutexはlockしていないのでいずれ充填してくれるはずだ。
-			sleep(1);
+			Tools::sleep(1);
 		}
 
 	}
@@ -1337,7 +1332,7 @@ struct SfenReader
 			filenames.pop_back();
 
 			fs.open(filename, ios::in | ios::binary);
-			cout << "open filename = " << filename << endl;
+			//cout << "open filename = " << filename << endl;
 			ASSERT(fs);
 
 			return true;
@@ -1348,7 +1343,7 @@ struct SfenReader
 			// バッファが減ってくるのを待つ。
 			// このsize()の読み取りはread onlyなのでlockしなくていいだろう。
 			while (!stop_flag && packed_sfens_pool.size() >= SFEN_READ_SIZE / THREAD_BUFFER_SIZE)
-				sleep(100);
+				Tools::sleep(100);
 			if (stop_flag)
 				return;
 
@@ -1405,7 +1400,7 @@ struct SfenReader
 
 			// sfensの用意が出来たので、折を見てコピー
 			{
-				std::unique_lock<Mutex> lk(mutex);
+				std::unique_lock<std::mutex> lk(mutex);
 
 				// ポインタをコピーするだけなのでこの時間は無視できるはず…。
 				// packed_sfens_poolの内容を変更するのでmutexのlockが必要。
@@ -1474,7 +1469,7 @@ protected:
 	std::vector<PSVector*> packed_sfens;
 
 	// packed_sfens_poolにアクセスするときのmutex
-	Mutex mutex;
+	std::mutex mutex;
 
 	// sfenのpool。fileから読み込むworker threadはここに補充する。
 	// 各worker threadはここから自分のpacked_sfens[thread_id]に充填する。
@@ -1505,6 +1500,7 @@ struct LearnerThink: public MultiThink
 		best_loss = std::numeric_limits<double>::infinity();
 		latest_loss_sum = 0.0;
 		latest_loss_count = 0;
+			progress.Load();
 #endif
 	}
 
@@ -1564,6 +1560,9 @@ struct LearnerThink: public MultiThink
 	double latest_loss_sum;
 	u64 latest_loss_count;
 	std::string best_nn_directory;
+		bool weight_by_progress;
+
+		Tanuki::Progress progress;
 #endif
 
 	u64 eval_save_interval;
@@ -1580,12 +1579,9 @@ struct LearnerThink: public MultiThink
 
 void LearnerThink::calc_loss(size_t thread_id, u64 done)
 {
-	// 置換表にhitされてもかなわんので、このタイミングで置換表の世代を新しくする。
-	// 置換表を無効にしているなら関係ないのだが。
-	TT.new_search();
 
 #if defined(EVAL_NNUE)
-	std::cout << "PROGRESS: " << now_string() << ", ";
+	std::cout << "PROGRESS: " << Tools::now_string() << ", ";
 	std::cout << sr.total_done << " sfens";
 	std::cout << ", iteration " << epoch;
 	std::cout << ", eta = " << Eval::get_eta() << ", ";
@@ -1640,13 +1636,15 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 		// TaskDispatcherを用いて各スレッドに作業を振る。
 		// そのためのタスクの定義。
 		// ↑で使っているposをcaptureされるとたまらんのでcaptureしたい変数は一つずつ指定しておく。
-		auto task = [&ps,&test_sum_cross_entropy_eval,&test_sum_cross_entropy_win,&test_sum_cross_entropy,&test_sum_entropy_eval,&test_sum_entropy_win,&test_sum_entropy, &sum_norm,&task_count ,&move_accord_count](size_t thread_id)
+			auto weight_by_progress = this->weight_by_progress;
+			auto& progress = this->progress;
+			auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
 		{
 			// これ、C++ではループごとに新たなpsのインスタンスをちゃんとcaptureするのだろうか.. →　するようだ。
 			auto th = Threads[thread_id];
 			auto& pos = th->rootPos;
 			StateInfo si;
-			if (pos.set_from_packed_sfen(ps.sfen ,&si, th) != 0)
+			if (pos.set_from_packed_sfen(ps.sfen ,&si, th).is_not_ok())
 			{
 				// 運悪くrmse計算用のsfenとして、不正なsfenを引いてしまっていた。
 				cout << "Error! : illegal packed sfen " << pos.sfen() << endl;
@@ -1662,7 +1660,7 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 			{
 				const auto rootColor = pos.side_to_move();
 				const auto pv = r.second;
-				std::vector<StateInfo,AlignedAllocator<StateInfo>> states(pv.size());
+				std::vector<StateInfo> states(pv.size());
 				for (size_t i = 0; i < pv.size(); ++i)
 				{
 					pos.do_move(pv[i], states[i]);
@@ -1697,9 +1695,15 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 			// 交差エントロピーを計算して表示させる。
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				double progress_weight = weight_by_progress
+					? (1.0 - progress.Estimate(pos))
+					: 1.0;
+
 			double test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy;
 			double test_entropy_eval, test_entropy_win, test_entropy;
-			calc_cross_entropy(deep_value, shallow_value, ps, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
+				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
 			// 交差エントロピーの合計は定義的にabs()をとる必要がない。
 			test_sum_cross_entropy_eval += test_cross_entropy_eval;
 			test_sum_cross_entropy_win += test_cross_entropy_win;
@@ -1730,7 +1734,7 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 
 	// すべてのtaskの完了を待つ
 	while (task_count)
-		sleep(1);
+		Tools::sleep(1);
 
 #if !defined(LOSS_FUNCTION_IS_ELMO_METHOD)
 	// rmse = root mean square error : 平均二乗誤差
@@ -1838,7 +1842,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 
 #if !defined(EVAL_NNUE)
 				// 現在時刻を出力。毎回出力する。
-				std::cout << sr.total_done << " sfens , at " << now_string() << std::endl;
+				std::cout << sr.total_done << " sfens , at " << Tools::now_string() << std::endl;
 
 				// このタイミングで勾配をweight配列に反映。勾配の計算も1M局面ごとでmini-batch的にはちょうどいいのでは。
 				Eval::update_weights(epoch , freeze);
@@ -1920,10 +1924,10 @@ void LearnerThink::thread_worker(size_t thread_id)
 		if (eval_limit < abs(ps.score) || abs(ps.score) == VALUE_SUPERIOR)
 			goto RetryRead;
 
-#if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
-		if (ps.game_result == 0)
+
+		if (!use_draw_in_training && ps.game_result == 0)
 			goto RetryRead;
-#endif
+
 
 		// 序盤局面に関する読み飛ばし
 		if (ps.gamePly < prng.rand(reduction_gameply))
@@ -1936,7 +1940,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 		// ↑sfenを経由すると遅いので専用の関数を作った。
 		StateInfo si;
 		const bool mirror = prng.rand(100) < mirror_percentage;
-		if (pos.set_from_packed_sfen(ps.sfen,&si,th,mirror) != 0)
+		if (pos.set_from_packed_sfen(ps.sfen,&si,th,mirror).is_not_ok())
 		{
 			// 変なsfenを掴かまされた。デバッグすべき！
 			// 不正なsfenなのでpos.sfen()で表示できるとは限らないが、しないよりマシ。
@@ -1947,13 +1951,13 @@ void LearnerThink::thread_worker(size_t thread_id)
 		{
 			auto key = pos.key();
 			// rmseの計算用に使っている局面なら除外する。
-			if (sr.is_for_rmse(key))
+			if (sr.is_for_rmse(key) && use_hash_in_training)
 				goto RetryRead;
 
 			// 直近で用いた局面も除外する。
 			auto hash_index = size_t(key & (sr.READ_SFEN_HASH_SIZE - 1));
 			auto key2 = sr.hash[hash_index];
-			if (key == key2)
+			if (key == key2 && use_hash_in_training)
 				goto RetryRead;
 			sr.hash[hash_index] = key; // 今回のkeyに入れ替えておく。
 		}
@@ -2017,10 +2021,16 @@ void LearnerThink::thread_worker(size_t thread_id)
 			Value shallow_value = (rootColor == pos.side_to_move()) ? Eval::evaluate(pos) : -Eval::evaluate(pos);
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				double progress_weight = weight_by_progress
+					? (1.0 - progress.Estimate(pos))
+					: 1.0;
+
 			// 学習データに対するロスの計算
 			double learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy;
 			double learn_entropy_eval, learn_entropy_win, learn_entropy;
-			calc_cross_entropy(deep_value, shallow_value, ps, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
+				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
 			learn_sum_cross_entropy_eval += learn_cross_entropy_eval;
 			learn_sum_cross_entropy_win += learn_cross_entropy_win;
 			learn_sum_cross_entropy += learn_cross_entropy;
@@ -2043,8 +2053,13 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 勾配に基づくupdateはのちほど行なう。
 			Eval::add_grad(pos, rootColor, dj_dw, freeze);
 #else
-			const double example_weight =
+				double example_weight =
 			    (discount_rate != 0 && ply != (int)pv.size()) ? discount_rate : 1.0;
+
+				// 進捗度に応じて学習率を調整する。
+				// WSCOC2020 elmo・水匠2
+				example_weight *= progress_weight;
+
 			Eval::NNUE::AddExample(pos, rootColor, ps, example_weight);
 #endif
 
@@ -2270,7 +2285,7 @@ void shuffle_files(const vector<string>& filenames , const string& output_file_n
 		cout << ".";
 	};
 
-	MKDIR("tmp");
+	Directory::CreateFolder("tmp");
 
 	// 10M局面の細切れファイルとしてシャッフルして書き出す。
 	for (auto filename : filenames)
@@ -2368,7 +2383,7 @@ void shuffle_files_on_memory(const vector<string>& filenames,const string output
 	for (auto filename : filenames)
 	{
 		std::cout << "read : " << filename << std::endl;
-		read_file_to_memory(filename, [&buf](u64 size) {
+		FileOperator::ReadFileToMemory(filename, [&buf](u64 size) {
 			ASSERT_LV1((size % sizeof(PackedSfenValue)) == 0);
 			// バッファを拡充して、前回の末尾以降に読み込む。
 			u64 last = buf.size();
@@ -2387,7 +2402,7 @@ void shuffle_files_on_memory(const vector<string>& filenames,const string output
 	std::cout << "write : " << output_file_name << endl;
 
 	// 書き出すファイルが2GBを超えるとfstream::write一発では書き出せないのでwrapperを用いる。
-	write_memory_to_file(output_file_name, (void*)&buf[0], (u64)sizeof(PackedSfenValue)*(u64)buf.size());
+	FileOperator::WriteMemoryToFile(output_file_name, (void*)&buf[0], (u64)sizeof(PackedSfenValue)*(u64)buf.size());
 
 	std::cout << "..shuffle_on_memory done." << std::endl;
 }
@@ -2419,7 +2434,7 @@ void convert_bin(const vector<string>& filenames , const string& output_file_nam
 			}
 			else if (token == "move") {
 				ss >> value;
-				p.move = USI::to_move(value);
+				p.move = USI::to_move16(value).to_u16();
 			}
 			else if (token == "score") {
 				ss >> p.score;
@@ -2569,6 +2584,8 @@ void learn(Position&, istringstream& is)
 	double newbob_decay = 1.0;
 	int newbob_num_trials = 2;
 	string nn_options;
+		bool weight_by_progress = false;
+		double l2_regularization_parameter = 0.0;
 #endif
 
 	u64 eval_save_interval = LEARN_EVAL_SAVE_INTERVAL;
@@ -2612,7 +2629,9 @@ void learn(Position&, istringstream& is)
 		else if (option == "eta3")       is >> eta3;
 		else if (option == "eta1_epoch") is >> eta1_epoch;
 		else if (option == "eta2_epoch") is >> eta2_epoch;
-
+		else if (option == "use_draw_in_training") is >> use_draw_in_training;
+		else if (option == "use_draw_in_validation") is >> use_draw_in_validation;
+		else if (option == "use_hash_in_training") is >> use_hash_in_training;
 		// 割引率
 		else if (option == "discount_rate") is >> discount_rate;
 
@@ -2654,6 +2673,8 @@ void learn(Position&, istringstream& is)
 		else if (option == "newbob_decay") is >> newbob_decay;
 		else if (option == "newbob_num_trials") is >> newbob_num_trials;
 		else if (option == "nn_options") is >> nn_options;
+			else if (option == "weight_by_progress") is >> weight_by_progress;
+			else if (option == "l2_regularization_parameter") is >> l2_regularization_parameter;
 #endif
 		else if (option == "eval_save_interval") is >> eval_save_interval;
 		else if (option == "loss_output_interval") is >> loss_output_interval;
@@ -2682,50 +2703,8 @@ void learn(Position&, istringstream& is)
 	{
 		string kif_base_dir = Path::Combine(base_dir, target_dir);
 
-		// このフォルダを根こそぎ取る。base_dir相対にしておく。
-#if defined(_MSC_VER)
-		// std::tr2を使用するとwaring C4996が出るので抑制。
-		// ※　std::tr2は、std:c++14 の下では既定で非推奨の警告を出し、/std:c++17 では既定で削除された。
-		#pragma warning(push)
-		#pragma warning(disable:4996)
-
-		namespace sys = std::tr2::sys;
-		sys::path p(kif_base_dir); // 列挙の起点
-		std::for_each(sys::directory_iterator(p), sys::directory_iterator(),
-			[&](const sys::path& p) {
-			if (sys::is_regular_file(p))
-				filenames.push_back(Path::Combine(target_dir, p.filename().generic_string()));
-		});
-		#pragma warning(pop)
-
-#elif defined(__GNUC__)
-
-		auto ends_with = [](std::string const & value, std::string const & ending)
-		{
-			if (ending.size() > value.size()) return false;
-			return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-		};
-
-		// 仕方ないのでdirent.hを用いて読み込む。
-		DIR *dp;       // ディレクトリへのポインタ
-		dirent* entry; // readdir() で返されるエントリーポイント
-
-		dp = opendir(kif_base_dir.c_str());
-		if (dp != NULL)
-		{
-			do {
-				entry = readdir(dp);
-				// ".bin"で終わるファイルのみを列挙
-				// →　連番でファイル生成するときにこの制約ちょっと嫌だな…。
-				if (entry != NULL  && ends_with(entry->d_name, ".bin")  )
-				{
-					//cout << entry->d_name << endl;
-					filenames.push_back(Path::Combine(target_dir, entry->d_name));
-				}
-			} while (entry != NULL);
-			closedir(dp);
-		}
-#endif
+		// このフォルダのファイルを根こそぎ取る。base_dir相対にしておく。
+		filenames = Directory::EnumerateFiles(kif_base_dir, ".bin");
 	}
 
 	cout << "learn from ";
@@ -2846,7 +2825,8 @@ void learn(Position&, istringstream& is)
 	Eval::init_grad(eta1,eta1_epoch,eta2,eta2_epoch,eta3);
 #else
 	cout << "init_training.." << endl;
-	Eval::NNUE::InitializeTraining(eta1,eta1_epoch,eta2,eta2_epoch,eta3);
+		Eval::NNUE::InitializeTraining(eta1, eta1_epoch, eta2, eta2_epoch, eta3,
+			l2_regularization_parameter);
 	Eval::NNUE::SetBatchSize(nn_batch_size);
 	Eval::NNUE::SetOptions(nn_options);
 	if (newbob_decay != 1.0 && !Options["SkipLoadingEval"]) {
@@ -2879,6 +2859,7 @@ void learn(Position&, istringstream& is)
 	learn_think.newbob_scale = 1.0;
 	learn_think.newbob_decay = newbob_decay;
 	learn_think.newbob_num_trials = newbob_num_trials;
+		learn_think.weight_by_progress = weight_by_progress;
 #endif
 	learn_think.eval_save_interval = eval_save_interval;
 	learn_think.loss_output_interval = loss_output_interval;
@@ -2894,6 +2875,8 @@ void learn(Position&, istringstream& is)
 		// mse計算用にデータ1万件ほど取得しておく。
 		sr.read_for_mse();
 	} else {
+		// base_dirの指定を"validation_set_file_name"オプションにも反映させるべきか..
+		//validation_set_file_name = Path::Combine(base_dir, validation_set_file_name);
 		sr.read_validation_set(validation_set_file_name, eval_limit);
 	}
 
