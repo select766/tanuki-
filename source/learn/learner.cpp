@@ -2790,6 +2790,7 @@ void learn(Position&, istringstream& is)
 #if defined(EVAL_NNUE)
 	cout << "nn_batch_size     : " << nn_batch_size     << endl;
 	cout << "nn_options        : " << nn_options        << endl;
+	cout << "weight_by_progress: " << weight_by_progress << endl;
 #endif
 	cout << "learning rate     : " << eta1 << " , " << eta2 << " , " << eta3 << endl;
 	cout << "eta_epoch         : " << eta1_epoch << " , " << eta2_epoch << endl;
