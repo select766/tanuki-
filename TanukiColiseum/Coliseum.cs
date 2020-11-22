@@ -20,7 +20,7 @@ namespace TanukiColiseum
         public event StatusHandler OnStatusChanged;
         public event ErrorHandler OnError;
 
-        public async Task RunAsync(Options options)
+        public void Run(Options options)
         {
             // 評価関数フォルダと思考エンジンの存在確認を行う
             if (!File.Exists(options.Engine1FilePath))
@@ -61,7 +61,7 @@ namespace TanukiColiseum
                 // エンジン1初期化
                 Dictionary<string, string> overriddenOptions1 = new Dictionary<string, string>(){
                     {"EvalDir", options.Eval1FolderPath},
-                    {"Hash", options.HashMb.ToString()},
+                    {"USI_Hash", options.HashMb.ToString()},
                     {"MinimumThinkingTime", "1000"},
                     {"NetworkDelay", "0"},
                     {"NetworkDelay2", "0"},
@@ -71,23 +71,29 @@ namespace TanukiColiseum
                     {"Threads", options.NumThreads1.ToString()},
                     {"BookEvalDiff", options.BookEvalDiff1.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount1},
+                    {"IgnoreBookPly", options.IgnoreBookPly1},
                     {"BookDepthLimit", "0"},
                     {"MaxMovesToDraw", "256"},
                 };
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2));
                 Console.Out.Flush();
                 var engine1 = new Engine(options.Engine1FilePath, this, gameIndex * 2, gameIndex, 0, numaNode, overriddenOptions1);
+                engine1.StartAsync().Wait(TimeSpan.FromMinutes(1));
                 // Windows 10 May 2019 Updateにおいて、
                 // 複数のプロセスが同時に大量のメモリを確保しようとしたときに
                 // フリーズする現象を確認した
                 // 原因がわかるまでは1プロセスずつメモリを確保するようにする
-                await engine1.StartAsync();
+                if (engine1.HasExited)
+                {
+                    OnError($"エンジン1が異常終了しました gameIndex={gameIndex}");
+                    return;
+                }
 
                 // エンジン2初期化
                 Dictionary<string, string> overriddenOptions2 = new Dictionary<string, string>()
                 {
                     {"EvalDir", options.Eval2FolderPath},
-                    {"Hash", options.HashMb.ToString()},
+                    {"USI_Hash", options.HashMb.ToString()},
                     {"MinimumThinkingTime", "1000"},
                     {"NetworkDelay", "0"},
                     {"NetworkDelay2", "0"},
@@ -97,13 +103,19 @@ namespace TanukiColiseum
                     {"Threads", options.NumThreads2.ToString()},
                     {"BookEvalDiff", options.BookEvalDiff2.ToString()},
                     {"ConsiderBookMoveCount", options.ConsiderBookMoveCount2},
+                    {"IgnoreBookPly", options.IgnoreBookPly2},
                     {"BookDepthLimit", "0"},
                     {"MaxMovesToDraw", "256"},
                 };
                 Console.WriteLine("Starting the engine process " + (gameIndex * 2 + 1));
                 Console.Out.Flush();
                 var engine2 = new Engine(options.Engine2FilePath, this, gameIndex * 2 + 1, gameIndex, 1, numaNode, overriddenOptions2);
-                await engine2.StartAsync();
+                engine2.StartAsync().Wait(TimeSpan.FromMinutes(1));
+                if (engine2.HasExited)
+                {
+                    OnError($"エンジン2が異常終了しました gameIndex={gameIndex}");
+                    return;
+                }
 
                 // ゲーム初期化
                 // 偶数番目はengine1が先手、奇数番目はengine2が先手

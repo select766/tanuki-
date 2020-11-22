@@ -217,7 +217,7 @@ namespace TanukiColiseum
             textBoxOutput.Text = errorMessage;
         }
 
-        private async void buttonStart_Click(object sender, EventArgs e)
+        private void buttonStart_Click(object sender, EventArgs e)
         {
             var options = ParseOptions();
             if (options == null)
@@ -231,8 +231,11 @@ namespace TanukiColiseum
             EnableControls(false);
             progressBar1.Value = 0;
             textBoxOutput.Text = "(対局準備中です。しばらくお待ちください。)";
-            await coliseum.RunAsync(options);
-            EnableControls(true);
+            new Task(() =>
+            {
+                coliseum.Run(options);
+                EnableControls(true);
+            });
         }
 
         private void buttonEngine1FilePath_Click(object sender, EventArgs e)

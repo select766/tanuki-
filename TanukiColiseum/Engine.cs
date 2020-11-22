@@ -192,5 +192,7 @@ namespace TanukiColiseum
         {
             Send("stop");
         }
+
+        public bool HasExited { get => Process.HasExited; }
     }
 }

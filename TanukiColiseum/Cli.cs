@@ -10,7 +10,7 @@ namespace TanukiColiseum
             var coliseum = new Coliseum();
             coliseum.OnStatusChanged += ShowResult;
             coliseum.OnError += OnError;
-            coliseum.RunAsync(options).Wait();
+            coliseum.Run(options);
         }
 
         private void ShowResult(Status status)
