@@ -1,9 +1,0 @@
-usi
-setoption name Hash value 1024
-setoption name EvalDir value C:\home\nodchip\hakubishin-private\book\tanuki-wcsc29-2019-05-06\eval
-setoption name BookInputFile value set_score_to_move_debug.db
-setoption name BookOutputFile value tera_shock2_debug.db
-setoption name IgnoreBookPly value true
-isready
-usinewgame
-tera_shock2
