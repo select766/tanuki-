@@ -1645,6 +1645,9 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 		auto& progress = this->progress;
 		auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
 		{
+			// 複数のプロセスでlearnコマンドを実行した場合、NUMAノード0しか使われなくなる問題への対処
+			WinProcGroup::bindThisThread(thread_id);
+
 			// これ、C++ではループごとに新たなpsのインスタンスをちゃんとcaptureするのだろうか.. →　するようだ。
 			auto th = Threads[thread_id];
 			auto& pos = th->rootPos;
