@@ -465,6 +465,9 @@
     <ClCompile Include="eval\nnue\features\pe9.cpp">
       <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
+    <ClCompile Include="learn\gensfen2019.cpp">
+      <Filter>リソース ファイル\learn</Filter>
+    </ClCompile>
     <ClCompile Include="tanuki_book.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
@@ -514,6 +517,9 @@
     </Text>
     <Text Include="..\script\readme.txt">
       <Filter>script</Filter>
+    </Text>
+    <Text Include="..\docs\最初に：やねうら王遊び方説明.txt">
+      <Filter>docs</Filter>
     </Text>
   </ItemGroup>
   <ItemGroup>
