@@ -1,3 +1,5 @@
+#pragma optimize( "", off )
+
 #include "tanuki_kifu_generator.h"
 #include "config.h"
 
@@ -49,6 +51,11 @@ namespace {
 	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
 	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
 	constexpr char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
+	constexpr char* kOptionGeneratorRandomMultiPV = "GeneratorRandomMultiPV";
+	constexpr char* kOptionGeneratorMinMultiPVPlay = "GeneratorMinMultiPVPlay";
+	constexpr char* kOptionGeneratorMaxMultiPVPlay = "GeneratorMaxMultiPVPlay";
+	constexpr char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
+	constexpr char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
 	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -134,10 +141,15 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionGeneratorMeasureDepth] << Option(false);
-	o[kOptionGeneratorStartPositionMaxPlay] << Option(320, 1, 320);
+	o[kOptionGeneratorStartPositionMaxPlay] << Option(std::numeric_limits<int>::max(), 1, std::numeric_limits<int>::max());
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
+	o[kOptionGeneratorRandomMultiPV] << Option(1, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMinMultiPVPlay] << Option(1, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxMultiPVPlay] << Option(32, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxMultiPVMoves] << Option(16, 0, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxEvalDiff] << Option(30, 0, std::numeric_limits<int>::max());
 }
 
 namespace {
@@ -200,6 +212,11 @@ void Tanuki::GenerateKifu() {
 	uint64_t optimum_nodes_searched =
 		ParseOptionOrDie<uint64_t>(kOptionGeneratorOptimumNodesSearched);
 	bool measure_depth = Options[kOptionGeneratorMeasureDepth];
+	int random_multi_pv = Options[kOptionGeneratorRandomMultiPV];
+	int min_multi_pv_play = Options[kOptionGeneratorMinMultiPVPlay];
+	int max_multi_pv_play = Options[kOptionGeneratorMaxMultiPVPlay];
+	int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPVMoves];
+	int max_eval_diff = Options[kOptionGeneratorMaxEvalDiff];
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
@@ -207,6 +224,11 @@ void Tanuki::GenerateKifu() {
 	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
 	std::cout << "optimum_nodes_searched=" << optimum_nodes_searched << std::endl;
 	std::cout << "measure_depth=" << measure_depth << std::endl;
+	std::cout << "random_multi_pv=" << random_multi_pv << std::endl;
+	std::cout << "min_multi_pv_play=" << min_multi_pv_play << std::endl;
+	std::cout << "max_multi_pv_play=" << max_multi_pv_play << std::endl;
+	std::cout << "max_multi_pv_count=" << max_multi_pv_moves << std::endl;
+	std::cout << "max_eval_diff=" << max_eval_diff << std::endl;
 
 	Search::LimitsType limits;
 	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
@@ -255,13 +277,35 @@ void Tanuki::GenerateKifu() {
 
 			std::vector<Learner::PackedSfenValue> records;
 			Value last_value;
+			int num_multi_pv_move = 0;
 			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
 				pos.DeclarationWin() == MOVE_NONE) {
-				Learner::search(pos, search_depth, 1, optimum_nodes_searched);
+
+				int multi_pv = 1;
+				if (min_multi_pv_play <= pos.game_ply() &&
+					pos.game_ply() <= max_multi_pv_play &&
+					num_multi_pv_move < max_multi_pv_moves &&
+					std::uniform_int_distribution<int>(0, 1)(mt19937_64) == 1) {
+					multi_pv = random_multi_pv;
+					++num_multi_pv_move;
+				}
+
+				Learner::search(pos, search_depth, multi_pv, optimum_nodes_searched);
 
 				const auto& root_moves = pos.this_thread()->rootMoves;
-				const auto& root_move = root_moves[0];
-				// 最も良かったスコアをこの局面のスコアとして記録する
+				multi_pv = std::min<int>(multi_pv, root_moves.size());
+
+				int num_valid_moves = 0;
+				for (int pv_index = 0; pv_index < multi_pv; ++pv_index) {
+					if (root_moves[0].score - max_eval_diff <= root_moves[pv_index].score) {
+						num_valid_moves = pv_index + 1;
+					}
+				}
+
+				int selected_move_index = std::uniform_int_distribution<int>(
+					0, num_valid_moves - 1)(mt19937_64);
+				const auto& root_move = root_moves[selected_move_index];
+				// 選ばれた指し手のスコアをこの局面のスコアとして記録する
 				last_value = root_move.score;
 				const std::vector<Move>& pv = root_move.pv;
 
