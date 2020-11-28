@@ -334,6 +334,8 @@ void Tanuki::GenerateKifu() {
 				continue;
 			}
 
+			thread.clear();
+
 			for (auto rit = records.rbegin(); rit != records.rend(); ++rit) {
 				rit->game_result = game_result;
 				rit->entering_king = entering_king;
