@@ -4,7 +4,7 @@
 # normal     : 通常使用用
 # evallearn  : 教師局面からの学習用
 # tournament : 大会で使う用
-# gensfen    : 教師生成用     // 現状、非公開 (currently private)
+# gensfen    : 教師生成用(2019年版)
 
 
 # === ビルドオプション (build options) ===
@@ -15,7 +15,7 @@
 # YANEURAOU_ENGINE_NNUE_HALFKPE9 : NNUE型評価関数(halfKPE9)
 # YANEURAOU_ENGINE_KPPT       : KPPT型評価関数
 # YANEURAOU_ENGINE_KPP_KKPT   : KPP_KKPT型評価関数
-# YANEURAOU_ENGINE_MATERIAL   : 駒得のみの評価関数
+# YANEURAOU_ENGINE_MATERIAL      : 駒得のみの評価関数(複数変種あり。MATERIAL_LEVELで選択できる)
 # MATE_ENGINE                 : tanuki- 詰将棋エンジン
 # USER_ENGINE                 : USER定義エンジン
 
@@ -28,10 +28,11 @@ YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = MATE_ENGINE
 #YANEURAOU_EDITION = USER_ENGINE
 
+
 # ターゲットCPU (target cpu)
 
 # 利用できるCPU拡張命令を指定する。
-# 
+#
 # AMDのRyzen(Zen/Zen2)はZEN1/ZEN2を選択するとBMI2命令が使わずに速くなる。(10%程度高速化)
 # Ryzen Zen3シリーズはZEN3を選択。こちらはAVX2用とたぶん変わらない。
 #
@@ -72,7 +73,7 @@ COMPILER = g++
 
 
 # developing branch // 現状、非公開 (currently private)
-# dev : 開発中のbranchならdevと指定する (developing branch) : 
+# dev : 開発中のbranchならdevと指定する (developing branch) :
 # abe : abe
 #ENGINE_BRANCH = dev
 
@@ -85,7 +86,14 @@ LIBS     =
 INCLUDE  = # -I../include
 
 # makeするときにCPPFLAGSを追加で指定したいときはこれを用いる。
-EXTRA_CPPFLAGS = 
+EXTRA_CPPFLAGS =
+
+# YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIALのときに指定できる、評価関数の通し番号
+#  1 : 普通の駒得のみの評価関数
+#  2 : …
+# cf.【連載】評価関数を作ってみよう！その1 : http://yaneuraou.yaneu.com/2020/11/17/make-evaluate-function/
+MATERIAL_LEVEL = 1
+
 
 # === implementations ===
 
@@ -261,7 +269,10 @@ endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_MATERIAL)
 	SOURCES += \
-		engine/yaneuraou-engine/yaneuraou-search.cpp
+		engine/yaneuraou-engine/yaneuraou-search.cpp                           \
+		eval/material/evaluate_material.cpp
+
+	CPPFLAGS += -DMATERIAL_LEVEL=$(MATERIAL_LEVEL)
 endif
 
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
@@ -295,11 +306,17 @@ ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_
 endif
 
 ifeq ($(YANEURAOU_EDITION),MATE_ENGINE)
-	SOURCES += engine/mate-engine/mate-search.cpp
+	SOURCES += \
+		engine/mate-engine/mate-search.cpp                              \
+	    eval/material/evaluate_material.cpp
+
 endif
 
 ifeq ($(YANEURAOU_EDITION),USER_ENGINE)
-	SOURCES += engine/user-engine/user-search.cpp
+	SOURCES += \
+		engine/user-engine/user-search.cpp                              \
+		eval/material/evaluate_material.cpp
+
 endif
 
 ifneq ($(ENGINE_NAME),)
@@ -356,6 +373,12 @@ else ifeq ($(TARGET_CPU),AVX512VNNI)
 	# NNUEのコード、USE_VNNIが指定されているとVNNI対応のコードになる。
 	# cascadelakeとicelakeとの違いがあるのかは知らないので、cascadelakeのみでいいや。
 
+else ifeq ($(TARGET_CPU),AVXVNNI)
+	CPPFLAGS += -DUSE_AVX2 -DUSE_BMI2 -DUSE_VNNI -march=alderlake
+	# NNUEのコード、USE_VNNIが指定されているとVNNI対応のコードになる。
+	# Intel Alder Lake、Sapphire Rapids 以降追加の命令群。LLVM12, GCC11 以降。
+	# AVXVNNI (AVX2VNNI という表記も有り?) は AVX512VNNIの256bit幅以下限定版。
+
 else ifeq ($(TARGET_CPU),AVX512)
 
 	CPPFLAGS += -DUSE_AVX512 -DUSE_BMI2 -march=skylake-avx512
@@ -385,8 +408,8 @@ else ifeq ($(TARGET_CPU),OTHER)
 
 endif
 
-
-CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) $(EXTRA_CPPFLAGS)
+# YANEURAOU_EDITION , CPUターゲット名 などのシンボルをコンパイル時に定義してやる。
+CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DTARGET_CPU=\"$(TARGET_CPU)\" $(EXTRA_CPPFLAGS)
 
 OBJECTS  = $(addprefix $(OBJDIR)/, $(SOURCES:.cpp=.o))
 DEPENDS  = $(OBJECTS:.o=.d)

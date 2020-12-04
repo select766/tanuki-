@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "5.32"
+#define ENGINE_VERSION "5.40"
 
 // --------------------
 //  思考エンジンの種類
@@ -20,7 +20,7 @@
 
 #if !defined (USE_MAKEFILE)
 
-#define YANEURAOU_ENGINE_NNUE    // やねうら王2018 with お多福Lab。(開発中2018/01/01～)
+#define YANEURAOU_ENGINE_NNUE            // やねうら王 通常探索部 NNUE評価関数
 //#define MATE_ENGINE                      // 詰め将棋solverとしてリリースする場合。(開発中2017/05/06～)
 //#define USER_ENGINE                      // ユーザーの思考エンジン
 
@@ -141,12 +141,11 @@ constexpr int MAX_PLY_NUM = 246;
 // 「！」がついているもの..かつて実装していたがサポートを終了したもの。
 
 // #define EVAL_NO_USE    // ！　評価関数なし。※4
-// #define EVAL_MATERIAL  // ○  駒得のみの評価関数
+// #define EVAL_MATERIAL  // ○  駒得のみの評価関数 ※5
 // #define EVAL_PP        // ×  ツツカナ型 2駒関係(開発予定なし)
 // #define EVAL_KPP       // ！  Bonanza型 3駒関係、手番なし
 // #define EVAL_KPPT      // ○  Bonanza型 3駒関係、手番つき(Apery WCSC26相当)
 // #define EVAL_KPP_KKPT  // ○  KK手番あり + KKP手番あり + KPP手番なし(Ponanza WCSC26相当？)
-// #define EVAL_KPP_KKPT_FV_VAR // ○ KPP_KKPTと同一。※5
 // #define EVAL_KPP_PPT   // ×  PP手番あり + KKP手番あり + KPP手番なし(実装、途中まで)※1
 // #define EVAL_KPPP_KKPT // △  KKP手番あり + KPP手番なし + KPPP(4駒関係)手番なし。→　※2,※3
 // #define EVAL_KPPPT     // △  KPPP(4駒関係)手番あり。→　実装したけどいまひとつだったので差分計算実装せず。※2,※3
@@ -161,21 +160,17 @@ constexpr int MAX_PLY_NUM = 246;
 // ※4 : 以前、EVAL_NO_USEという評価関数なしのものが選択できるようになっていたが、
 //       需要がほとんどない上に、ソースコードがifdefの嵐になるので読みづらいのでバッサリ削除した。
 //		代わりにEVAL_MATERIALを使うと良い。追加コストはほぼ無視できる。
-// ※5 : 可変長EvalListを用いるリファレンス実装。KPP_KKPT型に比べてわずかに遅いが、拡張性が非常に高く、
-//      極めて美しい実装なので、今後、評価関数の拡張は、これをベースにやっていくことになると思う。
-
+// ※5 : MATERIAL_LEVELというシンボルで評価関数のタイプを選択できる。
+//       #define MATERIAL_LEVEL 001 なら、駒得のみの評価関数
+//       #define MATERIAL_LEVEL 002 なら…
+//       → eval/material/evaluate_material.cppに定義があるのでそちらを見ること。
 
 // 評価関数を教師局面から学習させるときに使うときのモード
 //#define EVAL_LEARN
 
-// Eval::compute_eval()やLearner::add_grad()を呼び出す前にEvalListの組み換えを行なう機能を提供する。
-// 評価関数の実験に用いる。詳しくは、Eval::make_list_functionに書いてある説明などを読むこと。
-// #define USE_EVAL_MAKE_LIST_FUNCTION
-
-// この機能は、やねうら王の評価関数の開発/実験用の機能で、いまのところ一般ユーザーには提供していない。
-// 評価関数番号を指定するとその評価関数を持ち、その評価関数ファイルの読み込み/書き出しに自動的に対応して、
-// かつ評価関数の旧形式からの変換が"test convert"コマンドで自動的に出来るようになるという、わりかし凄い機能
-// #define EVAL_EXPERIMENTAL 0001
+// 教師生成用の特殊コマンド"gensfen2019"を使えるようにするモード。
+// 教師生成用の探索パラメーターも別途用意するといいかも。
+//#define GENSFEN2019
 
 // 長い利き(遠方駒の利き)のライブラリを用いるか。
 // 超高速1手詰め判定などではこのライブラリが必要。
@@ -217,12 +212,6 @@ constexpr int MAX_PLY_NUM = 246;
 // 駒の特徴量はBonaPiece。これはBonanzaに倣っている。
 // このオプションを有効化すると、金と小駒の成りを区別する。(Bonanzaとは異なる特徴量になる)
 // #define DISTINGUISH_GOLDS
-
-// オーダリングに使っているStatsの配列のなかで駒打ちのためのbitを持つ。
-// #define USE_DROPBIT_IN_STATS
-
-// 指し手生成のときに上位16bitにto(移動後の升)に来る駒を格納する。
-// #define KEEP_PIECE_IN_GENERATE_MOVES
 
 // 評価関数を計算したときに、それをHashTableに記憶しておく機能。KPPT評価関数においてのみサポート。
 // #define USE_EVAL_HASH
@@ -277,7 +266,6 @@ constexpr int MAX_PLY_NUM = 246;
 // "source/engine/yaneuraou-engine/yaneuraou-param.h"をそこに配置すること。
 //#define TUNING_SEARCH_PARAMETERS
 
-
 // --------------------
 // release configurations
 // --------------------
@@ -286,86 +274,93 @@ constexpr int MAX_PLY_NUM = 246;
 
 #if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT) || defined(YANEURAOU_ENGINE_NNUE) || defined(YANEURAOU_ENGINE_MATERIAL)
 
-#define ENGINE_NAME "YaneuraOu"
+	#define ENGINE_NAME "YaneuraOu"
 
-// 探索部は通常のやねうら王エンジンを用いる。
-#define YANEURAOU_ENGINE
+	// 探索部は通常のやねうら王エンジンを用いる。
+	#define YANEURAOU_ENGINE
 
-// EvalHashを用いるのは3駒型のみ。それ以外は差分計算用の状態が大きすぎてhitしたところでどうしようもない。
-#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT)
-#define USE_EVAL_HASH
-#endif
+	// EvalHashを用いるのは3駒型のみ。それ以外は差分計算用の状態が大きすぎてhitしたところでどうしようもない。
+	#if defined(YANEURAOU_ENGINE_KPPT) || defined(YANEURAOU_ENGINE_KPP_KKPT)
+	#define USE_EVAL_HASH
+	#endif
 
-#define USE_SEE
-#define USE_MATE_1PLY
-#define USE_ENTERING_KING_WIN
-#define USE_TIME_MANAGEMENT
-#define KEEP_PIECE_IN_GENERATE_MOVES
+	#define USE_SEE
+	#define USE_MATE_1PLY
+	#define USE_ENTERING_KING_WIN
+	#define USE_TIME_MANAGEMENT
 
-// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
-#define USE_SHARED_MEMORY_IN_EVAL
+	// 評価関数を共用して複数プロセス立ち上げたときのメモリを節約。(いまのところWindows限定)
+	#define USE_SHARED_MEMORY_IN_EVAL
 
-// 学習機能を有効にするオプション。
-// 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
-// 有効化してコンパイルしなければならない。
-//#define EVAL_LEARN
+	// 学習機能を有効にするオプション。
+	// 教師局面の生成、定跡コマンド(makebook thinkなど)を用いる時には、これを
+	// 有効化してコンパイルしなければならない。
+	//#define EVAL_LEARN
 
-// デバッグ絡み
-//#define ASSERT_LV 3
-//#define USE_DEBUG_ASSERT
+	// デバッグ絡み
+	//#define ASSERT_LV 3
+	//#define USE_DEBUG_ASSERT
 
 
-#define ENABLE_TEST_CMD
-// 学習絡みのオプション
-#define USE_SFEN_PACKER
+	#define ENABLE_TEST_CMD
+	// 学習絡みのオプション
+	#define USE_SFEN_PACKER
 
-// 定跡生成絡み
-#define ENABLE_MAKEBOOK_CMD
+	// 定跡生成絡み
+	#define ENABLE_MAKEBOOK_CMD
 
-// パラメーターの自動調整絡み
-#define USE_GAMEOVER_HANDLER
-//#define LONG_EFFECT_LIBRARY
+	// パラメーターの自動調整絡み
+	#define USE_GAMEOVER_HANDLER
+	//#define LONG_EFFECT_LIBRARY
 
-// GlobalOptionsは有効にしておく。
-#define USE_GLOBAL_OPTIONS
+	// GlobalOptionsは有効にしておく。
+	#define USE_GLOBAL_OPTIONS
 
-// -- 各評価関数ごとのconfiguration
+	// -- 各評価関数ごとのconfiguration
 
-#if defined(YANEURAOU_ENGINE_MATERIAL)
-#define EVAL_MATERIAL
-// 駒割のみの評価関数ではサポートされていない機能をundefする。
-#undef USE_EVAL_HASH
-#undef EVAL_LEARN
-#undef USE_SHARED_MEMORY_IN_EVAL
-#endif
+	#if defined(YANEURAOU_ENGINE_MATERIAL)
 
-#if defined(YANEURAOU_ENGINE_KPPT)
-#define EVAL_KPPT
-#endif
+		#define EVAL_MATERIAL
+		// 駒割のみの評価関数ではサポートされていない機能をundefする。
+		#undef USE_EVAL_HASH
+		#undef EVAL_LEARN
+		#undef USE_SHARED_MEMORY_IN_EVAL
 
-#if defined(YANEURAOU_ENGINE_KPP_KKPT)
-#define EVAL_KPP_KKPT
-#endif
+		// 実験用評価関数
+		// 駒得評価関数の拡張扱いをする。
+		#if MATERIAL_LEVEL >= 002
+			// evaluate()のために利きが必要。
+			#define LONG_EFFECT_LIBRARY
+		#endif
+	#endif
 
-#if defined(YANEURAOU_ENGINE_NNUE)
-#define EVAL_NNUE
-// 現状、評価関数のメモリ共有はNNUEではサポートされていない。
-#undef USE_SHARED_MEMORY_IN_EVAL
+	#if defined(YANEURAOU_ENGINE_KPPT)
+		#define EVAL_KPPT
+	#endif
 
-// 学習のためにOpenBLASを使う
-// "../openblas/lib/libopenblas.dll.a"をlibとして追加すること。
-//#define USE_BLAS
+	#if defined(YANEURAOU_ENGINE_KPP_KKPT)
+		#define EVAL_KPP_KKPT
+	#endif
 
-// NNUEの使いたい評価関数アーキテクチャの選択
-//
-// EVAL_NNUE_HALFKP256  : 標準NNUE型(評価関数ファイル60MB程度)
-// EVAL_NNUE_KP256      : KP256(評価関数1MB未満)
-// EVAL_NNUE_HALFKPE9   : 標準NNUE型のおよそ9倍(540MB程度)
+	#if defined(YANEURAOU_ENGINE_NNUE)
+		#define EVAL_NNUE
+		// 現状、評価関数のメモリ共有はNNUEではサポートされていない。
+		#undef USE_SHARED_MEMORY_IN_EVAL
 
-// #define EVAL_NNUE_HALFKP256
-// #define EVAL_NNUE_KP256
-// #define EVAL_NNUE_HALFKPE9
-#endif
+		// 学習のためにOpenBLASを使う
+		// "../openblas/lib/libopenblas.dll.a"をlibとして追加すること。
+		//#define USE_BLAS
+
+		// NNUEの使いたい評価関数アーキテクチャの選択
+		//
+		// EVAL_NNUE_HALFKP256  : 標準NNUE型(評価関数ファイル60MB程度)
+		// EVAL_NNUE_KP256      : KP256(評価関数1MB未満)
+		// EVAL_NNUE_HALFKPE9   : 標準NNUE型のおよそ9倍(540MB程度)
+
+		// #define EVAL_NNUE_HALFKP256
+		// #define EVAL_NNUE_KP256
+		// #define EVAL_NNUE_HALFKPE9
+	#endif
 
 #endif // defined(YANEURAOU_ENGINE_KPPT) || ...
 
@@ -373,24 +368,24 @@ constexpr int MAX_PLY_NUM = 246;
 // --- 詰将棋エンジンとして実行ファイルを公開するとき用の設定集
 
 #if defined(MATE_ENGINE)
-#define ENGINE_NAME "YaneuraOu mate solver"
-#define KEEP_LAST_MOVE
-#undef  MAX_PLY_NUM
-#define MAX_PLY_NUM 2000
-#define USE_SEE
-#define USE_MATE_1PLY
-#define EVAL_MATERIAL
-//#define LONG_EFFECT_LIBRARY
-#define USE_KEY_AFTER
-#define ENABLE_TEST_CMD
+	#define ENGINE_NAME "YaneuraOu mate solver"
+	#define KEEP_LAST_MOVE
+	#undef  MAX_PLY_NUM
+	#define MAX_PLY_NUM 2000
+	#define USE_SEE
+	#define USE_MATE_1PLY
+	#define EVAL_MATERIAL
+	//#define LONG_EFFECT_LIBRARY
+	#define USE_KEY_AFTER
+	#define ENABLE_TEST_CMD
 #endif
 
 // --- ユーザーの自作エンジンとして実行ファイルを公開するとき用の設定集
 
 #if defined(USER_ENGINE)
-#define ENGINE_NAME "YaneuraOu user engine"
-#define USE_SEE
-#define EVAL_MATERIAL
+	#define ENGINE_NAME "YaneuraOu user engine"
+	#define USE_SEE
+	#define EVAL_MATERIAL
 #endif
 
 // --------------------
@@ -399,11 +394,11 @@ constexpr int MAX_PLY_NUM = 246;
 
 // トーナメント(大会)用に、対局に不要なものをすべて削ぎ落とす。
 #if defined(FOR_TOURNAMENT)
-#undef ASSERT_LV
-#undef EVAL_LEARN
-#undef ENABLE_TEST_CMD
-#undef USE_GLOBAL_OPTIONS
-#undef KEEP_LAST_MOVE
+	#undef ASSERT_LV
+	#undef EVAL_LEARN
+	#undef ENABLE_TEST_CMD
+	#undef USE_GLOBAL_OPTIONS
+	#undef KEEP_LAST_MOVE
 #endif
 
 // --------------------
@@ -413,7 +408,7 @@ constexpr int MAX_PLY_NUM = 246;
 // 学習時にはEVAL_HASHを無効化しておかないと、rmseの計算のときなどにeval hashにhitしてしまい、
 // 正しく計算できない。そのため、EVAL_HASHを動的に無効化するためのオプションを用意する。
 #if defined(EVAL_LEARN)
-#define USE_GLOBAL_OPTIONS
+	#define USE_GLOBAL_OPTIONS
 #endif
 
 // --------------------
@@ -519,15 +514,6 @@ constexpr bool pretty_jp = false;
 #define HASH_KEY Key256
 #endif
 
-// --- Dropbit
-
-// USE_DROPBIT_IN_STATSがdefineされているときは、Moveの上位16bitに格納するPieceとして駒打ちは +32(PIECE_DROP)　にする。
-#if defined (USE_DROPBIT_IN_STATS)
-#define PIECE_DROP 32
-#else
-#define PIECE_DROP 0
-#endif
-
 // --- lastMove
 
 // KIF形式に変換するときにPositionクラスにその局面へ至る直前の指し手が保存されていないと
@@ -628,27 +614,28 @@ constexpr bool Is64Bit = false;
 
 // -- 評価関数の種類によりエンジン名に使用する文字列を変更する。
 #if defined(EVAL_MATERIAL)
-#define EVAL_TYPE_NAME "Material"
-
+	#if defined(MATERIAL_LEVEL)
+	// MATERIAL_LEVELの番号を"Level"として出力してやる。
+		#define EVAL_TYPE_NAME "MaterialLv" << MATERIAL_LEVEL
+	#else
+	// 適切な評価関数がないので単にEVAL_MATERIALを指定しているだけだから、EVAL_TYPE_NAMEとしては空欄でいいかと。
+		#define EVAL_TYPE_NAME ""
+	#endif
 #elif defined(EVAL_KPPT)
-#define EVAL_TYPE_NAME "KPPT"
-
+	#define EVAL_TYPE_NAME "KPPT"
 #elif defined(EVAL_KPP_KKPT)
-#define EVAL_TYPE_NAME "KPP_KKPT"
-
+	#define EVAL_TYPE_NAME "KPP_KKPT"
 #elif defined(EVAL_NNUE_KP256)
-#define EVAL_TYPE_NAME "NNUE KP256"
-
+	#define EVAL_TYPE_NAME "NNUE KP256"
 #elif defined(EVAL_NNUE_HALFKPE9)
-#define EVAL_TYPE_NAME "NNUE halfKPE9"
-// hafeKPE9には利きが必要
-#define LONG_EFFECT_LIBRARY
-#define USE_BOARD_EFFECT_PREV
-
+	#define EVAL_TYPE_NAME "NNUE halfKPE9"
+	// hafeKPE9には利きが必要
+	#define LONG_EFFECT_LIBRARY
+	#define USE_BOARD_EFFECT_PREV
 #elif defined(EVAL_NNUE) // それ以外のNNUEなので標準NNUE halfKP256だと思われる。
-#define EVAL_TYPE_NAME "NNUE"
+	#define EVAL_TYPE_NAME "NNUE"
 #else
-#define EVAL_TYPE_NAME ""
+	#define EVAL_TYPE_NAME ""
 #endif
 
 // -- do_move()のときに移動した駒の管理をして差分計算
