@@ -1,7 +1,7 @@
 ﻿// NNUE評価関数の入力特徴量Pの定義
 
-#ifndef _NNUE_FEATURES_A_H_
-#define _NNUE_FEATURES_A_H_
+#ifndef _NNUE_FEATURES_AV_H_
+#define _NNUE_FEATURES_AV_H_
 
 #include "../../../config.h"
 
@@ -16,17 +16,17 @@ namespace NNUE {
 
 namespace Features {
 
-// 特徴量A：駒のBonaPiece (A:All Pieces)
-class A {
+// 特徴量AV：駒のBonaPieceと空きマス (A:All Pieces V:Vacant)
+class AV {
  public:
   // 特徴量名
-  static constexpr const char* kName = "A";
+  static constexpr const char* kName = "AV";
   // 評価関数ファイルに埋め込むハッシュ値
-  static constexpr std::uint32_t kHashValue = 0x89F0A1BCu;
+  static constexpr std::uint32_t kHashValue = 0x659F8C7Bu;
   // 特徴量の次元数
-  static constexpr IndexType kDimensions = fe_end2;
+  static constexpr IndexType kDimensions = fe_end3;
   // 特徴量のうち、同時に値が1となるインデックスの数の最大値
-  static constexpr IndexType kMaxActiveDimensions = PIECE_NUMBER_NB;
+  static constexpr IndexType kMaxActiveDimensions = PIECE_NUMBER_NB + SQ_NB;
   // 差分計算の代わりに全計算を行うタイミング
   static constexpr TriggerEvent kRefreshTrigger = TriggerEvent::kNone;
 
