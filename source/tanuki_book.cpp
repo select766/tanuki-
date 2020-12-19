@@ -1,5 +1,3 @@
-//#pragma optimize( "", off )
-
 #include "tanuki_book.h"
 #include "config.h"
 
