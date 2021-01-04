@@ -312,17 +312,17 @@ ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_
 		eval/nnue/evaluate_nnue_learner.cpp                                    \
 		eval/nnue/nnue_test_command.cpp                                        \
 		eval/nnue/features/a.cpp                                               \
-		eval/nnue/features/av.cpp                                              \
 		eval/nnue/features/k.cpp                                               \
 		eval/nnue/features/p.cpp                                               \
 		eval/nnue/features/half_ka.cpp                                         \
-		eval/nnue/features/half_kav.cpp                                        \
 		eval/nnue/features/half_kp.cpp                                         \
+		eval/nnue/features/half_kv.cpp                                         \
 		eval/nnue/features/half_relative_ka.cpp                                \
-		eval/nnue/features/half_relative_kav.cpp                               \
 		eval/nnue/features/half_relative_kp.cpp                                \
+		eval/nnue/features/half_relative_kv.cpp                                \
 		eval/nnue/features/half_kpe9.cpp								\
 		eval/nnue/features/pe9.cpp										\
+		eval/nnue/features/v.cpp										\
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 endif
 
