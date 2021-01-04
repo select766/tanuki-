@@ -1,7 +1,7 @@
-﻿// NNUE評価関数の入力特徴量HalfRelativeKAVの定義
+﻿// NNUE評価関数の入力特徴量HalfRelativeKVの定義
 
-#ifndef _NNUE_FEATURES_HALF_RELATIVE_KAV_H_
-#define _NNUE_FEATURES_HALF_RELATIVE_KAV_H_
+#ifndef _NNUE_FEATURES_HALF_RELATIVE_KV_H_
+#define _NNUE_FEATURES_HALF_RELATIVE_KV_H_
 
 #include "../../../config.h"
 
@@ -16,27 +16,24 @@ namespace NNUE {
 
 namespace Features {
 
-// 特徴量HalfRelativeKAV：自玉または敵玉を基準とした、玉以外の各駒の相対位置
+// 特徴量HalfRelativeKV：自玉または敵玉を基準とした、玉以外の各駒の相対位置
 template <Side AssociatedKing>
-class HalfRelativeKAV {
+class HalfRelativeKV {
  public:
   // 特徴量名
   static constexpr const char* kName = (AssociatedKing == Side::kFriend) ?
-      "HalfRelativeKAV(Friend)" : "HalfRelativeKAV(Enemy)";
+      "HalfRelativeKV(Friend)" : "HalfRelativeKV(Enemy)";
   // 評価関数ファイルに埋め込むハッシュ値
   static constexpr std::uint32_t kHashValue =
       0x26420D73u ^ (AssociatedKing == Side::kFriend);
-  // 駒種
-  static constexpr IndexType kNumPieceKinds = (fe_end3 - fe_hand_end) / SQ_NB;
   // 玉を中央に置いた仮想的な盤の幅
   static constexpr IndexType kBoardWidth = FILE_NB * 2 - 1;
   // 玉を中央に置いた仮想的な盤の高さ
   static constexpr IndexType kBoardHeight = RANK_NB * 2 - 1;
   // 特徴量の次元数
-  static constexpr IndexType kDimensions =
-      kNumPieceKinds * kBoardHeight * kBoardWidth;
+  static constexpr IndexType kDimensions = kBoardHeight * kBoardWidth;
   // 特徴量のうち、同時に値が1となるインデックスの数の最大値
-  static constexpr IndexType kMaxActiveDimensions = PIECE_NUMBER_NB + SQ_NB;
+  static constexpr IndexType kMaxActiveDimensions = SQ_NB;
   // 差分計算の代わりに全計算を行うタイミング
   static constexpr TriggerEvent kRefreshTrigger =
       (AssociatedKing == Side::kFriend) ?
@@ -51,7 +48,7 @@ class HalfRelativeKAV {
                                    IndexList* removed, IndexList* added);
 
   // 玉の位置とBonaPieceから特徴量のインデックスを求める
-  static IndexType MakeIndex(Square sq_k, BonaPiece p);
+  static IndexType MakeIndex(Square sq_k, Square sq_vacant);
 
  private:
   // 駒の情報を取得する

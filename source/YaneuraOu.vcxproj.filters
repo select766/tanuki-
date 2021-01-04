@@ -325,20 +325,23 @@
     <ClInclude Include="eval\nnue\architectures\halfka_256x2-32-32.h">
       <Filter>リソース ファイル\eval\nnue\architectures</Filter>
     </ClInclude>
-    <ClInclude Include="eval\nnue\architectures\halfkav_256x2-32-32.h">
+    <ClInclude Include="eval\nnue\features\half_kv.h">
+      <Filter>リソース ファイル\eval\nnue\features</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\features\half_relative_kv.h">
+      <Filter>リソース ファイル\eval\nnue\features</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\features\v.h">
+      <Filter>リソース ファイル\eval\nnue\features</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\trainer\features\factorizer_half_kv.h">
+      <Filter>リソース ファイル\eval\nnue\trainer\features</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\architectures\halfkp-halfkv_256x2-32-32.h">
       <Filter>リソース ファイル\eval\nnue\architectures</Filter>
     </ClInclude>
-    <ClInclude Include="eval\nnue\features\av.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_kav.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_relative_kav.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\trainer\features\factorizer_half_kav.h">
-      <Filter>リソース ファイル\eval\nnue\trainer\features</Filter>
+    <ClInclude Include="eval\nnue\architectures\halfka-halfkv_256x2-32-32.h">
+      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -522,13 +525,13 @@
     <ClCompile Include="eval\nnue\features\half_relative_ka.cpp">
       <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
-    <ClCompile Include="eval\nnue\features\av.cpp">
+    <ClCompile Include="eval\nnue\features\half_kv.cpp">
       <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_kav.cpp">
+    <ClCompile Include="eval\nnue\features\half_relative_kv.cpp">
       <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_relative_kav.cpp">
+    <ClCompile Include="eval\nnue\features\v.cpp">
       <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
   </ItemGroup>

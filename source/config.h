@@ -363,7 +363,8 @@ constexpr int MAX_PLY_NUM = 246;
 		// #define EVAL_NNUE_KP256
 		// #define EVAL_NNUE_HALFKPE9
 		// #define EVAL_NNUE_HALFKA256
-		// #define EVAL_NNUE_HALFKAV256
+		// #define EVAL_NNUE_HALFKP_HALFKV256
+		// #define EVAL_NNUE_HALFKA_HALFKV256
 #endif
 
 #endif // defined(YANEURAOU_ENGINE_KPPT) || ...

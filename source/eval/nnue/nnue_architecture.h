@@ -32,10 +32,15 @@
 // halfKA型
 #include "architectures/halfka_256x2-32-32.h"
 
-#elif defined(EVAL_NNUE_HALFKAV256)
+#elif defined(EVAL_NNUE_HALFKP_HALFKV256)
 
-// halfKAV型
-#include "architectures/halfkav_256x2-32-32.h"
+// halfKP-halfKV型
+#include "architectures/halfkp-halfkv_256x2-32-32.h"
+
+#elif defined(EVAL_NNUE_HALFKA_HALFKV256)
+
+// halfKA-halfKV型
+#include "architectures/halfka-halfkv_256x2-32-32.h"
 
 #else
 
