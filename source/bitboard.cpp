@@ -1,6 +1,6 @@
 ﻿#include "bitboard.h"
 #include "extra/long_effect.h"
-#include "extra/mate/mate1ply.h"
+#include "mate/mate.h"
 
 #include <sstream>
 
@@ -35,10 +35,10 @@ Bitboard FILE_BB[FILE_NB] = { FILE1_BB,FILE2_BB,FILE3_BB,FILE4_BB,FILE5_BB,FILE6
 Bitboard RANK_BB[RANK_NB] = { RANK1_BB,RANK2_BB,RANK3_BB,RANK4_BB,RANK5_BB,RANK6_BB,RANK7_BB,RANK8_BB,RANK9_BB };
 
 Bitboard ForwardRanksBB[COLOR_NB][RANK_NB] = {
-  { ZERO_BB, RANK1_BB, RANK1_BB | RANK2_BB, RANK1_BB | RANK2_BB | RANK3_BB, RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB,
-  ~(RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB), ~(RANK9_BB | RANK8_BB | RANK7_BB), ~(RANK9_BB | RANK8_BB), ~RANK9_BB },
-  { ~RANK1_BB, ~(RANK1_BB | RANK2_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB),
-  RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB, RANK9_BB | RANK8_BB | RANK7_BB, RANK9_BB | RANK8_BB, RANK9_BB, ZERO_BB }
+	{ ZERO_BB, RANK1_BB, RANK1_BB | RANK2_BB, RANK1_BB | RANK2_BB | RANK3_BB, RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB,
+	~(RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB), ~(RANK9_BB | RANK8_BB | RANK7_BB), ~(RANK9_BB | RANK8_BB), ~RANK9_BB },
+	{ ~RANK1_BB, ~(RANK1_BB | RANK2_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB), ~(RANK1_BB | RANK2_BB | RANK3_BB | RANK4_BB),
+	RANK9_BB | RANK8_BB | RANK7_BB | RANK6_BB, RANK9_BB | RANK8_BB | RANK7_BB, RANK9_BB | RANK8_BB, RANK9_BB, ZERO_BB }
 };
 
 // 敵陣を表現するBitboard。
@@ -74,16 +74,16 @@ Bitboard CheckCandidateBB[SQ_NB_PLUS1][KING-1][COLOR_NB];
 Bitboard CheckCandidateKingBB[SQ_NB_PLUS1];
 
 u8 Slide[SQ_NB_PLUS1] = {
-  1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
-  10, 10, 10, 10, 10, 10, 10, 10, 10,
-  19, 19, 19, 19, 19, 19, 19, 19, 19,
-  28, 28, 28, 28, 28, 28, 28, 28, 28,
-  37, 37, 37, 37, 37, 37, 37, 37, 37,
-  46, 46, 46, 46, 46, 46, 46, 46, 46,
-  55, 55, 55, 55, 55, 55, 55, 55, 55,
-  1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
-  10, 10, 10, 10, 10, 10, 10, 10, 10,
-  0 , // SQ_NB用
+	1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+	10, 10, 10, 10, 10, 10, 10, 10, 10,
+	19, 19, 19, 19, 19, 19, 19, 19, 19,
+	28, 28, 28, 28, 28, 28, 28, 28, 28,
+	37, 37, 37, 37, 37, 37, 37, 37, 37,
+	46, 46, 46, 46, 46, 46, 46, 46, 46,
+	55, 55, 55, 55, 55, 55, 55, 55, 55,
+	1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
+	10, 10, 10, 10, 10, 10, 10, 10, 10,
+	0 , // SQ_NB用
 };
 
 Bitboard BetweenBB[785];
@@ -253,14 +253,14 @@ const u64 BishopMagic[SQ_NB_PLUS1] = {
 // これらは一度値を設定したら二度と変更しない。
 // 本当は const 化したい。
 #if defined (USE_BMI2)
-Bitboard RookAttack[495616];
+Bitboard RookAttack[495616 + 1 /* SQ_NB対応*/];
 #else
-Bitboard RookAttack[512000];
+Bitboard RookAttack[512000 + 1 /* SQ_NB対応*/];
 #endif
 
 int RookAttackIndex[SQ_NB_PLUS1];
 Bitboard RookBlockMask[SQ_NB_PLUS1];
-Bitboard BishopAttack[20224];
+Bitboard BishopAttack[20224 + 1 /* SQ_NB対応*/];
 int BishopAttackIndex[SQ_NB_PLUS1];
 Bitboard BishopBlockMask[SQ_NB_PLUS1];
 
@@ -363,6 +363,11 @@ namespace {
 			}
 			index += 1 << (64 - shift[sq]);
 		}
+
+		// 駒(飛車・角)がSQ_NBの時には利きは発生してはならない。
+		blockMask[SQ_NB] = ZERO_BB; // 駒はない扱い (マスク後、ZERO_BBになる)
+		attackIndex[SQ_NB] = index; // そうするとindexの先頭を指すはず
+		attacks[index] = ZERO_BB;   // そこにはZERO_BBが書き込まれていると。
 	}
 
 	// Apery型の遠方駒の利きの処理で用いるテーブルの初期化
@@ -385,45 +390,45 @@ namespace {
 // Bitboardを表示する(USI形式ではない) デバッグ用
 std::ostream& operator<<(std::ostream& os, const Bitboard& board)
 {
-  for (Rank rank = RANK_1; rank <= RANK_9; ++rank)
-  {
-    for (File file = FILE_9; file >= FILE_1; --file)
-      os << ((board & (file | rank)) ? " *" : " .");
-    os << endl;
-  }
-  // 連続して表示させるときのことを考慮して改行を最後に入れておく。
-  os << endl;
-  return os;
+	for (Rank rank = RANK_1; rank <= RANK_9; ++rank)
+	{
+		for (File file = FILE_9; file >= FILE_1; --file)
+			os << ((board & (file | rank)) ? " *" : " .");
+		os << endl;
+	}
+	// 連続して表示させるときのことを考慮して改行を最後に入れておく。
+	os << endl;
+	return os;
 }
 
 // 盤上sqに駒pc(先後の区別あり)を置いたときの利き。
 Bitboard effects_from(Piece pc, Square sq, const Bitboard& occ)
 {
-  switch (pc)
-  {
-  case B_PAWN: return pawnEffect(BLACK, sq);
-  case B_LANCE: return lanceEffect(BLACK, sq, occ);
-  case B_KNIGHT: return knightEffect(BLACK, sq);
-  case B_SILVER: return silverEffect(BLACK, sq);
-  case B_GOLD: case B_PRO_PAWN: case B_PRO_LANCE: case B_PRO_KNIGHT: case B_PRO_SILVER: return goldEffect(BLACK, sq);
+	switch (pc)
+	{
+	case B_PAWN: return pawnEffect(BLACK, sq);
+	case B_LANCE: return lanceEffect(BLACK, sq, occ);
+	case B_KNIGHT: return knightEffect(BLACK, sq);
+	case B_SILVER: return silverEffect(BLACK, sq);
+	case B_GOLD: case B_PRO_PAWN: case B_PRO_LANCE: case B_PRO_KNIGHT: case B_PRO_SILVER: return goldEffect(BLACK, sq);
 
-  case W_PAWN: return pawnEffect(WHITE, sq);
-  case W_LANCE: return lanceEffect(WHITE, sq, occ);
-  case W_KNIGHT: return knightEffect(WHITE, sq);
-  case W_SILVER: return silverEffect(WHITE, sq);
-  case W_GOLD: case W_PRO_PAWN: case W_PRO_LANCE: case W_PRO_KNIGHT: case W_PRO_SILVER: return goldEffect(WHITE, sq);
+	case W_PAWN: return pawnEffect(WHITE, sq);
+	case W_LANCE: return lanceEffect(WHITE, sq, occ);
+	case W_KNIGHT: return knightEffect(WHITE, sq);
+	case W_SILVER: return silverEffect(WHITE, sq);
+	case W_GOLD: case W_PRO_PAWN: case W_PRO_LANCE: case W_PRO_KNIGHT: case W_PRO_SILVER: return goldEffect(WHITE, sq);
 
-    //　先後同じ移動特性の駒
-  case B_BISHOP: case W_BISHOP: return bishopEffect(sq, occ);
-  case B_ROOK:   case W_ROOK:   return rookEffect(sq, occ);
-  case B_HORSE:  case W_HORSE:  return horseEffect(sq, occ);
-  case B_DRAGON: case W_DRAGON: return dragonEffect(sq, occ);
-  case B_KING:   case W_KING:   return kingEffect(sq);
-  case B_QUEEN:  case W_QUEEN:  return horseEffect(sq, occ) | dragonEffect(sq, occ);
-  case NO_PIECE: case PIECE_WHITE: return ZERO_BB; // これも入れておかないと初期化が面倒になる。
+		//　先後同じ移動特性の駒
+	case B_BISHOP: case W_BISHOP: return bishopEffect(sq, occ);
+	case B_ROOK:   case W_ROOK:   return rookEffect(sq, occ);
+	case B_HORSE:  case W_HORSE:  return horseEffect(sq, occ);
+	case B_DRAGON: case W_DRAGON: return dragonEffect(sq, occ);
+	case B_KING:   case W_KING:   return kingEffect(sq);
+	case B_QUEEN:  case W_QUEEN:  return horseEffect(sq, occ) | dragonEffect(sq, occ);
+	case NO_PIECE: case PIECE_WHITE: return ZERO_BB; // これも入れておかないと初期化が面倒になる。
 
-  default: UNREACHABLE; return ALL_BB;
-  }
+	default: UNREACHABLE; return ALL_BB;
+	}
 }
 
 
@@ -628,6 +633,7 @@ void Bitboards::init()
 			// RookRankEffect[FILE_NB][x] には値を代入していないがC++の規約によりゼロ初期化されている。
 		}
 	}
+
 #else
 
 	// Apery型の遠方駒の利きの処理で用いるテーブルの初期化
@@ -830,6 +836,9 @@ void Bitboards::init()
 			CheckCandidateKingBB[ksq] = target & ~Bitboard(ksq);
 		}
 
+	// 以下はBitboardとは関係はないが、Bitboardが初期化されていないと初期化できないので
+	// ここから初期化しておいてやる。
+
 	// 10. LONG_EFFECT_LIBRARYの初期化
 
 #if defined (LONG_EFFECT_LIBRARY)
@@ -838,7 +847,7 @@ void Bitboards::init()
 
 	// 11. 1手詰めテーブルの初期化
 #if defined (USE_MATE_1PLY)
-	Mate1Ply::init();
+	Mate::init();
 #endif
 
 }

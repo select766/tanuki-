@@ -26,6 +26,7 @@ Thread::~Thread()
 // このクラスが保持している探索で必要なテーブル(historyなど)をクリアする。
 void Thread::clear()
 {
+#if defined(USE_MOVE_PICKER)
 	counterMoves.fill(MOVE_NONE);
 	mainHistory.fill(0);
 	lowPlyHistory.fill(0);
@@ -38,10 +39,11 @@ void Thread::clear()
 		for (StatsType c : { NoCaptures, Captures })
 		{
 			for (auto& to : continuationHistory[inCheck][c])
-		for (auto& h : to)
-			h->fill(0);
+				for (auto& h : to)
+					h->fill(0);
 			continuationHistory[inCheck][c][SQ_ZERO][NO_PIECE]->fill(Search::CounterMovePruneThreshold - 1);
 		}
+#endif
 }
 
 // 待機していたスレッドを起こして探索を開始させる
@@ -71,13 +73,14 @@ void Thread::idle_loop() {
 	// cf. NUMA for 9 threads or more : https://github.com/official-stockfish/Stockfish/commit/bc3b148d5712ef9ea00e74d3ff5aea10a4d3cabe
 
 #if !defined(FORCE_BIND_THIS_THREAD)
-	if (Options["Threads"] > 8)
+	// "Threads"というオプションがない時は、強制的にbindThisThread()しておいていいと思う。(使うスレッド数がここではわからないので..)
+	if (Options.count("Threads")==0 || Options["Threads"] > 8)
+#endif
 		WinProcGroup::bindThisThread(idx);
 		// このifを有効にすると何故かNUMA環境のマルチスレッド時に弱くなることがある気がする。
 		// (長い時間対局させ続けると安定するようなのだが…)
 		// 上の投稿者と条件が何か違うのだろうか…。
 		// 前のバージョンのソフトが、こちらのNUMAの割当を阻害している可能性が微レ存。
-#endif
 
 	while (true)
 	{
@@ -178,17 +181,19 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 		rootMoves.emplace_back(MOVE_WIN);
 #endif
 
-#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
 	// 全合法手を生成するオプションが有効ならば。
+#if defined(USE_GENERATE_ALL_LEGAL_MOVES)
 	if (limits.generate_all_legal_moves)
 	{
 		for (auto m : MoveList<LEGAL_ALL>(pos))
 			if (limits.searchmoves.empty()
 				|| std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
 				rootMoves.emplace_back(m);
+
 	} else
 #endif
-	{   // トーナメントモードなら、歩の不成は生成しない。
+	{
+
 		for (auto m : MoveList<LEGAL>(pos))
 			if (limits.searchmoves.empty()
 				|| std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
@@ -213,11 +218,11 @@ void ThreadPool::start_thinking(const Position& pos, StateListPtr& states ,
 	// be deduced from a fen string, so set() clears them and they are set from
 	// setupStates->back() later. The rootState is per thread, earlier states are shared
 	// since they are read-only.
-
+	  
 	// Position::set()によってst->previosがクリアされるので事前にコピーして保存する。
 	// これは、rootStateの役割。これはスレッドごとに持っている。
 	// cf. Fix incorrect StateInfo : https://github.com/official-stockfish/Stockfish/commit/232c50fed0b80a0f39322a925575f760648ae0a5
-
+	
 	auto sfen = pos.sfen();
 	for (Thread* th : *this)
 	{
@@ -292,4 +297,16 @@ void ThreadPool::wait_for_search_finished() const {
 	for (Thread* th : *this)
 		if (th != front())
 			th->wait_for_search_finished();
+}
+
+// main thread以外の探索スレッドがすべて終了しているか。
+// すべて終了していればtrueが返る。
+bool ThreadPool::search_finished() const
+{
+	for (Thread* th : *this)
+		if (th != front())
+			if (th->is_searching())
+				return false;
+
+	return true;
 }

@@ -1,4 +1,4 @@
-#include "tanuki_book.h"
+ï»¿#include "tanuki_book.h"
 #include "config.h"
 
 #ifdef EVAL_LEARN
@@ -15,7 +15,7 @@
 #include <omp.h>
 
 #include "evaluate.h"
-#include "extra/book/book.h"
+#include "book/book.h"
 #include "learn/learn.h"
 #include "misc.h"
 #include "position.h"
@@ -24,7 +24,7 @@
 #include "tt.h"
 
 using Book::BookMoveSelector;
-using Book::BookPos;
+using Book::BookMove;
 using Book::MemoryBook;
 using USI::Option;
 
@@ -42,8 +42,8 @@ namespace {
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
 	constexpr const char* kBookTargetSfensFile = "BookTargetSfensFile";
-	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1ŠÔ
-	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6ŠÔ
+	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1æ™‚é–“
+	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6æ™‚é–“
 
 	struct SfenAndMove {
 		std::string sfen;
@@ -65,7 +65,7 @@ namespace {
 		}
 
 		book.write_book(output_book_file_path);
-		sync_cout << "|output_book_file_path|=" << book.get_body()->size() << sync_endl;
+		sync_cout << "|output_book_file_path|=" << book.get_body().size() << sync_endl;
 	}
 
 	void WriteBook(BookMoveSelector& book, const std::string output_book_file_path) {
@@ -75,10 +75,10 @@ namespace {
 	std::mutex UPSERT_BOOK_MOVE_MUTEX;
 
 	/// <summary>
-	/// ’èÕƒf[ƒ^ƒx[ƒX‚Éw‚µè‚ğ“o˜^‚·‚éB
-	/// ‚·‚Å‚Éw‚µè‚ª“o˜^‚³‚ê‚Ä‚¢‚éê‡Aî•ñ‚ğã‘‚«‚·‚éB
-	/// “à•”“I‚É‘åˆæ“I‚ÈƒƒbƒN‚ğæ‚Á‚Äˆ—‚·‚éB
-	/// w‚µèî•ñ‚Í16ƒrƒbƒg‚É•ÏŠ·‚µ‚Ä‚©‚ç•Û‘¶‚·‚éB
+	/// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«æŒ‡ã—æ‰‹ã‚’ç™»éŒ²ã™ã‚‹ã€‚
+	/// ã™ã§ã«æŒ‡ã—æ‰‹ãŒç™»éŒ²ã•ã‚Œã¦ã„ã‚‹å ´åˆã€æƒ…å ±ã‚’ä¸Šæ›¸ãã™ã‚‹ã€‚
+	/// å†…éƒ¨çš„ã«å¤§åŸŸçš„ãªãƒ­ãƒƒã‚¯ã‚’å–ã£ã¦å‡¦ç†ã™ã‚‹ã€‚
+	/// æŒ‡ã—æ‰‹æƒ…å ±ã¯16ãƒ“ãƒƒãƒˆã«å¤‰æ›ã—ã¦ã‹ã‚‰ä¿å­˜ã™ã‚‹ã€‚
 	/// </summary>
 	/// <param name="book"></param>
 	/// <param name="sfen"></param>
@@ -91,8 +91,8 @@ namespace {
 	{
 		std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 
-		// MemoryBook::insert()‚Éˆ—‚ğˆÚ÷‚·‚éB
-		book.insert(sfen, BookPos(Move16(best_move), Move16(next_move), value, depth, num));
+		// MemoryBook::insert()ã«å‡¦ç†ã‚’ç§»è­²ã™ã‚‹ã€‚
+		book.insert(sfen, BookMove(Move16(best_move), Move16(next_move), value, depth, num));
 	}
 }
 
@@ -109,10 +109,10 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	return true;
 }
 
-// sfenŠû•ˆƒtƒ@ƒCƒ‹‚©‚ç’èÕƒf[ƒ^ƒx[ƒX‚ğì¬‚·‚é
+// sfenæ£‹è­œãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹
 bool Tanuki::CreateRawBook() {
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -185,7 +185,7 @@ bool Tanuki::CreateScoredBook() {
 		<< sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -197,24 +197,24 @@ bool Tanuki::CreateScoredBook() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body().size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
 	std::vector<std::string> sfens;
-	for (const auto& sfen_and_count : *input_book.get_body()) {
+	for (const auto& sfen_and_count : input_book.get_body()) {
 		if (!overwrite_existing_positions &&
-			output_book.get_body()->find(sfen_and_count.first) != output_book.get_body()->end()) {
+			output_book.get_body().find(sfen_and_count.first) != output_book.get_body().end()) {
 			continue;
 		}
 		sfens.push_back(sfen_and_count.first);
 	}
-	int num_sfens = sfens.size();
+	int num_sfens = static_cast<int>(sfens.size());
 	sync_cout << "Number of the positions to be processed: " << num_sfens << sync_endl;
 
 	time_t start_time = 0;
@@ -265,13 +265,13 @@ bool Tanuki::CreateScoredBook() {
 			}
 
 			int num_processed_positions = ++global_num_processed_positions;
-			// ”O‚Ì‚½‚ßAI/O‚Íƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚Ì‚İs‚¤
+			// å¿µã®ãŸã‚ã€I/Oã¯ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã®ã¿è¡Œã†
 #pragma omp master
 			{
-				// i’»ó‹µ‚ğ•\¦‚·‚é
+				// é€²æ—çŠ¶æ³ã‚’è¡¨ç¤ºã™ã‚‹
 				progress_report.Show(num_processed_positions);
 
-				// ˆê’èŠÔ‚²‚Æ‚É•Û‘¶‚·‚é
+				// ä¸€å®šæ™‚é–“ã”ã¨ã«ä¿å­˜ã™ã‚‹
 				{
 					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
@@ -286,11 +286,11 @@ bool Tanuki::CreateScoredBook() {
 					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
 			if (need_wait) {
-				// ˆ—‘¬“x‚ª’á‰º‚µ‚Ä‚«‚Ä‚¢‚éB
-				// ‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// å‡¦ç†é€Ÿåº¦ãŒä½ä¸‹ã—ã¦ãã¦ã„ã‚‹ã€‚
+				// å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚µ‚Î‚ç‚­‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã—ã°ã‚‰ãå¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp master
 				{
 					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
@@ -302,7 +302,7 @@ bool Tanuki::CreateScoredBook() {
 					need_wait = false;
 				}
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Ì‘Ò‹@‚ªI‚í‚é‚Ü‚ÅAÄ“x‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã®å¾…æ©ŸãŒçµ‚ã‚ã‚‹ã¾ã§ã€å†åº¦å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 			}
 		}
@@ -313,9 +313,9 @@ bool Tanuki::CreateScoredBook() {
 	return true;
 }
 
-// •¡”‚Ì’èÕ‚ğƒ}[ƒW‚·‚é
-// BookInputFile‚É‚Íu;v‹æØ‚è‚Å’èÕƒf[ƒ^ƒx[ƒX‚ÌŒÃƒp[ƒX‚ğw’è‚·‚é
-// BookOutputFile‚É‚ÍbookˆÈ‰º‚Ìƒtƒ@ƒCƒ‹–¼‚ğw’è‚·‚é
+// è¤‡æ•°ã®å®šè·¡ã‚’ãƒãƒ¼ã‚¸ã™ã‚‹
+// BookInputFileã«ã¯ã€Œ;ã€åŒºåˆ‡ã‚Šã§å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã®å¤ãƒ‘ãƒ¼ã‚¹ã‚’æŒ‡å®šã™ã‚‹
+// BookOutputFileã«ã¯bookä»¥ä¸‹ã®ãƒ•ã‚¡ã‚¤ãƒ«åã‚’æŒ‡å®šã™ã‚‹
 bool Tanuki::MergeBook() {
 	std::string input_file_list = Options[kBookInputFile];
 	std::string output_file = Options[kBookOutputFile];
@@ -327,7 +327,7 @@ bool Tanuki::MergeBook() {
 	sync_cout << "Reading output book file: " << output_file << sync_endl;
 	output_book.get_body().read_book("book/" + output_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.get_body().get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().get_body().size() << sync_endl;
 
 	std::vector<std::string> input_files;
 	{
@@ -346,22 +346,22 @@ bool Tanuki::MergeBook() {
 		sync_cout << "Reading input book file: " << input_file << sync_endl;
 		input_book.get_body().read_book(input_file);
 		sync_cout << "done..." << sync_endl;
-		sync_cout << "|input_book|=" << input_book.get_body().get_body()->size() << sync_endl;
+		sync_cout << "|input_book|=" << input_book.get_body().get_body().size() << sync_endl;
 
-		for (const auto& book_type : *input_book.get_body().get_body()) {
+		for (const auto& book_type : input_book.get_body().get_body()) {
 			const auto& sfen = book_type.first;
 			const auto& pos_move_list = book_type.second;
 
-			uint64_t max_num = 0;
+			uint64_t max_move_count = 0;
 			for (const auto& pos_move : *pos_move_list) {
-				max_num = std::max(max_num, pos_move.num);
+				max_move_count = std::max(max_move_count, pos_move.move_count);
 			}
 
 			for (const auto& pos_move : *pos_move_list) {
-				if (max_num > 0 && pos_move.num == 0) {
-					// Ì‘ğ‰ñ”‚ªİ’è‚³‚ê‚Ä‚¨‚èA‚±‚Ìè‚ÌÌ‘ğ‰ñ”‚ª0‚Ìê‡A
-					// è“®‚Å‚±‚Ìè‚ğw‚³‚È‚¢‚æ‚¤’²®‚³‚ê‚Ä‚¢‚éB
-					// ‚»‚Ì‚æ‚¤‚Èè‚ÍƒXƒLƒbƒv‚·‚éB
+				if (max_move_count > 0 && pos_move.move_count == 0) {
+					// æ¡æŠå›æ•°ãŒè¨­å®šã•ã‚Œã¦ãŠã‚Šã€ã“ã®æ‰‹ã®æ¡æŠå›æ•°ãŒ0ã®å ´åˆã€
+					// æ‰‹å‹•ã§ã“ã®æ‰‹ã‚’æŒ‡ã•ãªã„ã‚ˆã†èª¿æ•´ã•ã‚Œã¦ã„ã‚‹ã€‚
+					// ãã®ã‚ˆã†ãªæ‰‹ã¯ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ã€‚
 					continue;
 				}
 				output_book.get_body().insert(sfen, pos_move, false);
@@ -374,8 +374,8 @@ bool Tanuki::MergeBook() {
 	return true;
 }
 
-// ’èÕ‚ÌŠew‚µè‚É•]‰¿’l‚ğ•t‚¯‚é
-// ‘Šè‚Ì‰è‚ªİ’è‚³‚ê‚Ä‚¢‚È‚¢ê‡A“Ç‚İ‹Ø‚©‚çİ’è‚·‚éB
+// å®šè·¡ã®å„æŒ‡ã—æ‰‹ã«è©•ä¾¡å€¤ã‚’ä»˜ã‘ã‚‹
+// ç›¸æ‰‹ã®å¿œæ‰‹ãŒè¨­å®šã•ã‚Œã¦ã„ãªã„å ´åˆã€èª­ã¿ç­‹ã‹ã‚‰è¨­å®šã™ã‚‹ã€‚
 bool Tanuki::SetScoreToMove() {
 	int num_threads = (int)Options[kThreads];
 	std::string input_book_file = Options[kBookInputFile];
@@ -392,7 +392,7 @@ bool Tanuki::SetScoreToMove() {
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -404,69 +404,69 @@ bool Tanuki::SetScoreToMove() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body().size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
 	std::vector<SfenAndMove> sfen_and_moves;
 
-	// –¢ˆ—‚Ì‹Ç–Ê‚ğƒLƒ…[‚É“o˜^‚·‚é
-	for (const auto& input_sfen_and_pos_move_list : *input_book.get_body()) {
+	// æœªå‡¦ç†ã®å±€é¢ã‚’ã‚­ãƒ¥ãƒ¼ã«ç™»éŒ²ã™ã‚‹
+	for (const auto& input_sfen_and_pos_move_list : input_book.get_body()) {
 		const auto& input_sfen = input_sfen_and_pos_move_list.first;
 
 		Position& position = Threads[0]->rootPos;
 		StateInfo state_info;
 		position.set(input_sfen, &state_info, Threads[0]);
 
-		auto output_book_moves_it = output_book.get_body()->find(input_sfen);
-		if (output_book_moves_it == output_book.get_body()->end()) {
-			// o—Í’èÕƒf[ƒ^ƒx[ƒX‚É‹Ç–Ê‚ª“o˜^‚³‚ê‚Ä‚¢‚È‚©‚Á‚½ê‡
+		auto output_book_moves_it = output_book.get_body().find(input_sfen);
+		if (output_book_moves_it == output_book.get_body().end()) {
+			// å‡ºåŠ›å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«å±€é¢ãŒç™»éŒ²ã•ã‚Œã¦ã„ãªã‹ã£ãŸå ´åˆ
 			for (const auto& input_book_move : *input_sfen_and_pos_move_list.second) {
 				sfen_and_moves.push_back({
 					input_sfen,
-					position.to_move(input_book_move.bestMove),
-					position.to_move(input_book_move.nextMove)
+					position.to_move(input_book_move.move),
+					position.to_move(input_book_move.ponder)
 					});
 			}
 			continue;
 		}
 
-		const auto& output_book_moves = *output_book_moves_it->second;
+		auto& output_book_moves = *output_book_moves_it->second;
 		for (const auto& input_book_move : *input_sfen_and_pos_move_list.second) {
 			if (std::find_if(output_book_moves.begin(), output_book_moves.end(),
 				[&input_book_move](const auto& x) {
-					return input_book_move.bestMove == x.bestMove;
+					return input_book_move.move == x.move;
 				}) != output_book_moves.end()) {
 				continue;
 			}
 
-			// o—Í’èÕƒf[ƒ^ƒx[ƒX‚Éw‚µè‚ª“o˜^‚³‚ê‚Ä‚¢‚È‚©‚Á‚½ê‡
+			// å‡ºåŠ›å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«æŒ‡ã—æ‰‹ãŒç™»éŒ²ã•ã‚Œã¦ã„ãªã‹ã£ãŸå ´åˆ
 			sfen_and_moves.push_back({
 				input_sfen,
-				position.to_move(input_book_move.bestMove),
-				position.to_move(input_book_move.nextMove)
+				position.to_move(input_book_move.move),
+				position.to_move(input_book_move.ponder)
 				});
 		}
 	}
-	int num_sfen_and_moves = sfen_and_moves.size();
+	int num_sfen_and_moves = static_cast<int>(sfen_and_moves.size());
 	sync_cout << "Number of the moves to be processed: " << num_sfen_and_moves << sync_endl;
 
-	// ƒ}ƒ‹ƒ`ƒXƒŒƒbƒhˆ—€”õ‚Ì‚½‚ßAƒCƒ“ƒfƒbƒNƒX‚ğ‰Šú‰»‚·‚é
+	// ãƒãƒ«ãƒã‚¹ãƒ¬ãƒƒãƒ‰å‡¦ç†æº–å‚™ã®ãŸã‚ã€ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’åˆæœŸåŒ–ã™ã‚‹
 	std::atomic_int global_sfen_and_move_index;
 	global_sfen_and_move_index = 0;
 
-	// i’»ó‹µ•\¦‚Ì€”õ
+	// é€²æ—çŠ¶æ³è¡¨ç¤ºã®æº–å‚™
 	ProgressReport progress_report(num_sfen_and_moves, kShowProgressPerAtMostSec);
 
-	// ’èÕ‚ğ’èŠú“I‚É•Û‘¶‚·‚é‚½‚ß‚Ì•Ï”
+	// å®šè·¡ã‚’å®šæœŸçš„ã«ä¿å­˜ã™ã‚‹ãŸã‚ã®å¤‰æ•°
 	time_t last_save_time_sec = std::time(nullptr);
 
-	// Apery®ƒ}ƒ‹ƒ`ƒXƒŒƒbƒhˆ—
+	// Aperyå¼ãƒãƒ«ãƒã‚¹ãƒ¬ãƒƒãƒ‰å‡¦ç†
 	std::atomic<bool> need_wait = false;
 	std::atomic_int global_num_processed_positions;
 	global_num_processed_positions = 0;
@@ -500,32 +500,32 @@ bool Tanuki::SetScoreToMove() {
 			pos.do_move(best_move, state_info0);
 			Eval::evaluate_with_no_return(pos);
 
-			// ‚±‚Ì‹Ç–Ê‚É‚Â‚¢‚Ä’Tõ‚·‚é
+			// ã“ã®å±€é¢ã«ã¤ã„ã¦æ¢ç´¢ã™ã‚‹
 			auto value_and_pv = Learner::search(pos, search_depth, 1, search_nodes);
 
-			// ‚Ğ‚Æ‚Â‘O‚Ì‹Ç–Ê‚©‚çŒ©‚½•]‰¿’l‚ğ‘ã“ü‚·‚é•K—v‚ª‚ ‚é‚Ì‚ÅA•„†‚ğ”½“]‚·‚éB
+			// ã²ã¨ã¤å‰ã®å±€é¢ã‹ã‚‰è¦‹ãŸè©•ä¾¡å€¤ã‚’ä»£å…¥ã™ã‚‹å¿…è¦ãŒã‚ã‚‹ã®ã§ã€ç¬¦å·ã‚’åè»¢ã™ã‚‹ã€‚
 			Value value = -value_and_pv.first;
 
 			auto pv = value_and_pv.second;
 			if (next_move == MOVE_NONE && pv.size() >= 1) {
-				// ’èÕ‚Ìè‚ğw‚µ‚½Ÿ‚Ì‹Ç–Ê‚È‚Ì‚ÅAnextMove‚É‚Ípv[0]‚ğ‘ã“ü‚·‚éB
-				// ‚½‚¾‚µA‚à‚Æ‚à‚ÆnextMove‚ªİ’è‚³‚ê‚Ä‚¢‚éê‡A‚»‚ê‚ğ—Dæ‚·‚éB
+				// å®šè·¡ã®æ‰‹ã‚’æŒ‡ã—ãŸæ¬¡ã®å±€é¢ãªã®ã§ã€nextMoveã«ã¯pv[0]ã‚’ä»£å…¥ã™ã‚‹ã€‚
+				// ãŸã ã—ã€ã‚‚ã¨ã‚‚ã¨nextMoveãŒè¨­å®šã•ã‚Œã¦ã„ã‚‹å ´åˆã€ãã‚Œã‚’å„ªå…ˆã™ã‚‹ã€‚
 				next_move = pv[0];
 			}
 
 			Depth depth = pos.this_thread()->completedDepth;
 
-			// w‚µè‚ğo—Íæ‚Ì’èÕ‚É“o˜^‚·‚é
+			// æŒ‡ã—æ‰‹ã‚’å‡ºåŠ›å…ˆã®å®šè·¡ã«ç™»éŒ²ã™ã‚‹
 			UpsertBookMove(output_book, sfen, best_move, next_move, value, depth, 1);
 
 			int num_processed_positions = ++global_num_processed_positions;
-			// ”O‚Ì‚½‚ßAI/O‚Íƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚Ì‚İs‚¤
+			// å¿µã®ãŸã‚ã€I/Oã¯ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã®ã¿è¡Œã†
 #pragma omp master
 			{
-				// i’»ó‹µ‚ğ•\¦‚·‚é
+				// é€²æ—çŠ¶æ³ã‚’è¡¨ç¤ºã™ã‚‹
 				progress_report.Show(num_processed_positions);
 
-				// ’èÕ‚ğƒXƒgƒŒ[ƒW‚É‘‚«o‚·B
+				// å®šè·¡ã‚’ã‚¹ãƒˆãƒ¬ãƒ¼ã‚¸ã«æ›¸ãå‡ºã™ã€‚
 				if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
 					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 					WriteBook(output_book, output_book_file);
@@ -538,11 +538,11 @@ bool Tanuki::SetScoreToMove() {
 					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
 			if (need_wait) {
-				// ˆ—‘¬“x‚ª’á‰º‚µ‚Ä‚«‚Ä‚¢‚éB
-				// ‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// å‡¦ç†é€Ÿåº¦ãŒä½ä¸‹ã—ã¦ãã¦ã„ã‚‹ã€‚
+				// å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 
-			// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚µ‚Î‚ç‚­‘Ò‹@‚·‚éB
+			// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã—ã°ã‚‰ãå¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp master
 				{
 					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
@@ -554,7 +554,7 @@ bool Tanuki::SetScoreToMove() {
 					need_wait = false;
 				}
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Ì‘Ò‹@‚ªI‚í‚é‚Ü‚ÅAÄ“x‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã®å¾…æ©ŸãŒçµ‚ã‚ã‚‹ã¾ã§ã€å†åº¦å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 			}
 		}
@@ -567,24 +567,24 @@ bool Tanuki::SetScoreToMove() {
 
 namespace {
 	struct ValueMoveDepth {
-		// •]‰¿’l
+		// è©•ä¾¡å€¤
 		Value value = VALUE_NONE;
-		// ‚±‚Ì‹Ç–Ê‚É‚¨‚¯‚éw‚µè
-		// ’èÕ‚Ìw‚µè‚É‘Î‚·‚é‰è‚ğ’èÕƒf[ƒ^ƒx[ƒX‚É“o˜^‚·‚é‚½‚ßAw‚µè‚à•Ô‚¹‚é‚æ‚¤‚É‚µ‚Ä‚¨‚­
+		// ã“ã®å±€é¢ã«ãŠã‘ã‚‹æŒ‡ã—æ‰‹
+		// å®šè·¡ã®æŒ‡ã—æ‰‹ã«å¯¾ã™ã‚‹å¿œæ‰‹ã‚’å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«ç™»éŒ²ã™ã‚‹ãŸã‚ã€æŒ‡ã—æ‰‹ã‚‚è¿”ã›ã‚‹ã‚ˆã†ã«ã—ã¦ãŠã
 		Move move = MOVE_NONE;
-		// ’Tõ[‚³
+		// æ¢ç´¢æ·±ã•
 		Depth depth = DEPTH_NONE;
 	};
 
 	// (sfen, ValueAndDepth)
-	// ‚â‚Ë‚¤‚ç‰¤–{‰Æ‚Å‚Íè”‚Ì•”•ª‚ğíœ‚µ‚Ä‚¢‚é‚ªA
-	// À‘•‚ğ—eˆÕ‚É‚·‚é‚½‚ßè”‚àŠÜ‚ß‚ÄŠi”[‚·‚éB
-	// –{—ˆ‚Å‚ ‚ê‚Î‚±‚ê‚É‚æ‚é•›ì—p‚ğnl‚·‚é•K—v‚ª‚ ‚é‚ªA
-	// ‚æ‚­•ª‚©‚ç‚È‚©‚Á‚½‚Ì‚Å“K“–‚ÉÀ‘•‚·‚éB
+	// ã‚„ã­ã†ã‚‰ç‹æœ¬å®¶ã§ã¯æ‰‹æ•°ã®éƒ¨åˆ†ã‚’å‰Šé™¤ã—ã¦ã„ã‚‹ãŒã€
+	// å®Ÿè£…ã‚’å®¹æ˜“ã«ã™ã‚‹ãŸã‚æ‰‹æ•°ã‚‚å«ã‚ã¦æ ¼ç´ã™ã‚‹ã€‚
+	// æœ¬æ¥ã§ã‚ã‚Œã°ã“ã‚Œã«ã‚ˆã‚‹å‰¯ä½œç”¨ã‚’ç†Ÿè€ƒã™ã‚‹å¿…è¦ãŒã‚ã‚‹ãŒã€
+	// ã‚ˆãåˆ†ã‹ã‚‰ãªã‹ã£ãŸã®ã§é©å½“ã«å®Ÿè£…ã™ã‚‹ã€‚
 	std::unordered_map<std::string, ValueMoveDepth> memo;
 
-	// IgnoreBookPlyƒIƒvƒVƒ‡ƒ“‚ªtrue‚Ìê‡A
-	// —^‚¦‚ç‚ê‚½sfen•¶š—ñ‚©‚çply‚ğæ‚èœ‚­
+	// IgnoreBookPlyã‚ªãƒ—ã‚·ãƒ§ãƒ³ãŒtrueã®å ´åˆã€
+	// ä¸ãˆã‚‰ã‚ŒãŸsfenæ–‡å­—åˆ—ã‹ã‚‰plyã‚’å–ã‚Šé™¤ã
 	std::string RemovePlyIfIgnoreBookPly(const std::string& sfen) {
 		if (Options["IgnoreBookPly"]) {
 			return StringExtension::trim_number(sfen);
@@ -594,38 +594,38 @@ namespace {
 		}
 	}
 
-	// Nega-Max–@‚Å––’[‹Ç–Ê‚Ì•]‰¿’l‚ğroot‹Ç–Ê‚ÉŒü‚¯‚Ä“`”À‚·‚é
-	// book ’èÕƒf[ƒ^ƒx[ƒX
-	// pos Œ»İ‚Ì‹Ç–Ê
-	// value_and_depth_without_nega_max_parent SetScoreToMove()‚Åİ’è‚µ‚½•]‰¿’l‚Æ’Tõ[‚³
-	//                                         Œ»‹Ç–Ê‚©‚çŒ©‚½•]‰¿’l‚É‚È‚é‚æ‚¤A•„†‚ğ”½“]‚µ‚Ä‚©‚ç“n‚·‚±‚Æ
+	// Nega-Maxæ³•ã§æœ«ç«¯å±€é¢ã®è©•ä¾¡å€¤ã‚’rootå±€é¢ã«å‘ã‘ã¦ä¼æ¬ã™ã‚‹
+	// book å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹
+	// pos ç¾åœ¨ã®å±€é¢
+	// value_and_depth_without_nega_max_parent SetScoreToMove()ã§è¨­å®šã—ãŸè©•ä¾¡å€¤ã¨æ¢ç´¢æ·±ã•
+	//                                         ç¾å±€é¢ã‹ã‚‰è¦‹ãŸè©•ä¾¡å€¤ã«ãªã‚‹ã‚ˆã†ã€ç¬¦å·ã‚’åè»¢ã—ã¦ã‹ã‚‰æ¸¡ã™ã“ã¨
 	ValueMoveDepth NegaMax(MemoryBook& book, Position& pos, int& counter) {
 		if (++counter % 1000000 == 0) {
 			sync_cout << counter << " |memo|=" << memo.size() << sync_endl;
 		}
 
-		// ‚±‚Ì‹Ç–Ê‚É‘Î‚µ‚Ä‚ÌƒL[‚Æ‚µ‚Äg—p‚·‚ésfen•¶š—ñB
-		// •K—v‚É‰‚¶‚Ä––”ö‚Ìply‚ğæ‚èœ‚¢‚Ä‚¨‚­B
+		// ã“ã®å±€é¢ã«å¯¾ã—ã¦ã®ã‚­ãƒ¼ã¨ã—ã¦ä½¿ç”¨ã™ã‚‹sfenæ–‡å­—åˆ—ã€‚
+		// å¿…è¦ã«å¿œã˜ã¦æœ«å°¾ã®plyã‚’å–ã‚Šé™¤ã„ã¦ãŠãã€‚
 		std::string sfen = RemovePlyIfIgnoreBookPly(pos.sfen());
 
-		// NegaMax()‚Í’èÕƒf[ƒ^ƒx[ƒX‚É“o˜^‚³‚ê‚Ä‚¢‚é‹Ç–Ê‚É‚Â‚¢‚Ä‚Ì‚İˆ—‚ğs‚¤B
-		ASSERT_LV3(book.get_body()->count(sfen));
+		// NegaMax()ã¯å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«ç™»éŒ²ã•ã‚Œã¦ã„ã‚‹å±€é¢ã«ã¤ã„ã¦ã®ã¿å‡¦ç†ã‚’è¡Œã†ã€‚
+		ASSERT_LV3(book.get_body().count(sfen));
 
 		auto& vmd = memo[sfen];
 		if (vmd.depth != DEPTH_NONE) {
-			// ƒLƒƒƒbƒVƒ…‚Éƒqƒbƒg‚µ‚½ê‡A‚»‚Ì’l‚ğ•Ô‚·B
+			// ã‚­ãƒ£ãƒƒã‚·ãƒ¥ã«ãƒ’ãƒƒãƒˆã—ãŸå ´åˆã€ãã®å€¤ã‚’è¿”ã™ã€‚
 			return vmd;
 		}
 
 		if (pos.is_mated()) {
-			// ‹l‚ñ‚Å‚¢‚éê‡
+			// è©°ã‚“ã§ã„ã‚‹å ´åˆ
 			vmd.value = mated_in(0);
 			vmd.depth = 0;
 			return vmd;
 		}
 
 		if (pos.DeclarationWin() != MOVE_NONE) {
-			// éŒ¾Ÿ‚¿‚Å‚«‚éê‡
+			// å®£è¨€å‹ã¡ã§ãã‚‹å ´åˆ
 			vmd.value = mate_in(1);
 			vmd.depth = 0;
 			return vmd;
@@ -634,33 +634,33 @@ namespace {
 		auto repetition_state = pos.is_repetition();
 		switch (repetition_state) {
 		case REPETITION_WIN:
-			// ˜A‘±‰¤è‚Ìç“úè‚É‚æ‚èŸ‚¿‚Ìê‡
+			// é€£ç¶šç‹æ‰‹ã®åƒæ—¥æ‰‹ã«ã‚ˆã‚Šå‹ã¡ã®å ´åˆ
 			vmd.value = mate_in(MAX_PLY);
 			vmd.depth = 0;
 			return vmd;
 
 		case REPETITION_LOSE:
-			// ˜A‘±‰¤è‚Ìç“úè‚É‚æ‚è•‰‚¯‚Ìê‡
+			// é€£ç¶šç‹æ‰‹ã®åƒæ—¥æ‰‹ã«ã‚ˆã‚Šè² ã‘ã®å ´åˆ
 			vmd.value = mated_in(MAX_PLY);
 			vmd.depth = 0;
 			return vmd;
 
 		case REPETITION_DRAW:
-			// ˆø‚«•ª‚¯‚Ìê‡
-			// ‚â‚Ë‚¤‚ç‰¤‚Å‚ÍæèŒãè‚É•ÊX‚Ì•]‰¿’l‚ğ•t‰Á‚µ‚Ä‚¢‚éB
-			// ‚±‚±‚Å‚ÍŠÈ’P‚Ì‚½‚ßA“¯‚¶•]‰¿’l‚ğ•t‰Á‚·‚éB
+			// å¼•ãåˆ†ã‘ã®å ´åˆ
+			// ã‚„ã­ã†ã‚‰ç‹ã§ã¯å…ˆæ‰‹å¾Œæ‰‹ã«åˆ¥ã€…ã®è©•ä¾¡å€¤ã‚’ä»˜åŠ ã—ã¦ã„ã‚‹ã€‚
+			// ã“ã“ã§ã¯ç°¡å˜ã®ãŸã‚ã€åŒã˜è©•ä¾¡å€¤ã‚’ä»˜åŠ ã™ã‚‹ã€‚
 			vmd.value = static_cast<Value>(Options["Contempt"] * Eval::PawnValue / 100);
 			vmd.depth = 0;
 			return vmd;
 
 		case REPETITION_SUPERIOR:
-			// —D“™‹Ç–Ê‚Ìê‡
+			// å„ªç­‰å±€é¢ã®å ´åˆ
 			vmd.value = VALUE_SUPERIOR;
 			vmd.depth = 0;
 			return vmd;
 
 		case REPETITION_INFERIOR:
-			// —ò“™‹Ç–Ê‚Ìê‡
+			// åŠ£ç­‰å±€é¢ã®å ´åˆ
 			vmd.value = -VALUE_SUPERIOR;
 			vmd.depth = 0;
 			return vmd;
@@ -671,30 +671,30 @@ namespace {
 
 		vmd.value = mated_in(0);
 		vmd.depth = 0;
-		// ‘S‡–@è‚É‚Â‚¢‚Ä’²‚×‚é
+		// å…¨åˆæ³•æ‰‹ã«ã¤ã„ã¦èª¿ã¹ã‚‹
 		for (const auto& move : MoveList<LEGAL_ALL>(pos)) {
 			StateInfo state_info = {};
 			pos.do_move(move, state_info);
-			if (book.get_body()->find(pos.sfen()) != book.get_body()->end()) {
-				// q‹Ç–Ê‚ª‘¶İ‚·‚éê‡‚Ì‚İˆ—‚·‚éB
+			if (book.get_body().find(pos.sfen()) != book.get_body().end()) {
+				// å­å±€é¢ãŒå­˜åœ¨ã™ã‚‹å ´åˆã®ã¿å‡¦ç†ã™ã‚‹ã€‚
 				ValueMoveDepth vmd_child = NegaMax(book, pos, counter);
 
-				// w‚µèî•ñ‚É’Tõ‚ÌŒ‹‰Ê‚ğŠi”[‚·‚éB
-				// •Ô‚Á‚Ä‚«‚½•]‰¿’l‚ÍŸ‚Ì‹Ç–Ê‚©‚çŒ©‚½•]‰¿’l‚È‚Ì‚ÅA•„†‚ğ”½“]‚·‚éB
-				// ‚Ü‚½A’Tõ[‚³‚ğ+1‚·‚éB
+				// æŒ‡ã—æ‰‹æƒ…å ±ã«æ¢ç´¢ã®çµæœã‚’æ ¼ç´ã™ã‚‹ã€‚
+				// è¿”ã£ã¦ããŸè©•ä¾¡å€¤ã¯æ¬¡ã®å±€é¢ã‹ã‚‰è¦‹ãŸè©•ä¾¡å€¤ãªã®ã§ã€ç¬¦å·ã‚’åè»¢ã™ã‚‹ã€‚
+				// ã¾ãŸã€æ¢ç´¢æ·±ã•ã‚’+1ã™ã‚‹ã€‚
 				UpsertBookMove(book, sfen, move, vmd_child.move, -vmd_child.value, vmd_child.depth + 1, 1);
 			}
 			pos.undo_move(move);
 		}
 
-		// Œ»‹Ç–Ê‚É‚Â‚¢‚ÄA’èÕƒf[ƒ^ƒx[ƒX‚Éq‹Ç–Ê‚Ö‚Ìw‚µè‚ª“o˜^‚³‚ê‚½B
-		// ’èÕƒf[ƒ^ƒx[ƒX‚ğ’²‚×A‚±‚Ì‹Ç–Ê‚É‚¨‚¯‚éÅ“K‚Èw‚µè‚ğ’²‚×‚Ä•Ô‚·B
-		auto book_moves = book.get_body()->find(sfen);
-		ASSERT_LV3(book_moves != book.get_body()->end());
+		// ç¾å±€é¢ã«ã¤ã„ã¦ã€å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«å­å±€é¢ã¸ã®æŒ‡ã—æ‰‹ãŒç™»éŒ²ã•ã‚ŒãŸã€‚
+		// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã‚’èª¿ã¹ã€ã“ã®å±€é¢ã«ãŠã‘ã‚‹æœ€é©ãªæŒ‡ã—æ‰‹ã‚’èª¿ã¹ã¦è¿”ã™ã€‚
+		auto book_moves = book.get_body().find(sfen);
+		ASSERT_LV3(book_moves != book.get_body().end());
 		for (const auto& book_move : *book_moves->second) {
 			if (vmd.value < book_move.value) {
 				vmd.value = static_cast<Value>(book_move.value);
-				vmd.move = pos.to_move(book_move.bestMove);
+				vmd.move = pos.to_move(book_move.move);
 				vmd.depth = book_move.depth;
 			}
 		}
@@ -703,7 +703,7 @@ namespace {
 	}
 }
 
-// ’èÕƒf[ƒ^ƒx[ƒX‚Ì––’[‹Ç–Ê‚Ì•]‰¿’l‚ğroot‹Ç–Ê‚ÉŒü‚¯‚Ä“`”À‚·‚é
+// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã®æœ«ç«¯å±€é¢ã®è©•ä¾¡å€¤ã‚’rootå±€é¢ã«å‘ã‘ã¦ä¼æ¬ã™ã‚‹
 bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	std::string input_book_file = Options[kBookInputFile];
 	std::string output_book_file = Options[kBookOutputFile];
@@ -712,7 +712,7 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -724,10 +724,10 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book_file|=" << book.get_body()->size() << sync_endl;
+	sync_cout << "|input_book_file|=" << book.get_body().size() << sync_endl;
 
-	// •½è‚Ì‹Ç–Ê‚©‚ç‚½‚Ç‚ê‚é‹Ç–Ê‚É‚Â‚¢‚Äˆ—‚·‚é
-	// ƒƒ‚‚ğƒNƒŠƒA‚·‚é‚Ì‚ğ–Y‚ê‚È‚¢
+	// å¹³æ‰‹ã®å±€é¢ã‹ã‚‰ãŸã©ã‚Œã‚‹å±€é¢ã«ã¤ã„ã¦å‡¦ç†ã™ã‚‹
+	// ãƒ¡ãƒ¢ã‚’ã‚¯ãƒªã‚¢ã™ã‚‹ã®ã‚’å¿˜ã‚Œãªã„
 	memo.clear();
 	auto& pos = Threads[0]->rootPos;
 	StateInfo state_info = {};
@@ -735,8 +735,8 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	int counter = 0;
 	NegaMax(book, pos, counter);
 
-	// •½è‚Ì‹Ç–Ê‚©‚ç’H‚ê‚È‚©‚Á‚½‹Ç–Ê‚ğˆ—‚·‚é
-	for (const auto& book_entry : *book.get_body()) {
+	// å¹³æ‰‹ã®å±€é¢ã‹ã‚‰è¾¿ã‚Œãªã‹ã£ãŸå±€é¢ã‚’å‡¦ç†ã™ã‚‹
+	for (const auto& book_entry : book.get_body()) {
 		auto& pos = Threads[0]->rootPos;
 		StateInfo state_info = {};
 		pos.set(book_entry.first, &state_info, Threads[0]);
@@ -744,16 +744,16 @@ bool Tanuki::PropagateLeafNodeValuesToRoot() {
 	}
 
 	WriteBook(book, "book/" + output_book_file);
-	sync_cout << "|output_book|=" << book.get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << book.get_body().size() << sync_endl;
 
 	return true;
 }
 
 namespace {
-	// —^‚¦‚ç‚ê‚½‹Ç–Ê‚É‚¨‚¯‚éA—^‚¦‚ç‚ê‚½w‚µè‚ª’èÕƒf[ƒ^ƒx[ƒX‚ÉŠÜ‚Ü‚ê‚Ä‚¢‚é‚©‚Ç‚¤‚©‚ğ•Ô‚·B
-	// ŠÜ‚Ü‚ê‚Ä‚¢‚éê‡‚ÍA‚»‚Ìw‚µè‚Ö‚Ìƒ|ƒCƒ“ƒ^[‚ğ•Ô‚·B
-	// ŠÜ‚Ü‚ê‚Ä‚¢‚È‚¢ê‡‚ÍAnullptr‚ğ•Ô‚·B
-	BookPos* IsBookMoveExist(BookMoveSelector& book, Position& position, Move move) {
+	// ä¸ãˆã‚‰ã‚ŒãŸå±€é¢ã«ãŠã‘ã‚‹ã€ä¸ãˆã‚‰ã‚ŒãŸæŒ‡ã—æ‰‹ãŒå®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«å«ã¾ã‚Œã¦ã„ã‚‹ã‹ã©ã†ã‹ã‚’è¿”ã™ã€‚
+	// å«ã¾ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€ãã®æŒ‡ã—æ‰‹ã¸ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼ã‚’è¿”ã™ã€‚
+	// å«ã¾ã‚Œã¦ã„ãªã„å ´åˆã¯ã€nullptrã‚’è¿”ã™ã€‚
+	BookMove* IsBookMoveExist(BookMoveSelector& book, Position& position, Move move) {
 		auto book_moves = book.get_body().find(position);
 		if (book_moves == nullptr) {
 			return nullptr;
@@ -761,10 +761,10 @@ namespace {
 
 		auto book_move = std::find_if(book_moves->begin(), book_moves->end(),
 			[move](auto& m) {
-				return m.bestMove == Move16(move);
+				return m.move == Move16(move);
 			});
 		if (book_move == book_moves->end()) {
-			// ’èÕƒf[ƒ^ƒx[ƒX‚ÉA‚±‚Ìw‚µè‚ª“o˜^‚³‚ê‚Ä‚¢‚È‚¢ê‡B
+			// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«ã€ã“ã®æŒ‡ã—æ‰‹ãŒç™»éŒ²ã•ã‚Œã¦ã„ãªã„å ´åˆã€‚
 			return nullptr;
 		}
 		else {
@@ -772,43 +772,43 @@ namespace {
 		}
 	}
 
-	// —^‚¦‚ç‚ê‚½‹Ç–Ê‚É‚¨‚¯‚éA—^‚¦‚ç‚ê‚½w‚µè‚ªA“WŠJ‚·‚×‚«‘ÎÛ‚©‚Ç‚¤‚©‚ğ•Ô‚·B
-	// “WŠJ‚·‚éğŒ‚ÍA
-	// - ’èÕƒf[ƒ^ƒx[ƒX‚Éw‚µè‚ªŠÜ‚Ü‚ê‚Ä‚¢‚éA‚©‚Â•]‰¿’l‚ªè‡’lˆÈã
-	// - ’èÕƒf[ƒ^ƒx[ƒX‚Éw‚µè‚ªŠÜ‚Ü‚ê‚Ä‚¢‚È‚¢A‚©‚ÂŸ‚Ì‹Ç–Ê‚ªŠÜ‚Ü‚ê‚Ä‚¢‚é
+	// ä¸ãˆã‚‰ã‚ŒãŸå±€é¢ã«ãŠã‘ã‚‹ã€ä¸ãˆã‚‰ã‚ŒãŸæŒ‡ã—æ‰‹ãŒã€å±•é–‹ã™ã¹ãå¯¾è±¡ã‹ã©ã†ã‹ã‚’è¿”ã™ã€‚
+	// å±•é–‹ã™ã‚‹æ¡ä»¶ã¯ã€
+	// - å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«æŒ‡ã—æ‰‹ãŒå«ã¾ã‚Œã¦ã„ã‚‹ã€ã‹ã¤è©•ä¾¡å€¤ãŒé–¾å€¤ä»¥ä¸Š
+	// - å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«æŒ‡ã—æ‰‹ãŒå«ã¾ã‚Œã¦ã„ãªã„ã€ã‹ã¤æ¬¡ã®å±€é¢ãŒå«ã¾ã‚Œã¦ã„ã‚‹
 	bool IsTargetMove(BookMoveSelector& book, Position& position, Move move32, int book_eval_black_limit, int book_eval_white_limit) {
 		auto book_pos = IsBookMoveExist(book, position, move32);
 		if (book_pos != nullptr) {
-			// ’èÕƒf[ƒ^ƒx[ƒX‚Éw‚µè‚ªŠÜ‚Ü‚ê‚Ä‚¢‚é
+			// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«æŒ‡ã—æ‰‹ãŒå«ã¾ã‚Œã¦ã„ã‚‹
 			int book_eval_limit = position.side_to_move() == BLACK ? book_eval_black_limit : book_eval_white_limit;
 			return book_pos->value > book_eval_limit;
 		}
 		else {
 			StateInfo state_info = {};
 			position.do_move(move32, state_info);
-			bool exist = book.get_body().get_body()->find(position.sfen()) != book.get_body().get_body()->end();
+			bool exist = book.get_body().get_body().find(position.sfen()) != book.get_body().get_body().end();
 			position.undo_move(move32);
 			return exist;
 		}
 	}
 
-	// —^‚¦‚ç‚ê‚½‹Ç–Ê‚ğ‰„’·‚·‚×‚«‚©‚Ç‚¤‚©”»’f‚·‚é
+	// ä¸ãˆã‚‰ã‚ŒãŸå±€é¢ã‚’å»¶é•·ã™ã¹ãã‹ã©ã†ã‹åˆ¤æ–­ã™ã‚‹
 	bool IsTargetPosition(BookMoveSelector& book, Position& position, int multi_pv) {
 		auto book_moves = book.get_body().find(position);
 		if (book_moves == nullptr) {
-			// ’èÕƒf[ƒ^ƒx[ƒX‚ÉA‚±‚Ì‹Ç–Ê‚ª“o˜^‚³‚ê‚Ä‚¢‚È‚¢ê‡A‰„’·‚·‚éB
+			// å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«ã€ã“ã®å±€é¢ãŒç™»éŒ²ã•ã‚Œã¦ã„ãªã„å ´åˆã€å»¶é•·ã™ã‚‹ã€‚
 			return true;
 		}
 
-		// “o˜^‚³‚ê‚Ä‚¢‚éw‚µè‚Ì”‚ªAMultiPV‚æ‚è­‚È‚¢ê‡A‰„’·‚·‚éB
+		// ç™»éŒ²ã•ã‚Œã¦ã„ã‚‹æŒ‡ã—æ‰‹ã®æ•°ãŒã€MultiPVã‚ˆã‚Šå°‘ãªã„å ´åˆã€å»¶é•·ã™ã‚‹ã€‚
 		return book_moves->size() < multi_pv;
 	}
 }
 
-// ’èÕ‚Ì‰„’·‚Ì‘ÎÛ‚Æ‚È‚é‹Ç–Ê‚ğ’Šo‚·‚éB
-// MultiPV‚ªw’è‚³‚ê‚½’l‚æ‚è’á‚¢‹Ç–ÊA‚¨‚æ‚Ñ’èÕƒf[ƒ^ƒx[ƒX‚ÉŠÜ‚Ü‚ê‚Ä‚¢‚È‚¢‹Ç–Ê‚ª‘ÎÛ‚Æ‚È‚éB
-// ‚ ‚ç‚©‚¶‚ßASetScoreToMove()‚ğ—p‚¢A’èÕƒf[ƒ^ƒx[ƒX‚ÌŠew‚µè‚É•]‰¿’l‚ğ•t‚¯A
-// PropagateLeafNodeValuesToRoot()‚ğ—p‚¢ALeaf‹Ç–Ê‚Ì•]‰¿’l‚ğRoot‹Ç–Ê‚É“`”À‚µ‚Ä‚©‚çg—p‚·‚éB
+// å®šè·¡ã®å»¶é•·ã®å¯¾è±¡ã¨ãªã‚‹å±€é¢ã‚’æŠ½å‡ºã™ã‚‹ã€‚
+// MultiPVãŒæŒ‡å®šã•ã‚ŒãŸå€¤ã‚ˆã‚Šä½ã„å±€é¢ã€ãŠã‚ˆã³å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã«å«ã¾ã‚Œã¦ã„ãªã„å±€é¢ãŒå¯¾è±¡ã¨ãªã‚‹ã€‚
+// ã‚ã‚‰ã‹ã˜ã‚ã€SetScoreToMove()ã‚’ç”¨ã„ã€å®šè·¡ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã®å„æŒ‡ã—æ‰‹ã«è©•ä¾¡å€¤ã‚’ä»˜ã‘ã€
+// PropagateLeafNodeValuesToRoot()ã‚’ç”¨ã„ã€Leafå±€é¢ã®è©•ä¾¡å€¤ã‚’Rootå±€é¢ã«ä¼æ¬ã—ã¦ã‹ã‚‰ä½¿ç”¨ã™ã‚‹ã€‚
 bool Tanuki::ExtractTargetPositions() {
 	int multi_pv = (int)Options[kMultiPV];
 	std::string input_book_file = Options[kBookInputFile];
@@ -823,7 +823,7 @@ bool Tanuki::ExtractTargetPositions() {
 	sync_cout << "info string target_sfens_file=" << sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -835,12 +835,12 @@ bool Tanuki::ExtractTargetPositions() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	book.get_body().read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book_file|=" << book.get_body().get_body()->size() << sync_endl;
+	sync_cout << "|input_book_file|=" << book.get_body().get_body().size() << sync_endl;
 
 	std::set<std::string> explorered;
 	explorered.insert(SFEN_HIRATE);
-	// ç“úè‚Ìˆ—“™‚Ì‚½‚ßA•½è‹Ç–Ê‚©‚ç‚Ìw‚µè‚Æ‚µ‚Ä•Û‚·‚é
-	// Move‚Í32ƒrƒbƒg”Å‚Æ‚·‚é
+	// åƒæ—¥æ‰‹ã®å‡¦ç†ç­‰ã®ãŸã‚ã€å¹³æ‰‹å±€é¢ã‹ã‚‰ã®æŒ‡ã—æ‰‹ã¨ã—ã¦ä¿æŒã™ã‚‹
+	// Moveã¯32ãƒ“ãƒƒãƒˆç‰ˆã¨ã™ã‚‹
 	std::deque<std::vector<Move>> frontier;
 	frontier.push_back({});
 
@@ -856,27 +856,27 @@ bool Tanuki::ExtractTargetPositions() {
 		auto moves = frontier.front();
 		Position& position = Threads[0]->rootPos;
 		position.set_hirate(&state_info[0], Threads[0]);
-		// Œ»‹Ç–Ê‚Ü‚Åw‚µè‚ği‚ß‚é
+		// ç¾å±€é¢ã¾ã§æŒ‡ã—æ‰‹ã‚’é€²ã‚ã‚‹
 		for (auto move : moves) {
 			position.do_move(move, state_info[position.game_ply()]);
 		}
 		frontier.pop_front();
 
-		// ç“úè‚Ì‹Ç–Ê‚Íˆ—‚µ‚È‚¢
+		// åƒæ—¥æ‰‹ã®å±€é¢ã¯å‡¦ç†ã—ãªã„
 		auto draw_type = position.is_repetition(MAX_PLY);
 		if (draw_type == REPETITION_DRAW) {
 			continue;
 		}
 
-		// ‹l‚İAéŒ¾Ÿ‚¿‚Ì‹Ç–Ê‚àˆ—‚µ‚È‚¢
+		// è©°ã¿ã€å®£è¨€å‹ã¡ã®å±€é¢ã‚‚å‡¦ç†ã—ãªã„
 		if (position.is_mated() || position.DeclarationWin() != MOVE_NONE) {
 			continue;
 		}
 
 		if (IsTargetPosition(book, position, multi_pv)) {
-			// ‘ÎÛ‚Ì‹Ç–Ê‚ğ‘‚«o‚·B
-			// Œ`®‚Ímove‚ğƒXƒy[ƒX‹æØ‚è‚Å•À‚×‚½‚à‚Ì‚Æ‚·‚éB
-			// ‚±‚ê‚ÍAç“úè“™‚ğ”F¯‚³‚¹‚é‚½‚ßB
+			// å¯¾è±¡ã®å±€é¢ã‚’æ›¸ãå‡ºã™ã€‚
+			// å½¢å¼ã¯moveã‚’ã‚¹ãƒšãƒ¼ã‚¹åŒºåˆ‡ã‚Šã§ä¸¦ã¹ãŸã‚‚ã®ã¨ã™ã‚‹ã€‚
+			// ã“ã‚Œã¯ã€åƒæ—¥æ‰‹ç­‰ã‚’èªè­˜ã•ã›ã‚‹ãŸã‚ã€‚
 
 			for (auto m : moves) {
 				ofs << m << " ";
@@ -884,21 +884,21 @@ bool Tanuki::ExtractTargetPositions() {
 			ofs << std::endl;
 		}
 
-		// q‹Ç–Ê‚ğ“WŠJ‚·‚é
+		// å­å±€é¢ã‚’å±•é–‹ã™ã‚‹
 		for (const auto& move : MoveList<LEGAL_ALL>(position)) {
 			if (!position.pseudo_legal(move) || !position.legal(move)) {
-				// •s³‚Èè‚Ìê‡‚Íˆ—‚µ‚È‚¢
+				// ä¸æ­£ãªæ‰‹ã®å ´åˆã¯å‡¦ç†ã—ãªã„
 				continue;
 			}
 
 			if (!IsTargetMove(book, position, move, book_eval_black_limit, book_eval_white_limit)) {
-				// ‚±‚Ìw‚µè‚Ìæ‚Ì‹Ç–Ê‚Íˆ—‚µ‚È‚¢B
+				// ã“ã®æŒ‡ã—æ‰‹ã®å…ˆã®å±€é¢ã¯å‡¦ç†ã—ãªã„ã€‚
 				continue;
 			}
 
 			position.do_move(move, state_info[position.game_ply()]);
 
-			// undo_move()‚ğŒÄ‚Ño‚·•K—v‚ª‚ ‚é‚Ì‚ÅAcontinue‚Æbreak‚ğ‹Ö~‚·‚éB
+			// undo_move()ã‚’å‘¼ã³å‡ºã™å¿…è¦ãŒã‚ã‚‹ã®ã§ã€continueã¨breakã‚’ç¦æ­¢ã™ã‚‹ã€‚
 			if (!explorered.count(position.sfen())) {
 				explorered.insert(position.sfen());
 
@@ -936,7 +936,7 @@ bool Tanuki::AddTargetPositions() {
 	sync_cout << "info string target_sfens_file=" << sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -948,16 +948,16 @@ bool Tanuki::AddTargetPositions() {
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body().size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
-	// ‘ÎÛ‚Ì‹Ç–Ê‚ğ“Ç‚İ‚Ş
+	// å¯¾è±¡ã®å±€é¢ã‚’èª­ã¿è¾¼ã‚€
 	sync_cout << "Reading target positions: target_sfens_file=" << target_sfens_file << sync_endl;
 	std::vector<std::string> lines;
 	std::ifstream ifs(target_sfens_file);
@@ -965,7 +965,7 @@ bool Tanuki::AddTargetPositions() {
 	while (std::getline(ifs, line)) {
 		lines.push_back(line);
 	}
-	int num_positions = lines.size();
+	int num_positions = static_cast<int>(lines.size());
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|lines|=" << num_positions << sync_endl;
 
@@ -1020,13 +1020,13 @@ bool Tanuki::AddTargetPositions() {
 			}
 
 			int num_processed_positions = ++global_num_processed_positions;
-			// ”O‚Ì‚½‚ßAI/O‚Íƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚Ì‚İs‚¤
+			// å¿µã®ãŸã‚ã€I/Oã¯ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã®ã¿è¡Œã†
 #pragma omp master
 			{
-				// i’»ó‹µ‚ğ•\¦‚·‚é
+				// é€²æ—çŠ¶æ³ã‚’è¡¨ç¤ºã™ã‚‹
 				progress_report.Show(num_processed_positions);
 
-				// ˆê’èŠÔ‚²‚Æ‚É•Û‘¶‚·‚é
+				// ä¸€å®šæ™‚é–“ã”ã¨ã«ä¿å­˜ã™ã‚‹
 				{
 					std::lock_guard<std::mutex> lock(UPSERT_BOOK_MOVE_MUTEX);
 					if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
@@ -1041,11 +1041,11 @@ bool Tanuki::AddTargetPositions() {
 					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
 			if (need_wait) {
-				// ˆ—‘¬“x‚ª’á‰º‚µ‚Ä‚«‚Ä‚¢‚éB
-				// ‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// å‡¦ç†é€Ÿåº¦ãŒä½ä¸‹ã—ã¦ãã¦ã„ã‚‹ã€‚
+				// å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚µ‚Î‚ç‚­‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã—ã°ã‚‰ãå¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp master
 				{
 					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
@@ -1057,11 +1057,11 @@ bool Tanuki::AddTargetPositions() {
 					need_wait = false;
 				}
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Ì‘Ò‹@‚ªI‚í‚é‚Ü‚ÅAÄ“x‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã®å¾…æ©ŸãŒçµ‚ã‚ã‚‹ã¾ã§ã€å†åº¦å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 			}
 
-			// ’uŠ·•\‚Ì¢‘ã‚ği‚ß‚é
+			// ç½®æ›è¡¨ã®ä¸–ä»£ã‚’é€²ã‚ã‚‹
 			Threads[thread_index]->tt.new_search();
 		}
 	}
@@ -1082,7 +1082,7 @@ bool Tanuki::CreateFromTanukiColiseum()
 	sync_cout << "info string output_book_file=" << output_book_file << sync_endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -1094,14 +1094,14 @@ bool Tanuki::CreateFromTanukiColiseum()
 	sync_cout << "Reading input book file: " << input_book_file << sync_endl;
 	input_book.read_book(input_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|input_book|=" << input_book.get_body()->size() << sync_endl;
+	sync_cout << "|input_book|=" << input_book.get_body().size() << sync_endl;
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
 	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
-	sync_cout << "|output_book|=" << output_book.get_body()->size() << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
 	// TanukiColiseu
 	for (const auto& entry : std::filesystem::recursive_directory_iterator(input_book_folder)) {
@@ -1122,8 +1122,8 @@ bool Tanuki::CreateFromTanukiColiseum()
 			std::istringstream iss_line(line);
 			std::string move_string;
 			std::vector<std::pair<std::string, Move16>> moves;
-			// æè‚ªŸ‚Á‚½ê‡‚Í0AŒãè‚ªŸ‚Á‚½ê‡‚Í1
-			// ˆø‚«•ª‚¯‚Ìê‡‚Í-1
+			// å…ˆæ‰‹ãŒå‹ã£ãŸå ´åˆã¯0ã€å¾Œæ‰‹ãŒå‹ã£ãŸå ´åˆã¯1
+			// å¼•ãåˆ†ã‘ã®å ´åˆã¯-1
 			int winner_offset = -1;
 			while (iss_line >> move_string) {
 				if (move_string == "startpos" || move_string == "moves") {
@@ -1140,74 +1140,74 @@ bool Tanuki::CreateFromTanukiColiseum()
 				auto repetition = pos.is_repetition();
 				if (pos.is_mated()) {
 					if (moves.size() % 2 == 0) {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					else {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					break;
 				}
 				else if (pos.DeclarationWin()) {
 					if (moves.size() % 2 == 0) {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					else {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					break;
 				}
 				else if (repetition == REPETITION_WIN) {
-					// ˜A‘±‰¤è‚Ìç“úè‚É‚æ‚éŸ‚¿
+					// é€£ç¶šç‹æ‰‹ã®åƒæ—¥æ‰‹ã«ã‚ˆã‚‹å‹ã¡
 					if (moves.size() % 2 == 0) {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					else {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					break;
 				}
 				else if (repetition == REPETITION_LOSE) {
-					// ˜A‘±‰¤è‚Ìç“úè‚É‚æ‚é•‰‚¯
+					// é€£ç¶šç‹æ‰‹ã®åƒæ—¥æ‰‹ã«ã‚ˆã‚‹è² ã‘
 					if (moves.size() % 2 == 0) {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					else {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					break;
 				}
 				else if (repetition == REPETITION_DRAW) {
-					// ˜A‘±‰¤è‚Å‚Í‚È‚¢•’Ê‚Ìç“úè
+					// é€£ç¶šç‹æ‰‹ã§ã¯ãªã„æ™®é€šã®åƒæ—¥æ‰‹
 					break;
 				}
 				else if (repetition == REPETITION_SUPERIOR) {
-					// —D“™‹Ç–Ê(”Õã‚Ì‹î‚ª“¯‚¶‚Åè‹î‚ª‘Šè‚æ‚è—D‚ê‚Ä‚¢‚é)
+					// å„ªç­‰å±€é¢(ç›¤ä¸Šã®é§’ãŒåŒã˜ã§æ‰‹é§’ãŒç›¸æ‰‹ã‚ˆã‚Šå„ªã‚Œã¦ã„ã‚‹)
 					if (moves.size() % 2 == 0) {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					else {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					break;
 				}
 				else if (repetition == REPETITION_INFERIOR) {
-					// —ò“™‹Ç–Ê(”Õã‚Ì‹î‚ª“¯‚¶‚Åè‹î‚ª‘Šè‚æ‚è—D‚ê‚Ä‚¢‚é)
+					// åŠ£ç­‰å±€é¢(ç›¤ä¸Šã®é§’ãŒåŒã˜ã§æ‰‹é§’ãŒç›¸æ‰‹ã‚ˆã‚Šå„ªã‚Œã¦ã„ã‚‹)
 					if (moves.size() % 2 == 0) {
-						// ŒãèŸ‚¿
+						// å¾Œæ‰‹å‹ã¡
 						winner_offset = 1;
 					}
 					else {
-						// æèŸ‚¿
+						// å…ˆæ‰‹å‹ã¡
 						winner_offset = 0;
 					}
 					break;
@@ -1226,7 +1226,7 @@ bool Tanuki::CreateFromTanukiColiseum()
 					next = moves[move_index + 1].second;
 				}
 
-				output_book.insert(sfen, BookPos(best, next, 0, 0, 1));
+				output_book.insert(sfen, BookMove(best, next, 0, 0, 1));
 			}
 		}
 	}

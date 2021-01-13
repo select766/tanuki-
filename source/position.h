@@ -59,7 +59,7 @@ struct StateInfo {
 	HASH_KEY long_key()           const { return board_key_ + hand_key_; }
 	HASH_KEY board_long_key()     const { return board_key_; }
 	HASH_KEY hand_long_key()      const { return hand_key_; }
-  
+
 	// 現局面で手番側に対して王手をしている駒のbitboard
 	Bitboard checkersBB;
 
@@ -105,8 +105,10 @@ struct StateInfo {
 
 	// --- evaluate
 
+#if defined (USE_PIECE_VALUE)
 	// この局面での評価関数の駒割
 	Value materialValue;
+#endif
 
 #if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
 
@@ -120,7 +122,7 @@ struct StateInfo {
 	Eval::NNUE::Accumulator accumulator;
 #endif
 
-#if defined(USE_FV38)
+#if defined (USE_EVAL_LIST)
 	// 評価値の差分計算の管理用
 	Eval::DirtyPiece dirtyPiece;
 #endif
@@ -185,7 +187,9 @@ public:
 	// 局面のsfen文字列を取得する
 	// ※ USIプロトコルにおいては不要な機能ではあるが、デバッグのために局面を標準出力に出力して
 	// 　その局面から開始させたりしたいときに、sfenで現在の局面を出力出来ないと困るので用意してある。
-	const std::string sfen() const;
+	// 引数としてintを取るほうのsfen()は、出力するsfen文字列の末尾の手数を指定できるバージョン。
+	const std::string sfen() const { return sfen(game_ply()); }
+	const std::string sfen(int gamePly) const;
 
 	// 平手の初期盤面を設定する。
 	// siについては、上記のset()にある説明を読むこと。
@@ -252,7 +256,7 @@ public:
 
 	// 定跡DBや置換表から取り出したMove16(16bit型の指し手)を32bit化する。
 	Move to_move(Move16 m) const;
-
+	
 	// 普通の千日手、連続王手の千日手等を判定する。
 	// そこまでの局面と同一局面であるかを、局面を遡って調べる。
 	// plies_from_root : rootからの手数。ss->plyを渡すこと。
@@ -329,7 +333,7 @@ public:
 
 	// --- 利き
 
-	// sに利きのあるc側の駒を列挙する。cの指定がないものは先後両方の駒が返る。
+	// sqに利きのあるc側の駒を列挙する。cの指定がないものは先後両方の駒が返る。
 	// occが指定されていなければ現在の盤面において。occが指定されていればそれをoccupied bitboardとして。
 	// sq == SQ_NBでの呼び出しは合法。ZERO_BBが返る。
 
@@ -395,6 +399,7 @@ public:
 	// ※　連続王手の千日手などについては探索の問題なのでこの関数のなかでは行わない。
 	// ※　それ以上のテストは行わないので、置換表から取ってきた指し手などについては、
 	// pseudo_legal()を用いて、そのあとこの関数で判定すること。
+	// 歩の不成に関しては、この関数は常にtrueを返す。(合法扱い)
 	bool legal(Move m) const;
 
 	// mがpseudo_legalな指し手であるかを判定する。
@@ -429,8 +434,10 @@ public:
 
 	// --- Evaluation
 
+#if defined(USE_EVAL_LIST)
 	// 評価関数で使うための、どの駒番号の駒がどこにあるかなどの情報。
 	const Eval::EvalList* eval_list() const { return &evalList; }
+#endif
 
 #if defined (USE_SEE)
 	// 指し手mのsee(Static Exchange Evaluation : 静的取り合い評価)において
@@ -521,32 +528,14 @@ public:
 	// 捕獲する指し手であるか。
 	bool capture(Move m) const { return !is_drop(m) && piece_on(to_sq(m)) != NO_PIECE; }
 
-	// --- 1手詰め判定
-#if defined(USE_MATE_1PLY)
-  // 現局面で1手詰めであるかを判定する。1手詰めであればその指し手を返す。
-  // ただし1手詰めであれば確実に詰ませられるわけではなく、簡単に判定できそうな近接王手による
-  // 1手詰めのみを判定する。(要するに判定に漏れがある。)
-  // 
-  // 返し値は、16bitのMove。このあとpseudo_legal()等を使いたいなら、
-  // pos.to_move()を使って32bitのMoveに変換すること。
-
-	Move mate1ply() const;
-
-	// ↑の先後別のバージョン。(内部的に用いる)
-	template <Color Us> Move mate1ply_impl() const;
-
-	// 利きのある場所への取れない近接王手からのply手詰め
-	// ply = 1,3,5,…,
-	Move weak_mate_n_ply(int ply) const;
-
-#endif
-
+#if defined(USE_ENTERING_KING_WIN)
 	// 入玉時の宣言勝ち
-  // Search::Limits.enteringKingRuleに基いて、宣言勝ちを行なう。
-  // 条件を満たしているとき、MOVE_WINや、玉を移動する指し手(トライルール時)が返る。さもなくば、MOVE_NONEが返る。
-  // mate1ply()から内部的に呼び出す。(そうするとついでに処理出来て良い)
+	// Search::Limits.enteringKingRuleに基いて、宣言勝ちを行なう。
+	// 条件を満たしているとき、MOVE_WINや、玉を移動する指し手(トライルール時)が返る。さもなくば、MOVE_NONEが返る。
+	// mate1ply()から内部的に呼び出す。(そうするとついでに処理出来て良い)
 	// 32bit Moveが返る。
 	Move DeclarationWin() const;
+#endif
 
 	// -- sfen化ヘルパ
 #if defined(USE_SFEN_PACKER)
@@ -571,7 +560,7 @@ public:
 	// -- 利き
 #if defined(LONG_EFFECT_LIBRARY)
 
-  // 各升の利きの数
+	// 各升の利きの数
 	LongEffect::ByteBoard board_effect[COLOR_NB];
 
 	// NNUE halfKPE9で局面の差分計算をするときに用いる
@@ -660,7 +649,7 @@ private:
 	// 更新してくれないので、自前で更新するか、一連の処理のあとにこの関数を呼び出す必要がある。
 	void update_kingSquare();
 
-#if defined(USE_FV38)
+#if defined (USE_EVAL_LIST)
 	// --- 盤面を更新するときにEvalListの更新のために必要なヘルパー関数
 
 	// c側の手駒ptの最後の1枚のBonaPiece番号を返す
@@ -714,8 +703,10 @@ private:
 	// undo_move()で前の局面に戻るときはStateInfo::previousから辿って戻る。
 	StateInfo* st;
 
+#if defined(USE_EVAL_LIST)
 	// 評価関数で用いる駒のリスト
 	Eval::EvalList evalList;
+#endif
 };
 
 inline void Position::xor_piece(Piece pc, Square sq)

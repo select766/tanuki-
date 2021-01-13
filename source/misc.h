@@ -6,6 +6,7 @@
 #include <functional>
 #include <fstream>
 #include <mutex>
+#include <atomic>
 
 #include "types.h"
 
@@ -264,7 +265,7 @@ struct Timer
 #if defined(USE_TIME_MANAGEMENT)
 
   // 今回の思考時間を計算して、optimum(),maximum()が値をきちんと返せるようにする。
-	void init(Search::LimitsType& limits, Color us, int ply);
+	void init(const Search::LimitsType& limits, Color us, int ply);
 
 	TimePoint minimum() const { return minimumTime; }
 	TimePoint optimum() const { return optimumTime; }
@@ -275,7 +276,7 @@ struct Timer
 	TimePoint round_up(TimePoint t) const;
 
 	// 探索終了の時間(startTime + search_end >= now()になったら停止)
-	TimePoint search_end;
+	std::atomic<TimePoint> search_end;
 
 private:
 	TimePoint minimumTime;
@@ -596,6 +597,7 @@ struct LineScanner
 	// 空の文字列である場合は引数の値がそのまま返る。
 	// "ABC"のような文字列で数値化できない場合は0が返る。(あまり良くない仕様だがatoll()を使うので仕方ない)
 	s64 get_number(s64 defaultValue);
+	double get_double(double defaultValue);
 
 	// 解析位置(カーソル)が行の末尾まで進んだのか？
 	// eolとはEnd Of Lineの意味。

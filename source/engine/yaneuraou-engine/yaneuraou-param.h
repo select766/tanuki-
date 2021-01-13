@@ -36,9 +36,9 @@ PARAM_DEFINE PARAM_FUTILITY_MARGIN_ALPHA1 = 186;
 
 // 
 
-// 元の値 = 170 , step = 20
+// 元の値 = 159 , step = 20
 // [PARAM] min:100,max:240,step:2,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA = 165;
+PARAM_DEFINE PARAM_FUTILITY_MARGIN_BETA = 159;
 
 
 // 静止探索でのfutility pruning
@@ -48,9 +48,9 @@ PARAM_DEFINE PARAM_FUTILITY_MARGIN_QUIET = 132;
 
 // futility pruningの適用depth。
 // この制限自体が要らない可能性がある。→　そうでもなかった。
-// 元の値 = 8 , step = 1
+// 元の値 = 9 , step = 1
 // [PARAM] min:5,max:15,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 8;
+PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 9;
 
 // 親nodeでのfutilityの適用depth。
 // この枝刈り、depthの制限自体が要らないような気がする。→　そうでもなかった。
@@ -59,9 +59,9 @@ PARAM_DEFINE PARAM_FUTILITY_RETURN_DEPTH = 8;
 PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_DEPTH = 7;
 
 // 親nodeでのfutility margin
-// 元の値 = 266 , step = 20
+// 元の値 = 254 , step = 20
 // [PARAM] min:100,max:400,step:3,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = 266;
+PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_MARGIN1 = 254;
 
 // 元の値 = 30
 // [PARAM] min:20,max:50,step:2,interval:2,time_rate:1,fixed
@@ -73,9 +73,9 @@ PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA1 = 30;
 PARAM_DEFINE PARAM_FUTILITY_AT_PARENT_NODE_GAMMA2 = 19;
 
 // lmrのときのseeの値。
-// 元の値 = 221 ,step = 40
+// 元の値 = 218 ,step = 40
 // [PARAM] min:0,max:300,step:3,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_LMR_SEE_MARGIN1 = 236;
+PARAM_DEFINE PARAM_LMR_SEE_MARGIN1 = 218;
 
 
 // Reductionの計算式に出てくる定数
@@ -151,9 +151,9 @@ PARAM_DEFINE PARAM_PROBCUT_DEPTH = 4;
 // probcutのmargin
 //    式 = beta + PARAM_PROBCUT_MARGIN1 - improving * PARAM_PROBCUT_MARGIN2
 //   improvingの効果怪しいので抑え気味にしておく。
-// 元の値 = 183
+// 元の値 = 194
 // [PARAM] min:100,max:300,step:3,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_PROBCUT_MARGIN1 = 199;
+PARAM_DEFINE PARAM_PROBCUT_MARGIN1 = 194;
 
 // 元の値 = 49 , step = 5
 // [PARAM] min:20,max:80,step:1,interval:1,time_rate:1,fixed
@@ -192,16 +192,6 @@ PARAM_DEFINE PARAM_PRUNING_BY_HISTORY_DEPTH = 4;
 // 元の値 = 5278 , step = 500
 // [PARAM] min:2000,max:8000,step:250,interval:1,time_rate:1,fixed
 PARAM_DEFINE PARAM_REDUCTION_BY_HISTORY = 4828;
-
-
-//
-// razoring pruning
-// 
-
-// 以下、変更しても計測できるほどの差ではないようだが。
-// 元の値 = 510 , step = 100
-// [PARAM] min:400,max:700,step:3,interval:1,time_rate:1,fixed
-PARAM_DEFINE PARAM_RAZORING_MARGIN = 515;
 
 
 //
@@ -284,63 +274,8 @@ PARAM_DEFINE AB_TEST1 = 1;
 
 // ABテスト用
 // [PARAM] min:0,max:1,step:1,interval:1,time_rate:1,fixed
-PARAM_DEFINE AB_TEST2 = 0;
+PARAM_DEFINE AB_TEST2 = 1;
 
-
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_0 = 1088;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_1 = 1872;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_2 = 80;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_3 = 792;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_4 = 744;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_5 = 880;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_6 = 1320;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_7 = 632;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE OUR_EFFECT_RATE_8 = 936;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_0 = 1088;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_1 = 1714;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_2 = 1688;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_3 = 1208;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_4 = 216;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_5 = 240;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_6 = 496;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_7 = 816;
-
-// [PARAM] min:-10000,max:10000,step:32,interval:1,time_rate:1
-PARAM_DEFINE THEIR_EFFECT_RATE_8 = 928;
 
 
 //#endif // defined(GENSFEN2019)

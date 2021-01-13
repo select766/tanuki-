@@ -105,16 +105,24 @@ namespace USI
 	// USIメッセージ応答部(起動時に、各種初期化のあとに呼び出される)
 	void loop(int argc, char* argv[]);
 
+#if defined(USE_PIECE_VALUE)
 	// USIプロトコルの形式でValue型を出力する。
 	// 歩が100になるように正規化するので、operator <<(Value)をこういう仕様にすると
 	// 実際の値と異なる表示になりデバッグがしにくくなるから、そうはしていない。
+	// USE_PIECE_VALUEが定義されていない時は正規化しようがないのでこの関数は呼び出せない。
 	std::string value(Value v);
+#endif
 
 	// Square型をUSI文字列に変換する
 	std::string square(Square s);
 
 	// 指し手をUSI文字列に変換する。
-	std::string move(Move m /*, bool chess960*/);
+	std::string move(Move   m /*, bool chess960*/);
+	std::string move(Move16 m /*, bool chess960*/);
+
+	// 読み筋をUSI文字列化して返す。
+	// " 7g7f 8c8d" のように返る。
+	std::string move(const std::vector<Move>& moves);
 
 	// pv(読み筋)をUSIプロトコルに基いて出力する。
 	// depth : 反復深化のiteration深さ。

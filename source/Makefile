@@ -10,17 +10,18 @@
 # === ビルドオプション (build options) ===
 
 # やねうら王の使いたいエディションを指定する (select YaneuraOu Edition)
-# YANEURAOU_ENGINE_NNUE       : NNUE型評価関数(halfKP256),標準NNUE型
-# YANEURAOU_ENGINE_NNUE_KP256 : NNUE型評価関数(KP256)
+# YANEURAOU_ENGINE_NNUE          : NNUE型評価関数(halfKP256),標準NNUE型
+# YANEURAOU_ENGINE_NNUE_KP256    : NNUE型評価関数(KP256)
 # YANEURAOU_ENGINE_NNUE_HALFKPE9 : NNUE型評価関数(halfKPE9)
 # YANEURAOU_ENGINE_NNUE_HALFKA256 : NNUE型評価関数(halfKA)
 # YANEURAOU_ENGINE_NNUE_HALFKP_HALFKV256 : NNUE型評価関数(halfKP-halfKV-256)
 # YANEURAOU_ENGINE_NNUE_HALFKA_HALFKV256 : NNUE型評価関数(halfKA-halfKV-256)
-# YANEURAOU_ENGINE_KPPT       : KPPT型評価関数
-# YANEURAOU_ENGINE_KPP_KKPT   : KPP_KKPT型評価関数
+# YANEURAOU_ENGINE_KPPT          : KPPT型評価関数
+# YANEURAOU_ENGINE_KPP_KKPT      : KPP_KKPT型評価関数
 # YANEURAOU_ENGINE_MATERIAL      : 駒得のみの評価関数(複数変種あり。MATERIAL_LEVELで選択できる)
-# MATE_ENGINE                 : tanuki- 詰将棋エンジン
-# USER_ENGINE                 : USER定義エンジン
+# TANUKI_MATE_ENGINE             : tanuki- 詰め将棋solver  (2017/05/06～)
+# YANEURAOU_MATE_ENGINE          : やねうら王 詰将棋solver (2020/12/29～)
+# USER_ENGINE                    : USER定義エンジン
 
 YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_KP256
@@ -31,14 +32,15 @@ YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPP_KKPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIAL
-#YANEURAOU_EDITION = MATE_ENGINE
+#YANEURAOU_EDITION = TANUKI_MATE_ENGINE
+#YANEURAOU_EDITION = YANEURAOU_MATE_ENGINE
 #YANEURAOU_EDITION = USER_ENGINE
 
 
 # ターゲットCPU (target cpu)
 
 # 利用できるCPU拡張命令を指定する。
-#
+# 
 # AMDのRyzen(Zen/Zen2)はZEN1/ZEN2を選択するとBMI2命令が使わずに速くなる。(10%程度高速化)
 # Ryzen Zen3シリーズはZEN3を選択。こちらはAVX2用とたぶん変わらない。
 #
@@ -79,7 +81,7 @@ COMPILER = g++
 
 
 # developing branch // 現状、非公開 (currently private)
-# dev : 開発中のbranchならdevと指定する (developing branch) :
+# dev : 開発中のbranchならdevと指定する (developing branch) : 
 # abe : abe
 #ENGINE_BRANCH = dev
 
@@ -87,12 +89,12 @@ COMPILER = g++
 # 標準的なコンパイルオプション (standard compile options)
 CPPFLAGS   = -std=c++17 -fno-exceptions -fno-rtti -Wextra -Ofast -MMD -MP -fpermissive
 WCPPFLAGS  =
-LDFLAGS  =
+LDFLAGS  = $(EXTRA_LDFLAGS)
 LIBS     =
 INCLUDE  = # -I../include
 
 # makeするときにCPPFLAGSを追加で指定したいときはこれを用いる。
-EXTRA_CPPFLAGS =
+EXTRA_CPPFLAGS = 
 
 # YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIALのときに指定できる、評価関数の通し番号
 #  1 : 普通の駒得のみの評価関数
@@ -140,13 +142,14 @@ else
 	endif
 endif
 
+TARGETDIR = .
 ifeq ($(OS),Windows_NT)
 	CPPFLAGS += $(WCPPFLAGS)
 	LDFLAGS += -static -Wl,--stack,25000000
-	TARGET = YaneuraOu-by-gcc.exe
+	TARGET = $(TARGETDIR)/YaneuraOu-by-gcc.exe
 else
 	CPPFLAGS += -D_LINUX
-	TARGET = YaneuraOu-by-gcc
+	TARGET = $(TARGETDIR)/YaneuraOu-by-gcc
 endif
 
 # リンク時最適化。
@@ -179,7 +182,7 @@ ifeq ($(findstring g++,$(COMPILER)),g++)
 	OPENMP_LDFLAGS =
 endif
 ifeq ($(findstring clang++,$(COMPILER)),clang++)
-	ifeq ($(MSYSTEM),MINGW64)
+		ifeq ($(MSYSTEM),MINGW64)
 		# MSYS2 MINGW64 env
 		# libgompを指定した場合、ビルドは通るがOpenMPは無効化される？
 		OPENMP = -fopenmp=libgomp
@@ -230,43 +233,52 @@ SOURCES  = \
 	movepick.cpp                                                               \
 	timeman.cpp                                                                \
 	benchmark.cpp                                                              \
-	extra/book/apery_book.cpp                                                  \
-	extra/book/book.cpp                                                        \
-	extra/book/makebook2019.cpp                                                \
+	book/book.cpp                                                              \
+	book/apery_book.cpp                                                        \
 	extra/bitop.cpp                                                            \
 	extra/long_effect.cpp                                                      \
-	extra/mate/mate1ply_with_effect.cpp                                        \
-	extra/mate/mate1ply_without_effect.cpp                                     \
-	extra/mate/mate_n_ply.cpp                                                  \
-	extra/test_cmd.cpp                                                         \
 	extra/sfen_packer.cpp                                                      \
-	extra/kif_converter/kif_convert_tools.cpp                                  \
+	extra/super_sort.cpp                                                       \
+	mate/mate.cpp                                                              \
+	mate/mate1ply_without_effect.cpp                                           \
+	mate/mate1ply_with_effect.cpp                                              \
+	mate/mate_solver.cpp                                                       \
+	mate/mate_test_cmd.cpp                                                     \
 	eval/evaluate_bona_piece.cpp                                               \
 	eval/evaluate.cpp                                                          \
 	eval/evaluate_io.cpp                                                       \
 	eval/evaluate_mir_inv_tools.cpp                                            \
-	learn/learner.cpp                                                          \
-	learn/learning_tools.cpp                                                   \
-	learn/multi_think.cpp                                                      \
-	tanuki_book.cpp                                                            \
-	tanuki_kifu_generator.cpp                                                  \
-	tanuki_kifu_shuffler.cpp                                                   \
-	tanuki_progress_report.cpp                                                 \
-	tanuki_kifu_writer.cpp                                                     \
-	tanuki_kifu_reader.cpp                                                     \
-	tanuki_progress.cpp                                                        \
-	tanuki_analysis.cpp                                                        \
-	tanuki_filesystem.cpp
+	eval/material/evaluate_material.cpp
+
+ifeq (,$(findstring evallearn,$@))
+	SOURCES  +=                                                                \
+		book/makebook.cpp                                                      \
+		book/makebook2015.cpp                                                  \
+		book/makebook2019.cpp                                                  \
+		book/makebook2021.cpp                                                  \
+		learn/learner.cpp                                                      \
+		learn/learning_tools.cpp                                               \
+		learn/multi_think.cpp                                                  \
+		tanuki_book.cpp                                                        \
+		tanuki_kifu_generator.cpp                                              \
+		tanuki_kifu_shuffler.cpp                                               \
+		tanuki_progress_report.cpp                                             \
+		tanuki_kifu_writer.cpp                                                 \
+		tanuki_kifu_reader.cpp                                                 \
+		tanuki_progress.cpp                                                    \
+		tanuki_analysis.cpp                                                    \
+		tanuki_filesystem.cpp
+endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
-	SOURCES += \
+	SOURCES  +=                                                                \
 		eval/kppt/evaluate_kppt.cpp                                            \
 		eval/kppt/evaluate_kppt_learner.cpp                                    \
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPP_KKPT)
-	SOURCES += \
+	SOURCES  +=                                                                \
 		eval/kppt/evaluate_kppt.cpp                                            \
 		eval/kpp_kkpt/evaluate_kpp_kkpt.cpp                                    \
 		eval/kpp_kkpt/evaluate_kpp_kkpt_learner.cpp                            \
@@ -274,11 +286,48 @@ ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPP_KKPT)
 endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_MATERIAL)
-	SOURCES += \
-		engine/yaneuraou-engine/yaneuraou-search.cpp                           \
-		eval/material/evaluate_material.cpp
+	SOURCES  +=                                                                \
+		engine/yaneuraou-engine/yaneuraou-search.cpp
 
 	CPPFLAGS += -DMATERIAL_LEVEL=$(MATERIAL_LEVEL)
+endif
+
+ifeq ($(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_DEEP)
+	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP)
+	else
+		# YANEURAOU_EDITIONがYANEURAOU_ENGINE_DEEPの後ろに文字が入っている名前なら、
+		# とりあえず"YANEURAOU_ENGINE_DEEP"というシンボルを定義してやる。
+		CPPFLAGS += -DYANEURAOU_ENGINE_DEEP
+
+		ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_TENSOR_RT)
+			CPPFLAGS += -DTENSOR_RT
+			LDFLAGS += -lnvinfer -lnvparsers -lnvonnxparser -lcuda -lcudnn -lcudart -lcublas
+			# CPPFLAGS += -I/usr/local/cuda/include
+			# LDFLAGS += -L/usr/local/cuda/lib64
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_CPU)
+			CPPFLAGS += -DORT_CPU
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_DML)
+			CPPFLAGS += -DORT_DML
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_MKL)
+			CPPFLAGS += -DORT_MKL
+
+		endif
+	endif
+
+	# 大して大きなファイルではないので全部してしまう。
+	SOURCES += \
+		eval/deep/nn_types.cpp                                          \
+		eval/deep/nn.cpp                                                \
+		eval/deep/nn_onnx_runtime.cpp                                   \
+		eval/deep/nn_tensorrt.cpp                                       \
+		engine/dlshogi-engine/dlshogi_searcher.cpp                      \
+		engine/dlshogi-engine/PrintInfo.cpp                             \
+		engine/dlshogi-engine/UctSearch.cpp                             \
+		engine/dlshogi-engine/Node.cpp                                  \
+		engine/dlshogi-engine/YaneuraOu_dlshogi_bridge.cpp
 endif
 
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
@@ -288,11 +337,11 @@ ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_
 		# 標準NNUE型の亜種なので、とりあえず"YANEURAOU_ENGINE_NNUE"というシンボルを定義してやる。
 		CPPFLAGS += -DYANEURAOU_ENGINE_NNUE
 
-	ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_KP256)
-		CPPFLAGS += -DEVAL_NNUE_KP256
+		ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_KP256)
+			CPPFLAGS += -DEVAL_NNUE_KP256
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKPE9)
-		CPPFLAGS += -DEVAL_NNUE_HALFKPE9
+			CPPFLAGS += -DEVAL_NNUE_HALFKPE9
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKA256)
 		CPPFLAGS += -DEVAL_NNUE_HALFKA256
@@ -308,53 +357,55 @@ ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_
 
 	# 大して大きなファイルではないので全部してしまう。
 	SOURCES += \
-		eval/nnue/evaluate_nnue.cpp                                            \
-		eval/nnue/evaluate_nnue_learner.cpp                                    \
-		eval/nnue/nnue_test_command.cpp                                        \
-		eval/nnue/features/a.cpp                                               \
-		eval/nnue/features/k.cpp                                               \
-		eval/nnue/features/p.cpp                                               \
-		eval/nnue/features/half_ka.cpp                                         \
-		eval/nnue/features/half_kp.cpp                                         \
-		eval/nnue/features/half_kv.cpp                                         \
-		eval/nnue/features/half_relative_ka.cpp                                \
-		eval/nnue/features/half_relative_kp.cpp                                \
-		eval/nnue/features/half_relative_kv.cpp                                \
-		eval/nnue/features/half_kpe9.cpp								\
-		eval/nnue/features/pe9.cpp										\
+		eval/nnue/evaluate_nnue.cpp                                     \
+		eval/nnue/evaluate_nnue_learner.cpp                             \
+		eval/nnue/nnue_test_command.cpp                                 \
+		eval/nnue/features/a.cpp                                        \
+		eval/nnue/features/k.cpp                                        \
+		eval/nnue/features/p.cpp                                        \
+		eval/nnue/features/half_ka.cpp                                  \
+		eval/nnue/features/half_kp.cpp                                  \
+		eval/nnue/features/half_kv.cpp                                  \
+		eval/nnue/features/half_relative_ka.cpp                         \
+		eval/nnue/features/half_relative_kp.cpp                         \
+		eval/nnue/features/half_relative_kv.cpp                         \
+		eval/nnue/features/half_kpe9.cpp                                \
+		eval/nnue/features/pe9.cpp                                      \
 		eval/nnue/features/v.cpp										\
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 endif
 
-ifeq ($(YANEURAOU_EDITION),MATE_ENGINE)
-	SOURCES += \
-		engine/mate-engine/mate-search.cpp                              \
-	    eval/material/evaluate_material.cpp
 
+ifeq ($(YANEURAOU_EDITION),TANUKI_MATE_ENGINE)
+	SOURCES += \
+		engine/tanuki-mate-engine/tanuki-mate-search.cpp
+endif
+
+
+ifeq ($(YANEURAOU_EDITION),YANEURAOU_MATE_ENGINE)
+	SOURCES += \
+		engine/yaneuraou-mate-engine/yaneuraou-mate-search.cpp
 endif
 
 ifeq ($(YANEURAOU_EDITION),USER_ENGINE)
 	SOURCES += \
-		engine/user-engine/user-search.cpp                              \
-		eval/material/evaluate_material.cpp
-
+		engine/user-engine/user-search.cpp
 endif
+
 
 ifneq ($(ENGINE_NAME),)
 	CPPFLAGS += -DENGINE_NAME_FROM_MAKEFILE=$(ENGINE_NAME)
 endif
 
+
 # 開発用branch
-ifeq ($(findstring dev,$(ENGINE_BRANCH)),dev)
+ifeq (,$(findstring dev,$(ENGINE_BRANCH)))
 	# SuperSort使ってみよう。
 	CPPFLAGS += -DDEV_BRANCH
-	SOURCES += extra/super_sort.cpp
 endif
 
 # abe
-ifeq ($(findstring abe,$(ENGINE_BRANCH)),abe)
-	SOURCES += extra/super_sort.cpp
-	CPPFLAGS += -DDEV_BRANCH
+ifeq (,$(findstring abe,$(ENGINE_BRANCH)))
 	CPPFLAGS += -DPV_OUTPUT_DRAW_ONLY -DFORCE_BIND_THIS_THREAD
 endif
 
@@ -390,7 +441,7 @@ else ifeq ($(TARGET_CPU),ZEN3)
 
 else ifeq ($(TARGET_CPU),AVX512VNNI)
 
-	CPPFLAGS += -DUSE_AVX512 -DUSE_VNNI -march=cascadelake
+	CPPFLAGS += -DUSE_AVX512 -DUSE_BMI2 -DUSE_VNNI -march=cascadelake
 	# NNUEのコード、USE_VNNIが指定されているとVNNI対応のコードになる。
 	# cascadelakeとicelakeとの違いがあるのかは知らないので、cascadelakeのみでいいや。
 
@@ -430,7 +481,7 @@ else ifeq ($(TARGET_CPU),OTHER)
 endif
 
 # YANEURAOU_EDITION , CPUターゲット名 などのシンボルをコンパイル時に定義してやる。
-CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) -DTARGET_CPU=\"$(TARGET_CPU)\" $(EXTRA_CPPFLAGS)
+CPPFLAGS += -D$(YANEURAOU_EDITION) -DTARGET_CPU=\"$(TARGET_CPU)\" $(EXTRA_CPPFLAGS)
 
 OBJECTS  = $(addprefix $(OBJDIR)/, $(SOURCES:.cpp=.o))
 DEPENDS  = $(OBJECTS:.o=.d)

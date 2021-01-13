@@ -29,7 +29,7 @@ namespace USI {
 		return std::lexicographical_compare(s1.begin(), s1.end(), s2.begin(), s2.end(),
 			[](char c1, char c2) { return tolower(c1) < tolower(c2); });
 	}
-
+	
 	// 前回のOptions["EvalDir"]
 	std::string last_eval_dir;
 
@@ -42,6 +42,8 @@ namespace USI {
 		// 並列探索するときのスレッド数
 		// CPUの搭載コア数をデフォルトとすべきかも知れないが余計なお世話のような気もするのでしていない。
 
+#if !defined(YANEURAOU_ENGINE_DEEP)
+
 		// ※　やねうら王独自改良
 		// スレッド数の変更やUSI_Hashのメモリ確保をそのハンドラでやってしまうと、
 		// そのあとThreadIdOffsetや、LargePageEnableを送られても困ることになる。
@@ -50,49 +52,45 @@ namespace USI {
 		// Stockfishもこうすべきだと思う。
 
 		o["Threads"] << Option(4, 1, 512, [](const Option& o) { /* Threads.set(o); */ });
+#endif
 
-#if !defined(MATE_ENGINE)
+#if !defined(TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
 		// 置換表のサイズ。[MB]で指定。
 		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { /* TT.resize(o); */ });
 
-#if defined(USE_EVAL_HASH)
-		// 評価値用のcacheサイズ。[MB]で指定。
+	#if defined(USE_EVAL_HASH)
+			// 評価値用のcacheサイズ。[MB]で指定。
 
-#if defined(FOR_TOURNAMENT)
-		// トーナメント用は少し大きなサイズ
-		o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
-#else
-		o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
-#endif // defined(FOR_TOURNAMENT)
-#endif // defined(USE_EVAL_HASH)
+		#if defined(FOR_TOURNAMENT)
+				// トーナメント用は少し大きなサイズ
+				o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+		#else
+				o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+		#endif // defined(FOR_TOURNAMENT)
+	#endif // defined(USE_EVAL_HASH)
 
 		o["USI_Ponder"] << Option(false);
 
 		// その局面での上位N個の候補手を調べる機能
 		o["MultiPV"] << Option(1, 1, 800);
 
-		// 弱くするために調整する。20なら手加減なし。0が最弱。
-		o["SkillLevel"] << Option(20, 0, 20);
-
-#else // !defined(MATE_ENGINE)
-
-		// MATE_ENGINEのとき
-		o["USI_Hash"] << Option(4096, 1, MaxHashMB);
-
-#endif // !defined(MATE_ENGINE)
-
-		// cin/coutの入出力をファイルにリダイレクトする
-		o["WriteDebugLog"] << Option(false, [](const Option& o) { start_logger(o); });
+		// 指し手がGUIに届くまでの時間。
+	#if defined(YANEURAOU_ENGINE_DEEP)
+			// GPUからの結果を待っている時間も込みなので少し上げておく。
+			int time_margin = 400;
+	#else
+			int time_margin = 120;
+	#endif
 
 		// ネットワークの平均遅延時間[ms]
 		// この時間だけ早めに指せばだいたい間に合う。
 		// 切れ負けの瞬間は、NetworkDelayのほうなので大丈夫。
-		o["NetworkDelay"] << Option(120, 0, 10000);
+		o["NetworkDelay"] << Option(time_margin, 0, 10000);
 
 		// ネットワークの最大遅延時間[ms]
 		// 切れ負けの瞬間だけはこの時間だけ早めに指す。
 		// 1.2秒ほど早く指さないとfloodgateで切れ負けしかねない。
-		o["NetworkDelay2"] << Option(1120, 0, 10000);
+		o["NetworkDelay2"] << Option(time_margin + 1000, 0, 10000);
 
 		// 最小思考時間[ms]
 		o["MinimumThinkingTime"] << Option(2000, 1000, 100000);
@@ -111,28 +109,6 @@ namespace USI {
 		// 探索ノード制限。0なら無制限。
 		o["NodesLimit"] << Option(0, 0, INT64_MAX);
 
-		// 引き分けを受け入れるスコア
-		// 歩を100とする。例えば、この値を100にすると引き分けの局面は評価値が -100とみなされる。
-
-		// 千日手での引き分けを回避しやすくなるように、デフォルト値を2に変更した。[2017/06/03]
-		// ちなみに、2にしてあるのは、
-		//  int contempt = Options["Contempt"] * PawnValue / 100; でPawnValueが100より小さいので
-		// 1だと切り捨てられてしまうからである。
-
-		o["Contempt"] << Option(2, -30000, 30000);
-
-		// Contemptの設定値を先手番から見た値とするオプション。Stockfishからの独自拡張。
-		// 先手のときは千日手を狙いたくなくて、後手のときは千日手を狙いたいような場合、
-		// このオプションをオンにすれば、Contemptをそういう解釈にしてくれる。
-		// この値がtrueのときは、Contemptを常に先手から見たスコアだとみなす。
-
-		o["ContemptFromBlack"] << Option(false);
-
-#if defined (USE_ENTERING_KING_WIN)
-		// 入玉ルール
-		o["EnteringKingRule"] << Option(USI::ekr_rules, USI::ekr_rules[EKR_27_POINT]);
-#endif
-
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
 		last_eval_dir = "eval";
 		o["EvalDir"] << Option("eval", [](const USI::Option&o) {
@@ -143,6 +119,30 @@ namespace USI {
 				load_eval_finished = false;
 			}
 		});
+
+#else
+		
+		// TANUKI_MATE_ENGINEのとき
+		o["USI_Hash"] << Option(4096, 1, MaxHashMB);
+
+#endif // !defined(TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
+
+		// cin/coutの入出力をファイルにリダイレクトする
+		o["WriteDebugLog"] << Option(false, [](const Option& o) { start_logger(o); });
+
+
+#if defined (USE_ENTERING_KING_WIN)
+		// 入玉ルール
+		o["EnteringKingRule"] << Option(USI::ekr_rules, USI::ekr_rules[EKR_27_POINT]);
+#endif
+
+#if defined(USE_GENERATE_ALL_LEGAL_MOVES)
+		// 読みの各局面ですべての合法手を生成する
+		// (普通、歩の2段目での不成などは指し手自体を生成しないのですが、これのせいで不成が必要な詰みが絡む問題が解けないことが
+		// あるので、このオプションを用意しました。トーナメントモードではこのオプションは無効化されます。)
+		o["GenerateAllLegalMoves"] << Option(false);
+#endif
+
 
 #if defined (USE_SHARED_MEMORY_IN_EVAL) && defined(_WIN32) && \
 	 (defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT) )
@@ -158,13 +158,6 @@ namespace USI {
 		// そこでこの隠しオプションでisready時の評価関数の読み込みを抑制して、
 		// test evalconvertコマンドを叩く。
 		o["SkipLoadingEval"] << Option(false);
-#endif
-
-#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT)
-		// 読みの各局面ですべての合法手を生成する
-		// (普通、歩の2段目での不成などは指し手自体を生成しないのですが、これのせいで不成が必要な詰みが絡む問題が解けないことが
-		// あるので、このオプションを用意しました。トーナメントモードではこのオプションは無効化されます。)
-		o["GenerateAllLegalMoves"] << Option(false);
 #endif
 
 #if defined(_WIN32)

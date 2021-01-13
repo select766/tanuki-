@@ -91,6 +91,9 @@ USIプロトコルの独自拡張コマンド
 	MinimumThinkingTime : 最小思考時間。2秒以内に指すと計測1秒となる場合、2000を指定すべき。(CSAルールなど)
 					このとき、NetworkDelayの分は減じて思考するので計測1秒となるはず。
 	MaxMovesToDraw      : 終局までの手数。256手ルールなら256と設定する。0なら無制限。
+    // 安全を見て、256手ルールなら258ぐらいに設定するほうが好ましい。
+    // 理由 →　多くの将棋ソフトで256手ルールの実装がバグっている件 : https://yaneuraou.yaneu.com/2021/01/13/incorrectly-implemented-the-256-moves-rule/
+    // →　このバグ自体は現在修正されているが、置換表を使う以上、256手ルールが絡んで引き分けになった局面の情報を256手目以前で使ってしまうというようなケースは考えられる。
 
 	BookMoves		: 定跡を用いる手数(0=未使用)
 					例えば16を指定した場合、開始局面から16手目の局面まで定跡にヒットする。
@@ -180,7 +183,9 @@ USIプロトコルの独自拡張コマンド
 
 	GenerateAllLegalMoves  : 読みの各局面ですべての合法手を生成する
 			(普通、歩の2段目での不成などは指し手自体を生成しないのですが、これのせいで不成が必要な詰みが絡む問題が解けないことが
-			あるので、このオプションを用意しました。トーナメントモードではこのオプションは無効化されます。)
+			あるので、このオプションを用意しました。オンにすると勝率が少し下がるのでデフォルトではオフになっています。)
+
+			関連) 将棋ソフトは不成が読めないという嘘 : http://yaneuraou.yaneu.com/2020/12/12/all-legal-moves/
 
 	EvalHash : EvalHash(評価関数の計算した値を保存しておくメモリ)の大きさを[MB]単位で指定する。2の累乗でなければならない。
 		※　デフォルト128[MB]。もう少し大きいほうが成績がいいかも。魔女ではAVX2用は1024[MB]。
@@ -236,6 +241,132 @@ USIプロトコルの独自拡張コマンド
 		0 だと最弱。(R2000以上弱くなる) Stockfishの"Skill Level"をそのまま移植。
 
 
+  // やねうら王詰将棋エンジン(2020/12/29 release)
+
+  USI_Hash   : 詰将棋エンジンに割り当てるメモリ[MB]
+  NodesLimit : 探索ノード数 (0 : 無制限)
+  SolverType :
+      32bitNodeSolver(探索ノード数 32bitで表現できる42億までしか扱えないが、必要メモリが64bitNodeSolverの半分で済む)
+      64bitNodeSolver(探索ノード数 64bitで表現できる範囲なので実質無制限だが、必要メモリは32bitNodeSolverの倍)
+  PvInterval : 読み筋の出力間隔 (0 : 出力しない)
+
+  例)
+    USI_Hash 4096 // 4096[MB]割り当てる
+    isready
+    sfen l2g5/2s3g2/3k1p2p/P2pp2P1/1pP4s1/p1+B6/NP1P+nPS1P/K1G4+p1/L6NL b RBGNLPrs3p 1    // 局面図
+    go mate 10000 // 10秒で解かせてみる
+
+    // ↓info ～でPvIntervalごとに読み筋が出力されて、最後、checkmate XXXで詰み手順が出力される。
+    // 詰まない(不詰が証明できた)ときは"checkmate nomate"と返ってくる。
+    // 時間切れの時は"checkmate timeout"と返ってくる。
+    // 探索ノード数制限で解けなかった時や、詰将棋用のメモリ(USI_Hashで指定している)がリミットに達した場合は、"checkmate none"が返ってくる。
+		//	※　その直前に "info string Out Of Memory."(メモリ不足) 、 "info string Exceeded NodesLimit."(探索ノード数に達した)　が出力される。
+
+    info time 1317 nodes 1781726 nps 1352867 hashfull 35 pv 7f8e 6c6b G*5b 6a5b 8e5b 6b5b P*5c 5b6c B*7d 6c5c R*5b 5c4d N*3f 2e3f G*3d 4d3d 5b3b+ R*3c P*3e 3d2d 3b3c 2d3c G*3d 3c2b L*2c 2b3a R*4a 3a3b 4a2a+ 3b4b 2a4a 4b5c 4a5b
+    checkmate 7f8e 6c6b G*5b 6a5b 8e5b 6b5b P*5c 5b6c B*7d 6c5c R*5b 5c4d N*3f 2e3f G*3d 4d3d 5b3b+ R*3c P*3e 3d2d 3b3c 2d3c G*3d 3c2b L*2c 2b3a R*4a 3a3b 4a2a+ 3b4b 2a4a 4b5c 4a5b
+
+
+
+	// ふかうら王(dlshogi互換エンジン)の場合
+
+	・dlshogiのほうの設定の説明も確認すること。
+		世界将棋AI 電竜戦バージョン（「GCT電竜」同梱）
+		https://github.com/TadaoYamaoka/DeepLearningShogi/releases/tag/denryu2020
+
+  ・定跡関連のオプションは、やねうら王通常探索エンジンの時と同様。
+
+	ReuseSubtree
+		探索したノードを次の手番のときに再利用するかのフラグ
+
+	Resign_Threshold		 : 投了値                 : 1000分率で
+		この値を下回った時に投了する。0なら最後まで投了しない。
+
+	Draw_Value_Black		 : 先手の引き分けの時の値 : 1000分率で
+	Draw_Value_White         : 後手の引き分けの時の値 : 1000分率で
+
+		Draw_Value_Blackを1000(期待勝率 100%の意味)に設定すれば、先手は引き分けを勝ちだとみなすことになるので
+		先手をもったコンピューターは積極的に千日手を狙うことになります。
+		逆に、0(期待勝率 0%の意味)に設定すれば、引き分けを負けだとみなすことになるので、積極的に千日手を回避
+		るすようになります。
+
+	Draw_Value_From_Black
+
+		これがtrueであるなら、root color(探索開始局面の手番)が後手なら、
+		Draw_Value_BlackとDraw_Value_Whiteの値を入れ替えたものとみなす。
+
+		大会では「(自分が先手か後手かはわからないけど)自分はできれば千日手を狙いたくて、
+		相手のソフトは千日手を引き分けだとみなしている」状況では、root color(開始局面の手番)と、
+		root colorの反対の手番(相手のcolor)に対して、それぞれ、0.7 , 0.5のように設定したいことがある。
+		これを実現するために、root colorが後手なら、Draw_Value_BlackとDraw_Value_Whiteを入れ替えてくれる
+		オプションがあれば良い。それがこれ。
+
+	DNN_Model1 ～ 8
+	UCT_Threads1 ～ 8
+	DNN_Batch_Size1 ～ 8
+
+		各GPU用のDNNモデル名(評価関数ファイルの名前)と、そのGPU用のUCT探索のスレッド数と、
+		そのGPUに一度に何個の局面をまとめて評価(推論)を行わせるのか。GPUは最大で8個まで扱える。
+
+		DNN_Batch_Size1～8 は、通常時の推奨128 , 検討の時は推奨256。
+
+		DNN_Model2～8は、""である(何も設定されていない)場合、DNN_Model1の値が採用される。(そのスレッド数に1以上が設定されているとき)
+		DNN_Batch_Size2～8は、0が設定されている場合、DNN_Batch_Size1の値が採用される。(そのスレッド数に1以上が設定されているとき)
+		例) 
+			UCT_Threads2 = 8  ← GPU2に割り当てるスレッド数が8
+			DNN_Model2 = ""   ← GPU2用のモデル名はないが、↑でスレッドを割り当てているので、DNN_Model1で指定したモデルがGPU2用に読み込まれる。
+			DNN_Batch_Size2 = 0 ← GPU2用のバッチサイズは0だが、↑でスレッドを割り当てているので、GPU2用のバッチサイズは、DNN_Batch_Size1の値と同じになる。
+
+    DNN_Batch_Sizeを上げると、GPUからの帰りを待つ時間が増えるので、時間超過になりやすい。
+    その場合、NetworkDelay,NetworkDelay2の値を調整すること。
+    // NetworkDelayは普通、400ぐらいが最適値だと思う。
+
+    例)
+    DebugMessageをオンにすると以下のようなログが出力される。
+    > info string search search_end = 3600[ms], interruption time = 3604[ms]
+    > info nps 172 time 4257 nodes 735 hashfull 0 depth 4 score cp 176 pv 2g2f 8c8d 1g1f 1c1d
+    これは、3600[ms]の時点で停止するようにそれより前の段階で計画した、そして3604[ms]の時点で探索スレッドに停止信号を送った、
+    ところが全スレッドが停止したのは4257[ms]の時点であった。このとき4257-3604 = 653[ms]だけ停止させるための遅延が発生している。
+    (GPUが処理中ですぐに停止できていない)　この場合、NetworDelayは 653 + α = 800ぐらいに設定するのが順当。
+    NetworkDelay2 は(ネット対戦であれば)そこに1秒ぐらい足して、1800ぐらいが順当。(←切れたら即負けなので少しマージンを持たせる)
+    ネット対戦でなければ、+500程度のマージンで良いと思う。
+
+
+	DebugMessage
+
+		デバッグ用のメッセージ出力の有無。
+
+	UCT_NodeLimit
+
+		探索するときに調べたNode数に比例してメモリを使用するが、このNodeをいくつ作るかという制限。
+		これに比例したメモリが必要となる。
+		NodesLimitは、これとは異なり、単に探索したノード数の制限。
+
+  MateSearchPly
+		leaf node(探索の末端の局面)での奇数手詰みルーチンを呼び出す時の手数
+    5に設定すると探索の末端の局面で5手で詰むかを調べる。CPU側で調べるのでCPUに負担がかかる。5がおそらくベスト。7はCPUが他の処理をできなくなる。
+  	0 = 奇数手詰めを呼び出さない。
+ 
+  RootMateSearchNodesLimit
+    root node(探索開始局面)でのdf-pnによる詰み探索を行う時の調べるノード(局面)数
+    これが0だと詰み探索を行わない。最大で指定したノード数まで詰み探索を行う。
+    ここで指定した数×16×8(王手の分岐数を考慮するとそれくらい)バイト、詰み探索用に消費する。
+    例) 100万を指定すると128MB消費する。
+    1秒間に100万～200万局面ぐらい調べられると思うので、最大で3秒調べさせたいのであれば300万～600万ぐらいを設定する。
+    // デフォルトは30万
+    // 不詰が証明できた場合はそこで詰み探索は終了する。
+    // dlshogiは、300[ms]探索するのがデフォルトなので、おそらく30万ノードぐらい。
+    // まあそんな長い詰み、そうそう実戦で出くわさないので300[ms]で十分なのかも知れない。
+    // それ以上は置換表のアクセスでメモリの転送帯域消費するのでUCT探索の邪魔になるという…。
+
+
+	★　dlshogiとの違いについて
+
+		// EvalDir　　　 →　dlshogiではサポートされていないが、やねうら王は、EvalDirにあるモデルファイルを読み込むようにする。
+
+		// 以下も、探索パラメーターだから、いらない。開発側が最適値にチューニングすべきという考え。
+		// C_fpu_reduction , C_fpu_reduction_root , C_init , C_base , C_init_root , C_base_root
+
+
 ・getoption
 
 
@@ -264,6 +395,10 @@ USIプロトコルの独自拡張コマンド
 	とすると、今回の思考時間として、100～300[ms]を使って思考する。
 	自己対局でレーティングを計測するときに指し手をバラけさせる効果がある…と思って用意したが、
 	いまとなっては使っていない。
+
+  go movetime 100
+  1手の持ち時間固定のオプション。この場合、1手100[ms]。
+  GUI側が普通対応していないが。
 
 	perft [depth] :パフォーマンステスト。現在の局面(positionコマンドで与えられる)から深さdepthまで
 		全合法手で進めるときの総node数を数えあげる。depthとして1以上の値を指定すること。
@@ -296,6 +431,8 @@ USIプロトコルの独自拡張コマンド
 	search  : 現在の局面に対してLearner::search()を直接呼び出して評価値と読み筋を表示する。
 				(デバッグ用 , EVAL_LEARNを有効にしてコンパイルした実行ファイルのみ使える。)
 
+	log		: ログファイル("io_log.txt")に標準入出力を書き出す設定。Write Debug Logでon/offも出来る。
+
 	bench   : ベンチマーク
 		bench [置換表サイズ][スレッド数][→の指定][LimitType = depth , nodes, time][局面の指定]
 		例)
@@ -309,37 +446,76 @@ USIプロトコルの独自拡張コマンド
 		例) bench 1024 1 10 default depth
 
 
+■　テストコマンド
+
 	test    : テスト用コマンド
-		実験的に実装してあるコマンドで、突然無くなることがあります。
-
-		test unit            : unit test
-		test perft [depth]   : perft(パフォーマンステスト)。深さを指定できる。
-		test rp    [回数]    : random playerのテスト。回数を指定できる。
-		test rpbench [回数]  : ランダムプレイヤーを用いたbenchマーク。
-		test checks [回数]	 : ランダムプレイヤーで対局させて、王手の指し手生成ルーチンで指し手が
-								正しく生成出来ているかをテストする。
-		test autoplay [回数] : 思考ルーチンを呼び出して連続自己対戦をさせる。
-		test timeman         : TimeManagerで消費する時間のテスト結果を表示する。(やねうら王classic-tce以降のみ)
-		test evalmerge [DIR1] [DIR2] [DIR3] [PERCENT] : DIR1の評価関数とDIR2の評価関数を
-				指定されたPERCENTで按分してDIR3に書き出す。(やねうら王2017Early以降のみ)
-				例) test evalmerge eval1 eval2 eval_out 20
-				  このときeval1が20%、eval2が80%の新しい評価関数ファイルがeval_out/フォルダに出力される。
-		test evalsave        : 現在の評価関数をファイルに保存。"EvalSaveDir"オプションで指定したフォルダに保存。
-		test evalresolve [DIR0] [DIR1] [DIR2] ...
-				DIR0,DIR1,DIR2,…は、評価関数フォルダ。
-				DIR0の評価関数が、DIR1,DIR2,…の、どの評価関数からevalmergeされているのかを調べる。
-					X1 DIR1 + X2 DIR2 + X3 DIR3 + ...
-				のような形で分解した結果を教えてくれる。
-				
-				以下の記事も参考に。
-
-				・評価関数ファイルの合成、学習元を解析するツールREsolveMUtationエンジンを公開します
-					http://qhapaq.hatenablog.com/entry/2017/07/16/040830
-				・REsolve MUtationエンジンの使い方
-					http://qhapaq.hatenablog.com/entry/2017/07/17/001152
+		※　testコマンドは実験的に実装してあるコマンドで、突然無くなることがあります。
 
 
-	log		: ログファイル("io_log.txt")に標準入出力を書き出す設定。Write Debug Logでon/offも出来る。
+    test genmate          : 詰将棋の自動生成(やねうら王通常探索部のLEARN版のみ)
+
+      自己対局を行い、その対局中に見つけた詰め将棋の局面をsfen形式で出力します。
+      // 自己対局を行うので、評価関数は正常に読み込め、エンジンは正常に動作している必要があります。
+
+      loop     : 生成する個数
+      min_ply  : 生成する詰将棋の最小手数(奇数にすること)
+      max_ply  : 生成する詰将棋の最大手数(奇数にすること)
+      filename : 生成するファイル名(sfen形式)
+
+      例) test genmate loop 10000 min_ply 5 max_ply 7 filename mate.sfen
+        とすると5手か7手の詰将棋がsfen形式で1万局面出力されます。
+          // このコマンドは5秒ごとに生成した局面数を表示します。
+
+        スレッド並列で生成するので、そのときのエンジンオプションのThreadsの数だけ並列生成します。
+      例) // 8スレッドで生成したいなら、以下のようにします。
+          Threads 8
+          test genmate loop 10000 min_ply 5 max_ply 7 filename mate.sfen
+      
+
+    test matebench        :  詰みルーチンに関するbenchをとる。
+
+      このbenchには、"test genmate"コマンドで生成した詰み局面を利用すると良い。
+
+      file   : 詰将棋のsfen文字列が書かれているファイル名
+      num    : ファイルから読み込む問題数(先頭からこの行数だけ読み込む)
+      loop   : 問題を何回ずつ解かせるのか。
+		      sfen文字列からPositionにセットする時間がロスするので、
+		      何度かずつ同じを局面を繰り返し解かせる時に用いる。
+
+      mate_ply : 奇数詰めルーチンを呼ぶ時の上限の詰み手数。
+      dfpn_mem : df-pnルーチン用のメモリをどれだけ割り当てるか。[MB]単位。
+
+      verbose  : 出力を多めにする。不詰がある時、その時のsfen文字列を出力する。
+
+      mode     : 1 : 奇数詰めのベンチをする ,  2 : df-pnルーチンのベンチをする。
+                  1 + 2 = 3を指定すると両方のベンチをする。
+
+      例) test matebench file mate/mate.sfen num 1000000
+        mate/mate.sfenファイルを、その先頭から100万局面分読み込んでベンチを行う。
+
+
+    test matebench2    : tanuki-詰将棋ルーチンのベンチマークテスト
+      // そのうち削除するかも知れないので説明は割愛
+
+
+    test dfpn         :  現在の局面に対してdf-pn詰将棋ルーチンを呼び出す
+
+      // df-pnルーチン自体が現在調整中につき非公開なのでこのコマンドは使えません。
+
+      解けた場合、その時の探索したノード数と読み筋を返す。
+
+      nodes		: 探索ノード数の制限
+      mem			: df-pn用のメモリ[MB]
+
+      現在の局面は、"position"コマンドか"sfen"コマンドで設定する。
+      positionコマンドの前には"isready"コマンドを送信してある必要がある。
+
+      例) sfenで指定した局面をdf-pn詰将棋ルーチンで解かせる。
+
+        isready
+        sfen ln6+P/2sk1G3/p1ppn2pp/5BP2/9/2N6/P1PPPP2P/1SG6/LN1KR+r3 w 2G2L5Pb2s 72
+        test dfpn
+        
 
 
 ■　詰将棋エンジン
@@ -370,7 +546,8 @@ USIプロトコルの独自拡張コマンド
 ■　定跡生成
 
 
-	// MAKE_BOOK_CMDをdefineしてコンパイルしたときにのみ有効。
+	// MAKE_BOOK_CMD,EVAL_LEARN をdefineしてコンパイルしたときにのみ有効。
+  // NNUEのLEARN版などで使えます。
 	makebook : 定跡作成コマンド。詳しくは doc/解説.txt のほうを参考に。
 
 
@@ -379,7 +556,7 @@ USIプロトコルの独自拡張コマンド
 
 ・評価関数の学習で用いる教師局面の生成
 
-	// やねうら王2017Early LEARN版のみ
+	// やねうら王 LEARN版のみ
 
 	gensfen [depth 探索深さ] [loop 生成する棋譜の数] [output_file_name ファイル名] [eval_limit 評価値]  : 学習用の自己対局棋譜の生成
 		例) gensfen depth 6  (残りは省略可)

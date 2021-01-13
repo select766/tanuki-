@@ -65,7 +65,7 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 		key16     = pos_key;
 		depth8    = (uint8_t)(d - DEPTH_OFFSET); // DEPTH_OFFSETだけ下駄履きさせてある。
 		genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
-		value16 = (int16_t)v;
+		value16   = (int16_t)v;
 		eval16    = (int16_t)ev;
 	}
 }
@@ -73,7 +73,7 @@ void TTEntry::save(Key k, Value v, bool pv , Bound b, Depth d, Move m , Value ev
 // 置換表のサイズを確保しなおす。
 void TranspositionTable::resize(size_t mbSize) {
 
-#if defined(MATE_ENGINE)
+#if defined(TANUKI_MATE_ENGINE) || defined(YANEURAOU_MATE_ENGINE)
 	// MateEngineではこの置換表は用いないので確保しない。
 	return;
 #endif
@@ -126,7 +126,7 @@ void TranspositionTable::resize(size_t mbSize) {
 
 void TranspositionTable::clear()
 {
-#if defined(MATE_ENGINE)
+#if defined(TANUKI_MATE_ENGINE) || defined(YANEURAOU_MATE_ENGINE)
 	// MateEngineではこの置換表は用いないのでクリアもしない。
 	return;
 #endif

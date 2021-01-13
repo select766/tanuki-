@@ -1,6 +1,7 @@
-﻿#ifndef _SEARCH_H_
-#define _SEARCH_H_
+﻿#ifndef _SEARCH_H_INCLUDED_
+#define _SEARCH_H_INCLUDED_
 
+#include "config.h"
 #include "misc.h"
 #include "movepick.h"
 #include "position.h"
@@ -8,6 +9,7 @@
 // 探索関係
 namespace Search {
 
+#if defined(USE_MOVE_PICKER)
 	// countermoves based pruningで使う閾値
 	constexpr int CounterMovePruneThreshold = 0;
 
@@ -30,6 +32,7 @@ namespace Search {
 		bool ttPv;					// 置換表にPV nodeで調べた値が格納されていたか(これは価値が高い)
 		bool ttHit;					// 置換表にhitしたかのフラグ
 	};
+#endif
 
 	// root(探索開始局面)での指し手として使われる。それぞれのroot moveに対して、
 	// その指し手で進めたときのscore(評価値)とPVを持っている。(PVはfail lowしたときには信用できない)
@@ -93,8 +96,7 @@ namespace Search {
 			enteringKingRule = EKR_NONE;
 			silent = bench = consideration_mode = outout_fail_lh_pv = false;
 			pv_interval = 0;
-
-#if !defined(FOR_TOURNAMENT)
+#if defined(USE_GENERATE_ALL_LEGAL_MOVES)
 			generate_all_legal_moves = false;
 #endif
 		}
@@ -138,6 +140,20 @@ namespace Search {
 		// この手数で引き分けとなる。256なら256手目を指したあとに引き分け。
 		// USIのoption["MaxMovesToDraw"]の値。引き分けなしなら100000。
 		// (残り手数を計算する時に桁あふれすると良くないのでINT_MAXにはしていない)
+		// この値が0なら引き分けルールはなし(無効)。
+		/*
+		  初手(76歩とか)が1手目である。1手目を指す前の局面はPosition::game_ply() == 1である。
+		  そして256手指された時点(257手目の局面で指す権利があること。サーバーから257手目の局面はやってこないものとする)で引き分けだとしたら
+		  257手目(を指す前の局面)は、game_ply() == 257である。これが、引き分け扱いということになる。
+
+			pos.game_ply() > limits.max_game_ply
+
+		　で(かつ、詰みでなければ)引き分けということになる。
+
+		  この引き分けの扱いについては、以下の記事が詳しい。
+			多くの将棋ソフトで256手ルールの実装がバグっている件
+			https://yaneuraou.yaneu.com/2021/01/13/incorrectly-implemented-the-256-moves-rule/
+		*/
 		int max_game_ply;
 
 		// "go rtime 100"とすると100～300msぐらい考える。
@@ -162,11 +178,13 @@ namespace Search {
 		// PVの出力間隔(探索のときにMainThread::search()内で初期化する)
 		TimePoint pv_interval;
 
-#if !defined(FOR_TOURNAMENT)
+#if defined (USE_GENERATE_ALL_LEGAL_MOVES)
 		// 全合法手を生成するのか
+		// TANUKI_MATE_ENGINE , YANEURAOU_MATE_ENGINE ではこの設定は無視されている。
 		bool generate_all_legal_moves;
 #endif
-#if defined(MATE_ENGINE)
+
+#if defined(TANUKI_MATE_ENGINE)
 		std::vector<Move16> pv_check;
 #endif
 	};
@@ -182,4 +200,5 @@ namespace Search {
 
 } // end of namespace Search
 
-#endif // _SEARCH_H_
+#endif // _SEARCH_H_INCLUDED_
+

@@ -1,12 +1,20 @@
 ﻿#include "movepick.h"
+#if defined(USE_MOVE_PICKER)
+
 #include "thread.h"
 
 // パラメーターの自動調整フレームワークからパラメーターの値を読み込む
 #include "engine/yaneuraou-engine/yaneuraou-param-common.h"
 
-#if defined(DEV_BRANCH) && defined(USE_AVX2)
+#if defined(USE_SUPER_SORT) && defined(USE_AVX2)
 // partial_insertion_sort()のSuperSortを用いた実装
 extern void partial_super_sort(ExtMove* start, ExtMove* end, int limit);
+
+/*
+  - 少し高速化されるらしい。
+  - 安定ソートではないので並び順が以前のとは異なるから、benchコマンドの探索ノード数は変わる。
+  - CPU targetによって実装が変わるのでCPUによってbenchコマンドの探索ノード数は変わる。
+*/
 #endif
 
 namespace {
@@ -102,17 +110,8 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
 // 歩の不成を生成するモードが必要なのでこの部分をwrapしておく必要があった。
 bool pseudo_legal(const Position& pos, Move ttm)
 {
-#if defined(FOR_TOURNAMENT) 
-
-	// トーナメントモードなら、歩の不成は生成しない
-	return pos.pseudo_legal_s<false>(ttm);
-
-#else
-
-	// トーナメントモードでないなら、歩の不成を生成するかは、Options["GenerateAllLegalMoves"]に依存する。
+	// 歩の不成を生成するかは、Options["GenerateAllLegalMoves"]に依存する。
 	return Search::Limits.generate_all_legal_moves ? pos.pseudo_legal_s<true>(ttm) : pos.pseudo_legal_s<false>(ttm);
-
-#endif
 }
 
 
@@ -207,7 +206,7 @@ void MovePicker::score()
 			Square movedSq = to_sq(m);
 
 #if 0
-			m.value = (*mainHistory)[from_to(m)][pos.side_to_move()]
+			m.value =     (*mainHistory)[from_to(m)][pos.side_to_move()]
 					+ 2 * (*continuationHistory[0])[movedSq][movedPiece]
 					+ 2 * (*continuationHistory[1])[movedSq][movedPiece]
 					+ 2 * (*continuationHistory[3])[movedSq][movedPiece]
@@ -307,11 +306,7 @@ top:
 	case QCAPTURE_INIT:
 		cur = endBadCaptures = moves;
 
-#if defined(FOR_TOURNAMENT)
-		endMoves = generateMoves<CAPTURES_PRO_PLUS>(pos, cur);
-#else
 		endMoves = Search::Limits.generate_all_legal_moves ? generateMoves<CAPTURES_PRO_PLUS_ALL>(pos, cur) : generateMoves<CAPTURES_PRO_PLUS>(pos, cur);
-#endif
 
 		// 駒を捕獲する指し手に対してオーダリングのためのスコアをつける
 		score<CAPTURES>();
@@ -372,11 +367,7 @@ top:
 			cur = (ExtMove*)Math::align((size_t)cur, 32);
 #endif
 
-#if defined(FOR_TOURNAMENT) 
-			endMoves = generateMoves<NON_CAPTURES_PRO_MINUS>(pos, cur);
-#else
 			endMoves = Search::Limits.generate_all_legal_moves ? generateMoves<NON_CAPTURES_PRO_MINUS_ALL>(pos, cur) : generateMoves<NON_CAPTURES_PRO_MINUS>(pos, cur);
-#endif
 
 			// 駒を捕獲しない指し手に対してオーダリングのためのスコアをつける
 			score<QUIETS>();
@@ -384,7 +375,7 @@ top:
 			// 指し手を部分的にソートする。depthに線形に依存する閾値で。
 			// (depthが低いときに真面目に全要素ソートするのは無駄だから)
 
-#if defined(DEV_BRANCH) && defined(USE_AVX2)
+#if defined(USE_SUPER_SORT) && defined(USE_AVX2)
 
 			// AVX2なので自動的にlittle endianと仮定できるのでint64_tとみなしてソートして良い。
 			// このとき、sortの高速化として、SuperSortが使える。
@@ -434,11 +425,8 @@ top:
 	case EVASION_INIT:
 		cur = moves;
 
-#if defined(FOR_TOURNAMENT) 
-		endMoves = generateMoves<EVASIONS>(pos, cur);
-#else
 		endMoves = Search::Limits.generate_all_legal_moves ? generateMoves<EVASIONS_ALL>(pos, cur) : generateMoves<EVASIONS>(pos, cur);
-#endif
+
 		// 王手を回避する指し手に対してオーダリングのためのスコアをつける
 		score<EVASIONS>();
 
@@ -477,11 +465,7 @@ top:
 		// QUIET_CHECKS_PRO_MINUSがあれば良いのだが、実装が難しいので、QUIET_CHECKSで生成して、このあとQCHECK_で歩の成る指し手を除外する。
 		cur = moves;
 
-#if defined(FOR_TOURNAMENT) 
-		endMoves = generateMoves<QUIET_CHECKS>(pos, cur);
-#else
 		endMoves = Search::Limits.generate_all_legal_moves ? generateMoves<QUIET_CHECKS_ALL>(pos, cur) : generateMoves<QUIET_CHECKS>(pos, cur);
-#endif
 
 		++stage;
 		[[fallthrough]];
@@ -499,3 +483,5 @@ top:
 	ASSERT(false);
 	return MOVE_NONE;
 }
+
+#endif // defined(USE_MOVE_PICKER)

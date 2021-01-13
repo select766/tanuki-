@@ -1,6 +1,9 @@
 ﻿#ifndef MOVEPICK_H_INCLUDED
 #define MOVEPICK_H_INCLUDED
 
+#include "config.h"
+#if defined(USE_MOVE_PICKER)
+
 #include <array>
 //#include <limits>
 //#include <type_traits>
@@ -96,7 +99,7 @@ enum StatsType { NoCaptures, Captures };
 // やねうら王では、ここで用いられるfromは、駒打ちのときに特殊な値になっていて、盤上のfromとは区別される。
 // そのため、(SQ_NB + 7)まで移動元がある。
 // ※　Stockfishとは、添字の順番を入れ替えてあるので注意。
-typedef Stats<int16_t, 10692, int(SQ_NB + 7) * int(SQ_NB) , COLOR_NB> ButterflyHistory;
+typedef Stats<int16_t, 13365, int(SQ_NB + 7) * int(SQ_NB) , COLOR_NB> ButterflyHistory;
 
 
 // より高い探索深さにおいて、LowPlyHistoryは、root付近の成功したquietな指し手と
@@ -116,7 +119,7 @@ typedef Stats<Move, NOT_USED, SQ_NB , PIECE_NB> CounterMoveHistory;
 
 /// CapturePieceToHistoryは、指し手の[to][piece][captured piece type]で示される。
 // ※　Stockfishとは、添字の順番を変更してあるので注意。
-//    Stockfishでは、[piece][to][captured piece type]の順。
+//     Stockfishでは、[piece][to][captured piece type]の順。
 typedef Stats<int16_t, 10692, SQ_NB, PIECE_NB , PIECE_TYPE_NB> CapturePieceToHistory;
 
 /// PieceToHistoryは、ButterflyHistoryに似たものだが、指し手の[to][piece]で示される。
@@ -236,6 +239,8 @@ private:
 	// メモリアドレスが32byteの倍数になるようにcurを使いたいので+3して、611。
 	ExtMove moves[MAX_MOVES + 11];
 };
+
+#endif // defined(USE_MOVE_PICKER)
 
 #endif // #ifndef MOVEPICK_H_INCLUDED
 

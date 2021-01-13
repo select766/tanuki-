@@ -17,28 +17,72 @@
 
 using namespace std;
 
+// ----------------------------------
+//      USI拡張コマンド "test"
+// ----------------------------------
+
+#if defined(ENABLE_TEST_CMD)
+
+// USI拡張コマンドのうち、開発上のテスト関係のコマンド。
+// 思考エンジンの実行には関係しない。
+
+namespace Test
+{
+	// 詰み関係のテストコマンド。コマンドを処理した時 trueが返る。
+	bool mate_test_cmd(Position& pos, std::istringstream& is, const std::string& token);
+
+	void test_cmd(Position& pos, std::istringstream& is)
+	{
+		// 探索をするかも知れないので初期化しておく。
+		is_ready();
+
+		std::string token;
+		is >> token;
+
+		// デザパタのDecoratorみたいな感じで書いていく。
+
+		// 詰み関係の拡張コマンド
+		if (mate_test_cmd(pos,is,token))
+			return;
+
+	}
+
+}
+
+#endif // defined(ENABLE_TEST_CMD)
+
+
+//
+// あとで整理する
+//
+
+
 // ユーザーの実験用に開放している関数。
 // USI拡張コマンドで"user"と入力するとこの関数が呼び出される。
 // "user"コマンドの後続に指定されている文字列はisのほうに渡される。
 void user_test(Position& pos, std::istringstream& is);
 
-// USI拡張コマンドの"test"コマンドなど。
-// サンプル用のコードを含めてtest.cppのほうに色々書いてあるのでそれを呼び出すために使う。
 #if defined(ENABLE_TEST_CMD)
-	void test_cmd(Position& pos, istringstream& is);
 	void generate_moves_cmd(Position& pos);
-#if defined(MATE_ENGINE)
-	void test_mate_engine_cmd(Position& pos, istringstream& is);
-#endif
 #endif
 
-// "bench"コマンドは、"test"コマンド群とは別。常に呼び出せるようにしてある。
-extern void bench_cmd(Position& pos, istringstream& is);
+#if defined(USE_MATE_DFPN)
+// "mate"コマンド
+void mate_cmd(Position& pos, istream& is);
+#endif
+
+// ----------------------------------
+//      USI拡張コマンド "makebook"
+// ----------------------------------
 
 // 定跡を作るコマンド
-#if defined(ENABLE_MAKEBOOK_CMD)
+#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
 namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 #endif
+
+// ----------------------------------
+//      USI拡張コマンド "learn"
+// ----------------------------------
 
 // 棋譜を自動生成するコマンド
 #if defined (EVAL_LEARN)
@@ -64,10 +108,19 @@ namespace Learner
 }
 #endif
 
+// ----------------------------------
+//      USI拡張コマンド "bench"
+// ----------------------------------
+
+// "bench"コマンドは、"test"コマンド群とは別。常に呼び出せるようにしてある。
+extern void bench_cmd(Position& pos, istringstream& is);
+
+
 // "gameover"コマンドに対するハンドラ
 #if defined(USE_GAMEOVER_HANDLER)
 void gameover_handler(const string& cmd);
 #endif
+
 
 namespace USI
 {
@@ -116,7 +169,10 @@ namespace USI
 			ss  << "info"
 				<< " depth "    << d
 				<< " seldepth " << rootMoves[i].selDepth
-				<< " score "    << USI::value(v);
+#if defined(USE_PIECE_VALUE)
+				<< " score "    << USI::value(v)
+#endif				
+				;
 
 			// これが現在探索中の指し手であるなら、それがlowerboundかupperboundかは表示させる
 			if (i == pvIdx)
@@ -127,7 +183,7 @@ namespace USI
 				ss << " multipv " << (i + 1);
 
 			ss << " nodes " << nodes_searched
-			   << " nps " << nodes_searched * 1000 / elapsed;
+			   << " nps "   << nodes_searched * 1000 / elapsed;
 
 			// 置換表使用率。経過時間が短いときは意味をなさないので出力しない。
 			if (elapsed > 1000)
@@ -293,11 +349,33 @@ void is_ready(bool skipCorruptCheck)
 	// --- Keep Alive的な処理ここまで ---
 
 	// スレッドを先に生成しないとUSI_Hashで確保したメモリクリアの並列化が行われなくて困る。
+
+#if defined(YANEURAOU_ENGINE_DEEP)
+
+	// ここ、max_gpu == 8固定として扱っている。あとで修正する。(かも)
+	int threads_num =
+		(int)Options["UCT_Threads1"] + (int)Options["UCT_Threads2"] + (int)Options["UCT_Threads3"] + (int)Options["UCT_Threads4"] +
+		(int)Options["UCT_Threads5"] + (int)Options["UCT_Threads6"] + (int)Options["UCT_Threads7"] + (int)Options["UCT_Threads8"];
+
+	Threads.set(std::max(threads_num,1));
+#else
 	Threads.set(size_t(Options["Threads"]));
+#endif
 
 #if defined (USE_EVAL_HASH)
 	Eval::EvalHash_Resize(Options["EvalHash"]);
 #endif
+
+	// 評価関数の読み込み
+
+#if defined(YANEURAOU_ENGINE_DEEP)
+
+	// 毎回、load_eval()は呼び出すものとする。
+	// モデルファイル名に変更がなければ、再読み込みされないような作りになっているならばこの実装のほうがシンプル。
+	Eval::load_eval();
+	USI::load_eval_finished = true;
+
+#else
 
 	// 評価関数の読み込みなど時間のかかるであろう処理はこのタイミングで行なう。
 	// 起動時に時間のかかる処理をしてしまうと将棋所がタイムアウト判定をして、思考エンジンとしての認識をリタイアしてしまう。
@@ -321,6 +399,7 @@ void is_ready(bool skipCorruptCheck)
 		if (!skipCorruptCheck && eval_sum != Eval::calc_check_sum())
 			sync_cout << "Error! : EVAL memory is corrupted" << sync_endl;
 	}
+#endif
 
 	// isreadyに対してはreadyokを返すまで次のコマンドが来ないことは約束されているので
 	// このタイミングで各種変数の初期化もしておく。
@@ -417,8 +496,8 @@ void setoption_cmd(istringstream& is)
 	if (Options.count(name))
 		Options[name] = value;
 	else
-		// この名前のoptionは存在しなかった
-		sync_cout << "Error! : No such option: " << name << sync_endl;
+			// この名前のoptionは存在しなかった
+			sync_cout << "Error! : No such option: " << name << sync_endl;
 
 }
 
@@ -452,17 +531,19 @@ void getoption_cmd(istringstream& is)
 // この関数は、入力文字列から思考時間とその他のパラメーターをセットし、探索を開始する。
 void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 
+	// "isready"コマンド受信前に"go"コマンドが呼び出されている。
+	if (!USI::load_eval_finished)
+	{
+		sync_cout << "Error! go cmd before isready cmd." << sync_endl;
+		return;
+	}
+
 	Search::LimitsType limits;
 	string token;
 	bool ponderMode = false;
 
 	// 思考開始時刻の初期化。なるべく早い段階でこれをしておかないとサーバー時間との誤差が大きくなる。
 	Time.reset();
-
-#if defined (USE_ENTERING_KING_WIN)
-	// 入玉ルール
-	limits.enteringKingRule = to_entering_king_rule(Options["EnteringKingRule"]);
-#endif
 
 	// 終局(引き分け)になるまでの手数
 	// 引き分けになるまでの手数。(Options["MaxMovesToDraw"]として与えられる。エンジンによってはこのオプションを持たないこともある。)
@@ -473,8 +554,13 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 		max_game_ply = (int)Options["MaxMovesToDraw"];
 	limits.max_game_ply = (max_game_ply == 0) ? 100000 : max_game_ply;
 
+#if defined (USE_ENTERING_KING_WIN)
+	// 入玉ルール
+	limits.enteringKingRule = to_entering_king_rule(Options["EnteringKingRule"]);
+#endif
+
 	// すべての合法手を生成するのか
-#if !defined(MATE_ENGINE) && !defined(FOR_TOURNAMENT) 
+#if defined (USE_GENERATE_ALL_LEGAL_MOVES)
 	limits.generate_all_legal_moves = Options["GenerateAllLegalMoves"];
 #endif
 
@@ -521,6 +607,9 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 		// この探索ノード数で探索を打ち切る
 		else if (token == "nodes")     is >> limits.nodes;
 
+		// 持ち時間固定(将棋だと対応しているGUIが無いかもしれないが..)
+		else if (token == "movetime")  is >> limits.movetime;
+
 		// 詰み探索。"UCI"プロトコルではこのあとには手数が入っており、その手数以内に詰むかどうかを判定するが、
 		// "USI"プロトコルでは、ここは探索のための時間制限に変更となっている。
 		else if (token == "mate") {
@@ -532,26 +621,26 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 				limits.mate = stoi(token);
 		}
 
-#if defined(MATE_ENGINE)
+#if defined(TANUKI_MATE_ENGINE)
 		// MateEngineのデバッグ用コマンド: 詰将棋の特定の変化に対する解析を効率的に行うことが出来る。
 		//	cf.https ://github.com/yaneurao/YaneuraOu/pull/115
-			
+
 		else if (token == "matedebug") {
-		  string token="";
+			string token="";
 			Move16 m;
-		  limits.pv_check.clear();
+			limits.pv_check.clear();
 			while (is >> token && (m = USI::to_move16(token)) != MOVE_NONE){
-		    limits.pv_check.push_back(m);
-		  }
+				limits.pv_check.push_back(m);
+			}
 		}
 #endif
 
 		// パフォーマンステスト(Stockfishにある、合法手N手で到達できる局面を求めるやつ)
 		// このあとposition～goコマンドを使うとパフォーマンステストモードに突入し、ここで設定した手数で到達できる局面数を求める
-		else if (token == "perft")     is >> limits.perft;
+		else if (token == "perft")		is >> limits.perft;
 
 		// 時間無制限。
-		else if (token == "infinite")  limits.infinite = 1;
+		else if (token == "infinite")	limits.infinite = 1;
 
 		// ponderモードでの思考。
 		else if (token == "ponder")		ponderMode = true;
@@ -793,17 +882,13 @@ void USI::loop(int argc, char* argv[])
 		
 #if defined (ENABLE_TEST_CMD)
 		// 指し手生成のテスト
-		else if (token == "s") generate_moves_cmd(pos);
+		//else if (token == "s") generate_moves_cmd(pos);
 
 		// テストコマンド
-		else if (token == "test") test_cmd(pos, is);
-
-#if defined (MATE_ENGINE)
-		else if (token == "test_mate_engine") test_mate_engine_cmd(pos, is);
-#endif
+		else if (token == "test") Test::test_cmd(pos, is);
 #endif
 
-#if defined (ENABLE_MAKEBOOK_CMD)
+#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
 		// 定跡を作るコマンド
 		else if (token == "makebook") Book::makebook_cmd(pos, is);
 #endif
@@ -1001,7 +1086,9 @@ namespace {
 	}
 }
 
+#if defined(USE_PIECE_VALUE)
 // スコアを歩の価値を100として正規化して出力する。
+// USE_PIECE_VALUEが定義されていない時は正規化しようがないのでこの関数は呼び出せない。
 std::string USI::value(Value v)
 {
 	ASSERT_LV3(-VALUE_INFINITE < v && v < VALUE_INFINITE);
@@ -1026,6 +1113,7 @@ std::string USI::value(Value v)
 
 	return s.str();
 }
+#endif
 
 // Square型をUSI文字列に変換する
 std::string USI::square(Square s) {
@@ -1033,16 +1121,17 @@ std::string USI::square(Square s) {
 }
 
 // 指し手をUSI文字列に変換する。
-std::string USI::move(Move m)
+std::string USI::move(Move   m) { return move(Move16(m)); }
+std::string USI::move(Move16 m)
 {
 	std::stringstream ss;
 	if (!is_ok(m))
 	{
 		ss << ((m == MOVE_RESIGN) ? "resign" :
-			(m == MOVE_WIN) ? "win" :
-			(m == MOVE_NULL) ? "null" :
-			(m == MOVE_NONE) ? "none" :
-			"");
+			   (m == MOVE_WIN)    ? "win" :
+			   (m == MOVE_NULL)   ? "null" :
+			   (m == MOVE_NONE)   ? "none" :
+			    "");
 	}
 	else if (is_drop(m))
 	{
@@ -1058,6 +1147,18 @@ std::string USI::move(Move m)
 	}
 	return ss.str();
 }
+
+// 読み筋をUSI文字列化して返す。
+// " 7g7f 8c8d" のように返る。
+std::string USI::move(const std::vector<Move>& moves)
+{
+	std::ostringstream oss;
+	for (const auto& move : moves) {
+		oss << " " << move;
+	}
+	return oss.str();
+}
+
 
 // 局面posとUSIプロトコルによる指し手を与えて
 // もし可能なら等価で合法な指し手を返す。(合法でないときはMOVE_NONEを返す)
@@ -1110,15 +1211,15 @@ Move16 USI::to_move16(const string& str)
 	{
 		// さすがに3文字以下の指し手はおかしいだろ。
 		if (str.length() <= 3)
-				goto END;
-	
+			goto END;
+
 		Square to = usi_to_sq(str[2], str[3]);
 		if (!is_ok(to))
-				goto END;
-	
+			goto END;
+
 		bool promote = str.length() == 5 && str[4] == '+';
 		bool drop = str[1] == '*';
-	
+
 		if (!drop)
 		{
 			Square from = usi_to_sq(str[0], str[1]);
