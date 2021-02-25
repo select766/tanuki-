@@ -104,7 +104,7 @@ namespace dlshogi::UctPrint
 
 		// 上位 multiPv個をソートして、あとは捨てる
 		multiPv = std::min(multiPv, (ChildNumType)list.size());
-		std::partial_sort(list.begin(), list.begin() + multiPv , list.end(), [](auto& rhs, auto& lhs){ return is_superior_to(rhs.second,lhs.second); });
+		std::partial_sort(list.begin(), list.begin() + multiPv , list.end(), [](auto& lhs, auto& rhs){ return is_superior_to(lhs.second,rhs.second); });
 
 		// listには良い順に並んでいる。例えば、1番良いChildNodeは、child[list[0].first]
 		for (ChildNumType i = 0; i < multiPv ; ++i)
@@ -172,7 +172,8 @@ namespace dlshogi::UctPrint
 	}
 
 	// ベストの指し手とponderの指し手の取得
-	BestMovePonder get_best_move_multipv(const Node* rootNode , const SearchLimits& po_info , const SearchOptions& options )
+	//   silent : これがtrueなら読み筋は出力しない。
+	BestMovePonder get_best_move_multipv(const Node* rootNode , const SearchLimits& po_info , const SearchOptions& options , bool silent)
 	{
 		ChildNumType multiPv = options.multi_pv;
 		
@@ -198,7 +199,8 @@ namespace dlshogi::UctPrint
 			std::vector<Move> moves = { best.move };
 			get_pv(best.node, moves);
 
-			sync_cout << pv_to_string(best, moves, multiPv, i , nps.str() ) << sync_endl;
+			if (!silent)
+				sync_cout << pv_to_string(best, moves, multiPv, i , nps.str() ) << sync_endl;
 
 			if (i == 0 && moves.size() >= 2)
 				ponder = moves[1];

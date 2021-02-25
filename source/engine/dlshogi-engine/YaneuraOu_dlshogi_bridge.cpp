@@ -62,20 +62,11 @@ void USI::extra_option(USI::OptionsMap& o)
 	o["Resign_Threshold"]            << USI::Option(0, 0, 1000);
 
 	// 引き分けの時の値 : 1000分率で
-
-	o["Draw_Value_Black"]            << USI::Option(500, 0, 1000);
-    o["Draw_Value_White"]            << USI::Option(500, 0, 1000);
-
-	// これがtrueであるなら、root color(探索開始局面の手番)が後手なら、
-	//
-	// Draw_Value_BlackとDraw_Value_Whiteの値を入れ替えたものとみなす。
-	// 大会では「(自分が先手か後手かはわからないけど)自分はできれば千日手を狙いたくて、
-	// 相手のソフトは千日手を引き分けだとみなしている」状況では、root color(開始局面の手番)と、
-	// root colorの反対の手番(相手のcolor)に対して、それぞれ、0.7 , 0.5のように設定したいことがある。
-	// これを実現するために、root colorが後手なら、Draw_Value_BlackとDraw_Value_Whiteを入れ替えてくれる
-	// オプションがあれば良い。それがこれ。
-
-	o["Draw_Value_From_Black"]       << USI::Option(false);
+	// 引き分けの局面では、この値とみなす。
+	// root color(探索開始局面の手番)に応じて、2通り。
+	
+	o["DrawValueBlack"]            << USI::Option(500, 0, 1000);
+	o["DrawValueWhite"]            << USI::Option(500, 0, 1000);
 
 	// --- PUCTの時の定数
 	// これ、探索パラメーターの一種と考えられるから、最適な値を事前にチューニングして設定するように
@@ -164,8 +155,10 @@ void Search::clear()
 	searcher.book.read_book();
 
 #if 0
-			// オプション設定
-			dfpn_min_search_millisecs = options["DfPn_Min_Search_Millisecs"];
+	// オプション設定
+	dfpn_min_search_millisecs = options["DfPn_Min_Search_Millisecs"];
+
+	// →　ふかうら王では、rootのdf-pnは、node数を指定することにした。
 #endif
 
 	searcher.SetPvInterval((TimePoint)Options["PV_Interval"]);
@@ -210,7 +203,6 @@ void Search::clear()
 
 	// その他、dlshogiにはあるけど、サポートしないもの。
 
-	// UCT_NodeLimit →　dlshogiでは存在するが、やねうら王旧来からあるエンジンオプションの"NodesLimit"を流用して良いと思う。
 	// EvalDir　　　 →　dlshogiではサポートされていないが、やねうら王は、EvalDirにあるモデルファイルを読み込むようにする。
 
 	// 以下も、探索パラメーターだから、いらない。開発側が最適値にチューニングすべきという考え。
@@ -233,12 +225,13 @@ void Search::clear()
 	Eval::dlshogi::set_softmax_temperature( 174 / 100.0f);
 
 	searcher.SetDrawValue(
-		(int)Options["Draw_Value_Black"],
-		(int)Options["Draw_Value_White"],
-		Options["Draw_Value_From_Black"]);
+		(int)Options["DrawValueBlack"],
+		(int)Options["DrawValueWhite"]);
 
 	searcher.SetPonderingMode(Options["USI_Ponder"]);
 
+	// UCT_NodeLimit : これはノード制限ではなく、ノード上限を示す。この値を超えたら思考を中断するが、
+	// 　この値を超えていなくとも、持ち時間制御によって思考は中断する。
 	searcher.InitializeUctSearch((NodeCountType)Options["UCT_NodeLimit"]);
 
 #if 0
@@ -277,7 +270,7 @@ void MainThread::search()
 	searcher.search_options.multi_pv = (ChildNumType)Options["MultiPV"];
 
 	Move ponderMove;
-	Move move = searcher.UctSearchGenmove(&rootPos, rootPos.sfen(), {}, ponderMove);
+	Move move = searcher.UctSearchGenmove(&rootPos, game_root_sfen , moves_from_game_root , ponderMove);
 
 	// ponder中であれば、呼び出し元で待機しなければならない。
 	
@@ -299,13 +292,17 @@ void MainThread::search()
 		// Stockfishのコード、ここ、busy waitになっているが、さすがにそれは良くないと思う。
 	}
 
-	sync_cout << "bestmove " << to_usi_string(move);
+	// silent modeでないなら、bestmoveとponderの指し手を出力する。
+	if (!Search::Limits.silent)
+	{
+		sync_cout << "bestmove " << to_usi_string(move);
 
-	// USI_Ponderがtrueならば、bestmoveに続けて、ponderの指し手も出力する。
-	if (searcher.search_options.usi_ponder && ponderMove)
-		std::cout << " ponder " << to_usi_string(ponderMove);
+		// USI_Ponderがtrueならば、bestmoveに続けて、ponderの指し手も出力する。
+		if (searcher.search_options.usi_ponder && ponderMove)
+			std::cout << " ponder " << to_usi_string(ponderMove);
 
-	std::cout << sync_endl;
+		std::cout << sync_endl;
+	}
 }
 
 void Thread::search()

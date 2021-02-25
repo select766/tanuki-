@@ -198,14 +198,13 @@ namespace dlshogi
 	}
 
 	// 千日手の価値設定
-	//   value_black           : この値を先手の千日手の価値とみなす。(千分率)
-	//   value_white           : この値を後手の千日手の価値とみなす。(千分率)
+	//   value_black           : この値をroot colorが先手番の時の千日手の価値とみなす。(千分率)
+	//   value_white           : この値をroot colorが後手番の時の千日手の価値とみなす。(千分率)
 	//   draw_value_from_black : エンジンオプションの"Draw_Value_From_Black"の値。
-	void DlshogiSearcher::SetDrawValue(const int value_black, const int value_white,bool draw_value_from_black)
+	void DlshogiSearcher::SetDrawValue(const int value_black, const int value_white)
 	{
 		search_options.draw_value_black = (float)value_black / 1000.0f;
 		search_options.draw_value_white = (float)value_white / 1000.0f;
-		search_options.draw_value_from_black = draw_value_from_black;
 	}
 
 	// →　これは、エンジンオプションの"MaxMovesToDraw"を自動的にDlshogiSearcher::SetLimits()で設定するので不要。
@@ -284,6 +283,9 @@ namespace dlshogi
 		// 思考時間固定の時の指定
 		s.movetime = limits.movetime;
 
+		// 出力の抑制フラグの反映
+		s.silent = limits.silent;
+
 		// 引き分けになる手数の設定。
 		o.max_moves_to_draw = limits.max_game_ply;
 
@@ -341,13 +343,13 @@ namespace dlshogi
 	// UCTアルゴリズムによる着手生成
 	// 並列探索を開始して、PVを表示したりしつつ、指し手ひとつ返す。
 	// ※　事前にSetLimits()で探索条件を設定しておくこと。
-	//   pos           : 探索開始局面
-	//   gameRootSfen  : 対局開始局面のsfen文字列(探索開始局面ではない)
-	//   moves         : 探索開始局面からの手順
-	//   ponderMove    : [Out] ponderの指し手(ないときはMOVE_NONEが代入される)
+	//   pos            : 探索開始局面
+	//   game_root_sfen : ゲーム開始局面のsfen文字列
+	//   moves          : ゲーム開始局面からの手順
+	//   ponderMove     : [Out] ponderの指し手(ないときはMOVE_NONEが代入される)
 	//   返し値 : この局面でのbestな指し手
 	// ponderの場合は、呼び出し元で待機すること。
-	Move DlshogiSearcher::UctSearchGenmove(Position* pos, const std::string& gameRootSfen, const std::vector<Move>& moves, Move& ponderMove)
+	Move DlshogiSearcher::UctSearchGenmove(Position* pos, const std::string& game_root_sfen , const std::vector<Move>& moves, Move& ponderMove)
 	{
 		// これ[Out]なのでとりあえず初期化しておかないと忘れてしまう。
 		ponderMove = MOVE_NONE;
@@ -367,7 +369,7 @@ namespace dlshogi
 		search_limits.interruption = false;
 
 		// ゲーム木を現在の局面にリセット
-		tree->ResetToPosition(gameRootSfen, moves);
+		tree->ResetToPosition(game_root_sfen,moves);
 
 		// ルート局面をグローバル変数に保存
 		//pos_root =  pos;
@@ -409,7 +411,8 @@ namespace dlshogi
 			if (move)
 			{
 				// 宣言勝ち
-				sync_cout << "info score mate 1 pv MOVE_WIN" << sync_endl;
+				if (!search_limits.silent)
+					sync_cout << "info score mate 1 pv MOVE_WIN" << sync_endl;
 				return move;
 			}
 
@@ -429,8 +432,9 @@ namespace dlshogi
 		if (book.probe(*th, Search::Limits))
 		{
 			// 定跡にhitしている以上、合法手がここに格納されているはず。
+			// ただし定跡DBによっては、2手目が格納されていないことはある。
 			Move bestMove   = th->rootMoves[0].pv[0];
-			     ponderMove = th->rootMoves[0].pv[1];
+			     ponderMove = th->rootMoves[0].pv.size() >= 2 ? th->rootMoves[0].pv[1] : MOVE_NONE;
 
 			return bestMove;
 		}
@@ -459,7 +463,7 @@ namespace dlshogi
 		// ---------------------
 
 		// PVの取得と表示
-		auto best = UctPrint::get_best_move_multipv(current_root , search_limits , search_options);
+		auto best = UctPrint::get_best_move_multipv(current_root , search_limits , search_options , search_limits.silent);
 
 		// デバッグ用のメッセージ出力
 		if (search_options.debug_message)
@@ -480,7 +484,8 @@ namespace dlshogi
 		if (root_dfpn_searcher->mate_move)
 		{
 			// 詰み筋を表示してやる。
-			sync_cout << root_dfpn_searcher->pv << sync_endl;
+			if (!search_limits.silent)
+				sync_cout << root_dfpn_searcher->pv << sync_endl;
 
 			ponderMove = root_dfpn_searcher->mate_ponder_move;
 			return root_dfpn_searcher->mate_move;
@@ -536,7 +541,7 @@ namespace dlshogi
 
 			// PV表示
 			//get_and_print_pv();
-			UctPrint::get_best_move_multipv(tree->GetCurrentHead() , search_limits , search_options );
+			UctPrint::get_best_move_multipv(tree->GetCurrentHead() , search_limits , search_options , search_limits.silent);
 
 			// 出力が終わった時点から数えて pv_interval後以降に再度表示。
 			// (前回の出力時刻から数えてしまうと、PVの出力がたくさんあるとき出力が間に合わなくなる)
@@ -881,7 +886,7 @@ namespace dlshogi
 			this->pv = ss.str();
 
 			mate_move = move;
-			if (pv.size() >= 2)
+			if (mate_pv.size() >= 2)
 				mate_ponder_move = mate_pv[1]; // ponder moveも設定しておいてやる。
 
 			// 探索の中断を申し入れる。

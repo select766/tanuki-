@@ -28,7 +28,10 @@ using namespace std;
 
 namespace Test
 {
-	// 詰み関係のテストコマンド。コマンドを処理した時 trueが返る。
+	// 通常のテスト用コマンド。コマンドを処理した時 trueが返る。
+	bool normal_test_cmd(Position& pos, std::istringstream& is, const std::string& token);
+
+	// 詰み関係のテスト用コマンド。コマンドを処理した時 trueが返る。
 	bool mate_test_cmd(Position& pos, std::istringstream& is, const std::string& token);
 
 	void test_cmd(Position& pos, std::istringstream& is)
@@ -39,12 +42,17 @@ namespace Test
 		std::string token;
 		is >> token;
 
-		// デザパタのDecoratorみたいな感じで書いていく。
+		// デザパタのDecoratorの呼び出しみたいな感じで書いていく。
 
-		// 詰み関係の拡張コマンド
+		// 通常のテスト用コマンド
+		if (normal_test_cmd(pos, is, token))
+			return;
+
+		// 詰み関係のテスト用コマンド
 		if (mate_test_cmd(pos,is,token))
 			return;
 
+		sync_cout << "Error! : unknown command = " << token << sync_endl;
 	}
 
 }
@@ -466,6 +474,8 @@ void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 	states = StateListPtr(new StateList(1));
 	pos.set(sfen , &states->back() , Threads.main());
 
+	std::vector<Move> moves_from_game_root;
+
 	// 指し手のリストをパースする(あるなら)
 	while (is >> token && (m = USI::to_move(pos, token)) != MOVE_NONE)
 	{
@@ -475,7 +485,13 @@ void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 			pos.do_null_move(states->back());
 		else
 			pos.do_move(m, states->back());
+
+		moves_from_game_root.emplace_back(m);
 	}
+
+	// やねうら王では、ここに保存しておくことになっている。
+	Threads.main()->game_root_sfen = sfen;
+	Threads.main()->moves_from_game_root = std::move(moves_from_game_root);
 }
 
 // "setoption"コマンド応答。
@@ -496,8 +512,8 @@ void setoption_cmd(istringstream& is)
 	if (Options.count(name))
 		Options[name] = value;
 	else
-			// この名前のoptionは存在しなかった
-			sync_cout << "Error! : No such option: " << name << sync_endl;
+		// この名前のoptionは存在しなかった
+		sync_cout << "Error! : No such option: " << name << sync_endl;
 
 }
 
@@ -566,8 +582,9 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 
 	// エンジンオプションによる探索制限(0なら無制限)
 	// このあと、depthもしくはnodesが指定されていたら、その値で上書きされる。(この値は無視される)
-	if (Options["DepthLimit"] >= 0)    limits.depth = (int)Options["DepthLimit"];
-	if (Options["NodesLimit"] >= 0)    limits.nodes = (u64)Options["NodesLimit"];
+	
+	limits.depth = Options.count("DepthLimit") ? (int)Options["DepthLimit"] : 0;
+	limits.nodes = Options.count("NodesLimit") ? (u64)Options["NodesLimit"] : 0;
 
 	while (is >> token)
 	{
@@ -881,9 +898,6 @@ void USI::loop(int argc, char* argv[])
 #endif
 		
 #if defined (ENABLE_TEST_CMD)
-		// 指し手生成のテスト
-		//else if (token == "s") generate_moves_cmd(pos);
-
 		// テストコマンド
 		else if (token == "test") Test::test_cmd(pos, is);
 #endif
@@ -1104,9 +1118,7 @@ std::string USI::value(Value v)
 		// USIプロトコルでは、手数がわからないときには "mate -"と出力するらしい。
 		// 手数がわからないというか詰んでいるのだが…。これを出力する方法がUSIプロトコルで定められていない。
 		// ここでは"-0"を出力しておく。
-		// 将棋所では検討モードは、go infiniteで呼び出されて、このときbestmoveを返さないから
-		// 結局、このときのスコアは画面に表示されない。
-		// ShogiGUIだと、これできちんと"+詰"と出力されるようである。
+		// ※　ShogiGUIだと、これで"+詰"と出力されるようである。
 		s << "mate -0";
 	else
 		s << "mate " << (v > 0 ? VALUE_MATE - v : -VALUE_MATE - v);
