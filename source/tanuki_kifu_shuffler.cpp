@@ -4,7 +4,6 @@
 #ifdef EVAL_LEARN
 
 #include <cstdio>
-#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <random>
@@ -40,7 +39,7 @@ void Tanuki::ShuffleKifu() {
 
 	std::vector<std::string> file_paths;
 	for (int file_index = 0; file_index < kNumShuffledKifuFiles; ++file_index) {
-		char file_path[_MAX_PATH];
+		char file_path[1024];
 		sprintf(file_path, "%s/shuffled.%03d.bin", shuffled_kifu_dir.c_str(), file_index);
 		file_paths.push_back(file_path);
 	}
