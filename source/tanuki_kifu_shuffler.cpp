@@ -85,14 +85,12 @@ void Tanuki::ShuffleKifu() {
 		sync_cout << "info string " << file_path << sync_endl;
 
 		// ファイル全体を読み込む
+		int64_t size = std::filesystem::file_size(file_path);
 		FILE* file = std::fopen(file_path.c_str(), "rb");
 		if (file == nullptr) {
 			sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
 			return;
 		}
-		_fseeki64(file, 0, SEEK_END);
-		int64_t size = _ftelli64(file);
-		_fseeki64(file, 0, SEEK_SET);
 		std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
 		std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), file);
 		std::fclose(file);
@@ -105,6 +103,7 @@ void Tanuki::ShuffleKifu() {
 		file = std::fopen(file_path.c_str(), "wb");
 		if (file == nullptr) {
 			sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
+			return;
 		}
 		if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), file) !=
 			records.size()) {
