@@ -1,14 +1,14 @@
-#include "tanuki_kifu_generator.h"
+ï»¿#include "tanuki_kifu_generator.h"
 #include "config.h"
 
 #ifdef EVAL_LEARN
 
-#include <direct.h>
 #include <omp.h>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <random>
@@ -65,7 +65,7 @@ namespace {
 	std::uniform_real_distribution<> probability_distribution;
 
 	bool ReadBook() {
-		// ’èÕƒtƒ@ƒCƒ‹(‚Æ‚¢‚¤‚©’P‚È‚éŠû•ˆƒtƒ@ƒCƒ‹)‚Ì“Ç‚İ‚İ
+		// å®šè·¡ãƒ•ã‚¡ã‚¤ãƒ«(ã¨ã„ã†ã‹å˜ãªã‚‹æ£‹è­œãƒ•ã‚¡ã‚¤ãƒ«)ã®èª­ã¿è¾¼ã¿
 		std::string book_file_name = Options[kOptionGeneratorStartposFileName];
 		std::ifstream fs_book;
 		fs_book.open(book_file_name);
@@ -100,7 +100,7 @@ namespace {
 				if (!is_ok(m) || !pos.legal(m)) {
 					//  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " <<
 					//  token << endl << rootPos << sync_endl;
-					// ¨@ƒGƒ‰[ˆµ‚¢‚Í‚µ‚È‚¢B
+					// â†’ã€€ã‚¨ãƒ©ãƒ¼æ‰±ã„ã¯ã—ãªã„ã€‚
 					break;
 				}
 
@@ -160,7 +160,7 @@ namespace {
 			root_moves.push_back(Search::RootMove(m));
 		}
 
-		// 50%‚ÌŠm—¦‚Å‹Ê‚ÌˆÚ“®‚Ì‚İ‚ğs‚¤
+		// 50%ã®ç¢ºç‡ã§ç‰ã®ç§»å‹•ã®ã¿ã‚’è¡Œã†
 		if (mt() & 1) {
 			root_moves.erase(std::remove_if(root_moves.begin(), root_moves.end(),
 				[&pos](const auto& root_move) {
@@ -188,7 +188,7 @@ namespace {
 void Tanuki::GenerateKifu() {
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-	// ’èÕ‚Ì“Ç‚İ‚İ
+	// å®šè·¡ã®èª­ã¿è¾¼ã¿
 	if (!ReadBook()) {
 		sync_cout << "Failed to read the book." << sync_endl;
 		return;
@@ -197,11 +197,11 @@ void Tanuki::GenerateKifu() {
 	int num_threads = (int)Options["Threads"];
 	omp_set_num_threads(num_threads);
 
-	// ‚±‚±‚ÅEval::load_eval()‚ğŒÄ‚Ô‚ÆALarge Page‚ğg—p‚µ‚Ä‚¢‚éê‡‚Éƒƒ‚ƒŠ‚ÌŠm•Û‚É¸”s‚µAƒNƒ‰ƒbƒVƒ…‚·‚éB
+	// ã“ã“ã§Eval::load_eval()ã‚’å‘¼ã¶ã¨ã€Large Pageã‚’ä½¿ç”¨ã—ã¦ã„ã‚‹å ´åˆã«ãƒ¡ãƒ¢ãƒªã®ç¢ºä¿ã«å¤±æ•—ã—ã€ã‚¯ãƒ©ãƒƒã‚·ãƒ¥ã™ã‚‹ã€‚
 	//Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
-	_mkdir(kifu_directory.c_str());
+	std::filesystem::create_directories(kifu_directory);
 
 	int search_depth = Options[kOptionGeneratorSearchDepth];
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
@@ -229,21 +229,21 @@ void Tanuki::GenerateKifu() {
 	std::cout << "max_eval_diff=" << max_eval_diff << std::endl;
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
 	limits.enteringKingRule = EKR_27_POINT;
 	Search::Limits = limits;
 
-	// ‰½è–Ú -> ’Tõ[‚³
+	// ä½•æ‰‹ç›® -> æ¢ç´¢æ·±ã•
 	std::vector<std::vector<int> > game_play_to_depths(kMaxGamePlay + 1);
 
 	time_t start_time;
 	std::time(&start_time);
 	ASSERT_LV3(start_positions.size());
 	std::uniform_int_distribution<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
-	// ƒXƒŒƒbƒhŠÔ‚Å‹¤—L‚·‚é
+	// ã‚¹ãƒ¬ãƒƒãƒ‰é–“ã§å…±æœ‰ã™ã‚‹
 	std::atomic_int64_t global_position_index;
 	global_position_index = 0;
 	ProgressReport progress_report(num_positions, 60 * 60);
@@ -259,7 +259,7 @@ void Tanuki::GenerateKifu() {
 			"%s/kifu.tag=%s.depth=%d.num_positions=%I64d.start_time=%I64d.thread_index=%03d.bin",
 			kifu_directory.c_str(), output_file_name_tag.c_str(), search_depth, num_positions,
 			start_time, thread_index);
-		// ŠeƒXƒŒƒbƒh‚É‚½‚¹‚é
+		// å„ã‚¹ãƒ¬ãƒƒãƒ‰ã«æŒãŸã›ã‚‹
 		std::unique_ptr<KifuWriter> kifu_writer =
 			std::make_unique<KifuWriter>(output_file_path);
 		std::mt19937_64 mt19937_64(start_time + thread_index);
@@ -303,22 +303,22 @@ void Tanuki::GenerateKifu() {
 				int selected_move_index = std::uniform_int_distribution<int>(
 					0, num_valid_moves - 1)(mt19937_64);
 				const auto& root_move = root_moves[selected_move_index];
-				// ‘I‚Î‚ê‚½w‚µè‚ÌƒXƒRƒA‚ğ‚±‚Ì‹Ç–Ê‚ÌƒXƒRƒA‚Æ‚µ‚Ä‹L˜^‚·‚é
+				// é¸ã°ã‚ŒãŸæŒ‡ã—æ‰‹ã®ã‚¹ã‚³ã‚¢ã‚’ã“ã®å±€é¢ã®ã‚¹ã‚³ã‚¢ã¨ã—ã¦è¨˜éŒ²ã™ã‚‹
 				last_value = root_move.score;
 				const std::vector<Move>& pv = root_move.pv;
 
-				// •]‰¿’l‚Ìâ‘Î’l‚ªè‡’l‚ğ’´‚¦‚½‚çI—¹‚·‚é
+				// è©•ä¾¡å€¤ã®çµ¶å¯¾å€¤ãŒé–¾å€¤ã‚’è¶…ãˆãŸã‚‰çµ‚äº†ã™ã‚‹
 				if (std::abs(last_value) > value_threshold) {
 					break;
 				}
 
-				// ‹l‚İ‚Ìê‡‚Ípv‚ª‹ó‚É‚È‚é
-				// ã‹L‚ÌğŒ‚ª‚ ‚é‚Ì‚Å‚±‚ê‚Í‚¢‚ç‚È‚¢‚©‚à‚µ‚ê‚È‚¢
+				// è©°ã¿ã®å ´åˆã¯pvãŒç©ºã«ãªã‚‹
+				// ä¸Šè¨˜ã®æ¡ä»¶ãŒã‚ã‚‹ã®ã§ã“ã‚Œã¯ã„ã‚‰ãªã„ã‹ã‚‚ã—ã‚Œãªã„
 				if (pv.empty()) {
 					break;
 				}
 
-				// ‹Ç–Ê‚ª•s³‚Èê‡‚ª‚ ‚é‚Ì‚ÅÄ“xƒ`ƒFƒbƒN‚·‚é
+				// å±€é¢ãŒä¸æ­£ãªå ´åˆãŒã‚ã‚‹ã®ã§å†åº¦ãƒã‚§ãƒƒã‚¯ã™ã‚‹
 				if (!pos.pos_is_ok()) {
 					break;
 				}
@@ -333,12 +333,12 @@ void Tanuki::GenerateKifu() {
 				records.push_back(record);
 
 				pos.do_move(pv_move, state[pos.game_ply()]);
-				// ·•ªŒvZ‚Ì‚½‚ßevaluate()‚ğŒÄ‚Ño‚·
+				// å·®åˆ†è¨ˆç®—ã®ãŸã‚evaluate()ã‚’å‘¼ã³å‡ºã™
 				Eval::evaluate(pos);
 
-				// è”–ˆ‚Ì’Tõ‚Ì[‚³‚ğ‹L˜^‚µ‚Ä‚¨‚­
-				// ‰½‚ç‚©‚ÌŒ`‚ÅŸ‚¿‚ªŒˆ‚Ü‚Á‚Ä‚¢‚é‹Ç–Ê‚Í
-				// ’Tõ[‚³‚ª‹É’[‚É[‚­‚È‚é‚½‚ßœŠO‚·‚é
+				// æ‰‹æ•°æ¯ã®æ¢ç´¢ã®æ·±ã•ã‚’è¨˜éŒ²ã—ã¦ãŠã
+				// ä½•ã‚‰ã‹ã®å½¢ã§å‹ã¡ãŒæ±ºã¾ã£ã¦ã„ã‚‹å±€é¢ã¯
+				// æ¢ç´¢æ·±ã•ãŒæ¥µç«¯ã«æ·±ããªã‚‹ãŸã‚é™¤å¤–ã™ã‚‹
 				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
 					std::lock_guard<std::mutex> lock(mutex_game_play_to_depths);
 					game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
@@ -350,26 +350,26 @@ void Tanuki::GenerateKifu() {
 			RepetitionState repetition_state = pos.is_repetition(0);
 			u8 entering_king = 0;
 			if (pos.is_mated()) {
-				// •‰‚¯
-				// ‹l‚Ü‚³‚ê‚½
-				// ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚ÅŸ‚¿
+				// è² ã‘
+				// è©°ã¾ã•ã‚ŒãŸ
+				// æœ€å¾Œã®å±€é¢ã¯ç›¸æ‰‹å±€é¢ãªã®ã§å‹ã¡
 				game_result = GameResultWin;
 			}
 			else if (pos.DeclarationWin() != MOVE_NONE) {
-				// Ÿ‚¿
-				// “ü‹ÊŸ—˜
-				// ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚Å•‰‚¯
+				// å‹ã¡
+				// å…¥ç‰å‹åˆ©
+				// æœ€å¾Œã®å±€é¢ã¯ç›¸æ‰‹å±€é¢ãªã®ã§è² ã‘
 				game_result = GameResultLose;
 				entering_king = 1;
 			}
 			else if (last_value > value_threshold) {
-				// Ÿ‚¿
-				// ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚Å•‰‚¯
+				// å‹ã¡
+				// æœ€å¾Œã®å±€é¢ã¯ç›¸æ‰‹å±€é¢ãªã®ã§è² ã‘
 				game_result = GameResultLose;
 			}
 			else if (last_value < -value_threshold) {
-				// •‰‚¯
-				// ÅŒã‚Ì‹Ç–Ê‚Í‘Šè‹Ç–Ê‚È‚Ì‚ÅŸ‚¿
+				// è² ã‘
+				// æœ€å¾Œã®å±€é¢ã¯ç›¸æ‰‹å±€é¢ãªã®ã§å‹ã¡
 				game_result = GameResultWin;
 			}
 			else {
@@ -400,11 +400,11 @@ void Tanuki::GenerateKifu() {
 					progress_report.GetDataPerTime() * 2 < progress_report.GetMaxDataPerTime());
 
 			if (need_wait) {
-				// ˆ—‘¬“x‚ª’á‰º‚µ‚Ä‚«‚Ä‚¢‚éB
-				// ‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// å‡¦ç†é€Ÿåº¦ãŒä½ä¸‹ã—ã¦ãã¦ã„ã‚‹ã€‚
+				// å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Å‚µ‚Î‚ç‚­‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã§ã—ã°ã‚‰ãå¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp master
 				{
 					sync_cout << "Speed is down. Waiting for a while. GetDataPerTime()=" <<
@@ -416,13 +416,13 @@ void Tanuki::GenerateKifu() {
 					need_wait = false;
 				}
 
-				// ƒ}ƒXƒ^[ƒXƒŒƒbƒh‚Ì‘Ò‹@‚ªI‚í‚é‚Ü‚ÅAÄ“x‘S‚Ä‚ÌƒXƒŒƒbƒh‚ğ‘Ò‹@‚·‚éB
+				// ãƒã‚¹ã‚¿ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã®å¾…æ©ŸãŒçµ‚ã‚ã‚‹ã¾ã§ã€å†åº¦å…¨ã¦ã®ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’å¾…æ©Ÿã™ã‚‹ã€‚
 #pragma omp barrier
 			}
 		}
 
-		// •K—v‹Ç–Ê”¶¬‚µ‚½‚ç‘SƒXƒŒƒbƒh‚Ì’Tõ‚ğ’â~‚·‚é
-		// ‚±‚¤‚µ‚È‚¢‚Æ‘Š“ü‹Ê“™‡–@è‚Ì‘½‚¢‹Ç–Ê‚Å~‚Ü‚é‚Ü‚Å‚ÉŠÔ‚ª‚©‚©‚é
+		// å¿…è¦å±€é¢æ•°ç”Ÿæˆã—ãŸã‚‰å…¨ã‚¹ãƒ¬ãƒƒãƒ‰ã®æ¢ç´¢ã‚’åœæ­¢ã™ã‚‹
+		// ã“ã†ã—ãªã„ã¨ç›¸å…¥ç‰ç­‰åˆæ³•æ‰‹ã®å¤šã„å±€é¢ã§æ­¢ã¾ã‚‹ã¾ã§ã«æ™‚é–“ãŒã‹ã‹ã‚‹
 		Threads.stop = true;
 	}
 
@@ -461,7 +461,7 @@ void Tanuki::ConvertSfenToLearningData() {
 	omp_set_num_threads((int)Options["Threads"]);
 
 	Search::LimitsType limits;
-	// ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+	// å¼•ãåˆ†ã‘ã®æ‰‹æ•°ä»˜è¿‘ã§å¼•ãåˆ†ã‘ã®å€¤ãŒè¿”ã‚‹ã®ã‚’é˜²ããŸã‚1 << 16ã«ã™ã‚‹
 	limits.max_game_ply = 1 << 16;
 	limits.depth = MAX_PLY;
 	limits.silent = true;
@@ -489,7 +489,7 @@ void Tanuki::ConvertSfenToLearningData() {
 		}
 	}
 
-	// ƒXƒŒƒbƒhŠÔ‚Å‹¤—L‚·‚é
+	// ã‚¹ãƒ¬ãƒƒãƒ‰é–“ã§å…±æœ‰ã™ã‚‹
 	std::atomic_int64_t global_sfen_index;
 	global_sfen_index = 0;
 	int64_t num_sfens = sfens.size();
