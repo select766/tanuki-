@@ -4,6 +4,7 @@
 #ifdef EVAL_LEARN
 
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <random>
