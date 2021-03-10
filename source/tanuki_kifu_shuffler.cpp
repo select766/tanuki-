@@ -1,12 +1,12 @@
-#include "tanuki_kifu_shuffler.h"
+ï»¿#include "tanuki_kifu_shuffler.h"
 #include "config.h"
 
 #ifdef EVAL_LEARN
 
-#include <direct.h>
 #include <cstdio>
-#include <random>
 #include <ctime>
+#include <filesystem>
+#include <random>
 
 #include "tanuki_kifu_reader.h"
 #include "tanuki_kifu_writer.h"
@@ -16,9 +16,9 @@ using Learner::PackedSfenValue;
 
 namespace {
 	static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
-	// ƒVƒƒƒbƒtƒ‹Œã‚Ìƒtƒ@ƒCƒ‹”
-	// Windows‚Å‚Íˆê“x‚É512ŒÂ‚Ü‚Å‚Ìƒtƒ@ƒCƒ‹‚µ‚©ŠJ‚¯‚È‚¢‚½‚ß
-	// 256ŒÂ‚É§ŒÀ‚µ‚Ä‚¨‚­
+	// ã‚·ãƒ£ãƒƒãƒ•ãƒ«å¾Œã®ãƒ•ã‚¡ã‚¤ãƒ«æ•°
+	// Windowsã§ã¯ä¸€åº¦ã«512å€‹ã¾ã§ã®ãƒ•ã‚¡ã‚¤ãƒ«ã—ã‹é–‹ã‘ãªã„ãŸã‚
+	// 256å€‹ã«åˆ¶é™ã—ã¦ãŠã
 	static const constexpr int kNumShuffledKifuFiles = 256;
 	static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
 }
@@ -28,14 +28,14 @@ void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
 }
 
 void Tanuki::ShuffleKifu() {
-	// Šû•ˆ‚ğ“ü—Í‚µA•¡”‚Ìƒtƒ@ƒCƒ‹‚Éƒ‰ƒ“ƒ_ƒ€‚É’Ç‰Á‚µ‚Ä‚¢‚­
+	// æ£‹è­œã‚’å…¥åŠ›ã—ã€è¤‡æ•°ã®ãƒ•ã‚¡ã‚¤ãƒ«ã«ãƒ©ãƒ³ãƒ€ãƒ ã«è¿½åŠ ã—ã¦ã„ã
 	sync_cout << "info string Reading and dividing kifu files..." << sync_endl;
 
 	std::string kifu_dir = Options["KifuDir"];
 	std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
 
 	auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
-	_mkdir(shuffled_kifu_dir.c_str());
+	std::filesystem::create_directories(shuffled_kifu_dir);
 
 	std::vector<std::string> file_paths;
 	for (int file_index = 0; file_index < kNumShuffledKifuFiles; ++file_index) {
@@ -80,11 +80,11 @@ void Tanuki::ShuffleKifu() {
 		writer->Close();
 	}
 
-	// Šeƒtƒ@ƒCƒ‹‚ğƒVƒƒƒbƒtƒ‹‚·‚é
+	// å„ãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã‚·ãƒ£ãƒƒãƒ•ãƒ«ã™ã‚‹
 	for (const auto& file_path : file_paths) {
 		sync_cout << "info string " << file_path << sync_endl;
 
-		// ƒtƒ@ƒCƒ‹‘S‘Ì‚ğ“Ç‚İ‚Ş
+		// ãƒ•ã‚¡ã‚¤ãƒ«å…¨ä½“ã‚’èª­ã¿è¾¼ã‚€
 		FILE* file = std::fopen(file_path.c_str(), "rb");
 		if (file == nullptr) {
 			sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
@@ -98,10 +98,10 @@ void Tanuki::ShuffleKifu() {
 		std::fclose(file);
 		file = nullptr;
 
-		// Šû•ˆ‘S‘Ì‚ğƒVƒƒƒbƒtƒ‹‚·‚é
+		// æ£‹è­œå…¨ä½“ã‚’ã‚·ãƒ£ãƒƒãƒ•ãƒ«ã™ã‚‹
 		std::shuffle(records.begin(), records.end(), mt);
 
-		// Šû•ˆ‘S‘Ì‚ğã‘‚«‚µ‚Ä‘‚«–ß‚·
+		// æ£‹è­œå…¨ä½“ã‚’ä¸Šæ›¸ãã—ã¦æ›¸ãæˆ»ã™
 		file = std::fopen(file_path.c_str(), "wb");
 		if (file == nullptr) {
 			sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
