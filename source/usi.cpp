@@ -5,6 +5,7 @@
 #include "thread.h"
 #include "tt.h"
 
+#include <filesystem>
 #include <queue>
 #include <sstream>
 
