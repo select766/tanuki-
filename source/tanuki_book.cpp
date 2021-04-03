@@ -54,6 +54,7 @@ namespace {
 		"NEEDLED-24.7",
 		"Suisho4_TR3990X",
 		// 4500
+
 		"Suisho2kai_TR3990X",
 		"NEEDLED-35.8kai0151_TR-3990X",
 		"FROZEN_BRIDGE",
@@ -66,6 +67,7 @@ namespace {
 		"COMEON",
 		"Hainaken_Corei9-7980XE_18c",
 		// 4400
+
 		"Yashajin_Ai",
 		"BLUETRANSPARENCY",
 		"QueenAI_210222_i9-7920x",
@@ -74,6 +76,7 @@ namespace {
 		"QueenInLove_test201224",
 		"BURNING_BRIDGE_210401",
 		// 4300
+		
 		"QueenAI_210317_i9-7920x",
 		"xeon_w",
 		"xeon_gold",
@@ -93,6 +96,7 @@ namespace {
 		"RUN",
 		"ECLIPSE_20210117_i9-9960X",
 		// 4200
+
 		"BB210302_RTX3070",
 		"KASHMIR",
 		"mytest0426",
@@ -133,6 +137,7 @@ namespace {
 		"15b_n001_3070",
 		"n3k1177",
 		// 4100
+
 		"ECLIPSE_20210326",
 		"YKT",
 		"10W",
@@ -181,6 +186,7 @@ namespace {
 		"Takeshi_ry4500U",
 		"YaOu_V540_nnue_1227",
 		// 4000
+
 		"sui3k_2c",
 		"slmv100_3c",
 		"cobra_denryu_6c",
@@ -220,6 +226,7 @@ namespace {
 		"goto2200last3",
 		"jky",
 		// 3900
+
 		"d_x20_0008",
 		"ilq6_ilqshock201202_tm2_YO_4415Y",
 		"d_x20_0009",
@@ -251,6 +258,7 @@ namespace {
 		"siege.RTX2070.MAX-Q",
 		"ICHIGO",
 		// 3800
+
 		"Kristallweizen-Core2Duo-P7450",
 		"JKishi18gou_1112",
 		"nnn_210214",
@@ -290,6 +298,7 @@ namespace {
 		"sankazero0007",
 		"kwe0.4_ym_Cortex-A17_4c",
 		// 3700
+
 		"GCT_Fbook",
 		"GCT_RX580",
 		"ForDen_1",
@@ -325,6 +334,7 @@ namespace {
 		"aziu_w2185_n_p20k",
 		"10be_n005_1080Ti",
 		// 3600
+
 		"nSRU_Suisho3_2000k",
 		"raizen21062004",
 		"pp3",
@@ -344,6 +354,7 @@ namespace {
 		"nnn_20210113",
 		"Suisho-1T-D18-YO5.40",
 		// 3500
+
 		"5b2_2060",
 		"ViVi001",
 		"hYPY_Suisho3_1000k",
@@ -356,6 +367,7 @@ namespace {
 		"afzgnnue004",
 		"SSFv2",
 		// 3400
+
 		"Suika-VAIOtypeG",
 		"b20_n009_1080Ti",
 		"elmo_WCSC27_479_4t_10m",
@@ -1596,19 +1608,26 @@ bool Tanuki::Create18Book() {
 		StateInfo state_info[512];
 		pos.set_hirate(&state_info[0], Threads[0]);
 
-		std::ifstream ifs(file_path);
-		if (!ifs.is_open()) {
+		FILE* file = std::fopen(file_path.string().c_str(), "r");
+
+		if (file == nullptr) {
 			std::cout << "!!! Failed to open the input file: filepath=" << file_path << std::endl;
 			continue;
 		}
 
-		std::string line;
 		bool toryo = false;
 		std::string black_player_name;
 		std::string white_player_name;
 		std::vector<Move> moves;
 		int winner_offset = 0;
-		while (std::getline(ifs, line)) {
+		char buffer[1024];
+		while (std::fgets(buffer, sizeof(buffer) - 1, file)) {
+			std::string line = buffer;
+			// std::fgets()の出力は行末の改行を含むため、ここで削除する。
+			while (!line.empty() && std::isspace(line.back())) {
+				line.pop_back();
+			}
+
 			auto offset = line.find(',');
 			if (offset != std::string::npos) {
 				// 将棋所の出力するCSAの指し手の末尾に",T1"などとつくため
@@ -1645,6 +1664,9 @@ bool Tanuki::Create18Book() {
 				toryo = true;
 			}
 		}
+
+		std::fclose(file);
+		file = nullptr;
 
 		// 投了以外の棋譜はスキップする
 		if (!toryo) {
