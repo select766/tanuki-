@@ -14,8 +14,9 @@
 
 #include <omp.h>
 
-#include "evaluate.h"
 #include "book/book.h"
+#include "csa.h"
+#include "evaluate.h"
 #include "learn/learn.h"
 #include "misc.h"
 #include "position.h"
@@ -42,8 +43,330 @@ namespace {
 	constexpr const char* kBookOverwriteExistingPositions = "OverwriteExistingPositions";
 	constexpr const char* kBookNarrowBook = "NarrowBook";
 	constexpr const char* kBookTargetSfensFile = "BookTargetSfensFile";
+	constexpr const char* kBookCsaFolder = "BookCsaFolder";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
+
+	const std::vector<std::string> kStrongPlayers = {
+		"Hinatsuru_Ai",
+		"Suisho3test_TR3990X",
+		"BURNING_BRIDGES",
+		"NEEDLED-24.7",
+		"Suisho4_TR3990X",
+		// 4500
+		"Suisho2kai_TR3990X",
+		"NEEDLED-35.8kai0151_TR-3990X",
+		"FROZEN_BRIDGE",
+		"kabuto",
+		"Suisho3kai_TR3990X",
+		"AAV",
+		"LUNA",
+		"Marulk",
+		"gcttest_x6_RTX2080ti",
+		"COMEON",
+		"Hainaken_Corei9-7980XE_18c",
+		// 4400
+		"Yashajin_Ai",
+		"BLUETRANSPARENCY",
+		"QueenAI_210222_i9-7920x",
+		"xg_kpe9",
+		"ECLIPSE_RyzenTR3990X",
+		"QueenInLove_test201224",
+		"BURNING_BRIDGE_210401",
+		// 4300
+		"QueenAI_210317_i9-7920x",
+		"xeon_w",
+		"xeon_gold",
+		"fist",
+		"RINGO",
+		"xgs",
+		"Mariel",
+		"kame",
+		"ANESIS",
+		"DG_test210307_24C_ubuntu",
+		"NEEDLED-35.8kai1050_R7-4800H",
+		"daigo8",
+		"BB_ry4500U",
+		"Frozen",
+		"Kamuy_s009_HKPE9",
+		"Cendrillon",
+		"RUN",
+		"ECLIPSE_20210117_i9-9960X",
+		// 4200
+		"BB210302_RTX3070",
+		"KASHMIR",
+		"mytest0426",
+		"TK045",
+		"Procyon",
+		"DaigorillaEX_test1_E5_2698v4",
+		"Nashi",
+		"YO600-HalfKPE9-20210124-8t",
+		"yuatan",
+		"Kristffersen",
+		"uy88",
+		"daigoEX",
+		"Method",
+		"koron",
+		"19W",
+		"BB_RTX3070",
+		"Amaeta_Denryu1_2950X",
+		"Lladro",
+		"Supercell",
+		"PLX",
+		"dlshogitest",
+		"Kristallweizen-E5-2620",
+		"Nao.",
+		"sui3k_ry4500U",
+		"ry4500U",
+		"Sagittarius",
+		"gcttest_RTX2080ti",
+		"Kristallweizen_4800H",
+		"40b_n008_RTX3070",
+		"Tora_Cat",
+		"ECLIPSE_test210205",
+		"Peach",
+		"test_e-4800H",
+		"Unagi",
+		"NEEDLED-24.7kai0447_16t",
+		"gcttest_x5_RTX2080ti",
+		"Rinne_p003_Ryzen7-4800H",
+		"15b_n001_3070",
+		"n3k1177",
+		// 4100
+		"ECLIPSE_20210326",
+		"YKT",
+		"10W",
+		"Qhapaq_WCSC28_Mizar_4790k",
+		"YO6.00_HKPE9_8t",
+		"PANDRABOX",
+		"40b_n007_RTX3070",
+		"test20210114",
+		"gcttest_x4_RTX2070_Max-Q",
+		"gcttest_x3_RTX2080ti",
+		"Fx13_2",
+		"Rinne_m009",
+		"Venus_210327",
+		"Suisho3test_i5-10210U",
+		"Suisho3kai_YO6.01_i5-6300U",
+		"Suisho2test_i5-10210U",
+		"Venus_210324",
+		"Takeshi2_Ryzen7-4800H",
+		"40b_n002",
+		"Suisho3kai_i5-10210U",
+		"gcttest_x4_RTX2080ti",
+		"Rinne_w041",
+		"Suisho3-i5-6300U",
+		"40b_n003",
+		"Titanda_L",
+		"40b_n006_RTX3090",
+		"Rinne_x022",
+		"N100k",
+		"ECLIPSE_test_i7-6700HQ",
+		"d_x15_n001_2080Ti",
+		"BB2021_i5-6300U",
+		"Ultima",
+		"grape",
+		"d_x15_n002_2080Ti",
+		"Mike_Cat",
+		"ELLE",
+		"40b_n009_RTX3070",
+		"Amid",
+		"DG_DGbook_i7_4720HQ",
+		"Pacman_4",
+		"40-05-70",
+		"test_YaOu600B_8t",
+		"DG_test_210202_i7_4720HQ",
+		"Aquarius",
+		"VIVI006",
+		"Takeshi_ry4500U",
+		"YaOu_V540_nnue_1227",
+		// 4000
+		"sui3k_2c",
+		"slmv100_3c",
+		"cobra_denryu_6c",
+		"DLSuishoFu6.02_RTX3090",
+		"ddp",
+		"FukauraOu_RTX2080ti",
+		"slmv115_2c",
+		"sui3_2c",
+		"melt",
+		"OTUKARE_SAYURI_4C",
+		"MentalistDaiGo",
+		"aqua.RTX2070.MAX-Q",
+		"Fairy-Stockfish-Suisho3kai-8t",
+		"sui2_2c",
+		"Rinne_v055_test",
+		"40-06-70",
+		"deg",
+		"DLSuishoFO6.02_GTX1650",
+		"dlshogi_blend_gtx1060",
+		"slmv100_2c",
+		"slmv85_2c",
+		"Vx_Cvk_tm1_YO620_4415Y",
+		"gcttest_x5_RTX2070_Max-Q",
+		"slmv145_2c",
+		"usa2xkai",
+		"BB210214_RTX3070",
+		"Daigorilla_i7_4720HQ",
+		"40-04-70",
+		"Soho_Amano",
+		"Takeshi_2c",
+		"flcl",
+		"Kristallweizen-i7-4578U",
+		"nibanshibori",
+		"slmv130_2c",
+		"YaOu_V540_nnue_1222",
+		"Krist_483_473stb_16t_100m",
+		"goto2200last3",
+		"jky",
+		// 3900
+		"d_x20_0008",
+		"ilq6_ilqshock201202_tm2_YO_4415Y",
+		"d_x20_0009",
+		"az_w2245_n_p100k_UctTreeDeclLose",
+		"ErenYeager",
+		"YaOu_V600_nnue_0103",
+		"Fairy-Stockfish-Furibisha-8t",
+		"MelonAle",
+		"CBTest01",
+		"az_w2425_n_s10_DlM1",
+		"JK_FGbook_1c",
+		"MBP2014",
+		"aziu_w2185_n_p100k",
+		"Cute_2c",
+		"Cool_2c",
+		"omiss",
+		"az_w2425_n_s10_DlPM3",
+		"Miacis_2080ti",
+		"YaOu_V600_nnue_0130",
+		"d_x20_0007",
+		"Siri",
+		"15b2_2060",
+		"az_w2305_n_s10_Mate1",
+		"JKishi18gou_m_0814",
+		"nnn_210324",
+		"slmv145",
+		"aziu_w3303_n_s10_M1",
+		"Phantom",
+		"siege.RTX2070.MAX-Q",
+		"ICHIGO",
+		// 3800
+		"Kristallweizen-Core2Duo-P7450",
+		"JKishi18gou_1112",
+		"nnn_210214",
+		"vaio",
+		"slmv115",
+		"BBFtest_RTX3070",
+		"slmv100",
+		"Sui3NB_i5-10210U",
+		"dbga",
+		"craft_Percy_MT2020_CB_F",
+		"slmv130",
+		"Unagi_hkpe9",
+		"YaOu_V540_nnue_1211",
+		"fku0",
+		"aziu_w3303_n_s10_PM3",
+		"slmv70",
+		"YaOu_V600_nnue_0106",
+		"slmv85",
+		"Sui3_illqhashock_i5-10210U",
+		"c2d-2c",
+		"AYM8__Suisho3_8000k",
+		"YaOu_V533_nnue_1201",
+		"Q_2t_tn_tn_N800kD14P3_MT3k_SM90",
+		"dl40b2_2060",
+		"ViVi005",
+		"nnn_210305",
+		"aziu_w2905_n_s10_PM3",
+		"15b_n001_1060",
+		"40b_n008_RX580",
+		"GCT_GTX1660Ti",
+		"Suisho-1T-D22-YO5.40",
+		"test_g4dn.xlarge",
+		"az_w2245_n_p20k_UctTreeDeclLose",
+		"superusa2x",
+		"ChocoCake",
+		"Kamuy_vi05_1c",
+		"sankazero0007",
+		"kwe0.4_ym_Cortex-A17_4c",
+		// 3700
+		"GCT_Fbook",
+		"GCT_RX580",
+		"ForDen_1",
+		"10be_n006_1080Ti",
+		"10be_n008_1080Ti",
+		"Macbook2010",
+		"b20_n011_1080Ti",
+		"GCT_1060",
+		"bbs-nnue-02.1",
+		"emmg_Suisho3_4000k",
+		"10be_n007_1080Ti",
+		"AobaZero-1.6-radeonvii-10sec",
+		"moon",
+		"suiseihuman",
+		"mac_5i_F",
+		"goto2200last6",
+		"10be_n009_1080Ti",
+		"tx-nnue",
+		"goto2200last5",
+		"nnn_210202",
+		"GCT_GTX-1060",
+		"20-10-70",
+		"5b_n007_1080Ti",
+		"craft_xeon_489_XKW_2t",
+		"40b_n005_RX580",
+		"JeSuisMoi",
+		"ViVi004",
+		"AobaZero_w2215_RTX2070",
+		"VIVI003",
+		"shotgun_i7-6700",
+		"40b_n007_1050Ti",
+		"5b_n007_1060",
+		"aziu_w2185_n_p20k",
+		"10be_n005_1080Ti",
+		// 3600
+		"nSRU_Suisho3_2000k",
+		"raizen21062004",
+		"pp3",
+		"Suisho-1T-D20-YO5.40",
+		"elmo_WCSC27_479_16t_100m",
+		"20b_n007_RX580",
+		"sankazero008",
+		"bbs-nnue-02.0.8",
+		"t0-nnue",
+		"AobaZero-1.9-radeonvii-10sec",
+		"AobaZero_GTX1660Ti",
+		"3be_n005_1050Ti",
+		"AobaZero_w3287_1080Ti",
+		"sz_ym_Cortex-A53_4c",
+		"40b_n005_1050Ti",
+		"VIVI002",
+		"nnn_20210113",
+		"Suisho-1T-D18-YO5.40",
+		// 3500
+		"5b2_2060",
+		"ViVi001",
+		"hYPY_Suisho3_1000k",
+		"3be_n005_1060",
+		"emmg_Suisho3_D17",
+		"VIVi00",
+		"dts-nnue-0.0",
+		"amant_VII",
+		"afzgnnue005",
+		"afzgnnue004",
+		"SSFv2",
+		// 3400
+		"Suika-VAIOtypeG",
+		"b20_n009_1080Ti",
+		"elmo_WCSC27_479_4t_10m",
+		"40b_n006_1050Ti",
+		"AobaZero_w3129_n_RTX3090x2",
+		"SSFv1",
+		"nnn",
+		"model6apu",
+		"gikou2_1c",
+		// 3300
+	};
 
 	struct SfenAndMove {
 		std::string sfen;
@@ -106,6 +429,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookOutputFile] << Option("user_book2.db");
 	o[kBookOverwriteExistingPositions] << Option(false);
 	o[kBookTargetSfensFile] << Option("");
+	o[kBookCsaFolder] << Option("");
 	return true;
 }
 
@@ -1228,6 +1552,114 @@ bool Tanuki::CreateFromTanukiColiseum()
 
 				output_book.insert(sfen, BookMove(best, next, 0, 0, 1));
 			}
+		}
+	}
+
+	WriteBook(output_book, output_book_file);
+
+	return true;
+}
+
+bool Tanuki::Create18Book() {
+	std::string csa_folder = Options[kBookCsaFolder];
+	std::string output_book_file = Options[kBookOutputFile];
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
+
+	int num_records = 0;
+	for (const std::filesystem::directory_entry& entry :
+		std::filesystem::recursive_directory_iterator(csa_folder)) {
+		auto& file_path = entry.path();
+		if (file_path.extension() != ".csa") {
+			// 拡張子が .csa でなかったらスキップする。
+			continue;
+		}
+
+		if (std::count_if(kStrongPlayers.begin(), kStrongPlayers.end(),
+			[&file_path](const auto& strong_player) {
+				return file_path.string().find("+" + strong_player + "+") != std::string::npos;
+			}) != 2) {
+			// 強いプレイヤー同士の対局でなかったらスキップする。
+			continue;
+		}
+
+		if (++num_records % 1000 == 0) {
+			sync_cout << num_records << sync_endl;
+		}
+
+		auto& pos = Threads[0]->rootPos;
+		StateInfo state_info[512];
+		pos.set_hirate(&state_info[0], Threads[0]);
+
+		std::ifstream ifs(file_path);
+		if (!ifs.is_open()) {
+			std::cout << "!!! Failed to open the input file: filepath=" << file_path << std::endl;
+			continue;
+		}
+
+		std::string line;
+		bool toryo = false;
+		std::string black_player_name;
+		std::string white_player_name;
+		std::vector<Move> moves;
+		int winner_offset = 0;
+		while (std::getline(ifs, line)) {
+			auto offset = line.find(',');
+			if (offset != std::string::npos) {
+				// 将棋所の出力するCSAの指し手の末尾に",T1"などとつくため
+				// ","以降を削除する
+				line = line.substr(0, offset);
+			}
+
+			if (line.find("N+") == 0) {
+				black_player_name = line.substr(2);
+			}
+			else if (line.find("N-") == 0) {
+				white_player_name = line.substr(2);
+			}
+			else if (line.size() == 7 && (line[0] == '+' || line[0] == '-')) {
+				Move move = CSA::to_move(pos, line.substr(1));
+
+				if (!pos.pseudo_legal(move) || !pos.legal(move)) {
+					std::cout << "!!! Found an illegal move." << std::endl;
+					break;
+				}
+
+				pos.do_move(move, state_info[pos.game_ply()]);
+
+				moves.push_back(move);
+			}
+			else if (line.find(black_player_name + " win") != std::string::npos) {
+				winner_offset = 0;
+			}
+			else if (line.find(white_player_name + " win") != std::string::npos) {
+				winner_offset = 1;
+			}
+
+			if (line.find("toryo") != std::string::npos) {
+				toryo = true;
+			}
+		}
+
+		// 投了以外の棋譜はスキップする
+		if (!toryo) {
+			continue;
+		}
+
+		pos.set_hirate(&state_info[0], Threads[0]);
+
+		for (int play = 0; play < moves.size(); ++play) {
+			Move move = moves[play];
+			if (play % 2 == winner_offset) {
+				Move ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
+				output_book.insert(pos.sfen(), Book::BookMove(move, ponder, 0, 0, 1));
+			}
+			pos.do_move(move, state_info[pos.game_ply()]);
 		}
 	}
 

@@ -578,6 +578,7 @@
     <ClInclude Include="book\apery_book.h" />
     <ClInclude Include="book\book.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="csa.h" />
     <ClInclude Include="engine\dlshogi-engine\dlshogi_types.h" />
     <ClInclude Include="engine\dlshogi-engine\misc\fastmath.h" />
     <ClInclude Include="engine\dlshogi-engine\dlshogi_searcher.h" />
@@ -680,6 +681,7 @@
     <ClCompile Include="book\makebook2015.cpp" />
     <ClCompile Include="book\makebook2019.cpp" />
     <ClCompile Include="book\makebook2021.cpp" />
+    <ClCompile Include="csa.cpp" />
     <ClCompile Include="engine\dlshogi-engine\dlshogi_searcher.cpp" />
     <ClCompile Include="engine\dlshogi-engine\PrintInfo.cpp" />
     <ClCompile Include="engine\dlshogi-engine\UctSearch.cpp" />

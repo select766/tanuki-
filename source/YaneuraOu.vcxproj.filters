@@ -376,6 +376,9 @@
     <ClInclude Include="mate\mate_move_picker.h">
       <Filter>リソース ファイル\mate</Filter>
     </ClInclude>
+    <ClInclude Include="csa.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -614,6 +617,9 @@
     </ClCompile>
     <ClCompile Include="testcmd\benchmark.cpp">
       <Filter>リソース ファイル\testcmd</Filter>
+    </ClCompile>
+    <ClCompile Include="csa.cpp">
+      <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

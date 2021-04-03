@@ -1,4 +1,4 @@
-#ifndef _TANUKI_BOOK_H_
+﻿#ifndef _TANUKI_BOOK_H_
 #define _TANUKI_BOOK_H_
 
 #include "config.h"
@@ -17,6 +17,7 @@ namespace Tanuki {
 	bool ExtractTargetPositions();
 	bool AddTargetPositions();
 	bool CreateFromTanukiColiseum();
+	bool Create18Book();
 }
 
 #endif
