@@ -269,7 +269,8 @@ ifeq (,$(findstring evallearn,$@))
 		tanuki_kifu_reader.cpp                                                 \
 		tanuki_progress.cpp                                                    \
 		tanuki_analysis.cpp                                                    \
-		tanuki_filesystem.cpp
+		tanuki_filesystem.cpp                                                  \
+		csa.cpp
 endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
