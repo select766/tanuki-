@@ -586,11 +586,11 @@ std::string to_usi_string(Move16 m);
 // それらを明確に区別したい時に用いる。
 struct Move16
 {
-	Move16():move(0){}
-	Move16(u16 m): move(m) {}
+	Move16() :move(0) {}
+	Move16(u16 m) : move(m) {}
 
 	// Moveからの暗黙変換はできないとMOVE_NONEの代入などで困る。
-	Move16(Move m) :move((u16)m){}
+	Move16(Move m) :move((u16)m) {}
 
 	// uint16_tのまま取り出す。
 	// Moveに変換が必要なときは、そのあとMove()にcastすることはできる。(上位16bitは0のまま)
@@ -604,6 +604,8 @@ struct Move16
 	bool operator != (const Move16 rhs) const { return !(*this == rhs); }
 	bool operator == (const Move rhs) const { return move == (u16)rhs; }
 	bool operator != (const Move rhs) const { return !(*this == rhs); }
+	bool operator < (const Move16 rhs) const { return move < rhs.move; }
+	bool operator < (const Move rhs) const { return move < (u16)rhs; }
 
 	// USI形式の文字列にする。
 	std::string to_usi_string() const { return ::to_usi_string(move); }

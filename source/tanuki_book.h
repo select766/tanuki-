@@ -18,6 +18,7 @@ namespace Tanuki {
 	bool AddTargetPositions();
 	bool CreateFromTanukiColiseum();
 	bool Create18Book();
+	bool CreateTayayanBook();
 }
 
 #endif

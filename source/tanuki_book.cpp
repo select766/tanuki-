@@ -14,6 +14,8 @@
 
 #include <omp.h>
 
+#include "sqlite/sqlite3.h"
+
 #include "book/book.h"
 #include "csa.h"
 #include "evaluate.h"
@@ -44,340 +46,485 @@ namespace {
 	constexpr const char* kBookNarrowBook = "NarrowBook";
 	constexpr const char* kBookTargetSfensFile = "BookTargetSfensFile";
 	constexpr const char* kBookCsaFolder = "BookCsaFolder";
+	constexpr const char* kBookTanukiColiseumLogFolder = "BookTanukiColiseumLogFolder";
+	constexpr const char* kBookMinimumWinningPercentage = "BookMinimumWinningPercentage";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
 	const std::vector<std::string> kStrongPlayers = {
-		"Hinatsuru_Ai",
-		"Suisho3test_TR3990X",
-		"BURNING_BRIDGES",
-		"NEEDLED-24.7",
-		"Suisho4_TR3990X",
-		// 4500
-
-		"Suisho2kai_TR3990X",
-		"NEEDLED-35.8kai0151_TR-3990X",
-		"FROZEN_BRIDGE",
-		"kabuto",
-		"Suisho3kai_TR3990X",
-		"AAV",
-		"LUNA",
-		"Marulk",
-		"gcttest_x6_RTX2080ti",
-		"COMEON",
-		"Hainaken_Corei9-7980XE_18c",
-		// 4400
-
-		"Yashajin_Ai",
-		"BLUETRANSPARENCY",
-		"QueenAI_210222_i9-7920x",
-		"xg_kpe9",
-		"ECLIPSE_RyzenTR3990X",
-		"QueenInLove_test201224",
-		"BURNING_BRIDGE_210401",
-		// 4300
-		
-		"QueenAI_210317_i9-7920x",
-		"xeon_w",
-		"xeon_gold",
-		"fist",
-		"RINGO",
-		"xgs",
-		"Mariel",
-		"kame",
-		"ANESIS",
-		"DG_test210307_24C_ubuntu",
-		"NEEDLED-35.8kai1050_R7-4800H",
-		"daigo8",
-		"BB_ry4500U",
-		"Frozen",
-		"Kamuy_s009_HKPE9",
-		"Cendrillon",
-		"RUN",
-		"ECLIPSE_20210117_i9-9960X",
-		// 4200
-
-		"BB210302_RTX3070",
-		"KASHMIR",
-		"mytest0426",
-		"TK045",
-		"Procyon",
-		"DaigorillaEX_test1_E5_2698v4",
-		"Nashi",
-		"YO600-HalfKPE9-20210124-8t",
-		"yuatan",
-		"Kristffersen",
-		"uy88",
-		"daigoEX",
-		"Method",
-		"koron",
-		"19W",
-		"BB_RTX3070",
-		"Amaeta_Denryu1_2950X",
-		"Lladro",
-		"Supercell",
-		"PLX",
-		"dlshogitest",
-		"Kristallweizen-E5-2620",
-		"Nao.",
-		"sui3k_ry4500U",
-		"ry4500U",
-		"Sagittarius",
-		"gcttest_RTX2080ti",
-		"Kristallweizen_4800H",
-		"40b_n008_RTX3070",
-		"Tora_Cat",
-		"ECLIPSE_test210205",
-		"Peach",
-		"test_e-4800H",
-		"Unagi",
-		"NEEDLED-24.7kai0447_16t",
-		"gcttest_x5_RTX2080ti",
-		"Rinne_p003_Ryzen7-4800H",
-		"15b_n001_3070",
-		"n3k1177",
-		// 4100
-
-		"ECLIPSE_20210326",
-		"YKT",
-		"10W",
-		"Qhapaq_WCSC28_Mizar_4790k",
-		"YO6.00_HKPE9_8t",
-		"PANDRABOX",
-		"40b_n007_RTX3070",
-		"test20210114",
-		"gcttest_x4_RTX2070_Max-Q",
-		"gcttest_x3_RTX2080ti",
-		"Fx13_2",
-		"Rinne_m009",
-		"Venus_210327",
-		"Suisho3test_i5-10210U",
-		"Suisho3kai_YO6.01_i5-6300U",
-		"Suisho2test_i5-10210U",
-		"Venus_210324",
-		"Takeshi2_Ryzen7-4800H",
-		"40b_n002",
-		"Suisho3kai_i5-10210U",
-		"gcttest_x4_RTX2080ti",
-		"Rinne_w041",
-		"Suisho3-i5-6300U",
-		"40b_n003",
-		"Titanda_L",
-		"40b_n006_RTX3090",
-		"Rinne_x022",
-		"N100k",
-		"ECLIPSE_test_i7-6700HQ",
-		"d_x15_n001_2080Ti",
-		"BB2021_i5-6300U",
-		"Ultima",
-		"grape",
-		"d_x15_n002_2080Ti",
-		"Mike_Cat",
-		"ELLE",
-		"40b_n009_RTX3070",
-		"Amid",
-		"DG_DGbook_i7_4720HQ",
-		"Pacman_4",
-		"40-05-70",
-		"test_YaOu600B_8t",
-		"DG_test_210202_i7_4720HQ",
-		"Aquarius",
-		"VIVI006",
-		"Takeshi_ry4500U",
-		"YaOu_V540_nnue_1227",
-		// 4000
-
-		"sui3k_2c",
-		"slmv100_3c",
-		"cobra_denryu_6c",
-		"DLSuishoFu6.02_RTX3090",
-		"ddp",
-		"FukauraOu_RTX2080ti",
-		"slmv115_2c",
-		"sui3_2c",
-		"melt",
-		"OTUKARE_SAYURI_4C",
-		"MentalistDaiGo",
-		"aqua.RTX2070.MAX-Q",
-		"Fairy-Stockfish-Suisho3kai-8t",
-		"sui2_2c",
-		"Rinne_v055_test",
-		"40-06-70",
-		"deg",
-		"DLSuishoFO6.02_GTX1650",
-		"dlshogi_blend_gtx1060",
-		"slmv100_2c",
-		"slmv85_2c",
-		"Vx_Cvk_tm1_YO620_4415Y",
-		"gcttest_x5_RTX2070_Max-Q",
-		"slmv145_2c",
-		"usa2xkai",
-		"BB210214_RTX3070",
-		"Daigorilla_i7_4720HQ",
-		"40-04-70",
-		"Soho_Amano",
-		"Takeshi_2c",
-		"flcl",
-		"Kristallweizen-i7-4578U",
-		"nibanshibori",
-		"slmv130_2c",
-		"YaOu_V540_nnue_1222",
-		"Krist_483_473stb_16t_100m",
-		"goto2200last3",
-		"jky",
-		// 3900
-
-		"d_x20_0008",
-		"ilq6_ilqshock201202_tm2_YO_4415Y",
-		"d_x20_0009",
-		"az_w2245_n_p100k_UctTreeDeclLose",
-		"ErenYeager",
-		"YaOu_V600_nnue_0103",
-		"Fairy-Stockfish-Furibisha-8t",
-		"MelonAle",
-		"CBTest01",
-		"az_w2425_n_s10_DlM1",
-		"JK_FGbook_1c",
-		"MBP2014",
-		"aziu_w2185_n_p100k",
-		"Cute_2c",
-		"Cool_2c",
-		"omiss",
-		"az_w2425_n_s10_DlPM3",
-		"Miacis_2080ti",
-		"YaOu_V600_nnue_0130",
-		"d_x20_0007",
-		"Siri",
-		"15b2_2060",
-		"az_w2305_n_s10_Mate1",
-		"JKishi18gou_m_0814",
-		"nnn_210324",
-		"slmv145",
-		"aziu_w3303_n_s10_M1",
-		"Phantom",
-		"siege.RTX2070.MAX-Q",
-		"ICHIGO",
-		// 3800
-
-		"Kristallweizen-Core2Duo-P7450",
-		"JKishi18gou_1112",
-		"nnn_210214",
-		"vaio",
-		"slmv115",
-		"BBFtest_RTX3070",
-		"slmv100",
-		"Sui3NB_i5-10210U",
-		"dbga",
-		"craft_Percy_MT2020_CB_F",
-		"slmv130",
-		"Unagi_hkpe9",
-		"YaOu_V540_nnue_1211",
-		"fku0",
-		"aziu_w3303_n_s10_PM3",
-		"slmv70",
-		"YaOu_V600_nnue_0106",
-		"slmv85",
-		"Sui3_illqhashock_i5-10210U",
-		"c2d-2c",
-		"AYM8__Suisho3_8000k",
-		"YaOu_V533_nnue_1201",
-		"Q_2t_tn_tn_N800kD14P3_MT3k_SM90",
-		"dl40b2_2060",
-		"ViVi005",
-		"nnn_210305",
-		"aziu_w2905_n_s10_PM3",
-		"15b_n001_1060",
-		"40b_n008_RX580",
-		"GCT_GTX1660Ti",
-		"Suisho-1T-D22-YO5.40",
-		"test_g4dn.xlarge",
-		"az_w2245_n_p20k_UctTreeDeclLose",
-		"superusa2x",
-		"ChocoCake",
-		"Kamuy_vi05_1c",
-		"sankazero0007",
-		"kwe0.4_ym_Cortex-A17_4c",
-		// 3700
-
-		"GCT_Fbook",
-		"GCT_RX580",
-		"ForDen_1",
-		"10be_n006_1080Ti",
-		"10be_n008_1080Ti",
-		"Macbook2010",
-		"b20_n011_1080Ti",
-		"GCT_1060",
-		"bbs-nnue-02.1",
-		"emmg_Suisho3_4000k",
-		"10be_n007_1080Ti",
-		"AobaZero-1.6-radeonvii-10sec",
-		"moon",
-		"suiseihuman",
-		"mac_5i_F",
-		"goto2200last6",
-		"10be_n009_1080Ti",
-		"tx-nnue",
-		"goto2200last5",
-		"nnn_210202",
-		"GCT_GTX-1060",
-		"20-10-70",
-		"5b_n007_1080Ti",
-		"craft_xeon_489_XKW_2t",
-		"40b_n005_RX580",
-		"JeSuisMoi",
-		"ViVi004",
-		"AobaZero_w2215_RTX2070",
-		"VIVI003",
-		"shotgun_i7-6700",
-		"40b_n007_1050Ti",
-		"5b_n007_1060",
-		"aziu_w2185_n_p20k",
-		"10be_n005_1080Ti",
-		// 3600
-
-		"nSRU_Suisho3_2000k",
-		"raizen21062004",
-		"pp3",
-		"Suisho-1T-D20-YO5.40",
-		"elmo_WCSC27_479_16t_100m",
-		"20b_n007_RX580",
-		"sankazero008",
-		"bbs-nnue-02.0.8",
-		"t0-nnue",
-		"AobaZero-1.9-radeonvii-10sec",
-		"AobaZero_GTX1660Ti",
-		"3be_n005_1050Ti",
-		"AobaZero_w3287_1080Ti",
-		"sz_ym_Cortex-A53_4c",
-		"40b_n005_1050Ti",
-		"VIVI002",
-		"nnn_20210113",
-		"Suisho-1T-D18-YO5.40",
-		// 3500
-
-		"5b2_2060",
-		"ViVi001",
-		"hYPY_Suisho3_1000k",
-		"3be_n005_1060",
-		"emmg_Suisho3_D17",
-		"VIVi00",
-		"dts-nnue-0.0",
-		"amant_VII",
-		"afzgnnue005",
-		"afzgnnue004",
-		"SSFv2",
-		// 3400
-
-		"Suika-VAIOtypeG",
-		"b20_n009_1080Ti",
-		"elmo_WCSC27_479_4t_10m",
-		"40b_n006_1050Ti",
-		"AobaZero_w3129_n_RTX3090x2",
-		"SSFv1",
-		"nnn",
-		"model6apu",
-		"gikou2_1c",
-		// 3300
+		"Hinatsuru_Ai", // 4607
+		"Suisho3test_TR3990X", // 4576
+		"BURNING_BRIDGES", // 4556
+		"NEEDLED-24.7", // 4535
+		"Suisho4_TR3990X", // 4530
+		"NEEDLED-35.8kai0151_TR-3990X", // 4476
+		"FROZEN_BRIDGE", // 4465
+		"kabuto", // 4454
+		"Suisho3kai_TR3990X", // 4453
+		"AAV", // 4443
+		"gcttest_x6_RTX2080ti", // 4440
+		"LUNA", // 4436
+		"Marulk", // 4433
+		"gct_v100x8_model-0000195", // 4427
+		"COMEON", // 4393
+		"Yashajin_Ai", // 4390
+		"BLUETRANSPARENCY", // 4385
+		"Hainaken_Corei9-7980XE_18c", // 4381
+		"QueenAI_210222_i9-7920x", // 4377
+		"BURNING_BRIDGE_210404z", // 4361
+		"xg_kpe9", // 4344
+		"ECLIPSE_RyzenTR3990X", // 4344
+		"BURNING_BRIDGE_210401", // 4338
+		"QueenInLove_test201224", // 4314
+		"DG_test210401", // 4302
+		"xeon_gold", // 4278
+		"xeon_w", // 4278
+		"fist", // 4272
+		"Karimero", // 4272
+		"xgs", // 4267
+		"Mariel", // 4266
+		"kame", // 4258
+		"RINGO", // 4256
+		"NEEDLED-35.8kai1050_R7-4800H", // 4251
+		"daigo8", // 4250
+		"ANESIS", // 4247
+		"DG_test210307_24C_ubuntu", // 4246
+		"BB_ry4500U", // 4239
+		"FukauraOu_RTX3090-2080S", // 4218
+		"Frozen", // 4216
+		"dlshogi_resnet20_swish_447", // 4211
+		"Cendrillon", // 4210
+		"Kamuy_s009_HKPE9", // 4209
+		"mbk_3340m", // 4208
+		"RUN", // 4207
+		"ECLIPSE_20210117_i9-9960X", // 4206
+		"BB210302_RTX3070", // 4205
+		"KASHMIR", // 4203
+		"TK045", // 4202
+		"mytest0426", // 4201
+		"Procyon", // 4199
+		"DaigorillaEX_test1_E5_2698v4", // 4189
+		"Nashi", // 4186
+		"Kristffersen", // 4177
+		"DLSuishoFO6.02_RTX3090", // 4176
+		"YO600-HalfKPE9-20210124-8t", // 4175
+		"yuatan", // 4174
+		"uy88", // 4171
+		"daigoEX", // 4167
+		"koron", // 4159
+		"Method", // 4156
+		"19W", // 4154
+		"Amaeta_Denryu1_2950X", // 4154
+		"BB_RTX3070", // 4153
+		"dlshogitest", // 4150
+		"Lladro", // 4148
+		"PLX", // 4147
+		"Supercell", // 4143
+		"Nao.", // 4142
+		"sui3k_ry4500U", // 4140
+		"QueenAI_210317_i9-7920x", // 4140
+		"ry4500U", // 4138
+		"Kristallweizen_4800H", // 4129
+		"gcttest_RTX2080ti", // 4126
+		"QueenInLove-j088_Ryzen7-4800H", // 4125
+		"Tora_Cat", // 4123
+		"ECLIPSE_test210205", // 4121
+		"test_e-4800H", // 4118
+		"Peach", // 4117
+		"NEEDLED-24.7kai0447_16t", // 4116
+		"Unagi", // 4115
+		"Rinne_p003_Ryzen7-4800H", // 4113
+		"gcttest_x5_RTX2080ti", // 4112
+		"15b_n001_3070", // 4107
+		"40b_n008_RTX3070", // 4107
+		"Qhapaq_WCSC28_Mizar_4790k", // 4106
+		"n3k1177", // 4102
+		"GGG", // 4102
+		"YKT", // 4101
+		"Kristallweizen-E5-2620", // 4099
+		"10W", // 4099
+		"YO6.00_HKPE9_8t", // 4096
+		"PANDRABOX", // 4096
+		"Venus_210327", // 4094
+		"test20210114", // 4092
+		"Suisho3test_i5-10210U", // 4091
+		"gcttest_x3_RTX2080ti", // 4090
+		"40b_n007_RTX3070", // 4090
+		"gcttest_x4_RTX2070_Max-Q", // 4089
+		"Rinne_m009", // 4089
+		"Suisho3kai_YO6.01_i5-6300U", // 4088
+		"Fx13_2", // 4088
+		"Suisho2test_i5-10210U", // 4086
+		"Sagittarius", // 4083
+		"Takeshi2_Ryzen7-4800H", // 4076
+		"Venus_210324", // 4074
+		"40b_n002", // 4074
+		"40b_n003", // 4074
+		"ECLIPSE_20210326", // 4073
+		"40b_n009_RTX3070", // 4073
+		"Rinne_w041", // 4071
+		"gcttest_x4_RTX2080ti", // 4070
+		"Suisho3-i5-6300U", // 4069
+		"Suisho3kai_i5-10210U", // 4069
+		"Titanda_L", // 4066
+		"Rinne_x022", // 4063
+		"40b_n006_RTX3090", // 4063
+		"N100k", // 4059
+		"ECLIPSE_test_i7-6700HQ", // 4056
+		"VIVI006", // 4055
+		"d_x15_n001_2080Ti", // 4051
+		"BB2021_i5-6300U", // 4051
+		"Ultima", // 4046
+		"d_x15_n002_2080Ti", // 4046
+		"ELLE", // 4046
+		"Mike_Cat", // 4044
+		"reflect.RTX2070.MAX-Q", // 4037
+		"Pacman_4", // 4035
+		"Amid", // 4032
+		"DG_DGbook_i7_4720HQ", // 4031
+		"40-05-70", // 4030
+		"DG_test_210202_i7_4720HQ", // 4029
+		"Aquarius", // 4027
+		"Takeshi_ry4500U", // 4016
+		"YaOu_V540_nnue_1227", // 4009
+		"sui3k_2c", // 4001
+		"cobra_denryu_6c", // 4000
+		"slmv100_3c", // 3998
+		"DLSuishoFu6.02_RTX3090", // 3998
+		"ddp", // 3993
+		"FukauraOu_RTX2080ti", // 3992
+		"slmv115_2c", // 3989
+		"slmv100_2c", // 3985
+		"sui3_2c", // 3985
+		"melt", // 3985
+		"OTUKARE_SAYURI_4C", // 3977
+		"Fairy-Stockfish-Suisho3kai-8t", // 3973
+		"sui2_2c", // 3972
+		"Venus_210406", // 3970
+		"Rinne_v055_test", // 3969
+		"aqua.RTX2070.MAX-Q", // 3968
+		"40-06-70", // 3968
+		"MentalistDaiGo", // 3964
+		"deg", // 3963
+		"slmv85_2c", // 3954
+		"dlshogi_blend_gtx1060", // 3954
+		"Vx_Cvk_tm1_YO620_4415Y", // 3950
+		"gcttest_x5_RTX2070_Max-Q", // 3947
+		"usa2xkai", // 3947
+		"Kristallweizen-i7-4578U", // 3947
+		"slmv145_2c", // 3944
+		"40-04-70", // 3939
+		"Soho_Amano", // 3938
+		"Daigorilla_i7_4720HQ", // 3938
+		"BB210214_RTX3070", // 3935
+		"slmv130_2c", // 3931
+		"Takeshi_2c", // 3930
+		"nibanshibori", // 3928
+		"DLSuishoFO6.02_GTX1650", // 3928
+		"flcl", // 3928
+		"YaOu_V540_nnue_1222", // 3921
+		"Krist_483_473stb_16t_100m", // 3920
+		"goto2200last3", // 3915
+		"jky", // 3907
+		"nnn_0406", // 3906
+		"d_x20_0008", // 3902
+		"d_x20_0009", // 3900
+		"ilq6_ilqshock201202_tm2_YO_4415Y", // 3899
+		"FBK_Fbook", // 3894
+		"CBTest01", // 3888
+		"az_w2245_n_p100k_UctTreeDeclLose", // 3887
+		"YaOu_V600_nnue_0103", // 3883
+		"Fairy-Stockfish-Furibisha-8t", // 3879
+		"az_w2425_n_s10_DlM1", // 3870
+		"JK_FGbook_1c", // 3869
+		"MBP2014", // 3863
+		"Q006_1t_tn_tn_N800kD14P3_M3kSM90", // 3857
+		"Cute_2c", // 3855
+		"Cool_2c", // 3849
+		"az_w2425_n_s10_DlPM3", // 3848
+		"b20_n012_1080Ti", // 3845
+		"omiss", // 3842
+		"Miacis_2080ti", // 3839
+		"QMP006_1_TNtn_N800kD16P3_M3kS90", // 3838
+		"d_x20_0007", // 3835
+		"Siri", // 3834
+		"15b2_2060", // 3832
+		"az_w2305_n_s10_Mate1", // 3828
+		"YaOu_V600_nnue_0130", // 3824
+		"JKishi18gou_m_0814", // 3822
+		"siege.RTX2070.MAX-Q", // 3818
+		"slmv145", // 3812
+		"nnn_210324", // 3807
+		"ICHIGO", // 3806
+		"aziu_w3303_n_s10_M1", // 3804
+		"JKishi18gou_1112", // 3801
+		"slmv115", // 3793
+		"nnn_210214", // 3793
+		"vaio", // 3793
+		"slmv100", // 3792
+		"BBFtest_RTX3070", // 3792
+		"dbga", // 3788
+		"Sui3NB_i5-10210U", // 3787
+		"YaOu_V600_nnue_0406", // 3784
+		"craft_Percy_MT2020_CB_F", // 3782
+		"slmv130", // 3780
+		"40b_n008_RX580", // 3780
+		"Unagi_hkpe9", // 3774
+		"Kristallweizen-Core2Duo-P7450", // 3774
+		"YaOu_V540_nnue_1211", // 3772
+		"fku0", // 3770
+		"slmv70", // 3767
+		"aziu_w3303_n_s10_PM3", // 3767
+		"Sui3_illqhashock_i5-10210U", // 3766
+		"slmv85", // 3764
+		"AYM8__Suisho3_8000k", // 3762
+		"c2d-2c", // 3761
+		"YaOu_V533_nnue_1201", // 3760
+		"Q_2t_tn_tn_N800kD14P3_MT3k_SM90", // 3759
+		"YaOu_V600_nnue_0106", // 3759
+		"ViVi005", // 3751
+		"dl40b2_2060", // 3749
+		"15b_n004_1060", // 3748
+		"nnn_210305", // 3746
+		"aziu_w2905_n_s10_PM3", // 3740
+		"GCT_GTX1660Ti", // 3736
+		"15b_n001_1060", // 3734
+		"Suisho-1T-D22-YO5.40", // 3732
+		"az_w2245_n_p20k_UctTreeDeclLose", // 3729
+		"test_g4dn.xlarge", // 3729
+		"superusa2x", // 3719
+		"ChocoCake", // 3717
+		"Kamuy_vi05_1c", // 3709
+		"nnn_tt0402", // 3708
+		"sankazero0007", // 3706
+		"b20_n011_1080Ti", // 3706
+		"GCT_RX580", // 3700
+		"ForDen_1", // 3698
+		"kwe0.4_ym_Cortex-A17_4c", // 3697
+		"10be_n006_1080Ti", // 3696
+		"10be_n008_1080Ti", // 3695
+		"Macbook2010", // 3693
+		"GCT_1060", // 3676
+		"bbs-nnue-02.1", // 3675
+		"AobaZero-1.6-radeonvii-10sec", // 3674
+		"emmg_Suisho3_4000k", // 3672
+		"10be_n007_1080Ti", // 3671
+		"moon", // 3664
+		"goto2200last6", // 3664
+		"mac_5i_F", // 3663
+		"suiseihuman", // 3661
+		"10be_n009_1080Ti", // 3661
+		"goto2200last5", // 3653
+		"nnn_210202", // 3648
+		"tx-nnue", // 3647
+		"GCT_GTX-1060", // 3646
+		"20-10-70", // 3643
+		"5b_n007_1080Ti", // 3642
+		"craft_xeon_489_XKW_2t", // 3641
+		"40b_n005_RX580", // 3636
+		"JeSuisMoi", // 3627
+		"AobaZero_w2215_RTX2070", // 3627
+		"ViVi004", // 3624
+		"shotgun_i7-6700", // 3623
+		"VIVI003", // 3613
+		"5b_n007_1060", // 3609
+		"aziu_w2185_n_p20k", // 3605
+		"10be_n005_1080Ti", // 3603
+		"40b_n007_1050Ti", // 3603
+		"nSRU_Suisho3_2000k", // 3600
+		"raizen21062004", // 3599
+		"pp3", // 3598
+		"Suisho-1T-D20-YO5.40", // 3592
+		"elmo_WCSC27_479_16t_100m", // 3588
+		"AP2_R2500U", // 3583
+		"20b_n007_RX580", // 3568
+		"nnn_tt0403", // 3555
+		"sankazero008", // 3555
+		"bbs-nnue-02.0.8", // 3551
+		"t0-nnue", // 3548
+		"AobaZero-1.9-radeonvii-10sec", // 3543
+		"AobaZero_GTX1660Ti", // 3543
+		"3be_n005_1050Ti", // 3534
+		"AobaZero_w3287_1080Ti", // 3527
+		"sz_ym_Cortex-A53_4c", // 3523
+		"40b_n005_1050Ti", // 3521
+		"nnn_20210113", // 3520
+		"Suisho-1T-D18-YO5.40", // 3505
+		"5b2_2060", // 3489
+		"hYPY_Suisho3_1000k", // 3484
+		"emmg_Suisho3_D17", // 3482
+		"3be_n005_1060", // 3482
+		"VIVi00", // 3477
+		"10b_n003_1060", // 3469
+		"dts-nnue-0.0", // 3451
+		"amant_VII", // 3446
+		"TEMPVSFVGIT_4", // 3425
+		"afzgnnue005", // 3425
+		"SSFv2", // 3410
+		"Suika-VAIOtypeG", // 3401
+		"Ayame_4t", // 3401
+		"b20_n009_1080Ti", // 3371
+		"elmo_WCSC27_479_4t_10m", // 3366
+		"40b_n006_1050Ti", // 3364
+		"AobaZero_w3129_n_RTX3090x2", // 3357
+		"SSFv1", // 3324
+		"nnn", // 3323
+		"model6apu", // 3313
+		"gikou2_1c", // 3300
+		//"ayame", // 3295
+		//"TEMPVSFVGIT_2", // 3294
+		//"AobaZero_w3190_kld_ave_p704", // 3284
+		//"AobaZero_w2525_n_p800", // 3278
+		//"TY-test_i7_0427", // 3275
+		//"F_f12", // 3271
+		//"AobaZero_w3053_n_p800", // 3261
+		//"F_f8", // 3255
+		//"Krist_483_473stb_1000k", // 3254
+		//"F_f10", // 3252
+		//"WHn3_Suisho3_500k", // 3251
+		//"AobaZero_w2865_n_p800", // 3245
+		//"AobaZero_w2885_n_p800", // 3243
+		//"512x", // 3241
+		//"AobaZero_w2925_n_p800", // 3235
+		//"AobaZero_w3203_n_p800", // 3215
+		//"AobaZero_w3263_n_p800", // 3212
+		//"AobaZero_w3163_n_p800", // 3205
+		//"AobaZero_w2805_n_p800", // 3201
+		//"AobaZero_w3083_n_p800", // 3199
+		//"AobaZero_w3143_n_p800", // 3190
+		//"az_w2305_n_p800_Mate1", // 3189
+		//"F_g1", // 3187
+		//"AobaZero_w2825_n_p800", // 3186
+		//"DLSuisho_FO6.02_MX250", // 3177
+		//"AobaZero_w2245_n_p800", // 3177
+		//"AobaZero_w3133_n_p800", // 3176
+		//"AobaZero_w3183_n_p800", // 3175
+		//"AobaZero_w2665_n_p800", // 3171
+		//"AobaZero_w2565_n_p800", // 3170
+		//"nSRU_Suisho3_D15", // 3167
+		//"AobaZero_w3005_n_p800", // 3167
+		//"AobaZero_w2785_n_p800", // 3166
+		//"TEMPVSFVGIT_3", // 3164
+		//"F_f6", // 3161
+		//"AobaZero_w2945_n_p800", // 3161
+		//"AobaZero_w3043_n_p800", // 3159
+		//"afzgnnue002", // 3156
+		//"F_g2", // 3156
+		//"AisakaTaiga", // 3155
+		//"AobaZero_w3283_n_p800", // 3153
+		//"AobaZero_w2845_n_p800", // 3151
+		//"F_e4", // 3150
+		//"AobaZero_w3393_n_p800", // 3150
+		//"AobaZero_w3333_n_p800", // 3146
+		//"F_f4", // 3143
+		//"AobaZero_w2545_n_p800", // 3139
+		//"AobaZero_w3173_n_p800", // 3138
+		//"AobaZero_w3253_n_p800", // 3135
+		//"AobaZero_w3223_n_p800", // 3133
+		//"AobaZero_w2965_n_p800", // 3132
+		//"AobaZero_w3113_n_p800", // 3131
+		//"AobaZero_w3273_n_p800", // 3131
+		//"F_e33", // 3130
+		//"AobaZero_w3293_n_p800", // 3130
+		//"AobaZero_w3303_n_p800", // 3130
+		//"AobaZero_w3233_n_p800", // 3130
+		//"AobaZero_w3323_n_p800", // 3128
+		//"g001", // 3127
+		//"AobaZero_w2985_n_p800", // 3126
+		//"AobaZero_w3025_n_p800", // 3112
+		//"AobaZero_w3243_n_p800", // 3111
+		//"AobaZero_w3153_n_p800", // 3108
+		//"AobaZero_w3073_n_p800", // 3107
+		//"AobaZero_w3343_n_p800", // 3106
+		//"AobaZero_w3373_n_p800", // 3104
+		//"AobaZero_w2905_n_p800", // 3103
+		//"AobaZero_w3123_n_p800", // 3096
+		//"AobaZero_w3193_n_p800", // 3096
+		//"AobaZero_w3063_n_p800", // 3092
+		//"AobaZero_w3103_n_p800", // 3088
+		//"AobaZero_w3353_n_p800", // 3087
+		//"AobaZero_w3093_n_p800", // 3085
+		//"256x", // 3080
+		//"AobaZero_w3213_n_p800", // 3079
+		//"FukauraOu-MKL-i7-6700HQ", // 3078
+		//"apery_WCSC25_E5-2687W_8t", // 3076
+		//"rezeroX1_cl2_2_YO_tm2_4415Y", // 3073
+		//"AobaZero_w2765_n_p800", // 3071
+		//"AobaZero_w3313_n_p800", // 3060
+		//"TEMPVS_FVGIT_1", // 3040
+		//"maxmove256wwwwww", // 3039
+		//"AobaZero_w2856_n_t4", // 3031
+		//"elmo_WCSC27_479_1000k", // 3029
+		//"AobaZero_w3383_n_p800", // 3026
+		//"Jcus_Suisho3_250k", // 3016
+		//"AobaZero_w2035_n_t4", // 3008
+		//"Genesis1_2_YO_v1_1c", // 2992
+		//"AobaZero_w2289_n_t4", // 2986
+		//"AobaZero_w2705_n_p800", // 2982
+		//"AobaZero_w3086_n_t4", // 2979
+		//"AobaZero_w3028_n_t4", // 2979
+		//"AobaZero_w3363_n_p800", // 2966
+		//"AobaZero_w2077_n_t4", // 2966
+		//"AobaZero_w2462_n_t4", // 2964
+		//"AobaZero_w2681_n_t4", // 2962
+		//"AobaZero_w3317_n_t4", // 2961
+		//"AobaZero_w1819_n_t4", // 2958
+		//"AobaZero_w1944_n_t4", // 2945
+		//"AobaZero_w2515_n_t4", // 2939
+		//"AobaZero_w1993_n_t4", // 2934
+		//"AobaZero_w2762_n_t4", // 2932
+		//"AobaZero_w2943_n_t4", // 2927
+		//"uezero-p05.8", // 2926
+		//"AobaZero_w1854_n_t4", // 2922
+		//"AobaZero_w3333_n_t4", // 2922
+		//"128x", // 2909
+		//"TakeWarabe_i9-9960X", // 2906
+		//"AobaZero_w3296_n_t4", // 2898
+		//"AobaZero_w3175_n_t4", // 2896
+		//"hYPY_Suisho3_D13", // 2895
+		//"AobaZero_w1880_n_t4", // 2893
+		//"YaneuraOuMiniV223_stdbk_16t", // 2884
+		//"AobaZero_w3139_n_t4", // 2877
+		//"AobaZero_w3235_n_t4", // 2876
+		//"Krist_483_473stb_100k", // 2829
+		//"AobaZero_w3351_n_t4", // 2824
+		//"AobaZero_w2515_n_p400_t8", // 2799
+		//"nanashogi", // 2786
+		//"AobaZero_w1537_n_p200_t4", // 2766
+		//"Gikou2_D11", // 2762
+		//"AobaZero_w1671_n_p200_t4", // 2739
+		//"AobaZero_w1618_n_p200_t4", // 2731
+		//"WHn3_Suisho3_D11", // 2730
+		//"AobaZero_192x10b_1207_n_p800", // 2700
+		//"64x", // 2697
+		//"Yss1000k", // 2688
+		//"AobaZero_w1310_n_p200_t4", // 2683
+		//"elmo_WCSC27_479_100k", // 2668
+		//"TEMPVSFVGIT_1", // 2618
+		//"32x", // 2614
+		//"bona6_D10", // 2613
+		//"TakeWarabe_i5-7200U", // 2596
+		//"test4_test", // 2509
+		//"YSS", // 2504
+		//"John", // 2488
+		//"go_test10c", // 2472
+		//"Jcus_Suisho3_D9", // 2449
+		//"frenzy_human", // 2446
+		//"Emily", // 2416
+		//"16x", // 2413
+		//"coduck_pi2_600MHz_1c", // 2247
+		//"8x", // 2218
+		//"AobaZero_w3392_p1", // 2178
+		//"4x", // 2011
+		//"tenuki", // 1967
+		//"2x", // 1836
+		//"komadokun_depth10", // 1833
+		//"komadokun_depth9", // 1792
+		//"1x", // 1766
+		//"Poppo-poppo_WCSC30_Kw", // 1597
+		//"Ino-shishi_WCSC25_Kw", // 1508
+		//"policy_23ver2", // 1430
+		//"Gao-gao_WCSC28_Kw", // 1335
 	};
 
 	struct SfenAndMove {
@@ -442,6 +589,8 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookOverwriteExistingPositions] << Option(false);
 	o[kBookTargetSfensFile] << Option("");
 	o[kBookCsaFolder] << Option("");
+	o[kBookTanukiColiseumLogFolder] << Option("");
+	o[kBookMinimumWinningPercentage] << Option(0, 0, 100);
 	return true;
 }
 
@@ -1683,6 +1832,442 @@ bool Tanuki::Create18Book() {
 			}
 			pos.do_move(move, state_info[pos.game_ply()]);
 		}
+	}
+
+	WriteBook(output_book, output_book_file);
+
+	return true;
+}
+
+namespace {
+	struct InternalBookMove {
+		Move16 move = Move::MOVE_NONE;   // この局面での指し手
+		Move16 ponder = Move::MOVE_NONE; // その指し手を指したときの予想される相手の指し手(指し手が無いときはnoneと書くことになっているので、このとMOVE_NONEになっている)
+		// この手を指した場合の勝利回数
+		int num_win = 0;
+		// この手を指した場合の敗北回数
+		int num_lose = 0;
+		// 評価値が付いていた指し手について、評価値の総和
+		s64 sum_values = 0;
+		// 評価値が付いていた指し手の数
+		int num_values = 0;
+	};
+	using InternalBook = std::map<std::pair<std::string, u16 /* Move16 */>, InternalBookMove>;
+
+	void ParseFloodgateCsaFiles(const std::string& csa_folder_path, InternalBook& internal_book) {
+		int num_records = 0;
+		for (const std::filesystem::directory_entry& entry :
+			std::filesystem::recursive_directory_iterator(csa_folder_path)) {
+			auto& file_path = entry.path();
+			if (file_path.extension() != ".csa") {
+				// 拡張子が .csa でなかったらスキップする。
+				continue;
+			}
+
+			if (std::count_if(kStrongPlayers.begin(), kStrongPlayers.end(),
+				[&file_path](const auto& strong_player) {
+					return file_path.string().find("+" + strong_player + "+") != std::string::npos;
+				}) != 2) {
+				// 強いプレイヤー同士の対局でなかったらスキップする。
+				continue;
+			}
+
+			if (++num_records % 1000 == 0) {
+				sync_cout << num_records << sync_endl;
+			}
+
+			auto& pos = Threads[0]->rootPos;
+			StateInfo state_info[512];
+			pos.set_hirate(&state_info[0], Threads[0]);
+
+			FILE* file = std::fopen(file_path.string().c_str(), "r");
+
+			if (file == nullptr) {
+				std::cout << "!!! Failed to open the input file: filepath=" << file_path << std::endl;
+				continue;
+			}
+
+			bool toryo = false;
+			std::string black_player_name;
+			std::string white_player_name;
+			std::vector<Move> moves;
+			int winner_offset = 0;
+			char buffer[1024];
+			while (std::fgets(buffer, sizeof(buffer) - 1, file)) {
+				std::string line = buffer;
+				// std::fgets()の出力は行末の改行を含むため、ここで削除する。
+				while (!line.empty() && std::isspace(line.back())) {
+					line.pop_back();
+				}
+
+				auto offset = line.find(',');
+				if (offset != std::string::npos) {
+					// 将棋所の出力するCSAの指し手の末尾に",T1"などとつくため
+					// ","以降を削除する
+					line = line.substr(0, offset);
+				}
+
+				if (line.find("N+") == 0) {
+					black_player_name = line.substr(2);
+				}
+				else if (line.find("N-") == 0) {
+					white_player_name = line.substr(2);
+				}
+				else if (line.size() == 7 && (line[0] == '+' || line[0] == '-')) {
+					Move move = CSA::to_move(pos, line.substr(1));
+
+					if (!pos.pseudo_legal(move) || !pos.legal(move)) {
+						std::cout << "!!! Found an illegal move." << std::endl;
+						break;
+					}
+
+					pos.do_move(move, state_info[pos.game_ply()]);
+
+					moves.push_back(move);
+				}
+				else if (line.find(black_player_name + " win") != std::string::npos) {
+					winner_offset = 0;
+				}
+				else if (line.find(white_player_name + " win") != std::string::npos) {
+					winner_offset = 1;
+				}
+
+				if (line.find("toryo") != std::string::npos) {
+					toryo = true;
+				}
+			}
+
+			std::fclose(file);
+			file = nullptr;
+
+			// 投了以外の棋譜はスキップする
+			if (!toryo) {
+				continue;
+			}
+
+			pos.set_hirate(&state_info[0], Threads[0]);
+
+			for (int play = 0; play < moves.size(); ++play) {
+				auto move = moves[play];
+				auto& internal_book_move = internal_book[std::make_pair(pos.sfen(), static_cast<u16>(move))];
+				internal_book_move.move = move;
+				internal_book_move.ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
+				if (play % 2 == winner_offset) {
+					++internal_book_move.num_win;
+				}
+				else {
+					++internal_book_move.num_lose;
+				}
+			}
+		}
+	}
+
+	void GetGameIdsAndWinners(sqlite3* database, std::vector<std::pair<int, int>>& game_ids_and_winners) {
+		sync_cout << "GetGameIdsAndWinners()" << sync_endl;
+
+		sqlite3_stmt* stmt = NULL;
+
+		// ゲームIDと勝者の取得。
+		int result = sqlite3_prepare(database, "SELECT id, winner FROM game ORDER BY id", -1, &stmt, nullptr);
+		if (result != SQLITE_OK) {
+			sync_cout << "Faile to call sqlite3_prepare(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
+			return;
+		}
+
+		if (stmt == nullptr) {
+			// コメント等、有効なSQLステートメントでないと、戻り値はOKだがstmはNULLになる。
+			return;
+		}
+
+		int num_columns = sqlite3_column_count(stmt);
+		int column_id = -1;
+		int column_winner = -1;
+		for (int column = 0; column < num_columns; ++column) {
+			std::string column_name = sqlite3_column_name(stmt, column);
+			if (column_name == "id") {
+				column_id = column;
+			}
+			else if (column_name == "winner") {
+				column_winner = column;
+			}
+			else {
+				sync_cout << "Invalid column name. column_name=" << column_name << sync_endl;
+			}
+		}
+
+		while ((result = sqlite3_step(stmt)) == SQLITE_ROW) {
+			int id = -1;
+			int winner = -1;
+			for (int column = 0; column < num_columns; ++column) {
+				if (column_id == column) {
+					id = sqlite3_column_int(stmt, column);
+				}
+				else if (column_winner == column) {
+					winner = sqlite3_column_int(stmt, column);
+				}
+				else {
+					sync_cout << "Unknown column. column=" << column << sync_endl;
+				}
+			}
+
+			if (id == -1) {
+				sync_cout << "id is not contained." << sync_endl;
+				continue;
+			}
+
+			if (winner == -1) {
+				sync_cout << "winner is not contained." << sync_endl;
+				continue;
+			}
+
+			game_ids_and_winners.emplace_back(id, winner);
+		}
+
+		sqlite3_finalize(stmt);
+		stmt = nullptr;
+
+		if (result == SQLITE_ERROR) {
+			sync_cout << "Faile to call sqlite3_step(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
+			sqlite3_finalize(stmt);
+			return;
+		}
+	}
+
+	u16 to_move16(const std::string& str) {
+		if (str == "none") {
+			return static_cast<u16>(Move::MOVE_NONE);
+		}
+		return USI::to_move16(str).to_u16();
+	}
+
+	struct InternalMove {
+		u16 best;
+		u16 next;
+		int value;
+		int book;
+	};
+
+	void GetRecord(sqlite3* database, std::map<int, std::map<int, InternalMove>>& internal_moves) {
+		sync_cout << "GetRecord()" << sync_endl;
+
+		sqlite3_stmt* stmt = NULL;
+
+		int result = sqlite3_prepare(database, "SELECT game_id, play, best, next, value, book FROM move", -1, &stmt, nullptr);
+		if (result != SQLITE_OK) {
+			sync_cout << "Faile to call sqlite3_prepare(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
+			return;
+		}
+
+		if (stmt == nullptr) {
+			// コメント等、有効なSQLステートメントでないと、戻り値はOKだがstmはNULLになる。
+			return;
+		}
+
+		int column_game_id = -1;
+		int column_play = -1;
+		int column_best = -1;
+		int column_next = -1;
+		int column_value = -1;
+		int column_book = -1;
+		int num_columns = sqlite3_column_count(stmt);
+		for (int column = 0; column < num_columns; ++column) {
+			std::string column_name = sqlite3_column_name(stmt, column);
+			if (column_name == "game_id") {
+				column_game_id = column;
+			}
+			else if (column_name == "play") {
+				column_play = column;
+			}
+			else if (column_name == "best") {
+				column_best = column;
+			}
+			else if (column_name == "next") {
+				column_next = column;
+			}
+			else if (column_name == "value") {
+				column_value = column;
+			}
+			else if (column_name == "book") {
+				column_book = column;
+			}
+			else {
+				sync_cout << "Invalid column name. column_name=" << column_name << sync_endl;
+			}
+		}
+
+		// カラム数の取得
+		while ((result = sqlite3_step(stmt)) == SQLITE_ROW) {
+			int game_id = -1;
+			int play = -1;
+			std::string best;
+			std::string next;
+			int value = Value::VALUE_NONE;
+			int book = -1;
+			for (int column = 0; column < num_columns; ++column) {
+				if (column_game_id == column) {
+					game_id = sqlite3_column_int(stmt, column);
+				}
+				else if (column_play == column) {
+					play = sqlite3_column_int(stmt, column);
+				}
+				else if (column_best == column) {
+					best = reinterpret_cast<const char*>(sqlite3_column_text(stmt, column));
+				}
+				else if (column_next == column) {
+					next = reinterpret_cast<const char*>(sqlite3_column_text(stmt, column));
+				}
+				else if (column_value == column) {
+					value = sqlite3_column_int(stmt, column);
+				}
+				else if (column_book == column) {
+					book = sqlite3_column_int(stmt, column);
+				}
+				else {
+					sync_cout << "Invalid column. column=" << column << sync_endl;
+				}
+			}
+
+			if (game_id == -1) {
+				sync_cout << "game_id is not recorded." << sync_endl;
+				continue;
+			}
+
+			if (play == -1) {
+				sync_cout << "play is not recorded." << sync_endl;
+				continue;
+			}
+
+			if (best.empty()) {
+				sync_cout << "best is not recorded." << sync_endl;
+				continue;
+			}
+
+			if (next.empty()) {
+				sync_cout << "next is not recorded." << sync_endl;
+				continue;
+			}
+
+			if (value == Value::VALUE_NONE) {
+				sync_cout << "value is not recorded." << sync_endl;
+				continue;
+			}
+
+			if (book == -1) {
+				sync_cout << "book is not recorded." << sync_endl;
+				continue;
+			}
+
+			internal_moves[game_id][play] = { to_move16(best), to_move16(next), value, book, };
+		}
+
+		sqlite3_finalize(stmt);
+		stmt = nullptr;
+
+		if (result == SQLITE_ERROR) {
+			sync_cout << "Faile to call sqlite3_step(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
+			sqlite3_finalize(stmt);
+			return;
+		}
+	}
+
+	void ParseTanukiColiseumResultFiles(const std::string& tanuki_coliseum_folder_path, InternalBook& internal_book) {
+		std::vector<StateInfo> state_infos(512);
+		int num_records = 0;
+		for (const std::filesystem::directory_entry& entry :
+			std::filesystem::recursive_directory_iterator(tanuki_coliseum_folder_path)) {
+			auto& file_path = entry.path();
+			if (file_path.extension() != ".sqlite3") {
+				// 拡張子が .csa でなかったらスキップする。
+				continue;
+			}
+
+			// C++からSQLite3を使ってみる。 - seraphyの日記 https://seraphy.hatenablog.com/entry/20061031/p1
+			sqlite3* database = nullptr;
+			int result = 0;
+
+			result = sqlite3_open(file_path.string().c_str(), &database);
+			if (result != SQLITE_OK) {
+				sqlite3_close(database);
+				database = nullptr;
+
+				sync_cout << "Failed to open an sqlite file. file_path=" << file_path << sync_endl;
+				continue;
+			}
+
+			std::vector<std::pair<int, int>> game_ids_and_winners;
+			GetGameIdsAndWinners(database, game_ids_and_winners);
+
+			std::map<int, std::map<int, InternalMove>> internal_moves;
+			GetRecord(database, internal_moves);
+
+			sqlite3_close(database);
+			database = nullptr;
+
+			sync_cout << "Constructing an internal book." << sync_endl;
+
+			for (auto& [game_id, winner] : game_ids_and_winners) {
+				auto& position = Threads[0]->rootPos;
+				position.set_hirate(&state_infos[0], Threads[0]);
+
+				for (auto& [play, move] : internal_moves[game_id]) {
+					auto move32 = position.to_move(move.best);
+					if (!position.pseudo_legal(move32) || !position.legal(move32)) {
+						sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
+						break;
+					}
+
+					auto& internal_book_move = internal_book[std::make_pair(position.sfen(), move.best)];
+					internal_book_move.move = move.best;
+					internal_book_move.ponder = move.next;
+					if (play % 2 == winner) {
+						++internal_book_move.num_win;
+					}
+					else {
+						++internal_book_move.num_lose;
+					}
+
+					if (!move.book) {
+						++internal_book_move.num_values;
+						internal_book_move.sum_values += move.value;
+					}
+
+					position.do_move(move32, state_infos[position.game_ply()]);
+				}
+			}
+		}
+	}
+}
+
+bool Tanuki::CreateTayayanBook() {
+	std::string csa_folder = Options[kBookCsaFolder];
+	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
+	std::string output_book_file = Options[kBookOutputFile];
+	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
+
+	InternalBook internal_book;
+	//ParseFloodgateCsaFiles(csa_folder, internal_book);
+	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
+
+	for (auto& [sfen_and_best16, book_move] : internal_book) {
+		const auto& sfen = sfen_and_best16.first;
+		auto move = book_move.move;
+		auto ponder = book_move.ponder;
+		int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+		int count = book_move.num_win + book_move.num_lose;
+
+		// book_move.num_win / count < minimum_winning_percentage / 100
+		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+			continue;
+		}
+
+		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 	}
 
 	WriteBook(output_book, output_book_file);
