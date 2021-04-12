@@ -212,6 +212,7 @@ endif
 CPPFLAGS += -DNO_EXCEPTIONS
 LDFLAGS += -lpthread
 LDFLAGS += -v
+LDFLAGS += -lsqlite3
 
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
