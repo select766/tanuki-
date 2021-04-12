@@ -2252,7 +2252,7 @@ bool Tanuki::CreateTayayanBook() {
 	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
 	InternalBook internal_book;
-	//ParseFloodgateCsaFiles(csa_folder, internal_book);
+	ParseFloodgateCsaFiles(csa_folder, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
 
 	for (auto& [sfen_and_best16, book_move] : internal_book) {
@@ -2264,6 +2264,15 @@ bool Tanuki::CreateTayayanBook() {
 
 		// book_move.num_win / count < minimum_winning_percentage / 100
 		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+			continue;
+		}
+
+		auto& position = Threads[0]->rootPos;
+		StateInfo state_info;
+		position.set(sfen, &state_info, Threads[0]);
+		auto move32 = position.to_move(move);
+		if (!position.pseudo_legal(move32) || !position.legal(move32)) {
+			sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
 			continue;
 		}
 
