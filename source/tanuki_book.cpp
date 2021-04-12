@@ -1949,6 +1949,11 @@ namespace {
 
 			for (int play = 0; play < moves.size(); ++play) {
 				auto move = moves[play];
+				if (!pos.pseudo_legal(move) || !pos.legal(move)) {
+					std::cout << "Illegal move. sfen=" << pos.sfen() << " move=" << move << std::endl;
+					break;
+				}
+
 				auto& internal_book_move = internal_book[std::make_pair(pos.sfen(), static_cast<u16>(move))];
 				internal_book_move.move = move;
 				internal_book_move.ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
@@ -1958,6 +1963,8 @@ namespace {
 				else {
 					++internal_book_move.num_lose;
 				}
+
+				pos.do_move(move, state_info[pos.game_ply()]);
 			}
 		}
 	}
