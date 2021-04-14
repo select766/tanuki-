@@ -2213,6 +2213,11 @@ namespace {
 			sync_cout << "Constructing an internal book." << sync_endl;
 
 			for (auto& [game_id, winner] : game_ids_and_winners) {
+				if (winner > 1) {
+					// 引き分けは取り除く
+					continue;
+				}
+
 				auto& position = Threads[0]->rootPos;
 				position.set_hirate(&state_infos[0], Threads[0]);
 
