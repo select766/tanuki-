@@ -48,6 +48,7 @@ namespace {
 	constexpr const char* kBookCsaFolder = "BookCsaFolder";
 	constexpr const char* kBookTanukiColiseumLogFolder = "BookTanukiColiseumLogFolder";
 	constexpr const char* kBookMinimumWinningPercentage = "BookMinimumWinningPercentage";
+	constexpr const char* kBookMinimumValue = "BookMinimumValue";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -591,6 +592,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookCsaFolder] << Option("");
 	o[kBookTanukiColiseumLogFolder] << Option("");
 	o[kBookMinimumWinningPercentage] << Option(0, 0, 100);
+	o[kBookMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
 	return true;
 }
 
@@ -2276,6 +2278,57 @@ bool Tanuki::CreateTayayanBook() {
 
 		// book_move.num_win / count < minimum_winning_percentage / 100
 		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+			continue;
+		}
+
+		auto& position = Threads[0]->rootPos;
+		StateInfo state_info;
+		position.set(sfen, &state_info, Threads[0]);
+		auto move32 = position.to_move(move);
+		if (!position.pseudo_legal(move32) || !position.legal(move32)) {
+			sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
+			continue;
+		}
+
+		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
+	}
+
+	WriteBook(output_book, output_book_file);
+
+	return true;
+}
+
+bool Tanuki::CreateTayayanBook2() {
+	std::string csa_folder = Options[kBookCsaFolder];
+	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
+	std::string output_book_file = Options[kBookOutputFile];
+	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
+	int minimum_value = Options[kBookMinimumValue];
+
+	MemoryBook output_book;
+	output_book_file = "book/" + output_book_file;
+	sync_cout << "Reading output book file: " << output_book_file << sync_endl;
+	output_book.read_book(output_book_file);
+	sync_cout << "done..." << sync_endl;
+	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
+
+	InternalBook internal_book;
+	ParseFloodgateCsaFiles(csa_folder, internal_book);
+	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
+
+	for (auto& [sfen_and_best16, book_move] : internal_book) {
+		const auto& sfen = sfen_and_best16.first;
+		auto move = book_move.move;
+		auto ponder = book_move.ponder;
+		int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+		int count = book_move.num_win + book_move.num_lose;
+
+		// book_move.num_win / count < minimum_winning_percentage / 100
+		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+			continue;
+		}
+
+		if (count > 0 && value < minimum_value) {
 			continue;
 		}
 

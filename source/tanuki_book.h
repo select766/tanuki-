@@ -19,6 +19,7 @@ namespace Tanuki {
 	bool CreateFromTanukiColiseum();
 	bool Create18Book();
 	bool CreateTayayanBook();
+	bool CreateTayayanBook2();
 }
 
 #endif
