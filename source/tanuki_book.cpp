@@ -48,7 +48,8 @@ namespace {
 	constexpr const char* kBookCsaFolder = "BookCsaFolder";
 	constexpr const char* kBookTanukiColiseumLogFolder = "BookTanukiColiseumLogFolder";
 	constexpr const char* kBookMinimumWinningPercentage = "BookMinimumWinningPercentage";
-	constexpr const char* kBookMinimumValue = "BookMinimumValue";
+	constexpr const char* kBookBlackMinimumValue = "BookBlackMinimumValue";
+	constexpr const char* kBookWhiteMinimumValue = "BookWhiteMinimumValue";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -592,7 +593,8 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookCsaFolder] << Option("");
 	o[kBookTanukiColiseumLogFolder] << Option("");
 	o[kBookMinimumWinningPercentage] << Option(0, 0, 100);
-	o[kBookMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
+	o[kBookBlackMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
+	o[kBookWhiteMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
 	return true;
 }
 
@@ -2303,7 +2305,8 @@ bool Tanuki::CreateTayayanBook2() {
 	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
 	std::string output_book_file = Options[kBookOutputFile];
 	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
-	int minimum_value = Options[kBookMinimumValue];
+	int black_minimum_value = Options[kBookBlackMinimumValue];
+	int white_minimum_value = Options[kBookWhiteMinimumValue];
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2322,13 +2325,16 @@ bool Tanuki::CreateTayayanBook2() {
 		auto ponder = book_move.ponder;
 		int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
 		int count = book_move.num_win + book_move.num_lose;
+		auto color = (sfen.find(" b ") != std::string::npos ? BLACK : WHITE);
 
+		// 勝率が行って一以下の指し手を削除する。
 		// book_move.num_win / count < minimum_winning_percentage / 100
 		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
 			continue;
 		}
 
-		if (count > 0 && value < minimum_value) {
+		// 評価値が行って一以下の指し手を削除する。
+		if (count > 0 && ((color == BLACK && value < black_minimum_value) || (color == WHITE && value < white_minimum_value))) {
 			continue;
 		}
 
