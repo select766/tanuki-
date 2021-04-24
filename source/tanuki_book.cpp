@@ -2252,6 +2252,30 @@ namespace {
 			}
 		}
 	}
+
+	using BadMove = std::pair<std::string, std::string>;
+	static const std::vector<BadMove> BadMoves = {
+		{"sfen lnsgk1snl/1r4gb1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8", "8d8e"},
+		{"sfen lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6", "8d8e"},
+		{"sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/7P1/PPPPPPP1P/1B5R1/LNSGKGSNL w - 2", "4a3b"},
+	};
+
+	void RemoveBadMove(InternalBook& internal_book) {
+		sync_cout << "RemoveBadMove()" << sync_endl;
+		for (auto& [sfen, move_string] : BadMoves) {
+			u16 move16 = USI::to_move16(move_string).to_u16();
+			auto bad_move = std::make_pair(sfen, move16);
+			auto book_move_iterator = internal_book.find(bad_move);
+			if (book_move_iterator == internal_book.end()) {
+				continue;
+			}
+
+			sync_cout << "Removed " << sfen << " " << move_string << sync_endl;
+			book_move_iterator->second.sum_values = -VALUE_MATE;
+			book_move_iterator->second.num_win = 0;
+			book_move_iterator->second.num_lose = 0;
+		}
+	}
 }
 
 bool Tanuki::CreateTayayanBook() {
@@ -2318,6 +2342,7 @@ bool Tanuki::CreateTayayanBook2() {
 	InternalBook internal_book;
 	ParseFloodgateCsaFiles(csa_folder, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
+	RemoveBadMove(internal_book);
 
 	for (auto& [sfen_and_best16, book_move] : internal_book) {
 		const auto& sfen = sfen_and_best16.first;
