@@ -50,6 +50,7 @@ namespace {
 	constexpr const char* kBookMinimumWinningPercentage = "BookMinimumWinningPercentage";
 	constexpr const char* kBookBlackMinimumValue = "BookBlackMinimumValue";
 	constexpr const char* kBookWhiteMinimumValue = "BookWhiteMinimumValue";
+	constexpr const char* kBookMinimumCount = "BookMinimumCount";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -595,6 +596,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookMinimumWinningPercentage] << Option(0, 0, 100);
 	o[kBookBlackMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
 	o[kBookWhiteMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
+	o[kBookMinimumCount] << Option(0, 0, INT_MAX);
 	return true;
 }
 
@@ -2400,6 +2402,7 @@ bool Tanuki::CreateTayayanBook2() {
 	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
 	int black_minimum_value = Options[kBookBlackMinimumValue];
 	int white_minimum_value = Options[kBookWhiteMinimumValue];
+	int minimum_count = Options[kBookMinimumCount];
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2422,14 +2425,20 @@ bool Tanuki::CreateTayayanBook2() {
 		int count = book_move.num_win + book_move.num_lose;
 		auto color = (sfen.find(" b ") != std::string::npos ? BLACK : WHITE);
 
-		// 勝率が行って一以下の指し手を削除する。
+		// 勝率が一定値以下の指し手を削除する。
 		// book_move.num_win / count < minimum_winning_percentage / 100
 		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
 			continue;
 		}
 
-		// 評価値が行って一以下の指し手を削除する。
+		// 評価値が一定値以下の指し手を削除する。
+		// TODO(hnoda): book_move.num_values に修正する。
 		if (count > 0 && ((color == BLACK && value < black_minimum_value) || (color == WHITE && value < white_minimum_value))) {
+			continue;
+		}
+
+		// 出現回数が一定値以下の指し手を削除する。
+		if (count < minimum_count) {
 			continue;
 		}
 
