@@ -2269,6 +2269,9 @@ namespace {
 		{"lnsgk1snl/1r4gb1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8", "8d8e"},
 		{"lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6", "8d8e"},
 		{"lnsgkgsnl/1r5b1/ppppppppp/9/9/7P1/PPPPPPP1P/1B5R1/LNSGKGSNL w - 2", "4a3b"},
+		{"ln5nl/1r2gkg2/3ppp1p1/p2s1sp1p/1pp4P1/2PPSPP2/PPS1P1N1P/2GK1G3/LN5RL b Bb 35", "7f7e"},
+		{"ln5nl/4gkg2/4ppsp1/p2p2p1p/5P1P1/1rPPS1P2/P3P1N1P/2GK1G3/LN5RL b BSPbs2p 49", "P*8g"},
+		{"ln5nl/1r2gkg2/3ppp1p1/p4sp1p/1ps4P1/3PSPP2/PPS1P1N1P/2GK1G3/LN5RL b BPbp 37", "4f4e"},
 	};
 
 	void RemoveBadMove(InternalBook& internal_book) {
