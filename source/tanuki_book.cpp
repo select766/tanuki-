@@ -1858,6 +1858,71 @@ namespace {
 	};
 	using InternalBook = std::map<std::pair<std::string, u16 /* Move16 */>, InternalBookMove>;
 
+	bool ReadCsaFile(const std::string& file_path, std::vector<Move>& moves, bool& toryo, int& winner_offset) {
+		auto& pos = Threads[0]->rootPos;
+		StateInfo state_info[512];
+		pos.set_hirate(&state_info[0], Threads[0]);
+
+		FILE* file = std::fopen(file_path.c_str(), "r");
+
+		if (file == nullptr) {
+			std::cout << "!!! Failed to open the input file: filepath=" << file_path << std::endl;
+			return false;
+		}
+
+		std::string black_player_name;
+		std::string white_player_name;
+		char buffer[1024];
+		while (std::fgets(buffer, sizeof(buffer) - 1, file)) {
+			std::string line = buffer;
+			// std::fgets()の出力は行末の改行を含むため、ここで削除する。
+			while (!line.empty() && std::isspace(line.back())) {
+				line.pop_back();
+			}
+
+			auto offset = line.find(',');
+			if (offset != std::string::npos) {
+				// 将棋所の出力するCSAの指し手の末尾に",T1"などとつくため
+				// ","以降を削除する
+				line = line.substr(0, offset);
+			}
+
+			if (line.find("N+") == 0) {
+				black_player_name = line.substr(2);
+			}
+			else if (line.find("N-") == 0) {
+				white_player_name = line.substr(2);
+			}
+			else if (line.size() == 7 && (line[0] == '+' || line[0] == '-')) {
+				Move move = CSA::to_move(pos, line.substr(1));
+
+				if (!pos.pseudo_legal(move) || !pos.legal(move)) {
+					std::cout << "!!! Found an illegal move." << std::endl;
+					break;
+				}
+
+				pos.do_move(move, state_info[pos.game_ply()]);
+
+				moves.push_back(move);
+			}
+			else if (line.find(black_player_name + " win") != std::string::npos) {
+				winner_offset = 0;
+			}
+			else if (line.find(white_player_name + " win") != std::string::npos) {
+				winner_offset = 1;
+			}
+
+			if (line.find("toryo") != std::string::npos) {
+				toryo = true;
+			}
+		}
+
+		std::fclose(file);
+		file = nullptr;
+
+		return true;
+	}
+
 	void ParseFloodgateCsaFiles(const std::string& csa_folder_path, InternalBook& internal_book) {
 		int num_records = 0;
 		for (const std::filesystem::directory_entry& entry :
@@ -1880,75 +1945,21 @@ namespace {
 				sync_cout << num_records << sync_endl;
 			}
 
-			auto& pos = Threads[0]->rootPos;
-			StateInfo state_info[512];
-			pos.set_hirate(&state_info[0], Threads[0]);
-
-			FILE* file = std::fopen(file_path.string().c_str(), "r");
-
-			if (file == nullptr) {
-				std::cout << "!!! Failed to open the input file: filepath=" << file_path << std::endl;
-				continue;
-			}
-
 			bool toryo = false;
-			std::string black_player_name;
-			std::string white_player_name;
 			std::vector<Move> moves;
 			int winner_offset = 0;
-			char buffer[1024];
-			while (std::fgets(buffer, sizeof(buffer) - 1, file)) {
-				std::string line = buffer;
-				// std::fgets()の出力は行末の改行を含むため、ここで削除する。
-				while (!line.empty() && std::isspace(line.back())) {
-					line.pop_back();
-				}
-
-				auto offset = line.find(',');
-				if (offset != std::string::npos) {
-					// 将棋所の出力するCSAの指し手の末尾に",T1"などとつくため
-					// ","以降を削除する
-					line = line.substr(0, offset);
-				}
-
-				if (line.find("N+") == 0) {
-					black_player_name = line.substr(2);
-				}
-				else if (line.find("N-") == 0) {
-					white_player_name = line.substr(2);
-				}
-				else if (line.size() == 7 && (line[0] == '+' || line[0] == '-')) {
-					Move move = CSA::to_move(pos, line.substr(1));
-
-					if (!pos.pseudo_legal(move) || !pos.legal(move)) {
-						std::cout << "!!! Found an illegal move." << std::endl;
-						break;
-					}
-
-					pos.do_move(move, state_info[pos.game_ply()]);
-
-					moves.push_back(move);
-				}
-				else if (line.find(black_player_name + " win") != std::string::npos) {
-					winner_offset = 0;
-				}
-				else if (line.find(white_player_name + " win") != std::string::npos) {
-					winner_offset = 1;
-				}
-
-				if (line.find("toryo") != std::string::npos) {
-					toryo = true;
-				}
+			if (!ReadCsaFile(file_path.string(), moves, toryo, winner_offset)) {
+				sync_cout << "Failed to read a csa file. file_path" << file_path << sync_endl;
+				continue;
 			}
-
-			std::fclose(file);
-			file = nullptr;
 
 			// 投了以外の棋譜はスキップする
 			if (!toryo) {
 				continue;
 			}
 
+			auto& pos = Threads[0]->rootPos;
+			StateInfo state_info[512];
 			pos.set_hirate(&state_info[0], Threads[0]);
 
 			for (int play = 0; play < moves.size(); ++play) {
@@ -2255,9 +2266,9 @@ namespace {
 
 	using BadMove = std::pair<std::string, std::string>;
 	static const std::vector<BadMove> BadMoves = {
-		{"sfen lnsgk1snl/1r4gb1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8", "8d8e"},
-		{"sfen lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6", "8d8e"},
-		{"sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/7P1/PPPPPPP1P/1B5R1/LNSGKGSNL w - 2", "4a3b"},
+		{"lnsgk1snl/1r4gb1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8", "8d8e"},
+		{"lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6", "8d8e"},
+		{"lnsgkgsnl/1r5b1/ppppppppp/9/9/7P1/PPPPPPP1P/1B5R1/LNSGKGSNL w - 2", "4a3b"},
 	};
 
 	void RemoveBadMove(InternalBook& internal_book) {
@@ -2267,13 +2278,68 @@ namespace {
 			auto bad_move = std::make_pair(sfen, move16);
 			auto book_move_iterator = internal_book.find(bad_move);
 			if (book_move_iterator == internal_book.end()) {
+				sync_cout << "Falied to remove a bad move sfen=" << sfen << " move=" << move_string << sync_endl;
 				continue;
 			}
 
-			sync_cout << "Removed " << sfen << " " << move_string << sync_endl;
-			book_move_iterator->second.sum_values = -VALUE_MATE;
-			book_move_iterator->second.num_win = 0;
-			book_move_iterator->second.num_lose = 0;
+			internal_book.erase(book_move_iterator);
+			sync_cout << "Removed a bad move. sfen=" << sfen << " move=" << move_string << sync_endl;
+		}
+	}
+
+	void RemoveBadMove2(const std::string& csa_folder, InternalBook& internal_book) {
+		sync_cout << "RemoveBadMove2()" << sync_endl;
+		std::ifstream ifs("bad_moves.txt");
+		std::string url;
+		int target_play;
+		while (ifs >> url >> target_play) {
+			int offset = url.find_last_of("/");
+			std::string file_name = url.substr(offset + 1);
+			std::string file_path = csa_folder + "\\wdoor2021\\2021\\" + file_name;
+
+			std::vector<Move> moves;
+			bool toryo = false;
+			int winner_offset = 0;
+			if (!ReadCsaFile(file_path, moves, toryo, winner_offset)) {
+				sync_cout << "Failed to read a csa file. file_path" << file_path << sync_endl;
+				continue;
+			}
+
+			auto& pos = Threads[0]->rootPos;
+			std::vector<StateInfo> state_info(512);
+			pos.set_hirate(&state_info[0], Threads[0]);
+			for (int play = 0; play + 1 < target_play; ++play) {
+				pos.do_move(moves[play], state_info[pos.game_ply()]);
+			}
+
+			u16 move16 = moves[target_play - 1];
+			std::string move_string = USI::move({ moves[target_play - 1] });
+			std::string sfen = pos.sfen();
+			auto bad_move = std::make_pair(sfen, move16);
+			auto book_move_iterator = internal_book.find(bad_move);
+			if (book_move_iterator == internal_book.end()) {
+				sync_cout << "Falied to remove a bad move sfen=" << sfen << " move=" << move_string << sync_endl;
+				continue;
+			}
+
+			internal_book.erase(book_move_iterator);
+			sync_cout << "Removed a bad move. sfen=" << sfen << " move=" << move_string << sync_endl;
+		}
+	}
+
+	static const std::vector<BadMove> GoodMoves = {
+		{"lr5nl/3gk1g2/2n1ppsp1/p1pps3p/1P4SP1/P1PP4P/2SGPP3/2G4R1/LNK4NL w B3Pb 43", "8a8e"},
+	};
+
+	void AddGoodMove(InternalBook& internal_book) {
+		sync_cout << "AddGoodMove()" << sync_endl;
+		for (auto& [sfen, move_string] : GoodMoves) {
+			Move16 move16 = USI::to_move16(move_string);
+
+			auto& internal_book_move = internal_book[std::make_pair(sfen, move16.to_u16())];
+			internal_book_move.move = move16;
+			internal_book_move.ponder = Move::MOVE_NONE;
+			++internal_book_move.num_win;
 		}
 	}
 }
@@ -2343,6 +2409,7 @@ bool Tanuki::CreateTayayanBook2() {
 	ParseFloodgateCsaFiles(csa_folder, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
 	RemoveBadMove(internal_book);
+	RemoveBadMove2(csa_folder, internal_book);
 
 	for (auto& [sfen_and_best16, book_move] : internal_book) {
 		const auto& sfen = sfen_and_best16.first;
@@ -2372,7 +2439,7 @@ bool Tanuki::CreateTayayanBook2() {
 			continue;
 		}
 
-		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
+		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count, book_move.num_win, 0));
 	}
 
 	WriteBook(output_book, output_book_file);
