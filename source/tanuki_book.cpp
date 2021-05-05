@@ -1782,6 +1782,11 @@ namespace {
 	}
 
 	void ParseTanukiColiseumResultFiles(const std::string& tanuki_coliseum_folder_path, InternalBook& internal_book) {
+		if (!std::filesystem::is_directory(tanuki_coliseum_folder_path)) {
+			sync_cout << "TanukiColiseum folder was not found. tanuki_coliseum_folder_path=" << tanuki_coliseum_folder_path << sync_endl;
+			return;
+		}
+
 		std::vector<StateInfo> state_infos(512);
 		int num_records = 0;
 		for (const std::filesystem::directory_entry& entry :
