@@ -11,6 +11,7 @@
 #include <random>
 #include <set>
 #include <sstream>
+#include <regex>
 
 #include <omp.h>
 
@@ -51,484 +52,9 @@ namespace {
 	constexpr const char* kBookBlackMinimumValue = "BookBlackMinimumValue";
 	constexpr const char* kBookWhiteMinimumValue = "BookWhiteMinimumValue";
 	constexpr const char* kBookMinimumCount = "BookMinimumCount";
+	constexpr const char* kBookMinimumRating = "BookMinimumRating";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
-
-	const std::vector<std::string> kStrongPlayers = {
-		"Hinatsuru_Ai", // 4607
-		"Suisho3test_TR3990X", // 4576
-		"BURNING_BRIDGES", // 4556
-		"NEEDLED-24.7", // 4535
-		"Suisho4_TR3990X", // 4530
-		"NEEDLED-35.8kai0151_TR-3990X", // 4476
-		"FROZEN_BRIDGE", // 4465
-		"kabuto", // 4454
-		"Suisho3kai_TR3990X", // 4453
-		"AAV", // 4443
-		"gcttest_x6_RTX2080ti", // 4440
-		"LUNA", // 4436
-		"Marulk", // 4433
-		"gct_v100x8_model-0000195", // 4427
-		"COMEON", // 4393
-		"Yashajin_Ai", // 4390
-		"BLUETRANSPARENCY", // 4385
-		"Hainaken_Corei9-7980XE_18c", // 4381
-		"QueenAI_210222_i9-7920x", // 4377
-		"BURNING_BRIDGE_210404z", // 4361
-		"xg_kpe9", // 4344
-		"ECLIPSE_RyzenTR3990X", // 4344
-		"BURNING_BRIDGE_210401", // 4338
-		"QueenInLove_test201224", // 4314
-		"DG_test210401", // 4302
-		"xeon_gold", // 4278
-		"xeon_w", // 4278
-		"fist", // 4272
-		"Karimero", // 4272
-		"xgs", // 4267
-		"Mariel", // 4266
-		"kame", // 4258
-		"RINGO", // 4256
-		"NEEDLED-35.8kai1050_R7-4800H", // 4251
-		"daigo8", // 4250
-		"ANESIS", // 4247
-		"DG_test210307_24C_ubuntu", // 4246
-		"BB_ry4500U", // 4239
-		"FukauraOu_RTX3090-2080S", // 4218
-		"Frozen", // 4216
-		"dlshogi_resnet20_swish_447", // 4211
-		"Cendrillon", // 4210
-		"Kamuy_s009_HKPE9", // 4209
-		"mbk_3340m", // 4208
-		"RUN", // 4207
-		"ECLIPSE_20210117_i9-9960X", // 4206
-		"BB210302_RTX3070", // 4205
-		"KASHMIR", // 4203
-		"TK045", // 4202
-		"mytest0426", // 4201
-		"Procyon", // 4199
-		"DaigorillaEX_test1_E5_2698v4", // 4189
-		"Nashi", // 4186
-		"Kristffersen", // 4177
-		"DLSuishoFO6.02_RTX3090", // 4176
-		"YO600-HalfKPE9-20210124-8t", // 4175
-		"yuatan", // 4174
-		"uy88", // 4171
-		"daigoEX", // 4167
-		"koron", // 4159
-		"Method", // 4156
-		"19W", // 4154
-		"Amaeta_Denryu1_2950X", // 4154
-		"BB_RTX3070", // 4153
-		"dlshogitest", // 4150
-		"Lladro", // 4148
-		"PLX", // 4147
-		"Supercell", // 4143
-		"Nao.", // 4142
-		"sui3k_ry4500U", // 4140
-		"QueenAI_210317_i9-7920x", // 4140
-		"ry4500U", // 4138
-		"Kristallweizen_4800H", // 4129
-		"gcttest_RTX2080ti", // 4126
-		"QueenInLove-j088_Ryzen7-4800H", // 4125
-		"Tora_Cat", // 4123
-		"ECLIPSE_test210205", // 4121
-		"test_e-4800H", // 4118
-		"Peach", // 4117
-		"NEEDLED-24.7kai0447_16t", // 4116
-		"Unagi", // 4115
-		"Rinne_p003_Ryzen7-4800H", // 4113
-		"gcttest_x5_RTX2080ti", // 4112
-		"15b_n001_3070", // 4107
-		"40b_n008_RTX3070", // 4107
-		"Qhapaq_WCSC28_Mizar_4790k", // 4106
-		"n3k1177", // 4102
-		"GGG", // 4102
-		"YKT", // 4101
-		"Kristallweizen-E5-2620", // 4099
-		"10W", // 4099
-		"YO6.00_HKPE9_8t", // 4096
-		"PANDRABOX", // 4096
-		"Venus_210327", // 4094
-		"test20210114", // 4092
-		"Suisho3test_i5-10210U", // 4091
-		"gcttest_x3_RTX2080ti", // 4090
-		"40b_n007_RTX3070", // 4090
-		"gcttest_x4_RTX2070_Max-Q", // 4089
-		"Rinne_m009", // 4089
-		"Suisho3kai_YO6.01_i5-6300U", // 4088
-		"Fx13_2", // 4088
-		"Suisho2test_i5-10210U", // 4086
-		"Sagittarius", // 4083
-		"Takeshi2_Ryzen7-4800H", // 4076
-		"Venus_210324", // 4074
-		"40b_n002", // 4074
-		"40b_n003", // 4074
-		"ECLIPSE_20210326", // 4073
-		"40b_n009_RTX3070", // 4073
-		"Rinne_w041", // 4071
-		"gcttest_x4_RTX2080ti", // 4070
-		"Suisho3-i5-6300U", // 4069
-		"Suisho3kai_i5-10210U", // 4069
-		"Titanda_L", // 4066
-		"Rinne_x022", // 4063
-		"40b_n006_RTX3090", // 4063
-		"N100k", // 4059
-		"ECLIPSE_test_i7-6700HQ", // 4056
-		"VIVI006", // 4055
-		"d_x15_n001_2080Ti", // 4051
-		"BB2021_i5-6300U", // 4051
-		"Ultima", // 4046
-		"d_x15_n002_2080Ti", // 4046
-		"ELLE", // 4046
-		"Mike_Cat", // 4044
-		"reflect.RTX2070.MAX-Q", // 4037
-		"Pacman_4", // 4035
-		"Amid", // 4032
-		"DG_DGbook_i7_4720HQ", // 4031
-		"40-05-70", // 4030
-		"DG_test_210202_i7_4720HQ", // 4029
-		"Aquarius", // 4027
-		"Takeshi_ry4500U", // 4016
-		"YaOu_V540_nnue_1227", // 4009
-		"sui3k_2c", // 4001
-		"cobra_denryu_6c", // 4000
-		"slmv100_3c", // 3998
-		"DLSuishoFu6.02_RTX3090", // 3998
-		"ddp", // 3993
-		"FukauraOu_RTX2080ti", // 3992
-		"slmv115_2c", // 3989
-		"slmv100_2c", // 3985
-		"sui3_2c", // 3985
-		"melt", // 3985
-		"OTUKARE_SAYURI_4C", // 3977
-		"Fairy-Stockfish-Suisho3kai-8t", // 3973
-		"sui2_2c", // 3972
-		"Venus_210406", // 3970
-		"Rinne_v055_test", // 3969
-		"aqua.RTX2070.MAX-Q", // 3968
-		"40-06-70", // 3968
-		"MentalistDaiGo", // 3964
-		"deg", // 3963
-		"slmv85_2c", // 3954
-		"dlshogi_blend_gtx1060", // 3954
-		"Vx_Cvk_tm1_YO620_4415Y", // 3950
-		"gcttest_x5_RTX2070_Max-Q", // 3947
-		"usa2xkai", // 3947
-		"Kristallweizen-i7-4578U", // 3947
-		"slmv145_2c", // 3944
-		"40-04-70", // 3939
-		"Soho_Amano", // 3938
-		"Daigorilla_i7_4720HQ", // 3938
-		"BB210214_RTX3070", // 3935
-		"slmv130_2c", // 3931
-		"Takeshi_2c", // 3930
-		"nibanshibori", // 3928
-		"DLSuishoFO6.02_GTX1650", // 3928
-		"flcl", // 3928
-		"YaOu_V540_nnue_1222", // 3921
-		"Krist_483_473stb_16t_100m", // 3920
-		"goto2200last3", // 3915
-		"jky", // 3907
-		"nnn_0406", // 3906
-		"d_x20_0008", // 3902
-		"d_x20_0009", // 3900
-		"ilq6_ilqshock201202_tm2_YO_4415Y", // 3899
-		"FBK_Fbook", // 3894
-		"CBTest01", // 3888
-		"az_w2245_n_p100k_UctTreeDeclLose", // 3887
-		"YaOu_V600_nnue_0103", // 3883
-		"Fairy-Stockfish-Furibisha-8t", // 3879
-		"az_w2425_n_s10_DlM1", // 3870
-		"JK_FGbook_1c", // 3869
-		"MBP2014", // 3863
-		"Q006_1t_tn_tn_N800kD14P3_M3kSM90", // 3857
-		"Cute_2c", // 3855
-		"Cool_2c", // 3849
-		"az_w2425_n_s10_DlPM3", // 3848
-		"b20_n012_1080Ti", // 3845
-		"omiss", // 3842
-		"Miacis_2080ti", // 3839
-		"QMP006_1_TNtn_N800kD16P3_M3kS90", // 3838
-		"d_x20_0007", // 3835
-		"Siri", // 3834
-		"15b2_2060", // 3832
-		"az_w2305_n_s10_Mate1", // 3828
-		"YaOu_V600_nnue_0130", // 3824
-		"JKishi18gou_m_0814", // 3822
-		"siege.RTX2070.MAX-Q", // 3818
-		"slmv145", // 3812
-		"nnn_210324", // 3807
-		"ICHIGO", // 3806
-		"aziu_w3303_n_s10_M1", // 3804
-		"JKishi18gou_1112", // 3801
-		"slmv115", // 3793
-		"nnn_210214", // 3793
-		"vaio", // 3793
-		"slmv100", // 3792
-		"BBFtest_RTX3070", // 3792
-		"dbga", // 3788
-		"Sui3NB_i5-10210U", // 3787
-		"YaOu_V600_nnue_0406", // 3784
-		"craft_Percy_MT2020_CB_F", // 3782
-		"slmv130", // 3780
-		"40b_n008_RX580", // 3780
-		"Unagi_hkpe9", // 3774
-		"Kristallweizen-Core2Duo-P7450", // 3774
-		"YaOu_V540_nnue_1211", // 3772
-		"fku0", // 3770
-		"slmv70", // 3767
-		"aziu_w3303_n_s10_PM3", // 3767
-		"Sui3_illqhashock_i5-10210U", // 3766
-		"slmv85", // 3764
-		"AYM8__Suisho3_8000k", // 3762
-		"c2d-2c", // 3761
-		"YaOu_V533_nnue_1201", // 3760
-		"Q_2t_tn_tn_N800kD14P3_MT3k_SM90", // 3759
-		"YaOu_V600_nnue_0106", // 3759
-		"ViVi005", // 3751
-		"dl40b2_2060", // 3749
-		"15b_n004_1060", // 3748
-		"nnn_210305", // 3746
-		"aziu_w2905_n_s10_PM3", // 3740
-		"GCT_GTX1660Ti", // 3736
-		"15b_n001_1060", // 3734
-		"Suisho-1T-D22-YO5.40", // 3732
-		"az_w2245_n_p20k_UctTreeDeclLose", // 3729
-		"test_g4dn.xlarge", // 3729
-		"superusa2x", // 3719
-		"ChocoCake", // 3717
-		"Kamuy_vi05_1c", // 3709
-		"nnn_tt0402", // 3708
-		"sankazero0007", // 3706
-		"b20_n011_1080Ti", // 3706
-		"GCT_RX580", // 3700
-		"ForDen_1", // 3698
-		"kwe0.4_ym_Cortex-A17_4c", // 3697
-		"10be_n006_1080Ti", // 3696
-		"10be_n008_1080Ti", // 3695
-		"Macbook2010", // 3693
-		"GCT_1060", // 3676
-		"bbs-nnue-02.1", // 3675
-		"AobaZero-1.6-radeonvii-10sec", // 3674
-		"emmg_Suisho3_4000k", // 3672
-		"10be_n007_1080Ti", // 3671
-		"moon", // 3664
-		"goto2200last6", // 3664
-		"mac_5i_F", // 3663
-		"suiseihuman", // 3661
-		"10be_n009_1080Ti", // 3661
-		"goto2200last5", // 3653
-		"nnn_210202", // 3648
-		"tx-nnue", // 3647
-		"GCT_GTX-1060", // 3646
-		"20-10-70", // 3643
-		"5b_n007_1080Ti", // 3642
-		"craft_xeon_489_XKW_2t", // 3641
-		"40b_n005_RX580", // 3636
-		"JeSuisMoi", // 3627
-		"AobaZero_w2215_RTX2070", // 3627
-		"ViVi004", // 3624
-		"shotgun_i7-6700", // 3623
-		"VIVI003", // 3613
-		"5b_n007_1060", // 3609
-		"aziu_w2185_n_p20k", // 3605
-		"10be_n005_1080Ti", // 3603
-		"40b_n007_1050Ti", // 3603
-		"nSRU_Suisho3_2000k", // 3600
-		"raizen21062004", // 3599
-		"pp3", // 3598
-		"Suisho-1T-D20-YO5.40", // 3592
-		"elmo_WCSC27_479_16t_100m", // 3588
-		"AP2_R2500U", // 3583
-		"20b_n007_RX580", // 3568
-		"nnn_tt0403", // 3555
-		"sankazero008", // 3555
-		"bbs-nnue-02.0.8", // 3551
-		"t0-nnue", // 3548
-		"AobaZero-1.9-radeonvii-10sec", // 3543
-		"AobaZero_GTX1660Ti", // 3543
-		"3be_n005_1050Ti", // 3534
-		"AobaZero_w3287_1080Ti", // 3527
-		"sz_ym_Cortex-A53_4c", // 3523
-		"40b_n005_1050Ti", // 3521
-		"nnn_20210113", // 3520
-		"Suisho-1T-D18-YO5.40", // 3505
-		"5b2_2060", // 3489
-		"hYPY_Suisho3_1000k", // 3484
-		"emmg_Suisho3_D17", // 3482
-		"3be_n005_1060", // 3482
-		"VIVi00", // 3477
-		"10b_n003_1060", // 3469
-		"dts-nnue-0.0", // 3451
-		"amant_VII", // 3446
-		"TEMPVSFVGIT_4", // 3425
-		"afzgnnue005", // 3425
-		"SSFv2", // 3410
-		"Suika-VAIOtypeG", // 3401
-		"Ayame_4t", // 3401
-		"b20_n009_1080Ti", // 3371
-		"elmo_WCSC27_479_4t_10m", // 3366
-		"40b_n006_1050Ti", // 3364
-		"AobaZero_w3129_n_RTX3090x2", // 3357
-		"SSFv1", // 3324
-		"nnn", // 3323
-		"model6apu", // 3313
-		"gikou2_1c", // 3300
-		//"ayame", // 3295
-		//"TEMPVSFVGIT_2", // 3294
-		//"AobaZero_w3190_kld_ave_p704", // 3284
-		//"AobaZero_w2525_n_p800", // 3278
-		//"TY-test_i7_0427", // 3275
-		//"F_f12", // 3271
-		//"AobaZero_w3053_n_p800", // 3261
-		//"F_f8", // 3255
-		//"Krist_483_473stb_1000k", // 3254
-		//"F_f10", // 3252
-		//"WHn3_Suisho3_500k", // 3251
-		//"AobaZero_w2865_n_p800", // 3245
-		//"AobaZero_w2885_n_p800", // 3243
-		//"512x", // 3241
-		//"AobaZero_w2925_n_p800", // 3235
-		//"AobaZero_w3203_n_p800", // 3215
-		//"AobaZero_w3263_n_p800", // 3212
-		//"AobaZero_w3163_n_p800", // 3205
-		//"AobaZero_w2805_n_p800", // 3201
-		//"AobaZero_w3083_n_p800", // 3199
-		//"AobaZero_w3143_n_p800", // 3190
-		//"az_w2305_n_p800_Mate1", // 3189
-		//"F_g1", // 3187
-		//"AobaZero_w2825_n_p800", // 3186
-		//"DLSuisho_FO6.02_MX250", // 3177
-		//"AobaZero_w2245_n_p800", // 3177
-		//"AobaZero_w3133_n_p800", // 3176
-		//"AobaZero_w3183_n_p800", // 3175
-		//"AobaZero_w2665_n_p800", // 3171
-		//"AobaZero_w2565_n_p800", // 3170
-		//"nSRU_Suisho3_D15", // 3167
-		//"AobaZero_w3005_n_p800", // 3167
-		//"AobaZero_w2785_n_p800", // 3166
-		//"TEMPVSFVGIT_3", // 3164
-		//"F_f6", // 3161
-		//"AobaZero_w2945_n_p800", // 3161
-		//"AobaZero_w3043_n_p800", // 3159
-		//"afzgnnue002", // 3156
-		//"F_g2", // 3156
-		//"AisakaTaiga", // 3155
-		//"AobaZero_w3283_n_p800", // 3153
-		//"AobaZero_w2845_n_p800", // 3151
-		//"F_e4", // 3150
-		//"AobaZero_w3393_n_p800", // 3150
-		//"AobaZero_w3333_n_p800", // 3146
-		//"F_f4", // 3143
-		//"AobaZero_w2545_n_p800", // 3139
-		//"AobaZero_w3173_n_p800", // 3138
-		//"AobaZero_w3253_n_p800", // 3135
-		//"AobaZero_w3223_n_p800", // 3133
-		//"AobaZero_w2965_n_p800", // 3132
-		//"AobaZero_w3113_n_p800", // 3131
-		//"AobaZero_w3273_n_p800", // 3131
-		//"F_e33", // 3130
-		//"AobaZero_w3293_n_p800", // 3130
-		//"AobaZero_w3303_n_p800", // 3130
-		//"AobaZero_w3233_n_p800", // 3130
-		//"AobaZero_w3323_n_p800", // 3128
-		//"g001", // 3127
-		//"AobaZero_w2985_n_p800", // 3126
-		//"AobaZero_w3025_n_p800", // 3112
-		//"AobaZero_w3243_n_p800", // 3111
-		//"AobaZero_w3153_n_p800", // 3108
-		//"AobaZero_w3073_n_p800", // 3107
-		//"AobaZero_w3343_n_p800", // 3106
-		//"AobaZero_w3373_n_p800", // 3104
-		//"AobaZero_w2905_n_p800", // 3103
-		//"AobaZero_w3123_n_p800", // 3096
-		//"AobaZero_w3193_n_p800", // 3096
-		//"AobaZero_w3063_n_p800", // 3092
-		//"AobaZero_w3103_n_p800", // 3088
-		//"AobaZero_w3353_n_p800", // 3087
-		//"AobaZero_w3093_n_p800", // 3085
-		//"256x", // 3080
-		//"AobaZero_w3213_n_p800", // 3079
-		//"FukauraOu-MKL-i7-6700HQ", // 3078
-		//"apery_WCSC25_E5-2687W_8t", // 3076
-		//"rezeroX1_cl2_2_YO_tm2_4415Y", // 3073
-		//"AobaZero_w2765_n_p800", // 3071
-		//"AobaZero_w3313_n_p800", // 3060
-		//"TEMPVS_FVGIT_1", // 3040
-		//"maxmove256wwwwww", // 3039
-		//"AobaZero_w2856_n_t4", // 3031
-		//"elmo_WCSC27_479_1000k", // 3029
-		//"AobaZero_w3383_n_p800", // 3026
-		//"Jcus_Suisho3_250k", // 3016
-		//"AobaZero_w2035_n_t4", // 3008
-		//"Genesis1_2_YO_v1_1c", // 2992
-		//"AobaZero_w2289_n_t4", // 2986
-		//"AobaZero_w2705_n_p800", // 2982
-		//"AobaZero_w3086_n_t4", // 2979
-		//"AobaZero_w3028_n_t4", // 2979
-		//"AobaZero_w3363_n_p800", // 2966
-		//"AobaZero_w2077_n_t4", // 2966
-		//"AobaZero_w2462_n_t4", // 2964
-		//"AobaZero_w2681_n_t4", // 2962
-		//"AobaZero_w3317_n_t4", // 2961
-		//"AobaZero_w1819_n_t4", // 2958
-		//"AobaZero_w1944_n_t4", // 2945
-		//"AobaZero_w2515_n_t4", // 2939
-		//"AobaZero_w1993_n_t4", // 2934
-		//"AobaZero_w2762_n_t4", // 2932
-		//"AobaZero_w2943_n_t4", // 2927
-		//"uezero-p05.8", // 2926
-		//"AobaZero_w1854_n_t4", // 2922
-		//"AobaZero_w3333_n_t4", // 2922
-		//"128x", // 2909
-		//"TakeWarabe_i9-9960X", // 2906
-		//"AobaZero_w3296_n_t4", // 2898
-		//"AobaZero_w3175_n_t4", // 2896
-		//"hYPY_Suisho3_D13", // 2895
-		//"AobaZero_w1880_n_t4", // 2893
-		//"YaneuraOuMiniV223_stdbk_16t", // 2884
-		//"AobaZero_w3139_n_t4", // 2877
-		//"AobaZero_w3235_n_t4", // 2876
-		//"Krist_483_473stb_100k", // 2829
-		//"AobaZero_w3351_n_t4", // 2824
-		//"AobaZero_w2515_n_p400_t8", // 2799
-		//"nanashogi", // 2786
-		//"AobaZero_w1537_n_p200_t4", // 2766
-		//"Gikou2_D11", // 2762
-		//"AobaZero_w1671_n_p200_t4", // 2739
-		//"AobaZero_w1618_n_p200_t4", // 2731
-		//"WHn3_Suisho3_D11", // 2730
-		//"AobaZero_192x10b_1207_n_p800", // 2700
-		//"64x", // 2697
-		//"Yss1000k", // 2688
-		//"AobaZero_w1310_n_p200_t4", // 2683
-		//"elmo_WCSC27_479_100k", // 2668
-		//"TEMPVSFVGIT_1", // 2618
-		//"32x", // 2614
-		//"bona6_D10", // 2613
-		//"TakeWarabe_i5-7200U", // 2596
-		//"test4_test", // 2509
-		//"YSS", // 2504
-		//"John", // 2488
-		//"go_test10c", // 2472
-		//"Jcus_Suisho3_D9", // 2449
-		//"frenzy_human", // 2446
-		//"Emily", // 2416
-		//"16x", // 2413
-		//"coduck_pi2_600MHz_1c", // 2247
-		//"8x", // 2218
-		//"AobaZero_w3392_p1", // 2178
-		//"4x", // 2011
-		//"tenuki", // 1967
-		//"2x", // 1836
-		//"komadokun_depth10", // 1833
-		//"komadokun_depth9", // 1792
-		//"1x", // 1766
-		//"Poppo-poppo_WCSC30_Kw", // 1597
-		//"Ino-shishi_WCSC25_Kw", // 1508
-		//"policy_23ver2", // 1430
-		//"Gao-gao_WCSC28_Kw", // 1335
-	};
 
 	struct SfenAndMove {
 		std::string sfen;
@@ -579,6 +105,47 @@ namespace {
 		// MemoryBook::insert()に処理を移譲する。
 		book.insert(sfen, BookMove(Move16(best_move), Move16(next_move), value, depth, num));
 	}
+
+	struct Player {
+		std::string name;
+		int rate;
+	};
+
+	bool ReadStrongPlayers(std::vector<Player>& strong_players) {
+		std::ifstream ifs("players-floodgate.html");
+		if (!ifs) {
+			return false;
+		}
+
+		std::string name;
+		int rate = 0;
+		std::string line;
+		while (std::getline(ifs, line)) {
+			if (line.find("<a id=\"popup") != std::string::npos) {
+				auto left = line.find(">");
+				auto right = line.find("<", left);
+				name = line.substr(left + 1, right - left - 1);
+			}
+			else if (line.find("<span id=\"popup") != std::string::npos) {
+				auto left = line.find(">");
+				auto right = line.find("<", left);
+				auto rate_string = line.substr(left + 2, right - left - 2);
+				// N/A は取り除く
+				if (!std::isdigit(rate_string[0])) {
+					continue;
+				}
+				rate = std::stoi(rate_string);
+
+				strong_players.push_back({ name, rate });
+			}
+		}
+
+		if (strong_players.empty()) {
+			return false;
+		}
+
+		return true;
+	}
 }
 
 bool Tanuki::InitializeBook(USI::OptionsMap& o) {
@@ -597,6 +164,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookBlackMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
 	o[kBookWhiteMinimumValue] << Option(-VALUE_MATE, -VALUE_MATE, VALUE_MATE);
 	o[kBookMinimumCount] << Option(0, 0, INT_MAX);
+	o[kBookMinimumRating] << Option(3300, 0, INT_MAX);
 	return true;
 }
 
@@ -1730,6 +1298,7 @@ bool Tanuki::CreateFromTanukiColiseum()
 bool Tanuki::Create18Book() {
 	std::string csa_folder = Options[kBookCsaFolder];
 	std::string output_book_file = Options[kBookOutputFile];
+	int minimum_rating = Options[kBookMinimumRating];
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -1737,6 +1306,12 @@ bool Tanuki::Create18Book() {
 	output_book.read_book(output_book_file);
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
+
+	std::vector<Player> strong_players;
+	if (!ReadStrongPlayers(strong_players)) {
+		sync_cout << "Failed to read the player list." << sync_endl;
+		return false;
+	}
 
 	int num_records = 0;
 	for (const std::filesystem::directory_entry& entry :
@@ -1747,9 +1322,14 @@ bool Tanuki::Create18Book() {
 			continue;
 		}
 
-		if (std::count_if(kStrongPlayers.begin(), kStrongPlayers.end(),
-			[&file_path](const auto& strong_player) {
-				return file_path.string().find("+" + strong_player + "+") != std::string::npos;
+		if (std::count_if(strong_players.begin(), strong_players.end(),
+			[&file_path, minimum_rating](const auto& strong_player) {
+				// レーティングが低いソフトの棋譜は使用しない。
+				if (strong_player.rate < minimum_rating) {
+					return false;
+				}
+
+				return file_path.string().find("+" + strong_player.name + "+") != std::string::npos;
 			}) != 2) {
 			// 強いプレイヤー同士の対局でなかったらスキップする。
 			continue;
@@ -1925,7 +1505,9 @@ namespace {
 		return true;
 	}
 
-	void ParseFloodgateCsaFiles(const std::string& csa_folder_path, InternalBook& internal_book) {
+	void ParseFloodgateCsaFiles(const std::string& csa_folder_path,
+		const std::vector<Player>& strong_players, int minimum_rating,
+		InternalBook& internal_book) {
 		int num_records = 0;
 		for (const std::filesystem::directory_entry& entry :
 			std::filesystem::recursive_directory_iterator(csa_folder_path)) {
@@ -1935,9 +1517,14 @@ namespace {
 				continue;
 			}
 
-			if (std::count_if(kStrongPlayers.begin(), kStrongPlayers.end(),
-				[&file_path](const auto& strong_player) {
-					return file_path.string().find("+" + strong_player + "+") != std::string::npos;
+			if (std::count_if(strong_players.begin(), strong_players.end(),
+				[&file_path, minimum_rating](const auto& strong_player) {
+					// レーティングが低いソフトの棋譜は使用しない。
+					if (strong_player.rate < minimum_rating) {
+						return false;
+					}
+
+					return file_path.string().find("+" + strong_player.name + "+") != std::string::npos;
 				}) != 2) {
 				// 強いプレイヤー同士の対局でなかったらスキップする。
 				continue;
@@ -2354,6 +1941,7 @@ bool Tanuki::CreateTayayanBook() {
 	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
 	std::string output_book_file = Options[kBookOutputFile];
 	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
+	int minimum_rating = Options[kBookMinimumRating];
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2362,8 +1950,14 @@ bool Tanuki::CreateTayayanBook() {
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
+	std::vector<Player> strong_players;
+	if (!ReadStrongPlayers(strong_players)) {
+		sync_cout << "Failed to read the player list." << sync_endl;
+		return false;
+	}
+
 	InternalBook internal_book;
-	ParseFloodgateCsaFiles(csa_folder, internal_book);
+	ParseFloodgateCsaFiles(csa_folder, strong_players, minimum_rating, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
 
 	for (auto& [sfen_and_best16, book_move] : internal_book) {
@@ -2403,6 +1997,7 @@ bool Tanuki::CreateTayayanBook2() {
 	int black_minimum_value = Options[kBookBlackMinimumValue];
 	int white_minimum_value = Options[kBookWhiteMinimumValue];
 	int minimum_count = Options[kBookMinimumCount];
+	int minimum_rating = Options[kBookMinimumRating];
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2411,8 +2006,14 @@ bool Tanuki::CreateTayayanBook2() {
 	sync_cout << "done..." << sync_endl;
 	sync_cout << "|output_book|=" << output_book.get_body().size() << sync_endl;
 
+	std::vector<Player> strong_players;
+	if (!ReadStrongPlayers(strong_players)) {
+		sync_cout << "Failed to read the player list." << sync_endl;
+		return false;
+	}
+
 	InternalBook internal_book;
-	ParseFloodgateCsaFiles(csa_folder, internal_book);
+	ParseFloodgateCsaFiles(csa_folder, strong_players, minimum_rating, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
 	RemoveBadMove(internal_book);
 	RemoveBadMove2(csa_folder, internal_book);
