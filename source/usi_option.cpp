@@ -183,7 +183,7 @@ namespace USI {
 		o["LargePageEnable"] << Option(true);
 #endif
 
-		o["EvalScalePercetage"] << Option(100, 0, 100, [](const Option& o) {
+		o["EvalScalePercentage"] << Option(100, 0, 100, [](const Option& o) {
 			Eval::eval_scale_percentage = static_cast<int>(o);
 			});
 
