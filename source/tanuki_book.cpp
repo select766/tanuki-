@@ -1438,7 +1438,7 @@ namespace {
 		// 評価値が付いていた指し手の数
 		int num_values = 0;
 	};
-	using InternalBook = std::map<std::pair<std::string, u16 /* Move16 */>, InternalBookMove>;
+	using InternalBook = std::map<std::string, std::map<u16 /* Move16 */, InternalBookMove>>;
 
 	bool ReadCsaFile(const std::string& file_path, std::vector<Move>& moves, bool& toryo, int& winner_offset) {
 		auto& pos = Threads[0]->rootPos;
@@ -1558,7 +1558,7 @@ namespace {
 					break;
 				}
 
-				auto& internal_book_move = internal_book[std::make_pair(pos.sfen(), static_cast<u16>(move))];
+				auto& internal_book_move = internal_book[pos.sfen()][static_cast<u16>(move)];
 				internal_book_move.move = move;
 				internal_book_move.ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
 				if (play % 2 == winner_offset) {
@@ -1837,7 +1837,7 @@ namespace {
 						break;
 					}
 
-					auto& internal_book_move = internal_book[std::make_pair(position.sfen(), move.best)];
+					auto& internal_book_move = internal_book[position.sfen()][move.best];
 					internal_book_move.move = move.best;
 					internal_book_move.ponder = move.next;
 					if (play % 2 == winner) {
@@ -1871,15 +1871,25 @@ namespace {
 	void RemoveBadMove(InternalBook& internal_book) {
 		sync_cout << "RemoveBadMove()" << sync_endl;
 		for (auto& [sfen, move_string] : BadMoves) {
-			u16 move16 = USI::to_move16(move_string).to_u16();
-			auto bad_move = std::make_pair(sfen, move16);
-			auto book_move_iterator = internal_book.find(bad_move);
-			if (book_move_iterator == internal_book.end()) {
-				sync_cout << "Falied to remove a bad move sfen=" << sfen << " move=" << move_string << sync_endl;
+			auto it = internal_book.find(sfen);
+			if (it == internal_book.end()) {
+				sync_cout << "Falied to remove a bad move. Position was not found. sfen=" << sfen << " move=" << move_string << sync_endl;
 				continue;
 			}
 
-			internal_book.erase(book_move_iterator);
+			u16 move16 = USI::to_move16(move_string).to_u16();
+			auto jt = it->second.find(move16);
+			if (jt == it->second.end()) {
+				sync_cout << "Falied to remove a bad move. Move was not found. sfen=" << sfen << " move=" << move_string << sync_endl;
+				continue;
+			}
+
+			it->second.erase(jt);
+
+			if (it->second.empty()) {
+				internal_book.erase(it);
+			}
+
 			sync_cout << "Removed a bad move. sfen=" << sfen << " move=" << move_string << sync_endl;
 		}
 	}
@@ -1912,14 +1922,25 @@ namespace {
 			u16 move16 = moves[target_play - 1];
 			std::string move_string = USI::move({ moves[target_play - 1] });
 			std::string sfen = pos.sfen();
-			auto bad_move = std::make_pair(sfen, move16);
-			auto book_move_iterator = internal_book.find(bad_move);
-			if (book_move_iterator == internal_book.end()) {
-				sync_cout << "Falied to remove a bad move sfen=" << sfen << " move=" << move_string << sync_endl;
+
+			auto it = internal_book.find(sfen);
+			if (it == internal_book.end()) {
+				sync_cout << "Falied to remove a bad move. Position was not found. sfen=" << sfen << " move=" << move_string << sync_endl;
 				continue;
 			}
 
-			internal_book.erase(book_move_iterator);
+			auto jt = it->second.find(move16);
+			if (jt == it->second.end()) {
+				sync_cout << "Falied to remove a bad move. Move was not found. sfen=" << sfen << " move=" << move_string << sync_endl;
+				continue;
+			}
+
+			it->second.erase(jt);
+
+			if (it->second.empty()) {
+				internal_book.erase(it);
+			}
+
 			sync_cout << "Removed a bad move. sfen=" << sfen << " move=" << move_string << sync_endl;
 		}
 	}
@@ -1933,7 +1954,7 @@ namespace {
 		for (auto& [sfen, move_string] : GoodMoves) {
 			Move16 move16 = USI::to_move16(move_string);
 
-			auto& internal_book_move = internal_book[std::make_pair(sfen, move16.to_u16())];
+			auto& internal_book_move = internal_book[sfen][move16.to_u16()];
 			internal_book_move.move = move16;
 			internal_book_move.ponder = Move::MOVE_NONE;
 			++internal_book_move.num_win;
@@ -1965,28 +1986,29 @@ bool Tanuki::CreateTayayanBook() {
 	ParseFloodgateCsaFiles(csa_folder, strong_players, minimum_rating, internal_book);
 	ParseTanukiColiseumResultFiles(tanuki_coliseum_log_folder, internal_book);
 
-	for (auto& [sfen_and_best16, book_move] : internal_book) {
-		const auto& sfen = sfen_and_best16.first;
-		auto move = book_move.move;
-		auto ponder = book_move.ponder;
-		int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
-		int count = book_move.num_win + book_move.num_lose;
+	for (auto& [sfen, best16_to_book_move] : internal_book) {
+		for (auto& [best16, book_move] : best16_to_book_move) {
+			auto move = book_move.move;
+			auto ponder = book_move.ponder;
+			int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+			int count = book_move.num_win + book_move.num_lose;
 
-		// book_move.num_win / count < minimum_winning_percentage / 100
-		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
-			continue;
+			// book_move.num_win / count < minimum_winning_percentage / 100
+			if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+				continue;
+			}
+
+			auto& position = Threads[0]->rootPos;
+			StateInfo state_info;
+			position.set(sfen, &state_info, Threads[0]);
+			auto move32 = position.to_move(move);
+			if (!position.pseudo_legal(move32) || !position.legal(move32)) {
+				sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
+				continue;
+			}
+
+			output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 		}
-
-		auto& position = Threads[0]->rootPos;
-		StateInfo state_info;
-		position.set(sfen, &state_info, Threads[0]);
-		auto move32 = position.to_move(move);
-		if (!position.pseudo_legal(move32) || !position.legal(move32)) {
-			sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
-			continue;
-		}
-
-		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 	}
 
 	WriteBook(output_book, output_book_file);
@@ -2023,41 +2045,42 @@ bool Tanuki::CreateTayayanBook2() {
 	RemoveBadMove(internal_book);
 	RemoveBadMove2(csa_folder, internal_book);
 
-	for (auto& [sfen_and_best16, book_move] : internal_book) {
-		const auto& sfen = sfen_and_best16.first;
-		auto move = book_move.move;
-		auto ponder = book_move.ponder;
-		int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
-		int count = book_move.num_win + book_move.num_lose;
-		auto color = (sfen.find(" b ") != std::string::npos ? BLACK : WHITE);
+	for (auto& [sfen, best16_to_book_move] : internal_book) {
+		for (auto& [best16, book_move] : best16_to_book_move) {
+			auto move = book_move.move;
+			auto ponder = book_move.ponder;
+			int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+			int count = book_move.num_win + book_move.num_lose;
+			auto color = (sfen.find(" b ") != std::string::npos ? BLACK : WHITE);
 
-		// 勝率が一定値以下の指し手を削除する。
-		// book_move.num_win / count < minimum_winning_percentage / 100
-		if (book_move.num_win * 100 < minimum_winning_percentage * count) {
-			continue;
+			// 勝率が一定値以下の指し手を削除する。
+			// book_move.num_win / count < minimum_winning_percentage / 100
+			if (book_move.num_win * 100 < minimum_winning_percentage * count) {
+				continue;
+			}
+
+			// 評価値が一定値以下の指し手を削除する。
+			// TODO(hnoda): book_move.num_values に修正する。
+			if (count > 0 && ((color == BLACK && value < black_minimum_value) || (color == WHITE && value < white_minimum_value))) {
+				continue;
+			}
+
+			// 出現回数が一定値以下の指し手を削除する。
+			if (count < minimum_count) {
+				continue;
+			}
+
+			auto& position = Threads[0]->rootPos;
+			StateInfo state_info;
+			position.set(sfen, &state_info, Threads[0]);
+			auto move32 = position.to_move(move);
+			if (!position.pseudo_legal(move32) || !position.legal(move32)) {
+				sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
+				continue;
+			}
+
+			output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 		}
-
-		// 評価値が一定値以下の指し手を削除する。
-		// TODO(hnoda): book_move.num_values に修正する。
-		if (count > 0 && ((color == BLACK && value < black_minimum_value) || (color == WHITE && value < white_minimum_value))) {
-			continue;
-		}
-
-		// 出現回数が一定値以下の指し手を削除する。
-		if (count < minimum_count) {
-			continue;
-		}
-
-		auto& position = Threads[0]->rootPos;
-		StateInfo state_info;
-		position.set(sfen, &state_info, Threads[0]);
-		auto move32 = position.to_move(move);
-		if (!position.pseudo_legal(move32) || !position.legal(move32)) {
-			sync_cout << "Illegal move. sfen=" << position.sfen() << " move=" << move32 << sync_endl;
-			continue;
-		}
-
-		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 	}
 
 	WriteBook(output_book, output_book_file);
