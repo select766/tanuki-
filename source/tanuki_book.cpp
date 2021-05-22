@@ -2057,7 +2057,7 @@ bool Tanuki::CreateTayayanBook2() {
 			continue;
 		}
 
-		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count, book_move.num_win, 0));
+		output_book.insert(sfen, Book::BookMove(move, ponder, value, 0, count));
 	}
 
 	WriteBook(output_book, output_book_file);
