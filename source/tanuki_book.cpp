@@ -1960,6 +1960,61 @@ namespace {
 			++internal_book_move.num_win;
 		}
 	}
+
+	void ReadInternalBook(const std::string& file_path, InternalBook& internal_book) {
+		sync_cout << "ReadInternalBook(): file_path=" << file_path << sync_endl;
+		int counter = 0;
+		std::ifstream ifs(file_path);
+		std::string sfen;
+		while (std::getline(ifs, sfen)) {
+			if (++counter % 10000 == 0) {
+				sync_cout << counter << "/" << internal_book.size() << sync_endl;
+			}
+
+			int num_book_moves;
+			ifs >> num_book_moves;
+
+			for (int book_move_index = 0; book_move_index < num_book_moves; ++book_move_index) {
+				u16 move16;
+				u16 ponder16;
+				int num_win;
+				int num_lose;
+				s64 sum_values;
+				int num_values;
+				ifs >> move16 >> ponder16 >> num_win >> num_lose >> sum_values >> num_values;
+				internal_book[sfen][move16] = { move16, ponder16, num_win, num_lose, sum_values, num_values };
+			}
+
+			// 末尾の改行を読む
+			std::string _;
+			std::getline(ifs, _);
+		}
+		sync_cout << "done." << sync_endl;
+	}
+
+	void WriteInternalBook(const std::string& file_path, const InternalBook& internal_book) {
+		sync_cout << "WriteInternalBook(): file_path=" << file_path << sync_endl;
+		int counter = 0;
+		std::ofstream ofs(file_path);
+		for (const auto& [sfen, move16_to_book_move] : internal_book) {
+			if (++counter % 10000 == 0) {
+				sync_cout << counter << "/" << internal_book.size() << sync_endl;
+			}
+
+			ofs << sfen << std::endl;
+			ofs << move16_to_book_move.size() << std::endl;
+			for (const auto& [move16, book_move] : move16_to_book_move) {
+				ofs
+					<< book_move.move.to_u16() << " "
+					<< book_move.ponder.to_u16() << " "
+					<< book_move.num_win << " "
+					<< book_move.num_lose << " "
+					<< book_move.sum_values << " "
+					<< book_move.num_values << std::endl;
+			}
+		}
+		sync_cout << "done." << sync_endl;
+	}
 }
 
 bool Tanuki::CreateTayayanBook() {
@@ -2084,6 +2139,24 @@ bool Tanuki::CreateTayayanBook2() {
 	}
 
 	WriteBook(output_book, output_book_file);
+
+	return true;
+}
+
+bool Tanuki::CreateInternalBookFromFloodgateRecords() {
+	std::string csa_folder = Options[kBookCsaFolder];
+	std::string output_book_file = Options[kBookOutputFile];
+	int minimum_rating = Options[kBookMinimumRating];
+
+	std::vector<Player> strong_players;
+	if (!ReadStrongPlayers(strong_players)) {
+		sync_cout << "Failed to read the player list." << sync_endl;
+		return false;
+	}
+
+	InternalBook internal_book;
+	ParseFloodgateCsaFiles(csa_folder, strong_players, minimum_rating, internal_book);
+	WriteInternalBook("book\\" + output_book_file, internal_book);
 
 	return true;
 }
