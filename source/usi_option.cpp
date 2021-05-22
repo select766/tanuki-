@@ -73,7 +73,11 @@ namespace USI {
 		#endif // defined(FOR_TOURNAMENT)
 	#endif // defined(USE_EVAL_HASH)
 
+		// ponderの有無
 		o["USI_Ponder"] << Option(false);
+
+		// 確率的ponder , defaultでfalseにしとかないと、読み筋の表示がおかしくなって、初心者混乱する。
+		o["Stochastic_Ponder"] << USI::Option(false);
 
 		// その局面での上位N個の候補手を調べる機能
 		o["MultiPV"] << Option(1, 1, 800);
@@ -343,7 +347,7 @@ namespace USI {
 	// このとき、Optionのhandlerとidxは書き換えない。
 	void build_option(string line)
 	{
-		LineScanner scanner(line);
+		Parser::LineScanner scanner(line);
 		if (scanner.get_text() != "option") return;
 
 		string name, value, option_type;

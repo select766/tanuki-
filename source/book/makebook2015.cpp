@@ -1,6 +1,6 @@
 ﻿#include "../config.h"
 
-#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
+#if defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))
 
 #include "book.h"
 #include "../position.h"
@@ -244,7 +244,7 @@ namespace Book
 			if (! bw_files)
 			{
 				vector<string> tmp_sfens;
-				FileOperator::ReadAllLines(sfen_file_name[0], tmp_sfens);
+				SystemIO::ReadAllLines(sfen_file_name[0], tmp_sfens);
 
 				// こちらは先後、どちらの手番でも解析対象とするのでCOLOR_NBを指定しておく。
 				for (auto& sfen : tmp_sfens)
@@ -263,7 +263,7 @@ namespace Book
 						continue;
 
 					vector<string> tmp_sfens;
-					FileOperator::ReadAllLines(filename, tmp_sfens);
+					SystemIO::ReadAllLines(filename, tmp_sfens);
 					for (auto& sfen : tmp_sfens)
 						sfens.push_back(SfenAndColor(sfen, c));
 				}
@@ -653,5 +653,4 @@ namespace Book
 
 } // namespace Book
 
-#endif // defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
-
+#endif // defined(YANEURAOU_ENGINE) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))

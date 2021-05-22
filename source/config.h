@@ -8,7 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-#define ENGINE_VERSION "6.02"
+#define ENGINE_VERSION "6.03"
 
 // --------------------
 //  思考エンジンの種類
@@ -498,10 +498,16 @@ constexpr int MAX_PLY_NUM = 246;
 	#define USE_MATE_DFPN
 	#define USE_PIECE_VALUE
 	#define ENABLE_TEST_CMD
+
 	// 勝率の集計を行う型としてdouble型を用いる。
 	#define WIN_TYPE_DOUBLE
 
-	//#define ASSERT_LV 3
+	// ふかうら王ではEVAL_LEARNみたいなのがない(実装していない)ので
+	// 定跡生成関係のコマンドは常にオンにしておく。
+	#define ENABLE_MAKEBOOK_CMD
+	#define USE_SFEN_PACKER
+
+	 //#define ASSERT_LV 3
 #endif
 
 // --- tanuki-詰将棋エンジンとして実行ファイルを公開するとき用の設定集

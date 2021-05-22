@@ -1,6 +1,6 @@
 ﻿#include "../config.h"
 
-#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
+#if defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))
 
 #include "book.h"
 #include "../position.h"
@@ -23,8 +23,10 @@ namespace Book
 	// 定跡生成コマンド2019年度版。makebook2019.cppで定義されている。テラショック定跡手法。
 	int makebook2019(Position& pos, istringstream& is, const string& token);
 
+#if defined(YANEURAOU_ENGINE_DEEP)
 	// 定跡生成コマンド2021年度版。makebook2021.cppで定義されている。MCTSによる生成。
 	int makebook2021(Position& pos, istringstream& is, const string& token);
+#endif
 
 	// ---------------------------------------------------------------------------------------------
 
@@ -33,8 +35,8 @@ namespace Book
 	void makebook_cmd(Position& pos, istringstream& is)
 	{
 		// makebookコマンドは、ほとんどがEVAL_LEARNが有効でないと使えないので、丸ごと使えないようにしておく。
-#if !(defined(EVAL_LEARN) && defined(YANEURAOU_ENGINE))
-		cout << "Error!:define EVAL_LEARN and YANEURAOU_ENGINE" << endl;
+#if ! (defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP)))
+		cout << "Error!:define EVAL_LEARN and (YANEURAOU_ENGINE or YANEUROU_ENGINE_DEEP)" << endl;
 		return;
 #endif
 
@@ -65,9 +67,11 @@ namespace Book
 		if (makebook2019(pos, is, token))
 			return;
 
+#if defined(YANEURAOU_ENGINE_DEEP)
 		// 2021年に作ったmakebook拡張コマンド
 		if (makebook2021(pos, is, token))
 			return;
+#endif
 
 		// いずれのコマンドも処理しなかったので、使用方法を出力しておく。
 
@@ -84,4 +88,5 @@ namespace Book
 
 } // namespace Book
 
-#endif // defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
+#endif // defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))
+

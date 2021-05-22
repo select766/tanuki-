@@ -84,8 +84,9 @@ void USI::extra_option(USI::OptionsMap& o)
     o["C_init_root"]                 << USI::Option(116, 0, 500);
     o["C_base_root"]                 << USI::Option(25617, 10000, 100000);
 
-    o["Softmax_Temperature"]         << USI::Option(174, 1, 500);
 #endif
+	// 探索のSoftmaxの温度
+	o["Softmax_Temperature"]		 << USI::Option( 1740 /* 方策分布を学習させた場合、1400から1500ぐらいが最適値らしいが… */ , 1, 5000);
 
 	// 各GPU用のDNNモデル名と、そのGPU用のUCT探索のスレッド数と、そのGPUに一度に何個の局面をまとめて評価(推論)を行わせるのか。
 	// GPUは最大で8個まで扱える。
@@ -133,11 +134,12 @@ void USI::extra_option(USI::OptionsMap& o)
     //(*this)["Const_Playout"]               = USIOption(0, 0, INT_MAX);
 	// →　Playout数固定。これはNodeLimitでできるので不要。
 
-	// leaf nodeでの奇数手詰めルーチンを呼び出す時の手数
-	o["MateSearchPly"]               << USI::Option(5, 0, 255);
+	// → leaf nodeではdf-pnに変更。
+	// 探索ノード数の上限値を設定する。0 : 呼び出さない。
+	o["LeafDfpnNodesLimit"]			<< USI::Option(40, 0, 10000);
 
 	// root nodeでのdf-pn詰将棋探索の最大ノード数
-	o["RootMateSearchNodesLimit"]    << USI::Option(1000000, 0, UINT32_MAX);
+	o["RootMateSearchNodesLimit"]	<< USI::Option(1000000, 0, UINT32_MAX);
 }
 
 // "isready"コマンドに対する初回応答
@@ -198,7 +200,7 @@ void Search::clear()
 	}
 
 	// ※　InitGPU()に先だってSetMateLimits()でのmate solverの初期化が必要。この呼出をInitGPU()のあとにしないこと！
-	searcher.SetMateLimits((int)Options["MaxMovesToDraw"] , (u32)Options["RootMateSearchNodesLimit"] , (int)Options["MateSearchPly"]);
+	searcher.SetMateLimits((int)Options["MaxMovesToDraw"] , (u32)Options["RootMateSearchNodesLimit"] , (u32)Options["LeafDfpnNodesLimit"] /*Options["MateSearchPly"]*/);
 	searcher.InitGPU(Eval::dlshogi::ModelPaths , thread_nums, policy_value_batch_maxsizes);
 
 	// その他、dlshogiにはあるけど、サポートしないもの。
@@ -216,13 +218,15 @@ void Search::clear()
 	search_options.c_init_root          =                Options["C_init_root"         ] / 100.0f;
 	search_options.c_base_root          = (NodeCountType)Options["C_base_root"         ];
 
-	set_softmax_temperature(options["Softmax_Temperature"] / 100.0f);
 #endif
 
 	// softmaxの時のボルツマン温度設定
-	// これは、dlshogiの"Softmax_Temperature"の値。(174)
-	// 決め打ちでいいと思う。
-	Eval::dlshogi::set_softmax_temperature( 174 / 100.0f);
+	// これは、dlshogiの"Softmax_Temperature"の値。(1740) = 1.740
+	// ※ dlshogiは100分率で指定する。ふかうら王では1000分率で指定する。
+	// hcpe3から学習させたmodelの場合、1.40～1.50ぐらいにしないといけない。
+	// cf. https://tadaoyamaoka.hatenablog.com/entry/2021/04/05/215431
+
+	Eval::dlshogi::set_softmax_temperature(Options["Softmax_Temperature"] / 1000.0f);
 
 	searcher.SetDrawValue(
 		(int)Options["DrawValueBlack"],

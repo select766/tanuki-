@@ -85,7 +85,7 @@ void mate_cmd(Position& pos, istream& is);
 // ----------------------------------
 
 // 定跡を作るコマンド
-#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
+#if defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))
 namespace Book { extern void makebook_cmd(Position& pos, istringstream& is); }
 #endif
 
@@ -493,6 +493,9 @@ void position_cmd(Position& pos, istringstream& is , StateListPtr& states)
 	// やねうら王では、ここに保存しておくことになっている。
 	Threads.main()->game_root_sfen = sfen;
 	Threads.main()->moves_from_game_root = std::move(moves_from_game_root);
+
+	// 盤面を設定しなおしたのでこのフラグはfalseに。
+	Threads.main()->position_is_dirty = false;
 }
 
 // "setoption"コマンド応答。
@@ -546,7 +549,8 @@ void getoption_cmd(istringstream& is)
 
 // go()は、思考エンジンがUSIコマンドの"go"を受け取ったときに呼び出される。
 // この関数は、入力文字列から思考時間とその他のパラメーターをセットし、探索を開始する。
-void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
+// ignore_ponder : これがtrueなら、"ponder"という文字を無視する。
+void go_cmd(const Position& pos, istringstream& is , StateListPtr& states , bool ignore_ponder = false) {
 
 	// "isready"コマンド受信前に"go"コマンドが呼び出されている。
 	if (!USI::load_eval_finished)
@@ -558,6 +562,19 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 	Search::LimitsType limits;
 	string token;
 	bool ponderMode = false;
+
+	auto main_thread = Threads.main();
+	if (!states)
+	{
+		// 前回から"position"コマンドを処理せずに再度goが呼び出された。
+		// 前回、ponderでStochastic Ponderのために局面を壊してしまっている可能性があるので復元しておく。
+		// (これがStochastic Ponderの一番簡単な実装)
+		// Stochastic Ponderのために局面を2手前に戻して、そのあと現在の局面に対するコマンド("d"など)を実行すると
+		// それは2手前の局面が表示されるが、それは仕様であるものとする。(これを修正するとプログラムのフローが複雑になる)
+		istringstream iss(main_thread->last_position_cmd_string);
+		iss >> token; // "position"
+		position_cmd(*const_cast<Position*>(&pos), iss, states);
+	}
 
 	// 思考開始時刻の初期化。なるべく早い段階でこれをしておかないとサーバー時間との誤差が大きくなる。
 	Time.reset();
@@ -661,7 +678,21 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states) {
 		else if (token == "infinite")	limits.infinite = 1;
 
 		// ponderモードでの思考。
-		else if (token == "ponder")		ponderMode = true;
+		else if (token == "ponder" && !ignore_ponder) {
+			ponderMode = true;
+
+			if (Options["Stochastic_Ponder"] && main_thread->moves_from_game_root.size() >= 1)
+			{
+				// 1手前の局面(相手番)に戻して、ponderとして思考する。
+				// Threads.main()->moves_from_game_root に保存されているので大丈夫。
+
+				auto m = main_thread->moves_from_game_root.back();
+				main_thread->moves_from_game_root.pop_back();
+				const_cast<Position*>(&pos)->undo_move(m);
+				states->pop_back();
+				main_thread->position_is_dirty = true;
+			}
+		}
 	}
 
 	// goコマンド、デバッグ時に使うが、そのときに"go btime XXX wtime XXX byoyomi XXX"と毎回入力するのが面倒なので
@@ -718,6 +749,7 @@ void search_cmd(Position& pos, istringstream& is)
 void USI::loop(int argc, char* argv[])
 {
 	// 探索開始局面(root)を格納するPositionクラス
+	// "position"コマンドで設定された局面が格納されている。
 	Position pos;
 
 	string cmd, token;
@@ -733,7 +765,7 @@ void USI::loop(int argc, char* argv[])
 	if (argc >= 3 && string(argv[1]) == "file")
 	{
 		vector<string> cmds0;
-		FileOperator::ReadAllLines(argv[2], cmds0);
+		SystemIO::ReadAllLines(argv[2], cmds0);
 
 		// queueに変換する。
 		for (auto c : cmds0)
@@ -807,8 +839,29 @@ void USI::loop(int argc, char* argv[])
 
 		} else if (token == "ponderhit")
 		{
-			Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
-			Threads.main()->ponder = false; // 通常探索に切り替える。
+			if (Options["Stochastic_Ponder"])
+			{
+				// Stochastic Ponder hit
+
+				// まず探索スレッドを停止させる。
+				// ただしこの時にbestmoveを返してはならないので、これはSearch::Limits.silentで抑制する。
+				auto org = Search::Limits.silent;
+				Search::Limits.silent = true;
+				Threads.stop = true;
+				// 終了を待機しないとsilentの解除ができない。
+				Threads.main()->wait_for_search_finished();
+				Search::Limits.silent = org;
+
+				// 前回と同様のgoコマンドをそのまま送る。ただし"ponder"の文字は無視する。
+				// last_go_cmd_stringには先頭に"go"の文字があるが、それはgo_cmdのなかで無視されるので気にしなくて良い。
+				istringstream iss(Threads.main()->last_go_cmd_string);
+				go_cmd(pos, iss, states, true);
+			}
+			else {
+				// 通常のponder
+				Time.reset_for_ponderhit(); // ponderhitから計測しなおすべきである。
+				Threads.main()->ponder = false; // 通常探索に切り替える。
+			}
 		}
 
 		// 起動時いきなりこれが飛んでくるので速攻応答しないとタイムアウトになる。
@@ -819,10 +872,16 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "setoption") setoption_cmd(is);
 
 		// 与えられた局面について思考するコマンド
-		else if (token == "go") go_cmd(pos, is , states);
+		else if (token == "go") {
+			Threads.main()->last_go_cmd_string = cmd;       // 保存しておく。
+			go_cmd(pos, is, states);
+		}
 
 		// (思考などに使うための)開始局面(root)を設定する
-		else if (token == "position") position_cmd(pos, is , states);
+		else if (token == "position") {
+			Threads.main()->last_position_cmd_string = cmd; // 保存しておく。
+			position_cmd(pos, is, states);
+		}
 
 		// "usinewgame"はゲーム中にsetoptionなどを送らないことを宣言するためのものだが、
 		// 我々はこれに関知しないので単に無視すれば良い。
@@ -893,6 +952,12 @@ void USI::loop(int argc, char* argv[])
 		// この局面のhash keyの値を出力
 		else if (token == "key") cout << hex << pos.state()->key() << dec << endl;
 
+		// 探索の終了を待機するコマンド("stop"は送らずに。goコマンドの終了を待機できて便利。)
+		else if (token == "wait") Threads.main()->wait_for_search_finished();
+
+		// 一定時間待機するコマンド。("quit"の前に一定時間待ちたい時などに用いる。sleep 1000 == 1秒待つ)
+		else if (token == "sleep") { u64 ms; is >> ms; Tools::sleep(ms); }
+
 #if defined(MATE_1PLY) && defined(LONG_EFFECT_LIBRARY)
 		// この局面での1手詰め判定
 		else if (token == "mate1") cout << pos.mate1ply() << endl;
@@ -903,7 +968,7 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "test") Test::test_cmd(pos, is);
 #endif
 
-#if defined (ENABLE_MAKEBOOK_CMD) && defined(EVAL_LEARN)
+#if defined (ENABLE_MAKEBOOK_CMD) && (defined(EVAL_LEARN) || defined(YANEURAOU_ENGINE_DEEP))
 		// 定跡を作るコマンド
 		else if (token == "makebook") Book::makebook_cmd(pos, is);
 #endif
