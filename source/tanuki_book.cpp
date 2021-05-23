@@ -2202,6 +2202,7 @@ bool Tanuki::CreateUctBook() {
 	std::mt19937_64 mt(random_device());
 
 	for (int match_index = 0; match_index < num_matches; ++match_index) {
+		sync_cout << "Match:" << match_index << "/" << num_matches << sync_endl;
 		std::vector<Move> moves;
 		std::vector<Value> values;
 
@@ -2222,14 +2223,14 @@ bool Tanuki::CreateUctBook() {
 			Move move = Move::MOVE_NONE;
 			Value value = Value::VALUE_NONE;
 
-			sync_cout << "sfen=" << pos.sfen() << sync_endl;
+			//sync_cout << "sfen=" << pos.sfen() << sync_endl;
 
 			// 定跡データベースの指し手を指すかどうか
 			if (std::uniform_int_distribution<>(0, 99)(mt) >= book_ignore_rate) {
 				auto sfen = pos.sfen();
 				auto it = internal_book.find(sfen);
 				if (it != internal_book.end()) {
-					sync_cout << "Selecting a move with the book." << sync_endl;
+					//sync_cout << "Selecting a move with the book." << sync_endl;
 
 					// 全シミュレーション回数を求める
 					int N = 0;
@@ -2245,7 +2246,7 @@ bool Tanuki::CreateUctBook() {
 						double w = internal_book_move.num_win;
 						double n = internal_book_move.num_win + internal_book_move.num_lose;
 						double ucb1 = w / n + ucb1_constant * std::sqrt(std::log(N) / n);
-						sync_cout << "w=" << w << " n=" << n << " ucb1=" << ucb1 << sync_endl;
+						//sync_cout << "w=" << w << " n=" << n << " ucb1=" << ucb1 << sync_endl;
 						if (best_ucb1 < ucb1) {
 							best_ucb1 = ucb1;
 							best_internal_book_move = internal_book_move;
@@ -2266,7 +2267,7 @@ bool Tanuki::CreateUctBook() {
 				go_command += " binc " + std::to_string(inc_ms);
 				go_command += " winc " + std::to_string(inc_ms);
 
-				sync_cout << go_command << sync_endl;
+				//sync_cout << go_command << sync_endl;
 
 				// goコマンドを実行する
 				go_cmd(pos, std::istringstream(go_command), states);
@@ -2392,9 +2393,9 @@ bool Tanuki::CreateUctBook() {
 			pos.do_move(move, states->back());
 			win = !win;
 		}
-	}
 
-	WriteInternalBook("book\\" + output_book_file, internal_book);
+		WriteInternalBook("book\\" + output_book_file, internal_book);
+	}
 
 	return true;
 }
