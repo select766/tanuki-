@@ -21,6 +21,7 @@ namespace Tanuki {
 	bool CreateTayayanBook();
 	bool CreateTayayanBook2();
 	bool CreateInternalBookFromFloodgateRecords();
+	bool CreateUctBook();
 }
 
 #endif

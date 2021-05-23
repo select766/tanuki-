@@ -191,6 +191,8 @@ namespace USI {
 			Eval::eval_scale_percentage = static_cast<int>(o);
 			});
 
+		o["ForceSilent"] << Option(false);
+
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 

@@ -700,6 +700,8 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states , bool
 	if (limits.byoyomi[BLACK] == 0 && limits.inc[BLACK] == 0 && limits.time[BLACK] == 0 && limits.rtime == 0)
 		limits.byoyomi[BLACK] = limits.byoyomi[WHITE] = 1000;
 
+	limits.silent = Options["ForceSilent"];
+
 	Threads.start_thinking(pos, states , limits , ponderMode);
 }
 
@@ -1093,6 +1095,8 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "create_tayayan_book2") Tanuki::CreateTayayanBook2();
 
 		else if (token == "create_internal_book_from_floodgate_records") Tanuki::CreateInternalBookFromFloodgateRecords();
+
+		else if (token == "create_uct_book") Tanuki::CreateUctBook();
 
 		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 
