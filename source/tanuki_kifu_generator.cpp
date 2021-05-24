@@ -276,8 +276,11 @@ void Tanuki::GenerateKifu() {
 			std::vector<Learner::PackedSfenValue> records;
 			Value last_value;
 			int num_multi_pv_move = 0;
-			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
-				pos.DeclarationWin() == MOVE_NONE) {
+			while (
+				pos.game_ply() < kMaxGamePlay &&
+				!pos.is_mated() &&
+				pos.DeclarationWin() == MOVE_NONE &&
+				pos.is_repetition() == RepetitionState::REPETITION_NONE) {
 
 				int multi_pv = 1;
 				if (min_multi_pv_play <= pos.game_ply() &&
@@ -352,27 +355,49 @@ void Tanuki::GenerateKifu() {
 			if (pos.is_mated()) {
 				// 負け
 				// 詰まされた
-				// 最後の局面は相手局面なので勝ち
+				// records.back()は相手局面なので勝ち
 				game_result = GameResultWin;
 			}
 			else if (pos.DeclarationWin() != MOVE_NONE) {
 				// 勝ち
 				// 入玉勝利
-				// 最後の局面は相手局面なので負け
+				// records.back()は相手局面なので負け
 				game_result = GameResultLose;
 				entering_king = 1;
 			}
 			else if (last_value > value_threshold) {
 				// 勝ち
-				// 最後の局面は相手局面なので負け
+				// records.back()は相手局面なので負け
 				game_result = GameResultLose;
 			}
 			else if (last_value < -value_threshold) {
 				// 負け
-				// 最後の局面は相手局面なので勝ち
+				// records.back()は相手局面なので勝ち
+				game_result = GameResultWin;
+			}
+			else if (repetition_state == RepetitionState::REPETITION_WIN) {
+				// 連続王手の千日手による勝ち
+				// records.back()は相手局面なので負け
+				game_result = GameResultLose;
+			}
+			else if (repetition_state == RepetitionState::REPETITION_LOSE) {
+				// 連続王手の千日手による負け
+				// records.back()は相手局面なので勝ち
+				game_result = GameResultWin;
+			}
+			else if (repetition_state == RepetitionState::REPETITION_SUPERIOR) {
+				// 優等局面(盤上の駒が同じで手駒が相手より優れている)
+				// records.back()は相手局面なので負け
+				game_result = GameResultLose;
+			}
+			else if (repetition_state == RepetitionState::REPETITION_INFERIOR) {
+				// 劣等局面(盤上の駒が同じで手駒が相手より優れている)
+				// records.back()は相手局面なので勝ち
 				game_result = GameResultWin;
 			}
 			else {
+				// 引き分け、一定手数に到達した場合は
+				// 学習データに含めない。
 				continue;
 			}
 
