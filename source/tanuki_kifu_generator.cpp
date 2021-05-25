@@ -273,13 +273,19 @@ void Tanuki::GenerateKifu() {
 			RandomMove(pos, state_info, mt19937_64);
 
 			std::vector<Learner::PackedSfenValue> records;
-			Value last_value;
 			int num_multi_pv_move = 0;
 			while (
+				// 一定の手数に達していない
 				pos.game_ply() < kMaxGamePlay &&
+				// 詰まされていない
 				!pos.is_mated() &&
+				// 宣言勝ちができない
 				pos.DeclarationWin() == MOVE_NONE &&
-				pos.is_repetition() == RepetitionState::REPETITION_NONE) {
+				// 千日手による引き分けではない
+				// 優等局面・劣等局面は、対局中に一瞬だけ現れ、その後通常通り対局が進むパターンがあるため、考慮しない
+				pos.is_repetition() != RepetitionState::REPETITION_DRAW &&
+				// 評価値の絶対値が一定値以内
+				(records.empty() || std::abs(records.back().score) < value_threshold)) {
 
 				int multi_pv = 1;
 				if (min_multi_pv_play <= pos.game_ply() &&
@@ -306,16 +312,9 @@ void Tanuki::GenerateKifu() {
 					0, num_valid_moves - 1)(mt19937_64);
 				const auto& root_move = root_moves[selected_move_index];
 				// 選ばれた指し手のスコアをこの局面のスコアとして記録する
-				last_value = root_move.score;
 				const std::vector<Move>& pv = root_move.pv;
 
-				// 評価値の絶対値が閾値を超えたら終了する
-				if (std::abs(last_value) > value_threshold) {
-					break;
-				}
-
 				// 詰みの場合はpvが空になる
-				// 上記の条件があるのでこれはいらないかもしれない
 				if (pv.empty()) {
 					break;
 				}
@@ -329,7 +328,7 @@ void Tanuki::GenerateKifu() {
 
 				Learner::PackedSfenValue record = {};
 				pos.sfen_pack(record.sfen);
-				record.score = last_value;
+				record.score = root_move.score;
 				record.gamePly = pos.game_ply();
 				record.move = pv_move;
 				records.push_back(record);
@@ -341,15 +340,13 @@ void Tanuki::GenerateKifu() {
 				// 手数毎の探索の深さを記録しておく
 				// 何らかの形で勝ちが決まっている局面は
 				// 探索深さが極端に深くなるため除外する
-				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
+				if (measure_depth && abs(root_move.score) < VALUE_KNOWN_WIN) {
 					std::lock_guard<std::mutex> lock(mutex_game_play_to_depths);
 					game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
 				}
 			}
 
 			int game_result = GameResultDraw;
-			Color win;
-			RepetitionState repetition_state = pos.is_repetition(0);
 			u8 entering_king = 0;
 			if (pos.is_mated()) {
 				// 負け
@@ -364,35 +361,15 @@ void Tanuki::GenerateKifu() {
 				game_result = GameResultLose;
 				entering_king = 1;
 			}
-			else if (last_value > value_threshold) {
+			else if (!records.empty() && records.back().score > value_threshold) {
 				// 勝ち
-				// records.back()は相手局面なので負け
-				game_result = GameResultLose;
+				// records.back()は自分の局面なので勝ち
+				game_result = GameResultWin;
 			}
-			else if (last_value < -value_threshold) {
+			else if (!records.empty() && records.back().score < -value_threshold) {
 				// 負け
-				// records.back()は相手局面なので勝ち
-				game_result = GameResultWin;
-			}
-			else if (repetition_state == RepetitionState::REPETITION_WIN) {
-				// 連続王手の千日手による勝ち
-				// records.back()は相手局面なので負け
+				// records.back()は自分の局面なので負け
 				game_result = GameResultLose;
-			}
-			else if (repetition_state == RepetitionState::REPETITION_LOSE) {
-				// 連続王手の千日手による負け
-				// records.back()は相手局面なので勝ち
-				game_result = GameResultWin;
-			}
-			else if (repetition_state == RepetitionState::REPETITION_SUPERIOR) {
-				// 優等局面(盤上の駒が同じで手駒が相手より優れている)
-				// records.back()は相手局面なので負け
-				game_result = GameResultLose;
-			}
-			else if (repetition_state == RepetitionState::REPETITION_INFERIOR) {
-				// 劣等局面(盤上の駒が同じで手駒が相手より優れている)
-				// records.back()は相手局面なので勝ち
-				game_result = GameResultWin;
 			}
 			else {
 				// 引き分け、一定手数に到達した場合は
