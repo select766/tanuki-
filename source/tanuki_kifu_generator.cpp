@@ -266,12 +266,11 @@ void Tanuki::GenerateKifu() {
 
 		while (global_position_index < num_positions) {
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_infos[4096] = {};
-			StateInfo* state = state_infos + 8;
+			StateInfo state_info[1024];
 			Position& pos = thread.rootPos;
-			pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
+			pos.set(start_positions[start_positions_index(mt19937_64)], &state_info[0], &thread);
 
-			RandomMove(pos, state, mt19937_64);
+			RandomMove(pos, state_info, mt19937_64);
 
 			std::vector<Learner::PackedSfenValue> records;
 			Value last_value;
@@ -335,7 +334,7 @@ void Tanuki::GenerateKifu() {
 				record.move = pv_move;
 				records.push_back(record);
 
-				pos.do_move(pv_move, state[pos.game_ply()]);
+				pos.do_move(pv_move, state_info[pos.game_ply()]);
 				// 差分計算のためevaluate()を呼び出す
 				Eval::evaluate(pos);
 
