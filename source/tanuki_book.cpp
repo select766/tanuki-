@@ -60,6 +60,7 @@ namespace {
 	constexpr const char* kBookUctTimeMs = "BookUctTimeMs";
 	constexpr const char* kBookUctIncMs = "BookUctIncMs";
 	constexpr const char* kBookUctNumMatches = "BookUctNumMatches";
+	constexpr const char* kBookUctMaxSearchPerPosition = "BookUctMaxSearchPerPosition";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -176,6 +177,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookUctTimeMs] << Option(15 * 60 * 1000, 0, INT_MAX);
 	o[kBookUctIncMs] << Option(5 * 1000, 0, INT_MAX);
 	o[kBookUctNumMatches] << Option(5 * 1000, 0, INT_MAX);
+	o[kBookUctMaxSearchPerPosition] << Option(3, 0, INT_MAX);
 
 	return true;
 }
@@ -2182,7 +2184,7 @@ bool Tanuki::CreateUctBook() {
 	int inc_ms = Options[kBookUctIncMs];
 	int num_matches = Options[kBookUctNumMatches];
 	int max_moves_to_draw = Options["MaxMovesToDraw"];
-	int book_ignore_rate = Options["BookIgnoreRate"];
+	int max_search_per_position = Options[kBookUctMaxSearchPerPosition];
 	int resign_value = Options["ResignValue"];
 	ASSERT_LV3(max_moves_to_draw > 0);
 
@@ -2192,7 +2194,7 @@ bool Tanuki::CreateUctBook() {
 	sync_cout << "inc_ms=" << inc_ms << sync_endl;
 	sync_cout << "num_matches=" << num_matches << sync_endl;
 	sync_cout << "max_moves_to_draw=" << max_moves_to_draw << sync_endl;
-	sync_cout << "book_ignore_rate=" << book_ignore_rate << sync_endl;
+	sync_cout << "max_search_per_position=" << max_search_per_position << sync_endl;
 	sync_cout << "resign_value=" << resign_value << sync_endl;
 
 	InternalBook internal_book;
@@ -2222,44 +2224,22 @@ bool Tanuki::CreateUctBook() {
 			pos.is_repetition() == RepetitionState::REPETITION_NONE) {
 			Move move = Move::MOVE_NONE;
 			Value value = Value::VALUE_NONE;
+			auto sfen = pos.sfen();
 
 			//sync_cout << "sfen=" << pos.sfen() << sync_endl;
 
-			// 定跡データベースの指し手を指すかどうか
-			if (std::uniform_int_distribution<>(0, 99)(mt) >= book_ignore_rate) {
-				auto sfen = pos.sfen();
-				auto it = internal_book.find(sfen);
-				if (it != internal_book.end()) {
-					//sync_cout << "Selecting a move with the book." << sync_endl;
-
-					// 全シミュレーション回数を求める
-					int N = 0;
-					for (const auto& [best16, internal_book_move] : it->second) {
-						N += internal_book_move.num_win;
-						N += internal_book_move.num_lose;
-					}
-
-					// 最大の UCB1 を求める。
-					double best_ucb1 = 0.0;
-					InternalBookMove best_internal_book_move;
-					for (const auto& [best16, internal_book_move] : it->second) {
-						double w = internal_book_move.num_win;
-						double n = internal_book_move.num_win + internal_book_move.num_lose;
-						double ucb1 = w / n + ucb1_constant * std::sqrt(std::log(N) / n);
-						//sync_cout << "w=" << w << " n=" << n << " ucb1=" << ucb1 << sync_endl;
-						if (best_ucb1 < ucb1) {
-							best_ucb1 = ucb1;
-							best_internal_book_move = internal_book_move;
-						}
-					}
-
-					//その手を指す
-					move = pos.to_move(best_internal_book_move.move);
+			// この局面で探索した回数を調べる。
+			// 探索した場合は、評価値を記録するため、その個数を調べる。
+			int num_searches = 0;
+			if (auto it = internal_book.find(sfen); it != internal_book.end()) {
+				for (const auto& [best16, internal_book_move] : it->second) {
+					num_searches += internal_book_move.num_values;
 				}
 			}
 
-			// 定跡データベースを使用しなかった場合、探索で指し手を決める
-			if (move == Move::MOVE_NONE) {
+			if (num_searches < max_search_per_position){
+				// この局面で探索した回数が一定値以下の場合、探索を行う。
+
 				// goコマンドを生成して実行する
 				std::string go_command = "go";
 				go_command += " btime " + std::to_string(black_time_ms);
@@ -2294,6 +2274,36 @@ bool Tanuki::CreateUctBook() {
 				// 指し手と評価値を保存する
 				move = root_moves[0].pv[0];
 				value = root_moves[0].score;
+			}
+			else {
+				// 定跡の指し手を指す
+				auto it = internal_book.find(sfen);
+				ASSERT_LV3(it != internal_book.end());
+				//sync_cout << "Selecting a move with the book." << sync_endl;
+
+				// 全シミュレーション回数を求める
+				int N = 0;
+				for (const auto& [best16, internal_book_move] : it->second) {
+					N += internal_book_move.num_win;
+					N += internal_book_move.num_lose;
+				}
+
+				// 最大の UCB1 を求める。
+				double best_ucb1 = 0.0;
+				InternalBookMove best_internal_book_move;
+				for (const auto& [best16, internal_book_move] : it->second) {
+					double w = internal_book_move.num_win;
+					double n = internal_book_move.num_win + internal_book_move.num_lose;
+					double ucb1 = w / n + ucb1_constant * std::sqrt(std::log(N) / n);
+					//sync_cout << "w=" << w << " n=" << n << " ucb1=" << ucb1 << sync_endl;
+					if (best_ucb1 < ucb1) {
+						best_ucb1 = ucb1;
+						best_internal_book_move = internal_book_move;
+					}
+				}
+
+				//その手を指す
+				move = pos.to_move(best_internal_book_move.move);
 			}
 
 			moves.push_back(move);
