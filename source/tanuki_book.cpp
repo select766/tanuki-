@@ -2210,7 +2210,10 @@ bool Tanuki::CreateUctBook() {
 
 		Position pos;
 		StateListPtr states(new StateList(1));
-		position_cmd(pos, std::istringstream("startpos"), states);
+		{
+			std::istringstream iss("startpos");
+			position_cmd(pos, iss, states);
+		}
 
 		is_ready();
 
@@ -2250,7 +2253,10 @@ bool Tanuki::CreateUctBook() {
 				//sync_cout << go_command << sync_endl;
 
 				// goコマンドを実行する
-				go_cmd(pos, std::istringstream(go_command), states);
+				{
+					std::istringstream iss(go_command);
+					go_cmd(pos, iss, states);
+				}
 
 				// goコマンドを待機する
 				Threads.main()->wait_for_search_finished();
@@ -2317,7 +2323,10 @@ bool Tanuki::CreateUctBook() {
 				position_command += " ";
 				position_command += to_usi_string(move);
 			}
-			position_cmd(pos, std::istringstream(position_command), states);
+			{
+				std::istringstream iss(position_command);
+				position_cmd(pos, iss, states);
+			}
 		}
 
 		// 終局処理
