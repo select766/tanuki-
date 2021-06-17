@@ -3742,7 +3742,7 @@ namespace Learner
 	// 　search()から戻ったあと、Threads.stop == trueなら、その探索結果を用いてはならない。
 	// 　あと、呼び出し前は、Threads.stop == falseの状態で呼び出さないと、探索を中断して返ってしまうので注意。
 
-	ValueAndPV search(Position& pos, int depth_, size_t multiPV /* = 1 */, u64 nodesLimit /* = 0 */)
+	ValueAndPV search(Position& pos, int depth_, size_t multiPV /* = 1 */, u64 nodesLimit /* = 0 */, bool adjustNodesLimit /* = false */)
 	{
 		std::vector<Move> pvs;
 
