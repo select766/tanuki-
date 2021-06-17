@@ -3782,11 +3782,7 @@ namespace Learner
 		Value delta = -VALUE_INFINITE;
 		Value bestValue = -VALUE_INFINITE;
 
-		while (++rootDepth <= depth
-			// node制限を超えた場合もこのループを抜ける
-			// 探索ノード数は、この関数の引数で渡されている。
-			&& !(nodesLimit /*node制限あり*/ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit)
-			)
+		while (++rootDepth <= depth)
 		{
 			for (RootMove& rm : rootMoves)
 				rm.previousScore = rm.score;
@@ -3851,6 +3847,12 @@ namespace Learner
 			} // multi PV
 
 			completedDepth = rootDepth;
+
+			// node制限を超えた場合もこのループを抜ける
+			// 探索ノード数は、この関数の引数で渡されている。
+			if (nodesLimit /*node制限あり*/ && th->nodes.load(std::memory_order_relaxed) >= nodesLimit) {
+				break;
+			}
 		}
 
 		// このPV、途中でNULL_MOVEの可能性があるかも知れないので排除するためにis_ok()を通す。
