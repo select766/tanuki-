@@ -253,6 +253,7 @@ void Tanuki::GenerateKifu() {
 	ProgressReport progress_report(num_positions, 60 * 60);
 	std::mutex mutex_game_play_to_depths;
 	std::atomic<bool> need_wait = false;
+	std::atomic<int> num_records = 0;
 
 #pragma omp parallel
 	{
@@ -269,6 +270,7 @@ void Tanuki::GenerateKifu() {
 		std::mt19937_64 mt19937_64(start_time + thread_index);
 
 		while (global_position_index < num_positions) {
+			++num_records;
 			Thread& thread = *Threads[thread_index];
 			StateInfo state_info[1024];
 			Position& pos = thread.rootPos;
@@ -430,6 +432,8 @@ void Tanuki::GenerateKifu() {
 		// こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
 		Threads.stop = true;
 	}
+
+	std::cout << "Number of plays per record=" << global_position_index / num_records << std::endl;
 
 	if (measure_depth) {
 		char output_file_path[1024];
