@@ -2200,6 +2200,8 @@ bool Tanuki::CreateUctBook() {
 	InternalBook internal_book;
 	ReadInternalBook("book\\" + output_book_file, internal_book);
 
+	time_t last_save_time_sec = std::time(nullptr);
+
 	std::random_device random_device;
 	std::mt19937_64 mt(random_device());
 
@@ -2413,7 +2415,10 @@ bool Tanuki::CreateUctBook() {
 			win = !win;
 		}
 
-		WriteInternalBook("book\\" + output_book_file, internal_book);
+		if (last_save_time_sec + kSavePerAtMostSec < std::time(nullptr)) {
+			WriteInternalBook("book\\" + output_book_file, internal_book);
+			last_save_time_sec = std::time(nullptr);
+		}
 	}
 
 	return true;
