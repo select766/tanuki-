@@ -40,26 +40,26 @@ namespace {
 		GameResultDraw = 0,
 	};
 
-	constexpr char* kOptionKifuDir = "KifuDir";
-	constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
-	constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
-	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
-	constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
-	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
-	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
-	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
-	constexpr char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
-	constexpr char* kOptionGeneratorRandomMultiPV = "GeneratorRandomMultiPV";
-	constexpr char* kOptionGeneratorMinMultiPVPlay = "GeneratorMinMultiPVPlay";
-	constexpr char* kOptionGeneratorMaxMultiPVPlay = "GeneratorMaxMultiPVPlay";
-	constexpr char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
-	constexpr char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
-	constexpr char* kOptionGeneratorAdjustNodesLimit = "GeneratorAdjustNodesLimit";
-	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
+	constexpr const char* kOptionKifuDir = "KifuDir";
+	constexpr const char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
+	constexpr const char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
+	constexpr const char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
+	constexpr const char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
+	constexpr const char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+	constexpr const char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
+	constexpr const char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
+	constexpr const char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
+	constexpr const char* kOptionGeneratorRandomMultiPV = "GeneratorRandomMultiPV";
+	constexpr const char* kOptionGeneratorMinMultiPVPlay = "GeneratorMinMultiPVPlay";
+	constexpr const char* kOptionGeneratorMaxMultiPVPlay = "GeneratorMaxMultiPVPlay";
+	constexpr const char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
+	constexpr const char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
+	constexpr const char* kOptionGeneratorAdjustNodesLimit = "GeneratorAdjustNodesLimit";
+	constexpr const char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
-	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
+	constexpr const char* kOptionConvertSfenToLearningDataSearchDepth =
 		"ConvertSfenToLearningDataSearchDepth";
-	constexpr char* kOptionConvertSfenToLearningDataOutputFileName =
+	constexpr const char* kOptionConvertSfenToLearningDataOutputFileName =
 		"ConvertSfenToLearningDataOutputFileName";
 
 	std::vector<std::string> start_positions;
