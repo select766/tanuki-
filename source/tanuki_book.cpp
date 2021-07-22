@@ -411,7 +411,7 @@ bool Tanuki::MergeBook() {
 		}
 	}
 
-	for (int input_file_index = 0; input_file_index < input_files.size(); ++input_file_index) {
+	for (int input_file_index = 0; input_file_index < static_cast<int>(input_files.size()); ++input_file_index) {
 		sync_cout << (input_file_index + 1) << " / " << input_files.size() << sync_endl;
 
 		const auto& input_file = input_files[input_file_index];
@@ -874,7 +874,7 @@ namespace {
 		}
 
 		// 登録されている指し手の数が、MultiPVより少ない場合、延長する。
-		return book_moves->size() < multi_pv;
+		return static_cast<int>(book_moves->size()) < multi_pv;
 	}
 }
 
@@ -1291,11 +1291,11 @@ bool Tanuki::CreateFromTanukiColiseum()
 				continue;
 			}
 
-			for (int move_index = winner_offset; move_index < moves.size(); move_index += 2) {
+			for (int move_index = winner_offset; move_index < static_cast<int>(moves.size()); move_index += 2) {
 				const auto& sfen = moves[move_index].first;
 				Move16 best = moves[move_index].second;
 				Move16 next = MOVE_NONE;
-				if (move_index + 1 < moves.size()) {
+				if (move_index + 1 < static_cast<int>(moves.size())) {
 					next = moves[move_index + 1].second;
 				}
 
@@ -1312,7 +1312,7 @@ bool Tanuki::CreateFromTanukiColiseum()
 bool Tanuki::Create18Book() {
 	std::string csa_folder = Options[kBookCsaFolder];
 	std::string output_book_file = Options[kBookOutputFile];
-	int minimum_rating = Options[kBookMinimumRating];
+	int minimum_rating = static_cast<int>(Options[kBookMinimumRating]);
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -1424,10 +1424,10 @@ bool Tanuki::Create18Book() {
 
 		pos.set_hirate(&state_info[0], Threads[0]);
 
-		for (int play = 0; play < moves.size(); ++play) {
+		for (int play = 0; play < static_cast<int>(moves.size()); ++play) {
 			Move move = moves[play];
 			if (play % 2 == winner_offset) {
-				Move ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
+				Move ponder = (play + 1 < static_cast<int>(moves.size())) ? moves[play + 1] : Move::MOVE_NONE;
 				output_book.insert(pos.sfen(), Book::BookMove(move, ponder, 0, 0, 1));
 			}
 			pos.do_move(move, state_info[pos.game_ply()]);
@@ -1565,7 +1565,7 @@ namespace {
 			StateInfo state_info[512];
 			pos.set_hirate(&state_info[0], Threads[0]);
 
-			for (int play = 0; play < moves.size(); ++play) {
+			for (int play = 0; play < static_cast<int>(moves.size()); ++play) {
 				auto move = moves[play];
 				if (!pos.pseudo_legal(move) || !pos.legal(move)) {
 					std::cout << "Illegal move. sfen=" << pos.sfen() << " move=" << move << std::endl;
@@ -1574,7 +1574,7 @@ namespace {
 
 				auto& internal_book_move = internal_book[pos.sfen()][static_cast<u16>(move)];
 				internal_book_move.move = move;
-				internal_book_move.ponder = (play + 1 < moves.size()) ? moves[play + 1] : Move::MOVE_NONE;
+				internal_book_move.ponder = (play + 1 < static_cast<int>(moves.size())) ? moves[play + 1] : Move::MOVE_NONE;
 				if (play % 2 == winner_offset) {
 					++internal_book_move.num_win;
 				}
@@ -1914,7 +1914,7 @@ namespace {
 		std::string url;
 		int target_play;
 		while (ifs >> url >> target_play) {
-			int offset = url.find_last_of("/");
+			int offset = static_cast<int>(url.find_last_of("/"));
 			std::string file_name = url.substr(offset + 1);
 			std::string file_path = csa_folder + "\\wdoor2021\\2021\\" + file_name;
 
@@ -1997,7 +1997,7 @@ namespace {
 				int num_values;
 				ifs >> move_string >> ponder_string >> num_win >> num_lose >> sum_values >> num_values;
 				u16 move16 = USI::to_move16(move_string).to_u16();
-				u16 ponder16 = ponder_string == "none" ? Move::MOVE_NONE : USI::to_move16(ponder_string).to_u16();
+				u16 ponder16 = ponder_string == "none" ? static_cast<u16>(Move::MOVE_NONE) : USI::to_move16(ponder_string).to_u16();
 				internal_book[sfen][move16] = { move16, ponder16, num_win, num_lose, sum_values, num_values };
 			}
 
@@ -2037,8 +2037,8 @@ bool Tanuki::CreateTayayanBook() {
 	std::string csa_folder = Options[kBookCsaFolder];
 	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
 	std::string output_book_file = Options[kBookOutputFile];
-	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
-	int minimum_rating = Options[kBookMinimumRating];
+	int minimum_winning_percentage = static_cast<int>(Options[kBookMinimumWinningPercentage]);
+	int minimum_rating = static_cast<int>(Options[kBookMinimumRating]);
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2061,7 +2061,7 @@ bool Tanuki::CreateTayayanBook() {
 		for (auto& [best16, book_move] : best16_to_book_move) {
 			auto move = book_move.move;
 			auto ponder = book_move.ponder;
-			int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+			int value = book_move.num_values ? static_cast<int>(book_move.sum_values / book_move.num_values) : 0;
 			int count = book_move.num_win + book_move.num_lose;
 
 			// book_move.num_win / count < minimum_winning_percentage / 100
@@ -2091,11 +2091,11 @@ bool Tanuki::CreateTayayanBook2() {
 	std::string csa_folder = Options[kBookCsaFolder];
 	std::string tanuki_coliseum_log_folder = Options[kBookTanukiColiseumLogFolder];
 	std::string output_book_file = Options[kBookOutputFile];
-	int minimum_winning_percentage = Options[kBookMinimumWinningPercentage];
-	int black_minimum_value = Options[kBookBlackMinimumValue];
-	int white_minimum_value = Options[kBookWhiteMinimumValue];
-	int minimum_count = Options[kBookMinimumCount];
-	int minimum_rating = Options[kBookMinimumRating];
+	int minimum_winning_percentage = static_cast<int>(Options[kBookMinimumWinningPercentage]);
+	int black_minimum_value = static_cast<int>(Options[kBookBlackMinimumValue]);
+	int white_minimum_value = static_cast<int>(Options[kBookWhiteMinimumValue]);
+	int minimum_count = static_cast<int>(Options[kBookMinimumCount]);
+	int minimum_rating = static_cast<int>(Options[kBookMinimumRating]);
 
 	MemoryBook output_book;
 	output_book_file = "book/" + output_book_file;
@@ -2120,7 +2120,7 @@ bool Tanuki::CreateTayayanBook2() {
 		for (auto& [best16, book_move] : best16_to_book_move) {
 			auto move = book_move.move;
 			auto ponder = book_move.ponder;
-			int value = book_move.num_values ? (book_move.sum_values / book_move.num_values) : 0;
+			int value = book_move.num_values ? static_cast<int>(book_move.sum_values / book_move.num_values) : 0;
 			int count = book_move.num_win + book_move.num_lose;
 			auto color = (sfen.find(" b ") != std::string::npos ? BLACK : WHITE);
 
@@ -2162,7 +2162,7 @@ bool Tanuki::CreateTayayanBook2() {
 bool Tanuki::CreateInternalBookFromFloodgateRecords() {
 	std::string csa_folder = Options[kBookCsaFolder];
 	std::string output_book_file = Options[kBookOutputFile];
-	int minimum_rating = Options[kBookMinimumRating];
+	int minimum_rating = static_cast<int>(Options[kBookMinimumRating]);
 
 	std::vector<Player> strong_players;
 	if (!ReadStrongPlayers(strong_players)) {
@@ -2180,12 +2180,12 @@ bool Tanuki::CreateInternalBookFromFloodgateRecords() {
 bool Tanuki::CreateUctBook() {
 	std::string output_book_file = Options[kBookOutputFile];
 	double ucb1_constant = std::stof(Options[kBookUctUcb1Constant]);
-	int time_ms = Options[kBookUctTimeMs];
-	int inc_ms = Options[kBookUctIncMs];
-	int num_matches = Options[kBookUctNumMatches];
-	int max_moves_to_draw = Options["MaxMovesToDraw"];
-	int max_search_per_position = Options[kBookUctMaxSearchPerPosition];
-	int resign_value = Options["ResignValue"];
+	int time_ms = static_cast<int>(Options[kBookUctTimeMs]);
+	int inc_ms = static_cast<int>(Options[kBookUctIncMs]);
+	int num_matches = static_cast<int>(Options[kBookUctNumMatches]);
+	int max_moves_to_draw = static_cast<int>(Options["MaxMovesToDraw"]);
+	int max_search_per_position = static_cast<int>(Options[kBookUctMaxSearchPerPosition]);
+	int resign_value = static_cast<int>(Options["ResignValue"]);
 	ASSERT_LV3(max_moves_to_draw > 0);
 
 	sync_cout << "output_book_file=" << output_book_file << sync_endl;
@@ -2268,11 +2268,11 @@ bool Tanuki::CreateUctBook() {
 				if (pos.game_ply() % 2 == 1) {
 					// 先手
 					black_time_ms += inc_ms;
-					black_time_ms -= elapsed;
+					black_time_ms -= static_cast<int>(elapsed);
 				}
 				else {
 					white_time_ms += inc_ms;
-					white_time_ms -= elapsed;
+					white_time_ms -= static_cast<int>(elapsed);
 				}
 
 				// 選ばれた指し手のスコアをこの局面のスコアとして記録する
@@ -2388,13 +2388,13 @@ bool Tanuki::CreateUctBook() {
 		// 定跡データベースに追加していく
 		states.reset(new StateList(1));
 		pos.set_hirate(&states->back(), Threads.main());
-		for (int play = 0; play < moves.size(); ++play) {
+		for (int play = 0; play < static_cast<int>(moves.size()); ++play) {
 			auto sfen = pos.sfen();
 			auto move = moves[play];
 			auto value = values[play];
 			auto& internal_book_move = internal_book[sfen][move];
 			internal_book_move.move = move;
-			if (play + 1 < moves.size()) {
+			if (play + 1 < static_cast<int>(moves.size())) {
 				internal_book_move.ponder = moves[play + 1];
 			}
 
