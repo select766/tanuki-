@@ -85,7 +85,11 @@ LIBS     =
 INCLUDE  = # -I../include
 
 # makeするときにCPPFLAGSを追加で指定したいときはこれを用いる。
-EXTRA_CPPFLAGS = 
+EXTRA_CPPFLAGS =
+
+# evallearnで使用するBLASの種類を指定する。
+BLAS = OPENBLAS
+# BLAS = BLIS
 
 # === implementations ===
 
@@ -185,10 +189,19 @@ endif
 
 # NNUE評価関数 学習バイナリ用 OpenBLAS
 ifeq ($(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)),YANEURAOU_ENGINE_NNUE)
-	BLAS_CPPFLAGS = -DUSE_BLAS
-	BLAS_LDFLAGS = -lopenblas
-	ifeq ($(MSYSTEM),MINGW64)
-		BLAS_CPPFLAGS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+	ifeq ($(BLAS),OPENBLAS)
+		BLAS_CPPFLAGS = -DUSE_BLAS
+		BLAS_LDFLAGS = -lopenblas
+		ifeq ($(MSYSTEM),MINGW64)
+			BLAS_CPPFLAGS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+		endif
+	endif
+
+	ifeq ($(BLAS),BLIS)
+		BLAS_CPPFLAGS = -DUSE_BLAS
+		BLAS_CPPFLAGS += -I$(shell cygpath -aw /usr/local/include/blis)
+		BLAS_LDFLAGS = -lblis.dll
+		BLAS_LDFLAGS += -L$(shell cygpath -aw /usr/local/lib)
 	endif
 endif
 
