@@ -101,6 +101,9 @@ EXTRA_CPPFLAGS =
 # cf.【連載】評価関数を作ってみよう！その1 : http://yaneuraou.yaneu.com/2020/11/17/make-evaluate-function/
 MATERIAL_LEVEL = 1
 
+# evallearnで使用するBLASの種類を指定する。
+BLAS = OPENBLAS
+# BLAS = BLIS
 
 # === implementations ===
 
@@ -212,10 +215,19 @@ endif
 
 # NNUE評価関数 学習バイナリ用 OpenBLAS
 ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
-	BLAS_CPPFLAGS = -DUSE_BLAS
-	BLAS_LDFLAGS = -lopenblas
-	ifeq ($(MSYSTEM),MINGW64)
-		BLAS_CPPFLAGS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+	ifeq ($(BLAS),OPENBLAS)
+		BLAS_CPPFLAGS = -DUSE_BLAS
+		BLAS_LDFLAGS = -lopenblas
+		ifeq ($(MSYSTEM),MINGW64)
+			BLAS_CPPFLAGS += -I$(shell cygpath -aw /mingw64/include/OpenBLAS)
+		endif
+	endif
+
+	ifeq ($(BLAS),BLIS)
+		BLAS_CPPFLAGS = -DUSE_BLAS
+		BLAS_CPPFLAGS += -I$(shell cygpath -aw /usr/local/include/blis)
+		BLAS_LDFLAGS = -lblis.dll
+		BLAS_LDFLAGS += -L$(shell cygpath -aw /usr/local/lib)
 	endif
 endif
 
