@@ -61,6 +61,7 @@ namespace {
 	constexpr const char* kBookUctIncMs = "BookUctIncMs";
 	constexpr const char* kBookUctNumMatches = "BookUctNumMatches";
 	constexpr const char* kBookUctMaxSearchPerPosition = "BookUctMaxSearchPerPosition";
+	constexpr const char* kBookUctRecordFile = "BookUctRecordFile";
 	constexpr int kShowProgressPerAtMostSec = 1 * 60 * 60;	// 1時間
 	constexpr time_t kSavePerAtMostSec = 6 * 60 * 60;		// 6時間
 
@@ -178,6 +179,7 @@ bool Tanuki::InitializeBook(USI::OptionsMap& o) {
 	o[kBookUctIncMs] << Option(5 * 1000, 0, INT_MAX);
 	o[kBookUctNumMatches] << Option(5 * 1000, 0, INT_MAX);
 	o[kBookUctMaxSearchPerPosition] << Option(3, 0, INT_MAX);
+	o[kBookUctRecordFile] << Option("record.sqlite");
 
 	return true;
 }
@@ -1587,7 +1589,7 @@ namespace {
 		}
 	}
 
-	void GetGameIdsAndWinners(sqlite3* database, std::vector<std::pair<int, int>>& game_ids_and_winners) {
+	int GetGameIdsAndWinners(sqlite3* database, std::vector<std::pair<int, int>>& game_ids_and_winners) {
 		sync_cout << "GetGameIdsAndWinners()" << sync_endl;
 
 		sqlite3_stmt* stmt = NULL;
@@ -1596,12 +1598,12 @@ namespace {
 		int result = sqlite3_prepare(database, "SELECT id, winner FROM game ORDER BY id", -1, &stmt, nullptr);
 		if (result != SQLITE_OK) {
 			sync_cout << "Faile to call sqlite3_prepare(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
-			return;
+			return result;
 		}
 
 		if (stmt == nullptr) {
 			// コメント等、有効なSQLステートメントでないと、戻り値はOKだがstmはNULLになる。
-			return;
+			return -1;
 		}
 
 		int num_columns = sqlite3_column_count(stmt);
@@ -1617,6 +1619,7 @@ namespace {
 			}
 			else {
 				sync_cout << "Invalid column name. column_name=" << column_name << sync_endl;
+				return -1;
 			}
 		}
 
@@ -1653,9 +1656,10 @@ namespace {
 
 		if (result == SQLITE_ERROR) {
 			sync_cout << "Faile to call sqlite3_step(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
-			sqlite3_finalize(stmt);
-			return;
+			return result;
 		}
+
+		return SQLITE_OK;
 	}
 
 	u16 to_move16(const std::string& str) {
@@ -1670,9 +1674,10 @@ namespace {
 		u16 next;
 		int value;
 		int book;
+		int depth;
 	};
 
-	void GetRecord(sqlite3* database, std::map<int, std::map<int, InternalMove>>& internal_moves) {
+	int GetRecord(sqlite3* database, std::map<int, std::map<int, InternalMove>>& internal_moves) {
 		sync_cout << "GetRecord()" << sync_endl;
 
 		sqlite3_stmt* stmt = NULL;
@@ -1680,12 +1685,12 @@ namespace {
 		int result = sqlite3_prepare(database, "SELECT game_id, play, best, next, value, book FROM move", -1, &stmt, nullptr);
 		if (result != SQLITE_OK) {
 			sync_cout << "Faile to call sqlite3_prepare(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
-			return;
+			return result;
 		}
 
 		if (stmt == nullptr) {
 			// コメント等、有効なSQLステートメントでないと、戻り値はOKだがstmはNULLになる。
-			return;
+			return -1;
 		}
 
 		int column_game_id = -1;
@@ -1790,9 +1795,10 @@ namespace {
 
 		if (result == SQLITE_ERROR) {
 			sync_cout << "Faile to call sqlite3_step(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
-			sqlite3_finalize(stmt);
-			return;
+			return result;
 		}
+
+		return SQLITE_OK;
 	}
 
 	void ParseTanukiColiseumResultFiles(const std::string& tanuki_coliseum_folder_path, InternalBook& internal_book) {
@@ -1870,6 +1876,333 @@ namespace {
 				}
 			}
 		}
+	}
+
+	int WriteGameIdsAndWinners(sqlite3_stmt* stmt, int game_id, int winner) {
+		int result = 0;
+
+		result = sqlite3_bind_int(stmt, 1, game_id);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 1
+				<< " iValue=" << game_id
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_int(stmt, 2, winner);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 2
+				<< " iValue=" << winner
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_step(stmt);
+		if (result != SQLITE_DONE) {
+			sync_cout << "Failed to execute a statement."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_reset(stmt);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to reset a statement."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_clear_bindings(stmt);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to clear bindings."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		return SQLITE_OK;
+	}
+
+	int WriteMove(sqlite3_stmt* stmt, int game_id, int play, const InternalMove& internal_move) {
+		int result = 0;
+
+		result = sqlite3_bind_int(stmt, 1, game_id);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 1
+				<< " iValue=" << game_id
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_int(stmt, 2, play);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 2
+				<< " iValue=" << play
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_text(stmt, 3, to_usi_string(internal_move.best).c_str(), -1, SQLITE_TRANSIENT);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 3
+				<< " zData=" << to_usi_string(internal_move.best)
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_text(stmt, 4, to_usi_string(internal_move.next).c_str(), -1, SQLITE_TRANSIENT);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 4
+				<< " zData=" << to_usi_string(internal_move.next)
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_int(stmt, 5, internal_move.value);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 5
+				<< " iValue=" << internal_move.value
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_int(stmt, 6, internal_move.depth);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 6
+				<< " iValue=" << internal_move.depth
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_bind_int(stmt, 7, internal_move.book);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to bind a value to a statement."
+				<< " i=" << 7
+				<< " iValue=" << internal_move.book
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_step(stmt);
+		if (result != SQLITE_DONE) {
+			sync_cout << "Failed to execute a statement."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_reset(stmt);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to reset a statement."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_clear_bindings(stmt);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to clear bindings."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		return SQLITE_OK;
+	}
+
+	int WriteRecordToSQLiteBody(sqlite3* database, int winner, const std::vector<InternalMove>& internal_moves) {
+		char* error_message = nullptr;
+		int result = 0;
+		int finalize_result = 0;
+		sqlite3_stmt* stmt = NULL;
+
+		// トランザクションを開始する
+		result = sqlite3_exec(database, "BEGIN", 0, 0, &error_message);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to execute BEGIN."
+				<< " result=" << result
+				<< " error_message=" << error_message
+				<< sync_endl;
+			return result;
+		}
+
+		// テーブルを作成する
+		result = sqlite3_exec(database,
+			"CREATE TABLE IF NOT EXISTS game("
+			"	id INTEGER PRIMARY KEY ASC,"
+			"	winner INTEGER"
+			");", 0, 0, &error_message);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to create the game table."
+				<< " result=" << result
+				<< " error_message=" << error_message
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_exec(database,
+			"CREATE TABLE IF NOT EXISTS move ("
+			"	game_id INTEGER,"
+			"	play INTEGER,"
+			"	best TEXT,"
+			"	next TEXT,"
+			"	value INTEGER,"
+			"	depth INTEGER,"
+			"	book INTEGER"
+			");", 0, 0, &error_message);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to create the game table."
+				<< " result=" << result
+				<< " error_message=" << error_message
+				<< sync_endl;
+			return result;
+		}
+
+		// インデックスの作成
+		result = sqlite3_exec(database,
+			"CREATE INDEX IF NOT EXISTS move_game_id_index ON move ("
+			"	game_id"
+			");", 0, 0, &error_message);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to create the game table."
+				<< " result=" << result
+				<< " error_message=" << error_message
+				<< sync_endl;
+			return result;
+		}
+
+		// すでに記録されている対局の結果を読み込む
+		std::vector<std::pair<int, int>> game_ids_and_winners;
+		result = GetGameIdsAndWinners(database, game_ids_and_winners);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to get ids and winners."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		int last_game_id = 0;
+		for (auto& [game_id, winner] : game_ids_and_winners) {
+			last_game_id = std::max(last_game_id, game_id);
+		}
+
+		int game_id = last_game_id + 1;
+
+		// 対局IDと対局結果の書き込み
+		result = sqlite3_prepare(database,
+			"INSERT INTO game(id, winner)"
+			"VALUES(?, ?)", -1, &stmt, nullptr);
+		if (result != SQLITE_OK || stmt == nullptr) {
+			sync_cout << "Failed to prepare a statement."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		result = WriteGameIdsAndWinners(stmt, game_id, winner);
+
+		finalize_result = sqlite3_finalize(stmt);
+		stmt = nullptr;
+
+		if (result != SQLITE_OK) {
+			// エラーメッセージは表示済み
+			return result;
+		}
+
+		if (finalize_result != SQLITE_OK) {
+			sync_cout << "Failed to finalize a statement."
+				<< " finalize_result=" << finalize_result
+				<< sync_endl;
+			return result;
+		}
+
+		// 棋譜の書き込み
+		for (int play = 0; play < static_cast<int>(internal_moves.size()); ++play) {
+			result = sqlite3_prepare(database,
+				"INSERT INTO move(game_id, play, best, next, value, depth, book)"
+				"VALUES(?, ?, ?, ?, ?, ?, ?)", -1, &stmt, nullptr);
+			if (result != SQLITE_OK || stmt == nullptr) {
+				sync_cout << "Failed to prepare a statement."
+					<< " result=" << result
+					<< sync_endl;
+				return result;
+			}
+
+			result = WriteMove(stmt, game_id, play, internal_moves[play]);
+
+			finalize_result = sqlite3_finalize(stmt);
+			stmt = nullptr;
+
+			if (result != SQLITE_OK) {
+				// エラーメッセージは表示済み
+				return result;
+			}
+
+			if (finalize_result != SQLITE_OK) {
+				sync_cout << "Failed to finalize a statement."
+					<< " finalize_result=" << finalize_result
+					<< sync_endl;
+				return result;
+			}
+		}
+
+		// トランザクションを終了する
+		result = sqlite3_exec(database, "COMMIT", 0, 0, &error_message);
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to execute COMMIT."
+				<< " result=" << result
+				<< " error_message=" << error_message
+				<< sync_endl;
+			return result;
+		}
+
+		result = sqlite3_close(database);
+		database = nullptr;
+		if (result != SQLITE_OK) {
+			sync_cout << "Failed to close a databse."
+				<< " result=" << result
+				<< sync_endl;
+			return result;
+		}
+
+		return result;
+	}
+
+	bool WriteRecordToSQLite(const std::string& record_file, int winner, const std::vector<InternalMove>& internal_moves) {
+		// SQLiteデータベースへの棋譜の保存
+		sqlite3* database = nullptr;
+		int result = 0;
+
+		result = sqlite3_open(record_file.c_str(), &database);
+		if (result == SQLITE_OK) {
+			result = WriteRecordToSQLiteBody(database, winner, internal_moves);
+		} else {
+			sync_cout << "Failed to open an sqlite file."
+				<< " record_file=" << record_file
+				<< sync_endl;
+		}
+
+		sqlite3_close(database);
+		database = nullptr;
+		return result == SQLITE_OK;
 	}
 
 	using BadMove = std::pair<std::string, std::string>;
@@ -2186,6 +2519,7 @@ bool Tanuki::CreateUctBook() {
 	int max_moves_to_draw = static_cast<int>(Options["MaxMovesToDraw"]);
 	int max_search_per_position = static_cast<int>(Options[kBookUctMaxSearchPerPosition]);
 	int resign_value = static_cast<int>(Options["ResignValue"]);
+	std::string record_file = Options[kBookUctRecordFile];
 	ASSERT_LV3(max_moves_to_draw > 0);
 
 	sync_cout << "output_book_file=" << output_book_file << sync_endl;
@@ -2207,8 +2541,7 @@ bool Tanuki::CreateUctBook() {
 
 	for (int match_index = 0; match_index < num_matches; ++match_index) {
 		sync_cout << "Match:" << match_index << "/" << num_matches << sync_endl;
-		std::vector<Move> moves;
-		std::vector<Value> values;
+		std::vector<InternalMove> internal_moves;
 
 		Position pos;
 		StateListPtr states(new StateList(1));
@@ -2225,10 +2558,12 @@ bool Tanuki::CreateUctBook() {
 		while (pos.game_ply() < max_moves_to_draw &&
 			!pos.is_mated() &&
 			pos.DeclarationWin() == MOVE_NONE &&
-			(values.empty() || values.back() == Value::VALUE_NONE || std::abs(values.back()) < resign_value) &&
+			(internal_moves.empty() || internal_moves.back().value == Value::VALUE_NONE || std::abs(internal_moves.back().value) < resign_value) &&
 			pos.is_repetition() == RepetitionState::REPETITION_NONE) {
-			Move move = Move::MOVE_NONE;
-			Value value = Value::VALUE_NONE;
+			InternalMove internal_move = {};
+			internal_move.best = Move::MOVE_NONE;
+			internal_move.next = Move::MOVE_NONE;
+			internal_move.value = Value::VALUE_NONE;
 			auto sfen = pos.sfen();
 
 			//sync_cout << "sfen=" << pos.sfen() << sync_endl;
@@ -2277,11 +2612,16 @@ bool Tanuki::CreateUctBook() {
 
 				// 選ばれた指し手のスコアをこの局面のスコアとして記録する
 				// 終局している場合はmated_in(0)が代入されている。
-				const auto& root_moves = pos.this_thread()->rootMoves;
+				const auto& root_moves = Threads.main()->rootMoves;
 
 				// 指し手と評価値を保存する
-				move = root_moves[0].pv[0];
-				value = root_moves[0].score;
+				internal_move.best = root_moves[0].pv[0];
+				if (root_moves[0].pv.size() > 1) {
+					internal_move.next = root_moves[0].pv[1];
+				}
+				internal_move.value = root_moves[0].score;
+				internal_move.depth = Threads.get_best_thread()->completedDepth;
+				internal_move.book = 0;
 			}
 			else {
 				// 定跡の指し手を指す
@@ -2311,19 +2651,22 @@ bool Tanuki::CreateUctBook() {
 				}
 
 				//その手を指す
-				move = pos.to_move(best_internal_book_move.move);
+				internal_move.best = best_internal_book_move.move.to_u16();
+				internal_move.next = best_internal_book_move.ponder.to_u16();
+				internal_move.value = Value::VALUE_NONE;
+				internal_move.book = 1;
+				internal_move.depth = 0;
 			}
 
-			moves.push_back(move);
-			values.push_back(value);
+			internal_moves.push_back(internal_move);
 
 			std::string position_command = "startpos";
-			if (!moves.empty()) {
+			if (!internal_moves.empty()) {
 				position_command += " moves";
 			}
-			for (auto move : moves) {
+			for (auto move : internal_moves) {
 				position_command += " ";
-				position_command += to_usi_string(move);
+				position_command += to_usi_string(move.best);
 			}
 			{
 				std::istringstream iss(position_command);
@@ -2345,11 +2688,11 @@ bool Tanuki::CreateUctBook() {
 			// 入玉勝利
 			current_player_is_win = true;
 		}
-		else if (!values.empty() && values.back() >= resign_value) {
+		else if (!internal_moves.empty() && internal_moves.back().value >= resign_value) {
 			// 勝ち
 			current_player_is_win = false;
 		}
-		else if (!values.empty() && values.back() <= -resign_value) {
+		else if (!internal_moves.empty() && internal_moves.back().value <= -resign_value) {
 			// 負け
 			current_player_is_win = true;
 		}
@@ -2381,21 +2724,21 @@ bool Tanuki::CreateUctBook() {
 
 		// 先手が勝ったかどうか
 		bool win = current_player_is_win;
-		if (moves.size() % 2 == 1) {
+		if (internal_moves.size() % 2 == 1) {
 			win = !win;
 		}
 
 		// 定跡データベースに追加していく
 		states.reset(new StateList(1));
 		pos.set_hirate(&states->back(), Threads.main());
-		for (int play = 0; play < static_cast<int>(moves.size()); ++play) {
+		for (int play = 0; play < static_cast<int>(internal_moves.size()); ++play) {
 			auto sfen = pos.sfen();
-			auto move = moves[play];
-			auto value = values[play];
+			auto move = internal_moves[play].best;
+			auto value = internal_moves[play].value;
 			auto& internal_book_move = internal_book[sfen][move];
 			internal_book_move.move = move;
-			if (play + 1 < static_cast<int>(moves.size())) {
-				internal_book_move.ponder = moves[play + 1];
+			if (play + 1 < static_cast<int>(internal_moves.size())) {
+				internal_book_move.ponder = internal_moves[play + 1].best;
 			}
 
 			if (win) {
@@ -2411,7 +2754,7 @@ bool Tanuki::CreateUctBook() {
 			}
 
 			states->emplace_back();
-			pos.do_move(move, states->back());
+			pos.do_move(pos.to_move(move), states->back());
 			win = !win;
 		}
 
@@ -2419,6 +2762,8 @@ bool Tanuki::CreateUctBook() {
 			WriteInternalBook("book\\" + output_book_file, internal_book);
 			last_save_time_sec = std::time(nullptr);
 		}
+
+		WriteRecordToSQLite(record_file, win ? 0 : 1, internal_moves);
 	}
 
 	return true;
