@@ -1682,7 +1682,7 @@ namespace {
 
 		sqlite3_stmt* stmt = NULL;
 
-		int result = sqlite3_prepare(database, "SELECT game_id, play, best, next, value, book FROM move", -1, &stmt, nullptr);
+		int result = sqlite3_prepare(database, "SELECT game_id, play, best, next, value, book, depth FROM move", -1, &stmt, nullptr);
 		if (result != SQLITE_OK) {
 			sync_cout << "Faile to call sqlite3_prepare(). errmsg=" << sqlite3_errmsg(database) << sync_endl;
 			return result;
@@ -1699,6 +1699,7 @@ namespace {
 		int column_next = -1;
 		int column_value = -1;
 		int column_book = -1;
+		int column_depth = -1;
 		int num_columns = sqlite3_column_count(stmt);
 		for (int column = 0; column < num_columns; ++column) {
 			std::string column_name = sqlite3_column_name(stmt, column);
@@ -1720,6 +1721,9 @@ namespace {
 			else if (column_name == "book") {
 				column_book = column;
 			}
+			else if (column_name == "depth") {
+				column_depth = column;
+			}
 			else {
 				sync_cout << "Invalid column name. column_name=" << column_name << sync_endl;
 			}
@@ -1733,6 +1737,7 @@ namespace {
 			std::string next;
 			int value = Value::VALUE_NONE;
 			int book = -1;
+			int depth = 0;
 			for (int column = 0; column < num_columns; ++column) {
 				if (column_game_id == column) {
 					game_id = sqlite3_column_int(stmt, column);
@@ -1751,6 +1756,9 @@ namespace {
 				}
 				else if (column_book == column) {
 					book = sqlite3_column_int(stmt, column);
+				}
+				else if (column_depth == column) {
+					depth = sqlite3_column_int(stmt, column);
 				}
 				else {
 					sync_cout << "Invalid column. column=" << column << sync_endl;
@@ -1787,7 +1795,7 @@ namespace {
 				continue;
 			}
 
-			internal_moves[game_id][play] = { to_move16(best), to_move16(next), value, book, };
+			internal_moves[game_id][play] = { to_move16(best), to_move16(next), value, book, depth };
 		}
 
 		sqlite3_finalize(stmt);
