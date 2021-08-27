@@ -234,7 +234,7 @@ endif
 CPPFLAGS += -DNO_EXCEPTIONS
 LDFLAGS += -lpthread
 LDFLAGS += -v
-LDFLAGS += -lsqlite3
+LDFLAGS += -lsqlite3.dll -L$(shell cygpath -aw /usr/lib)
 
 OBJDIR   = ../obj
 ifeq "$(strip $(OBJDIR))" ""
