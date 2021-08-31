@@ -1550,9 +1550,6 @@ struct LearnerThink: public MultiThink
 	// trueだとフォルダを掘らない。
 	bool save_only_once;
 
-	// 学習データの評価値に掛ける係数
-	double training_data_score_scale;
-
 	// --- lossの計算
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
@@ -1940,9 +1937,6 @@ void LearnerThink::thread_worker(size_t thread_id)
 			stop_flag = true;
 			break;
 		}
-
-		// 評価値をスケールする。
-		ps.score = static_cast<s16>(ps.score * training_data_score_scale);
 
 		// 評価値が学習対象の値を超えている。
 		// この局面情報を無視する。
@@ -2628,9 +2622,6 @@ void learn(Position&, istringstream& is)
 
 	string validation_set_file_name;
 
-	// 学習データの評価値に掛ける係数
-	double training_data_score_scale = 1.0;
-
 	// ファイル名が後ろにずらずらと書かれていると仮定している。
 	while (true)
 	{
@@ -2707,13 +2698,10 @@ void learn(Position&, istringstream& is)
 		else if (option == "loss_output_interval") is >> loss_output_interval;
 		else if (option == "mirror_percentage") is >> mirror_percentage;
 		else if (option == "validation_set_file_name") is >> validation_set_file_name;
-
+		
 		// 雑巾のconvert関連
 		else if (option == "convert_plain") use_convert_plain = true;
 		else if (option == "convert_bin") use_convert_bin = true;
-
-		else if (option == "training_data_score_scale") is >> training_data_score_scale;
-
 		// さもなくば、それはファイル名である。
 		else
 			filenames.push_back(option);
@@ -2832,8 +2820,6 @@ void learn(Position&, istringstream& is)
 	cout << "eval_save_interval  : " << eval_save_interval << " sfens" << endl;
 	cout << "loss_output_interval: " << loss_output_interval << " sfens" << endl;
 
-	cout << "training_data_score_scale: " << training_data_score_scale << endl;
-
 #if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
 	cout << "freeze_kk/kkp/kpp      : " << freeze[0] << " , " << freeze[1] << " , " << freeze[2] << endl;
 #endif
@@ -2919,8 +2905,6 @@ void learn(Position&, istringstream& is)
 		cout << "initial loss: " << learn_think.best_loss << endl;
 	}
 #endif
-
-	learn_think.training_data_score_scale = training_data_score_scale;
 
 	// -----------------------------------
 	//   評価関数パラメーターの学習の開始
