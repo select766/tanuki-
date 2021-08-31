@@ -274,9 +274,6 @@
     <ClInclude Include="eval\nnue\trainer\features\factorizer_half_kpe9.h">
       <Filter>リソース ファイル\eval\nnue\trainer\features</Filter>
     </ClInclude>
-    <ClInclude Include="eval\nnue\features\pe9.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
     <ClInclude Include="tanuki_book.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
@@ -303,39 +300,6 @@
     </ClInclude>
     <ClInclude Include="tanuki_filesystem.h">
       <Filter>リソース ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\a.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_ka.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_relative_ka.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\trainer\features\factorizer_half_ka.h">
-      <Filter>リソース ファイル\eval\nnue\trainer\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\architectures\halfka_256x2-32-32.h">
-      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_kv.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\half_relative_kv.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\features\v.h">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\trainer\features\factorizer_half_kv.h">
-      <Filter>リソース ファイル\eval\nnue\trainer\features</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\architectures\halfkp-halfkv_256x2-32-32.h">
-      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
-    </ClInclude>
-    <ClInclude Include="eval\nnue\architectures\halfka-halfkv_256x2-32-32.h">
-      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
     </ClInclude>
     <ClInclude Include="book\apery_book.h">
       <Filter>リソース ファイル\book</Filter>
@@ -533,24 +497,6 @@
     </ClCompile>
     <ClCompile Include="tanuki_filesystem.cpp">
       <Filter>リソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\a.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_ka.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_relative_ka.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_kv.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\half_relative_kv.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
-    </ClCompile>
-    <ClCompile Include="eval\nnue\features\v.cpp">
-      <Filter>リソース ファイル\eval\nnue\features</Filter>
     </ClCompile>
     <ClCompile Include="book\apery_book.cpp">
       <Filter>リソース ファイル\book</Filter>

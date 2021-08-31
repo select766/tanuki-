@@ -19,46 +19,13 @@
 #include "evaluate_nnue.h"
 #include "evaluate_nnue_learner.h"
 #include "trainer/features/factorizer_feature_set.h"
-
-#if defined(EVAL_NNUE_HALFKP256)
-
-// 標準NNUE型。NNUE評価関数のデフォルトは、halfKP256
-
-#include "trainer/features/factorizer_half_kp.h"
-
-#elif defined(EVAL_NNUE_KP256)
-
-// KP256型
-
-#elif defined(EVAL_NNUE_HALFKPE9)
-
-// halfKPE9型
+#if defined(EVAL_NNUE_HALFKPE9)
+// halfKPE9の時用のfactorizer
 #include "trainer/features/factorizer_half_kpe9.h"
-
-#elif defined(EVAL_NNUE_HALFKA256)
-
-// halfKA型
-#include "trainer/features/factorizer_half_ka.h"
-
-#elif defined(EVAL_NNUE_HALFKP_HALFKV256)
-
-// halfKP-halfKV型
-#include "trainer/features/factorizer_half_kp.h"
-#include "trainer/features/factorizer_half_kv.h"
-
-#elif defined(EVAL_NNUE_HALFKA_HALFKV256)
-
-// halfKA-halfKV型
-#include "trainer/features/factorizer_half_ka.h"
-#include "trainer/features/factorizer_half_kv.h"
-
 #else
-
-// どれも定義されていなかったので標準NNUE型にしておく。
+// 通常のNNUEのときのfactorizer
 #include "trainer/features/factorizer_half_kp.h"
-
 #endif
-
 #include "trainer/trainer_feature_transformer.h"
 #include "trainer/trainer_input_slice.h"
 #include "trainer/trainer_affine_transform.h"

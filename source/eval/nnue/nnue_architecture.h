@@ -27,21 +27,6 @@
 // halfKPE9型
 #include "architectures/halfkpe9_256x2-32-32.h"
 
-#elif defined(EVAL_NNUE_HALFKA256)
-
-// halfKA型
-#include "architectures/halfka_256x2-32-32.h"
-
-#elif defined(EVAL_NNUE_HALFKP_HALFKV256)
-
-// halfKP-halfKV型
-#include "architectures/halfkp-halfkv_256x2-32-32.h"
-
-#elif defined(EVAL_NNUE_HALFKA_HALFKV256)
-
-// halfKA-halfKV型
-#include "architectures/halfka-halfkv_256x2-32-32.h"
-
 #else
 
 // どれも定義されていなかったので標準NNUE型にしておく。

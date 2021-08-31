@@ -12,9 +12,6 @@
 # YANEURAOU_ENGINE_NNUE          : NNUE型評価関数(halfKP256),標準NNUE型
 # YANEURAOU_ENGINE_NNUE_KP256    : NNUE型評価関数(KP256)
 # YANEURAOU_ENGINE_NNUE_HALFKPE9 : NNUE型評価関数(halfKPE9)
-# YANEURAOU_ENGINE_NNUE_HALFKA256 : NNUE型評価関数(halfKA)
-# YANEURAOU_ENGINE_NNUE_HALFKP_HALFKV256 : NNUE型評価関数(halfKP-halfKV-256)
-# YANEURAOU_ENGINE_NNUE_HALFKA_HALFKV256 : NNUE型評価関数(halfKA-halfKV-256)
 # YANEURAOU_ENGINE_KPPT          : KPPT型評価関数
 # YANEURAOU_ENGINE_KPP_KKPT      : KPP_KKPT型評価関数
 # YANEURAOU_ENGINE_MATERIAL      : 駒得のみの評価関数(複数変種あり。MATERIAL_LEVELで選択できる)
@@ -25,9 +22,6 @@
 YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_KP256
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKPE9
-#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKA256
-#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKP_HALFKV256
-#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKA_HALFKV256
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPP_KKPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIAL
@@ -378,15 +372,6 @@ ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKPE9)
 			CPPFLAGS += -DEVAL_NNUE_HALFKPE9
 
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKA256)
-		CPPFLAGS += -DEVAL_NNUE_HALFKA256
-
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKP_HALFKV256)
-		CPPFLAGS += -DEVAL_NNUE_HALFKP_HALFKV256
-
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKA_HALFKV256)
-		CPPFLAGS += -DEVAL_NNUE_HALFKA_HALFKV256
-
 		endif
 	endif
 
@@ -395,18 +380,12 @@ ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
 		eval/nnue/evaluate_nnue.cpp                                     \
 		eval/nnue/evaluate_nnue_learner.cpp                             \
 		eval/nnue/nnue_test_command.cpp                                 \
-		eval/nnue/features/a.cpp                                        \
 		eval/nnue/features/k.cpp                                        \
 		eval/nnue/features/p.cpp                                        \
-		eval/nnue/features/half_ka.cpp                                  \
 		eval/nnue/features/half_kp.cpp                                  \
-		eval/nnue/features/half_kv.cpp                                  \
-		eval/nnue/features/half_relative_ka.cpp                         \
 		eval/nnue/features/half_relative_kp.cpp                         \
-		eval/nnue/features/half_relative_kv.cpp                         \
 		eval/nnue/features/half_kpe9.cpp                                \
 		eval/nnue/features/pe9.cpp                                      \
-		eval/nnue/features/v.cpp										\
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 endif
 

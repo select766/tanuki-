@@ -459,8 +459,6 @@ constexpr int MAX_PLY_NUM = 246;
 		// EVAL_NNUE_HALFKP256  : 標準NNUE型(評価関数ファイル60MB程度)
 		// EVAL_NNUE_KP256      : KP256(評価関数1MB未満)
 		// EVAL_NNUE_HALFKPE9   : 標準NNUE型のおよそ9倍(540MB程度)
-		// EVAL_NNUE_HALFKA256  : HalfKA256x2-32-32
-		// EVAL_NNUE_HALFKAV256 : HalfKAV256x2-32-32
 
 		 //#undef EVAL_NNUE_KP256
 		 //#define EVAL_NNUE_HALFKPE9
@@ -468,10 +466,7 @@ constexpr int MAX_PLY_NUM = 246;
 		// #define EVAL_NNUE_HALFKP256
 		// #define EVAL_NNUE_KP256
 		// #define EVAL_NNUE_HALFKPE9
-		// #define EVAL_NNUE_HALFKA256
-		// #define EVAL_NNUE_HALFKP_HALFKV256
-		// #define EVAL_NNUE_HALFKA_HALFKV256
-#endif
+	#endif
 
 #endif // defined(YANEURAOU_ENGINE_KPPT) || ...
 
