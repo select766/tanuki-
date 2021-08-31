@@ -197,9 +197,6 @@ namespace Eval {
 		fe_end2 = e_king + SQ_NB, // 玉も含めた末尾の番号。
 
 		// 末尾は評価関数の性質によって異なるので、BONA_PIECE_NBを定義するわけにはいかない。
-
-		// 空きマスを含める場合
-		fe_end3 = fe_end2 + SQ_NB,
 	};
 
 	// BonaPieceの内容を表示する。手駒ならH,盤上の駒なら升目。例) HP3 (3枚目の手駒の歩)
