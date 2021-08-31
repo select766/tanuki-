@@ -14,10 +14,6 @@ using std::string;
 // Option設定が格納されたglobal object。
 USI::OptionsMap Options;
 
-namespace Eval {
-	extern int eval_scale_percentage;
-}
-
 namespace USI {
 
 	// --- やねうら王独自拡張分の前方宣言
@@ -188,10 +184,6 @@ namespace USI {
 		// 不公平になるため、無効化する方法が必要であった。
 		o["LargePageEnable"] << Option(true);
 #endif
-
-		o["EvalScalePercentage"] << Option(100, 0, 100, [](const Option& o) {
-			Eval::eval_scale_percentage = static_cast<int>(o);
-			});
 
 		o["ForceSilent"] << Option(false);
 

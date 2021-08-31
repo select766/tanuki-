@@ -18,7 +18,6 @@
 #include "evaluate_nnue.h"
 
 namespace Eval {
-	int eval_scale_percentage = 100;
 
     namespace NNUE {
 
@@ -268,7 +267,7 @@ namespace Eval {
     Value evaluate(const Position& pos) {
         const auto& accumulator = pos.state()->accumulator;
         if (accumulator.computed_score) {
-            return accumulator.score * eval_scale_percentage / 100;
+            return accumulator.score;
         }
 
 #if defined(USE_GLOBAL_OPTIONS)
@@ -276,7 +275,7 @@ namespace Eval {
         // eval hashへの照会をskipする。
         if (!GlobalOptions.use_eval_hash) {
             ASSERT_LV5(pos.state()->materialValue == Eval::material(pos));
-            return NNUE::ComputeScore(pos) * eval_scale_percentage / 100;
+            return NNUE::ComputeScore(pos);
         }
 #endif
 
@@ -300,7 +299,7 @@ namespace Eval {
         *g_evalTable[key] = entry;
 #endif
 
-        return score * eval_scale_percentage / 100;
+        return score;
     }
 
     // 差分計算ができるなら進める
