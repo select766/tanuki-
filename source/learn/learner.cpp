@@ -1226,7 +1226,7 @@ struct SfenReader
 		}
 	}
 
-	void read_validation_set(const string file_name, int eval_limit)
+	void read_validation_set(const string file_name, int eval_limit, bool force_learn_entering_king)
 	{
 		ifstream fs(file_name, ios::binary);
 
@@ -1235,8 +1235,12 @@ struct SfenReader
 			PackedSfenValue p;
 			if (fs.read((char*)&p, sizeof(PackedSfenValue)))
 			{
-				if (eval_limit < abs(p.score) || abs(p.score) == VALUE_SUPERIOR)
-					continue;
+				if (eval_limit < abs(p.score) || abs(p.score) == VALUE_SUPERIOR) {
+					// 入玉将棋の棋譜を強制的に学習データ含める。
+					if (!(force_learn_entering_king && p.entering_king)) {
+						continue;
+					}
+				}
 #if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
 				if (p.game_result == 0)
 					continue;
@@ -1545,6 +1549,9 @@ struct LearnerThink: public MultiThink
 
 	// 教師局面の深い探索の評価値の絶対値がこの値を超えていたらその教師局面を捨てる。
 	int eval_limit;
+
+	// 入玉将棋の棋譜を強制的に学習データ含める。
+	bool force_learn_entering_king;
 
 	// 評価関数の保存するときに都度フォルダを掘るかのフラグ。
 	// trueだとフォルダを掘らない。
@@ -1940,8 +1947,12 @@ void LearnerThink::thread_worker(size_t thread_id)
 
 		// 評価値が学習対象の値を超えている。
 		// この局面情報を無視する。
-		if (eval_limit < abs(ps.score) || abs(ps.score) == VALUE_SUPERIOR)
-			goto RetryRead;
+		if (eval_limit < abs(ps.score) || abs(ps.score) == VALUE_SUPERIOR) {
+			// 入玉将棋の棋譜を強制的に学習データ含める。
+			if (!(force_learn_entering_king && ps.entering_king)) {
+				goto RetryRead;
+			}
+		}
 
 #if !defined (LEARN_GENSFEN_USE_DRAW_RESULT)
 		if (ps.game_result == 0)
@@ -2582,6 +2593,9 @@ void learn(Position&, istringstream& is)
 	// 教師局面の深い探索での評価値の絶対値が、この値を超えていたらその局面は捨てる。
 	int eval_limit = 32000;
 
+	// 入玉将棋の棋譜を強制的に学習データ含める。
+	bool force_learn_entering_king = false;
+
 	// 評価関数ファイルの保存は終了間際の1回に限定するかのフラグ。
 	bool save_only_once = false;
 
@@ -2683,6 +2697,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "output_file_name") is >> output_file_name;
 
 		else if (option == "eval_limit") is >> eval_limit;
+		else if (option == "force_learn_entering_king") is >> force_learn_entering_king;
 		else if (option == "save_only_once") save_only_once = true;
 		else if (option == "no_shuffle") no_shuffle = true;
 
@@ -2776,6 +2791,7 @@ void learn(Position&, istringstream& is)
 
 	cout << "loop              : " << loop << endl;
 	cout << "eval_limit        : " << eval_limit << endl;
+	cout << "force_learn_entering_king : " << force_learn_entering_king << endl;
 	cout << "save_only_once    : " << (save_only_once ? "true" : "false") << endl;
 	cout << "no_shuffle        : " << (no_shuffle ? "true" : "false") << endl;
 
@@ -2865,6 +2881,7 @@ void learn(Position&, istringstream& is)
 	// その他、オプション設定を反映させる。
 	learn_think.discount_rate = discount_rate;
 	learn_think.eval_limit = eval_limit;
+	learn_think.force_learn_entering_king = force_learn_entering_king;
 	learn_think.save_only_once = save_only_once;
 	learn_think.sr.no_shuffle = no_shuffle;
 	learn_think.freeze = freeze;
@@ -2891,7 +2908,7 @@ void learn(Position&, istringstream& is)
 	} else {
 		// base_dirの指定を"validation_set_file_name"オプションにも反映させるべきか..
 		//validation_set_file_name = Path::Combine(base_dir, validation_set_file_name);
-		sr.read_validation_set(validation_set_file_name, eval_limit);
+		sr.read_validation_set(validation_set_file_name, eval_limit, force_learn_entering_king);
 	}
 
 	// この時点で一度rmseを計算(0 sfenのタイミング)
