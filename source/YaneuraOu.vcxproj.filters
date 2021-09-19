@@ -352,6 +352,9 @@
     <ClInclude Include="sqlite\sqlite3ext.h">
       <Filter>リソース ファイル\sqlite</Filter>
     </ClInclude>
+    <ClInclude Include="testcmd\unit_test.h">
+      <Filter>リソース ファイル\testcmd</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -578,6 +581,9 @@
     </ClCompile>
     <ClCompile Include="sqlite\sqlite3.c">
       <Filter>リソース ファイル\sqlite</Filter>
+    </ClCompile>
+    <ClCompile Include="testcmd\unit_test.cpp">
+      <Filter>リソース ファイル\testcmd</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

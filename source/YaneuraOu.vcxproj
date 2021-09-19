@@ -678,6 +678,7 @@
     <ClInclude Include="sqlite\sqlite3.h" />
     <ClInclude Include="sqlite\sqlite3ext.h" />
     <ClInclude Include="tanuki_filesystem.h" />
+    <ClInclude Include="testcmd\unit_test.h" />
     <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="tanuki_analysis.h" />
     <ClInclude Include="tanuki_book.h" />
@@ -762,6 +763,7 @@
     <ClCompile Include="tanuki_kifu_writer.cpp" />
     <ClCompile Include="tanuki_progress.cpp" />
     <ClCompile Include="tanuki_progress_report.cpp" />
+    <ClCompile Include="testcmd\unit_test.cpp" />
     <ClCompile Include="timeman.cpp" />
     <ClCompile Include="types.cpp" />
     <ClCompile Include="position.cpp" />
