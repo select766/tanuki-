@@ -230,7 +230,7 @@ namespace Eval {
         if (!Options["SkipLoadingEval"])
 #endif
         {
-            auto full_dir_name = (std::string)Options["EvalDir"];
+            auto full_dir_name = Path::Combine(Directory::GetCurrentFolder(), (std::string)Options["EvalDir"]);
             sync_cout << "info string EvalDirectory = " << full_dir_name << sync_endl;
 
             const std::string dir_name = Options["EvalDir"];
