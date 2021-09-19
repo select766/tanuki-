@@ -27,6 +27,16 @@
 // halfKPE9型
 #include "architectures/halfkpe9_256x2-32-32.h"
 
+#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_512X2_16_32)
+
+// halfkp_512x2-16-32型
+#include "architectures/halfkp_512x2-16-32.h"
+
+#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32)
+
+// halfkp_1024x2-8-32型
+#include "architectures/halfkp_1024x2-8-32.h"
+
 #else
 
 // どれも定義されていなかったので標準NNUE型にしておく。
