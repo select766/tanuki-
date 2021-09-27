@@ -1099,6 +1099,8 @@ double calc_grad(Value deep, Value shallow, const PackedSfenValue& psv)
 double ELMO_LAMBDA = 0.33;
 double ELMO_LAMBDA2 = 0.33;
 double ELMO_LAMBDA_LIMIT = 32000;
+constexpr const double epsilon = 0.000001;
+double winning_percentage_for_win = 1.0;
 
 double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 {
@@ -1108,9 +1110,13 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 	const double eval_winrate = winning_percentage(shallow);
 	const double teacher_winrate = winning_percentage(deep);
 
-	// 期待勝率を勝っていれば1、負けていれば 0、引き分けなら0.5として補正項として用いる。
-	// game_result = 1,0,-1なので1足して2で割る。
-	const double t = double(psv.game_result + 1) / 2;
+	// 期待勝率を勝っていればwinning_percentage_for_win、
+	// 負けていれば 1.0 - winning_percentage_for_win、
+	// 引き分けなら0.5として補正項として用いる。
+	const double t =
+		psv.game_result == 1 ? winning_percentage_for_win :
+		psv.game_result == 0 ? 0.5 :
+		1.0 - winning_percentage_for_win;
 
 	// 深い探索での評価値がELMO_LAMBDA_LIMITを超えているならELMO_LAMBDAではなくELMO_LAMBDA2を適用する。
 	const double lambda = (abs(deep) >= ELMO_LAMBDA_LIMIT) ? ELMO_LAMBDA2 : ELMO_LAMBDA;
@@ -1130,9 +1136,10 @@ void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv,
 {
 	const double p /* teacher_winrate */ = winning_percentage(deep);
 	const double q /* eval_winrate    */ = winning_percentage(shallow);
-	const double t = double(psv.game_result + 1) / 2;
-
-	constexpr double epsilon = 0.000001;
+	const double t =
+		psv.game_result == 1 ? winning_percentage_for_win :
+		psv.game_result == 0 ? 0.5 :
+		1.0 - winning_percentage_for_win;
 
 	// 深い探索での評価値がELMO_LAMBDA_LIMITを超えているならELMO_LAMBDAではなくELMO_LAMBDA2を適用する。
 	const double lambda = (abs(deep) >= ELMO_LAMBDA_LIMIT) ? ELMO_LAMBDA2 : ELMO_LAMBDA;
@@ -2668,6 +2675,7 @@ void learn(Position&, istringstream& is)
 		else if (option == "loss_output_interval") is >> loss_output_interval;
 		else if (option == "mirror_percentage") is >> mirror_percentage;
 		else if (option == "validation_set_file_name") is >> validation_set_file_name;
+		else if (option == "winning_percentage_for_win") is >> winning_percentage_for_win;
 		
 		// 雑巾のconvert関連
 		else if (option == "convert_plain") use_convert_plain = true;
@@ -2763,6 +2771,7 @@ void learn(Position&, istringstream& is)
 #if defined(EVAL_NNUE)
 	cout << "nn_batch_size     : " << nn_batch_size     << endl;
 	cout << "nn_options        : " << nn_options        << endl;
+	cout << "l2_regularization_parameter: " << l2_regularization_parameter << endl;
 #endif
 	cout << "learning rate     : " << eta1 << " , " << eta2 << " , " << eta3 << endl;
 	cout << "eta_epoch         : " << eta1_epoch << " , " << eta2_epoch << endl;
@@ -2788,6 +2797,8 @@ void learn(Position&, istringstream& is)
 	cout << "mirror_percentage : " << mirror_percentage << endl;
 	cout << "eval_save_interval  : " << eval_save_interval << " sfens" << endl;
 	cout << "loss_output_interval: " << loss_output_interval << " sfens" << endl;
+	cout << "winning_percentage_for_win: " << winning_percentage_for_win << endl;
+
 
 #if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
 	cout << "freeze_kk/kkp/kpp      : " << freeze[0] << " , " << freeze[1] << " , " << freeze[2] << endl;
