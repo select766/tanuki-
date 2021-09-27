@@ -369,6 +369,16 @@ enum Bound {
 };
 
 // --------------------
+//    探索用のフラグ
+// --------------------
+
+// 探索で組合せ爆発が起きていないかの状態
+enum ExplosionState {
+	EXPLOSION_NONE, // 平常運転
+	MUST_CALM_DOWN  // 組合せ爆発が起きているのでいったん冷静になれ
+};
+
+// --------------------
 //        評価値
 // --------------------
 
@@ -376,6 +386,9 @@ enum Bound {
 enum Value: int32_t
 {
 	VALUE_ZERO = 0,
+
+	// 引き分け時のスコア(千日手のスコアリングなどで用いる)
+	VALUE_DRAW = 0,
 
 	// 0手詰めのスコア(rootで詰んでいるときのscore)
 	// 例えば、3手詰めならこの値より3少ない。
@@ -586,11 +599,11 @@ std::string to_usi_string(Move16 m);
 // それらを明確に区別したい時に用いる。
 struct Move16
 {
-	Move16() :move(0) {}
-	Move16(u16 m) : move(m) {}
+	Move16():move(0){}
+	Move16(u16 m): move(m) {}
 
 	// Moveからの暗黙変換はできないとMOVE_NONEの代入などで困る。
-	Move16(Move m) :move((u16)m) {}
+	Move16(Move m) :move((u16)m){}
 
 	// uint16_tのまま取り出す。
 	// Moveに変換が必要なときは、そのあとMove()にcastすることはできる。(上位16bitは0のまま)
@@ -966,7 +979,9 @@ enum EnteringKingRule
 {
 	EKR_NONE,            // 入玉ルールなし
 	EKR_24_POINT,        // 24点法(31点以上で宣言勝ち)
-	EKR_27_POINT,        // 27点法 = CSAルール
+	EKR_24_POINT_H,      // 24点法 , 駒落ち対応
+	EKR_27_POINT,        // 27点法 = CSAルール(先手28点、後手27点)
+	EKR_27_POINT_H,      // 27点法 , 駒落ち対応
 	EKR_TRY_RULE,        // トライルール
 };
 
@@ -1013,6 +1028,19 @@ namespace Eval
 	//  abs(value) < VALUE_MAX_EVAL
 	// を満たす。
 	Value evaluate(const Position& pos);
+}
+
+// --------------------
+//      UnitTest
+// --------------------
+
+// 前方宣言だけ。
+// 実際に使う時は、"testcmd/unit_test.h"をincludeせよ。
+// 使い方については、Position::UnitTest()などを参考にすること。
+namespace Test
+{
+	class UnitTester;
+	void UnitTest(Position& pos,std::istringstream& is);
 }
 
 // --------------------

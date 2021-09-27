@@ -70,7 +70,6 @@
 
 #if defined(EVAL_NNUE)
 #include "../eval/nnue/evaluate_nnue_learner.h"
-#include "../tanuki_progress.h"
 #include <shared_mutex>
 #endif
 
@@ -1100,6 +1099,8 @@ double calc_grad(Value deep, Value shallow, const PackedSfenValue& psv)
 double ELMO_LAMBDA = 0.33;
 double ELMO_LAMBDA2 = 0.33;
 double ELMO_LAMBDA_LIMIT = 32000;
+constexpr const double epsilon = 0.000001;
+double winning_percentage_for_win = 1.0;
 
 double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 {
@@ -1109,9 +1110,13 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 	const double eval_winrate = winning_percentage(shallow);
 	const double teacher_winrate = winning_percentage(deep);
 
-	// 期待勝率を勝っていれば1、負けていれば 0、引き分けなら0.5として補正項として用いる。
-	// game_result = 1,0,-1なので1足して2で割る。
-	const double t = double(psv.game_result + 1) / 2;
+	// 期待勝率を勝っていればwinning_percentage_for_win、
+	// 負けていれば 1.0 - winning_percentage_for_win、
+	// 引き分けなら0.5として補正項として用いる。
+	const double t =
+		psv.game_result == 1 ? winning_percentage_for_win :
+		psv.game_result == 0 ? 0.5 :
+		1.0 - winning_percentage_for_win;
 
 	// 深い探索での評価値がELMO_LAMBDA_LIMITを超えているならELMO_LAMBDAではなくELMO_LAMBDA2を適用する。
 	const double lambda = (abs(deep) >= ELMO_LAMBDA_LIMIT) ? ELMO_LAMBDA2 : ELMO_LAMBDA;
@@ -1125,16 +1130,16 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 
 // 学習時の交差エントロピーの計算
 // elmo式の勝敗項と勝率項との個別の交差エントロピーが引数であるcross_entropy_evalとcross_entropy_winに返る。
-	// 進行度による学習率の調整についても考慮する。
-	void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv, double weight,
+void calc_cross_entropy(Value deep, Value shallow, const PackedSfenValue& psv,
 	double& cross_entropy_eval, double& cross_entropy_win, double& cross_entropy,
 	double& entropy_eval, double& entropy_win, double& entropy)
 {
 	const double p /* teacher_winrate */ = winning_percentage(deep);
 	const double q /* eval_winrate    */ = winning_percentage(shallow);
-	const double t = double(psv.game_result + 1) / 2;
-
-	constexpr double epsilon = 0.000001;
+	const double t =
+		psv.game_result == 1 ? winning_percentage_for_win :
+		psv.game_result == 0 ? 0.5 :
+		1.0 - winning_percentage_for_win;
 
 	// 深い探索での評価値がELMO_LAMBDA_LIMITを超えているならELMO_LAMBDAではなくELMO_LAMBDA2を適用する。
 	const double lambda = (abs(deep) >= ELMO_LAMBDA_LIMIT) ? ELMO_LAMBDA2 : ELMO_LAMBDA;
@@ -1142,18 +1147,18 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 	const double m = (1.0 - lambda) * t + lambda * p;
 
 	cross_entropy_eval =
-			(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon)) * weight;
+		(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon));
 	cross_entropy_win =
-			(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon)) * weight;
+		(-t * std::log(q + epsilon) - (1.0 - t) * std::log(1.0 - q + epsilon));
 	entropy_eval =
-			(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon)) * weight;
+		(-p * std::log(p + epsilon) - (1.0 - p) * std::log(1.0 - p + epsilon));
 	entropy_win =
-			(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon)) * weight;
+		(-t * std::log(t + epsilon) - (1.0 - t) * std::log(1.0 - t + epsilon));
 
 	cross_entropy =
-			(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon)) * weight;
+		(-m * std::log(q + epsilon) - (1.0 - m) * std::log(1.0 - q + epsilon));
 	entropy =
-			(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon)) * weight;
+		(-m * std::log(m + epsilon) - (1.0 - m) * std::log(1.0 - m + epsilon));
 }
 
 #endif
@@ -1508,10 +1513,6 @@ struct LearnerThink: public MultiThink
 		best_loss = std::numeric_limits<double>::infinity();
 		latest_loss_sum = 0.0;
 		latest_loss_count = 0;
-
-		if (!progress.Load()) {
-			std::exit(1);
-		}
 #endif
 	}
 
@@ -1571,9 +1572,6 @@ struct LearnerThink: public MultiThink
 	double latest_loss_sum;
 	u64 latest_loss_count;
 	std::string best_nn_directory;
-	bool weight_by_progress;
-
-	Tanuki::Progress progress;
 #endif
 
 	u64 eval_save_interval;
@@ -1647,9 +1645,7 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 		// TaskDispatcherを用いて各スレッドに作業を振る。
 		// そのためのタスクの定義。
 		// ↑で使っているposをcaptureされるとたまらんのでcaptureしたい変数は一つずつ指定しておく。
-		auto weight_by_progress = this->weight_by_progress;
-		auto& progress = this->progress;
-		auto task = [&ps, &test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy, &test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy, &sum_norm, &task_count, &move_accord_count, weight_by_progress, &progress](size_t thread_id)
+		auto task = [&ps,&test_sum_cross_entropy_eval,&test_sum_cross_entropy_win,&test_sum_cross_entropy,&test_sum_entropy_eval,&test_sum_entropy_win,&test_sum_entropy, &sum_norm,&task_count ,&move_accord_count](size_t thread_id)
 		{
 			// 複数のプロセスでlearnコマンドを実行した場合、NUMAノード0しか使われなくなる問題への対処
 			WinProcGroup::bindThisThread(thread_id);
@@ -1709,15 +1705,9 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 			// 交差エントロピーを計算して表示させる。
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
-			// 進捗度に応じて学習率を調整する。
-			// WSCOC2020 elmo・水匠2
-			double progress_weight = weight_by_progress
-				? (1.0 - progress.Estimate(pos))
-				: 1.0;
-
 			double test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy;
 			double test_entropy_eval, test_entropy_win, test_entropy;
-			calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
+			calc_cross_entropy(deep_value, shallow_value, ps, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
 			// 交差エントロピーの合計は定義的にabs()をとる必要がない。
 			test_sum_cross_entropy_eval += test_cross_entropy_eval;
 			test_sum_cross_entropy_win += test_cross_entropy_win;
@@ -1963,7 +1953,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 		{
 			// 変なsfenを掴かまされた。デバッグすべき！
 			// 不正なsfenなのでpos.sfen()で表示できるとは限らないが、しないよりマシ。
-			cout << "Error! : illigal packed sfen = " << pos.sfen() << endl;
+			cout << "Error! : illegal packed sfen = " << pos.sfen() << endl;
 			goto RetryRead;
 		}
 #if !defined(EVAL_NNUE)
@@ -2049,16 +2039,10 @@ void LearnerThink::thread_worker(size_t thread_id)
 			Value shallow_value = (rootColor == pos.side_to_move()) ? Eval::evaluate(pos) : -Eval::evaluate(pos);
 
 #if defined ( LOSS_FUNCTION_IS_ELMO_METHOD )
-			// 進捗度に応じて学習率を調整する。
-			// WSCOC2020 elmo・水匠2
-			double progress_weight = weight_by_progress
-				? (1.0 - progress.Estimate(pos))
-				: 1.0;
-
 			// 学習データに対するロスの計算
 			double learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy;
 			double learn_entropy_eval, learn_entropy_win, learn_entropy;
-				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
+			calc_cross_entropy(deep_value, shallow_value, ps, learn_cross_entropy_eval, learn_cross_entropy_win, learn_cross_entropy, learn_entropy_eval, learn_entropy_win, learn_entropy);
 			learn_sum_cross_entropy_eval += learn_cross_entropy_eval;
 			learn_sum_cross_entropy_win += learn_cross_entropy_win;
 			learn_sum_cross_entropy += learn_cross_entropy;
@@ -2081,13 +2065,8 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 勾配に基づくupdateはのちほど行なう。
 			Eval::add_grad(pos, rootColor, dj_dw, freeze);
 #else
-			double example_weight =
+			const double example_weight =
 			    (discount_rate != 0 && ply != (int)pv.size()) ? discount_rate : 1.0;
-
-			// 進捗度に応じて学習率を調整する。
-			// WSCOC2020 elmo・水匠2
-			example_weight *= progress_weight;
-
 			Eval::NNUE::AddExample(pos, rootColor, ps, example_weight);
 #endif
 
@@ -2612,7 +2591,6 @@ void learn(Position&, istringstream& is)
 	double newbob_decay = 1.0;
 	int newbob_num_trials = 2;
 	string nn_options;
-	bool weight_by_progress = false;
 	double l2_regularization_parameter = 0.0;
 #endif
 
@@ -2691,13 +2669,13 @@ void learn(Position&, istringstream& is)
 		else if (option == "newbob_decay") is >> newbob_decay;
 		else if (option == "newbob_num_trials") is >> newbob_num_trials;
 		else if (option == "nn_options") is >> nn_options;
-		else if (option == "weight_by_progress") is >> weight_by_progress;
 		else if (option == "l2_regularization_parameter") is >> l2_regularization_parameter;
 #endif
 		else if (option == "eval_save_interval") is >> eval_save_interval;
 		else if (option == "loss_output_interval") is >> loss_output_interval;
 		else if (option == "mirror_percentage") is >> mirror_percentage;
 		else if (option == "validation_set_file_name") is >> validation_set_file_name;
+		else if (option == "winning_percentage_for_win") is >> winning_percentage_for_win;
 		
 		// 雑巾のconvert関連
 		else if (option == "convert_plain") use_convert_plain = true;
@@ -2793,7 +2771,7 @@ void learn(Position&, istringstream& is)
 #if defined(EVAL_NNUE)
 	cout << "nn_batch_size     : " << nn_batch_size     << endl;
 	cout << "nn_options        : " << nn_options        << endl;
-	cout << "weight_by_progress: " << weight_by_progress << endl;
+	cout << "l2_regularization_parameter: " << l2_regularization_parameter << endl;
 #endif
 	cout << "learning rate     : " << eta1 << " , " << eta2 << " , " << eta3 << endl;
 	cout << "eta_epoch         : " << eta1_epoch << " , " << eta2_epoch << endl;
@@ -2819,6 +2797,8 @@ void learn(Position&, istringstream& is)
 	cout << "mirror_percentage : " << mirror_percentage << endl;
 	cout << "eval_save_interval  : " << eval_save_interval << " sfens" << endl;
 	cout << "loss_output_interval: " << loss_output_interval << " sfens" << endl;
+	cout << "winning_percentage_for_win: " << winning_percentage_for_win << endl;
+
 
 #if defined(EVAL_KPPT) || defined(EVAL_KPP_KKPT)
 	cout << "freeze_kk/kkp/kpp      : " << freeze[0] << " , " << freeze[1] << " , " << freeze[2] << endl;
@@ -2873,7 +2853,6 @@ void learn(Position&, istringstream& is)
 	learn_think.newbob_scale = 1.0;
 	learn_think.newbob_decay = newbob_decay;
 	learn_think.newbob_num_trials = newbob_num_trials;
-	learn_think.weight_by_progress = weight_by_progress;
 #endif
 	learn_think.eval_save_interval = eval_save_interval;
 	learn_think.loss_output_interval = loss_output_interval;

@@ -629,7 +629,9 @@
     <ClInclude Include="eval\kppt\evaluate_kppt.h" />
     <ClInclude Include="eval\kpp_kkpt\evaluate_kpp_kkpt.h" />
     <ClInclude Include="eval\nnue\architectures\halfkpe9_256x2-32-32.h" />
+    <ClInclude Include="eval\nnue\architectures\halfkp_1024x2-8-32.h" />
     <ClInclude Include="eval\nnue\architectures\halfkp_256x2-32-32.h" />
+    <ClInclude Include="eval\nnue\architectures\halfkp_512x2-16-32.h" />
     <ClInclude Include="eval\nnue\architectures\k-p_256x2-32-32.h" />
     <ClInclude Include="eval\nnue\evaluate_nnue.h" />
     <ClInclude Include="eval\nnue\evaluate_nnue_learner.h" />
@@ -678,6 +680,7 @@
     <ClInclude Include="sqlite\sqlite3.h" />
     <ClInclude Include="sqlite\sqlite3ext.h" />
     <ClInclude Include="tanuki_filesystem.h" />
+    <ClInclude Include="testcmd\unit_test.h" />
     <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="tanuki_analysis.h" />
     <ClInclude Include="tanuki_book.h" />
@@ -762,6 +765,7 @@
     <ClCompile Include="tanuki_kifu_writer.cpp" />
     <ClCompile Include="tanuki_progress.cpp" />
     <ClCompile Include="tanuki_progress_report.cpp" />
+    <ClCompile Include="testcmd\unit_test.cpp" />
     <ClCompile Include="timeman.cpp" />
     <ClCompile Include="types.cpp" />
     <ClCompile Include="position.cpp" />

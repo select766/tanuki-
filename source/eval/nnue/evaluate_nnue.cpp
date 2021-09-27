@@ -45,10 +45,8 @@ namespace Eval {
                 void Initialize(AlignedPtr<T>& pointer) {
 
                     // →　メモリはLarge Pageから確保することで高速化する。
-                    void* mem; // 開放すべきポインタ
-                    void* ptr = LargeMemory::static_alloc(sizeof(T), mem , alignof(T), true);
+                    void* ptr = LargeMemory::static_alloc(sizeof(T) , alignof(T), true);
                     pointer.reset(reinterpret_cast<T*>(ptr));
-                    pointer.get_deleter().mem = mem;
 
                     //sync_cout << "nnue.alloc(" << sizeof(T) << "," << alignof(T) << ")" << sync_endl;
                 }
@@ -230,7 +228,7 @@ namespace Eval {
         if (!Options["SkipLoadingEval"])
 #endif
         {
-            auto full_dir_name = (std::string)Options["EvalDir"];
+            auto full_dir_name = Path::Combine(Directory::GetCurrentFolder(), (std::string)Options["EvalDir"]);
             sync_cout << "info string EvalDirectory = " << full_dir_name << sync_endl;
 
             const std::string dir_name = Options["EvalDir"];

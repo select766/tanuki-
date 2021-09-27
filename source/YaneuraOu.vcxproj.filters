@@ -352,6 +352,15 @@
     <ClInclude Include="sqlite\sqlite3ext.h">
       <Filter>リソース ファイル\sqlite</Filter>
     </ClInclude>
+    <ClInclude Include="testcmd\unit_test.h">
+      <Filter>リソース ファイル\testcmd</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\architectures\halfkp_512x2-16-32.h">
+      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
+    </ClInclude>
+    <ClInclude Include="eval\nnue\architectures\halfkp_1024x2-8-32.h">
+      <Filter>リソース ファイル\eval\nnue\architectures</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -578,6 +587,9 @@
     </ClCompile>
     <ClCompile Include="sqlite\sqlite3.c">
       <Filter>リソース ファイル\sqlite</Filter>
+    </ClCompile>
+    <ClCompile Include="testcmd\unit_test.cpp">
+      <Filter>リソース ファイル\testcmd</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
