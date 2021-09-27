@@ -309,6 +309,10 @@ u64 eval_sum;
 // 局面は初期化されないので注意。
 void is_ready(bool skipCorruptCheck)
 {
+	// EvalDirにある"eval_options.txt"を読み込む。
+	// ここに評価関数に応じた設定を書いておくことができる。
+
+	USI::read_engine_options(Path::Combine(Options["EvalDir"], "eval_options.txt"));
 
 	// --- Keep Alive的な処理 ---
 
@@ -606,6 +610,10 @@ void go_cmd(const Position& pos, istringstream& is , StateListPtr& states , bool
 	while (is >> token)
 	{
 		// 探索すべき指し手。(探索開始局面から特定の初手だけ探索させるとき)
+		// これ、Stockfishのコードでこうなっているからそのままにしてあるが、
+		// これを指定しても定跡の指し手としてはこれ以外を指したりする問題はある。
+		// またふかうら王ではこのオプションをサポートしていない。
+		// ゆえに、非対応扱いで考えて欲しい。
 		if (token == "searchmoves")
 			// 残りの指し手すべてをsearchMovesに突っ込む。
 			while (is >> token)
@@ -929,7 +937,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "sfen") position_cmd(pos, is, states);
 
 		// ログファイルの書き出しのon
-		else if (token == "log") start_logger(true);
+		// 備考)
+		// Stockfishの方は、エンジンオプションでログの出力ファイル名を指定できるのだが、
+		// ログ自体はホスト側で記録することが多いので、ファイル名は固定でいいや…。
+		else if (token == "log") start_logger("io_log.txt");
 
 #if defined(EVAL_LEARN)
 		// テスト用にqsearch(),search()を直接呼ぶコマンド
