@@ -185,7 +185,11 @@ struct SfenWriter
 	// write_workerスレッドを開始する。
 	void start_file_write_worker()
 	{
-		file_worker_thread = std::thread([&] { this->file_write_worker(); });
+		file_worker_thread = std::thread([&] {
+			// プロセッサーグループが複数ある環境で、負荷が片方のプロセッサーグループに偏るのを防ぐ。
+			WinProcGroup::bindThisThread(0);
+			this->file_write_worker();
+			});
 	}
 
 	// ファイルに書き出すの専用スレッド
@@ -1321,7 +1325,11 @@ struct SfenReader
 	// 局面ファイルをバックグラウンドで読み込むスレッドを起動する。
 	void start_file_read_worker()
 	{
-		file_worker_thread = std::thread([&] { this->file_read_worker(); });
+		file_worker_thread = std::thread([&] {
+			// プロセッサーグループが複数ある環境で、負荷が片方のプロセッサーグループに偏るのを防ぐ。
+			WinProcGroup::bindThisThread(0);
+			this->file_read_worker();
+			});
 	}
 
 	// ファイルの読み込み専用スレッド用
