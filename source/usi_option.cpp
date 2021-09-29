@@ -173,7 +173,11 @@ namespace USI {
 		// (プロセッサグループは64論理コアごとに1つ作られる。上のケースでは、ThreadIdOffset = 0,0,64,64でも同じ意味。)
 		//	※　1つのPCで複数の思考エンジンを同時に起動して対局させる場合はこれを適切に設定すべき。
 
-		o["ThreadIdOffset"] << Option(0, 0, std::thread::hardware_concurrency() - 1);
+		o["ThreadIdOffset"] << Option(0, 0, std::thread::hardware_concurrency() - 1,
+			[](const Option& o) {
+				// プロセッサーグループが複数ある環境で、負荷が片方のプロセッサーグループに偏るのを防ぐ。
+				WinProcGroup::bindThisThread(0);
+			});
 #endif
 
 #if defined(_WIN64)
