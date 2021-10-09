@@ -95,6 +95,10 @@ EXTRA_CPPFLAGS =
 BLAS = OPENBLAS
 # BLAS = BLIS
 
+# 相対KPを有効・無効を指定する。
+HALF_RELATIVE_KP = ON
+# HALF_RELATIVE_KP = OFF
+
 # === implementations ===
 
 # デバッガーを使わないなら、NDEBUGをdefineする。
@@ -408,6 +412,10 @@ else ifeq ($(TARGET_CPU),OTHER)
 
 endif
 
+# 相対KPを有効・無効を指定する。
+ifeq ($(HALF_RELATIVE_KP),ON)
+	CPPFLAGS += -DENABLE_HALF_RELATIVE_KP
+endif
 
 CPPFLAGS += -DUSE_MAKEFILE -D$(YANEURAOU_EDITION) $(EXTRA_CPPFLAGS)
 
