@@ -1198,6 +1198,11 @@ struct SfenReader
 		if (file_worker_thread.joinable())
 			file_worker_thread.join();
 
+		if (file) {
+			std::fclose(file);
+			file = nullptr;
+		}
+
 		for (auto p : packed_sfens)
 			delete p;
 		for (auto p : packed_sfens_pool)
@@ -1261,6 +1266,8 @@ struct SfenReader
 	// あまり大きいとメモリ消費量も上がる。
 	// SFEN_READ_SIZEはTHREAD_BUFFER_SIZEの倍数であるものとする。
 	const size_t SFEN_READ_SIZE = LEARN_SFEN_READ_SIZE;
+
+	const size_t FILE_READ_BUFFER_SIZE = 4096;
 
 	// [ASYNC] スレッドが局面を一つ返す。なければfalseが返る。
 	bool read_to_thread_buffer(size_t thread_id, PackedSfenValue& ps)
@@ -1337,8 +1344,10 @@ struct SfenReader
 	{
 		auto open_next_file = [&]()
 		{
-			if (fs.is_open())
-				fs.close();
+			if (file) {
+				std::fclose(file);
+				file = nullptr;
+			}
 
 			// もう無い
 			if (filenames.size() == 0)
@@ -1348,12 +1357,16 @@ struct SfenReader
 			string filename = *filenames.rbegin();
 			filenames.pop_back();
 
-			fs.open(filename, ios::in | ios::binary);
+			file = std::fopen(filename.c_str(), "rb");
 			//cout << "open filename = " << filename << endl;
-			ASSERT(fs);
+			ASSERT(file);
+
+			std::setvbuf(file, nullptr, _IOFBF, FILE_READ_BUFFER_SIZE);
 
 			return true;
 		};
+
+		open_next_file();
 
 		while (true)
 		{
@@ -1364,19 +1377,19 @@ struct SfenReader
 			if (stop_flag)
 				return;
 
-			PSVector sfens;
-			sfens.reserve(SFEN_READ_SIZE);
+			PSVector sfens(SFEN_READ_SIZE);
+			// 次にこの位置から読み込む。
+			int sfens_read_offset = 0;
 
 			// ファイルバッファにファイルから読み込む。
-			while (sfens.size() < SFEN_READ_SIZE)
+			while (sfens_read_offset < SFEN_READ_SIZE)
 			{
-				PackedSfenValue p;
-				if (fs.read((char*)&p, sizeof(PackedSfenValue)))
-				{
-					sfens.push_back(p);
-				} else
-				{
-					// 読み込み失敗
+				int expected_num_read_sfens = SFEN_READ_SIZE - sfens_read_offset;
+				int actual_num_read_sfens = std::fread(&sfens[sfens_read_offset], sizeof(PackedSfenValue), expected_num_read_sfens, file);
+				sfens_read_offset += actual_num_read_sfens;
+				if (sfens_read_offset < SFEN_READ_SIZE) {
+					// ファイルの終端に達した等、必要な量を読み込むことができなかった。
+					// 次のファイルを読み込む。
 					if (!open_next_file())
 					{
 						// 次のファイルもなかった。あぼーん。
@@ -1479,7 +1492,7 @@ protected:
 
 
 	// sfenファイルのハンドル
-	std::fstream fs;
+	FILE* file = nullptr;
 
 	// 各スレッド用のsfen
 	// (使いきったときにスレッドが自らdeleteを呼び出して開放すべし。)
