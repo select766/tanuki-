@@ -1197,11 +1197,6 @@ struct SfenReader
 		if (file_worker_thread.joinable())
 			file_worker_thread.join();
 
-		if (file) {
-			std::fclose(file);
-			file = nullptr;
-		}
-
 		for (auto p : packed_sfens)
 			delete p;
 		for (auto p : packed_sfens_pool)
@@ -1348,11 +1343,6 @@ struct SfenReader
 	{
 		auto open_next_file = [&]()
 		{
-			if (file) {
-				std::fclose(file);
-				file = nullptr;
-			}
-
 			// もう無い
 			if (filenames.size() == 0)
 				return false;
@@ -1361,11 +1351,9 @@ struct SfenReader
 			string filename = *filenames.rbegin();
 			filenames.pop_back();
 
-			file = std::fopen(filename.c_str(), "rb");
-			//cout << "open filename = " << filename << endl;
-			ASSERT(file);
-
-			std::setvbuf(file, nullptr, _IOFBF, FILE_READ_BUFFER_SIZE);
+			auto result = binary_reader.open(filename);
+			// cout << "open filename = " << filename << endl;
+			ASSERT(result.is_ok());
 
 			return true;
 		};
@@ -1388,9 +1376,16 @@ struct SfenReader
 			// ファイルバッファにファイルから読み込む。
 			while (sfens_read_offset < SFEN_READ_SIZE)
 			{
-				int expected_num_read_sfens = SFEN_READ_SIZE - sfens_read_offset;
-				int actual_num_read_sfens = std::fread(&sfens[sfens_read_offset], sizeof(PackedSfenValue), expected_num_read_sfens, file);
-				sfens_read_offset += actual_num_read_sfens;
+				size_t expected_size_of_read_bytes = (SFEN_READ_SIZE - sfens_read_offset) * sizeof(PackedSfenValue);
+				size_t actual_size_of_read_bytes = 0;
+				auto result = binary_reader.read(&sfens[sfens_read_offset], expected_size_of_read_bytes, &actual_size_of_read_bytes);
+				if (!(result.is_ok() || result.is_eof())) {
+					cout << endl << "Failed to read a file." << endl;
+					end_of_files = true;
+					return;
+				}
+
+				sfens_read_offset += actual_size_of_read_bytes / sizeof(PackedSfenValue);
 				if (sfens_read_offset < SFEN_READ_SIZE) {
 					// ファイルの終端に達した等、必要な量を読み込むことができなかった。
 					// 次のファイルを読み込む。
@@ -1496,7 +1491,7 @@ protected:
 
 
 	// sfenファイルのハンドル
-	FILE* file = nullptr;
+	SystemIO::BinaryReader binary_reader;
 
 	// 各スレッド用のsfen
 	// (使いきったときにスレッドが自らdeleteを呼び出して開放すべし。)
