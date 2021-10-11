@@ -103,6 +103,10 @@ MATERIAL_LEVEL = 1
 BLAS = OPENBLAS
 # BLAS = BLIS
 
+# 相対KPを有効・無効を指定する。
+HALF_RELATIVE_KP = ON
+# HALF_RELATIVE_KP = OFF
+
 # === implementations ===
 
 # 以下では、
@@ -503,6 +507,11 @@ else ifeq ($(TARGET_CPU),NO_SSE)
 else ifeq ($(TARGET_CPU),OTHER)
 	CPPFLAGS += -DNO_SSE
 
+endif
+
+# 相対KPを有効・無効を指定する。
+ifeq ($(HALF_RELATIVE_KP),ON)
+	CPPFLAGS += -DENABLE_HALF_RELATIVE_KP
 endif
 
 # YANEURAOU_EDITION , CPUターゲット名 などのシンボルをコンパイル時に定義してやる。
