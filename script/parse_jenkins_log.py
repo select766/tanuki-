@@ -3,12 +3,16 @@ import re
 import urllib
 import urllib.request
 
-# PATTERN0 = re.compile(r'=([-0-9]+)?.db')
-PATTERN0 = re.compile(r'training_data_score_scale=(.+?)\\')
+# PATTERN0 = re.compile(r'=([-0-9]+)?. db')
+# PATTERN0 = re.compile(r'depth=(\d+)')
+# PATTERN0 = re.compile(r'lambda=([0-9.]+)')
+# PATTERN0 = re.compile(r'eval_limit=([0-9]+)')
+# PATTERN0 = re.compile(r'winning_percentage_for_win=([0-9.]+)')
+# PATTERN0 = re.compile(r'l2_regularization_parameter=([0-9.]+)')
+PATTERN0 = re.compile(r'nn_batch_size=([0-9]+)')
 PATTERN1 = re.compile(
     r'勝ち\d+\(([0-9.]+)% R[-0-9.]+ \+-[0-9.]+\) 先手勝ち\d+\(([0-9.]+)%\) 後手勝ち\d+\(([0-9.]+)%\)')
-FIRST_BUILD_NUMBER = 11
-LAST_BUILD_NUMBER = 17
+BUILD_NUMBERS = [80, 81, 82, 83, 84, 85, 86]
 
 
 def main():
@@ -23,9 +27,7 @@ def main():
                         help='User name ex) nodchip', required=True)
     args = parser.parse_args()
 
-    for build_number in range(FIRST_BUILD_NUMBER, LAST_BUILD_NUMBER + 1):
-        if build_number == 14:
-            build_number = 18
+    for build_number in BUILD_NUMBERS:
         url = f'http://{args.host_name}:8080/job/{args.projet_name}/{build_number}/consoleText'
         with urllib.request.urlopen(url) as response:
             html = response.read().decode('cp932')
@@ -33,18 +35,21 @@ def main():
         print(html.split('\r\n\r\n')[-2])
         print()
 
-    for build_number in range(FIRST_BUILD_NUMBER, LAST_BUILD_NUMBER + 1):
-        # if build_number == 14:
-        #     build_number = 18
+    for build_number in BUILD_NUMBERS:
         url = f'http://{args.host_name}:8080/job/{args.projet_name}/{build_number}/consoleText'
         with urllib.request.urlopen(url) as response:
             html = response.read().decode('cp932')
 
         key = 0
+        last_key = 0
 
         # for m in re.finditer(PATTERN0, html):
-        #     key = m.group(1)
-        #     break
+        #     key = last_key
+        #     last_key = m.group(1)
+
+        for m in re.finditer(PATTERN0, html):
+            key = m.group(1)
+            break
 
         matched = None
         for m in re.finditer(PATTERN1, html):
