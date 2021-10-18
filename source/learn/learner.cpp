@@ -1678,7 +1678,7 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 		auto task = [&test_sum_cross_entropy_eval, &test_sum_cross_entropy_win, &test_sum_cross_entropy,
 			&test_sum_entropy_eval, &test_sum_entropy_win, &test_sum_entropy,
 			&sum_norm, &num_finished_tasks, &move_accord_count,
-			&global_position_index, this](size_t thread_id)
+			&global_position_index, weight_by_progress, &progress, this](size_t thread_id)
 		{
 			// 複数のプロセスでlearnコマンドを実行した場合、NUMAノード0しか使われなくなる問題への対処
 			WinProcGroup::bindThisThread(thread_id);
@@ -1759,7 +1759,7 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 
 				double test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy;
 				double test_entropy_eval, test_entropy_win, test_entropy;
-				calc_cross_entropy(deep_value, shallow_value, ps, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
+				calc_cross_entropy(deep_value, shallow_value, ps, progress_weight, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy, test_entropy_eval, test_entropy_win, test_entropy);
 				// 交差エントロピーの合計は定義的にabs()をとる必要がない。
 				local_test_sum_cross_entropy_eval += test_cross_entropy_eval;
 				local_test_sum_cross_entropy_win += test_cross_entropy_win;
