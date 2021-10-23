@@ -2,7 +2,7 @@
 #define MOVEPICK_H_INCLUDED
 
 #include <array>
-//#include <limits>
+#include <limits>
 //#include <type_traits>
 
 //#include "movegen.h"
