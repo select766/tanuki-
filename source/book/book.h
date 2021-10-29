@@ -198,6 +198,9 @@ namespace Book
 			return book_body;
 		}
 
+		// 保持している局面数を返す。これは、on the flyではない状態でread_book()した時にのみ有効。
+		size_t size() const { return book_body.size(); }
+
 	protected:
 
 		// メモリ上に読み込まれた定跡本体
