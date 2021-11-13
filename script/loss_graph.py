@@ -15,14 +15,22 @@ URL = 'url'
 LABEL = 'label'
 HTML = 'html'
 DATA_LIST = [
+    # {
+    #     URL: 'http://hnoda-dt2:8080/job/learn.2020-05-30/85/consoleText',
+    #     LABEL: 'tanuki-tsec1',
+    # },
     {
-        URL: 'http://hnoda-dt2:8080/job/learn.2021-10-15/2/consoleText',
-        LABEL: '9dc8a7b773e120d44a756daf670b3e5050d41dc6',
+        URL: 'http://hnoda-dt2:8080/job/learn.2021-09-27/75/consoleText',
+        LABEL: 'tanuki-wcsc29-2019-05-06.winning_percentage_for_win=0.990000',
     },
     {
-        URL: 'http://hnoda-dt2:8080/job/learn.2020-05-30/85/consoleText',
-        LABEL: 'tanuki-tsec1',
+        URL: 'http://hnoda-dt2:8080/job/learn.2021-09-27/85/consoleText',
+        LABEL: 'tanuki-wcsc29-2019-05-06.factorizer',
     },
+    # {
+    #     URL: 'http://hnoda-dt2:8080/job/learn.2021-09-27/86/consoleText',
+    #     LABEL: 'tanuki-wcsc29-2019-05-06.factorizer.HALF_RELATIVE_KP=OFF',
+    # },
 ]
 PATTERNS = [
     Pattern('learn_cross_entropy',
