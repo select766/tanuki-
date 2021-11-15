@@ -302,7 +302,7 @@ void Tanuki::GenerateKifu() {
 					++num_multi_pv_move;
 				}
 
-				Learner::search(pos, search_depth, multi_pv, optimum_nodes_searched, adjust_nodes_limit);
+				Learner::search(pos, search_depth, multi_pv, optimum_nodes_searched);
 
 				const auto& root_moves = pos.this_thread()->rootMoves;
 				multi_pv = std::min<int>(multi_pv, root_moves.size());
