@@ -3,12 +3,12 @@
 
 #ifdef EVAL_LEARN
 
-#include <direct.h>
 #include <omp.h>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <random>
@@ -40,20 +40,26 @@ namespace {
 		GameResultDraw = 0,
 	};
 
-	constexpr char* kOptionKifuDir = "KifuDir";
-	constexpr char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
-	constexpr char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
-	constexpr char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
-	constexpr char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
-	constexpr char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
-	constexpr char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
-	constexpr char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
-	constexpr char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
-	constexpr char* kOptionConvertSfenToLearningDataInputSfenFileName =
+	constexpr const char* kOptionKifuDir = "KifuDir";
+	constexpr const char* kOptionGeneratorNumPositions = "GeneratorNumPositions";
+	constexpr const char* kOptionGeneratorSearchDepth = "GeneratorSearchDepth";
+	constexpr const char* kOptionGeneratorKifuTag = "GeneratorKifuTag";
+	constexpr const char* kOptionGeneratorStartposFileName = "GeneratorStartposFileName";
+	constexpr const char* kOptionGeneratorValueThreshold = "GeneratorValueThreshold";
+	constexpr const char* kOptionGeneratorOptimumNodesSearched = "GeneratorOptimumNodesSearched";
+	constexpr const char* kOptionGeneratorMeasureDepth = "GeneratorMeasureDepth";
+	constexpr const char* kOptionGeneratorStartPositionMaxPlay = "GeneratorStartPositionMaxPlay";
+	constexpr const char* kOptionGeneratorRandomMultiPV = "GeneratorRandomMultiPV";
+	constexpr const char* kOptionGeneratorMinMultiPVPlay = "GeneratorMinMultiPVPlay";
+	constexpr const char* kOptionGeneratorMaxMultiPVPlay = "GeneratorMaxMultiPVPlay";
+	constexpr const char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
+	constexpr const char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
+	constexpr const char* kOptionGeneratorAdjustNodesLimit = "GeneratorAdjustNodesLimit";
+	constexpr const char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
-	constexpr char* kOptionConvertSfenToLearningDataSearchDepth =
+	constexpr const char* kOptionConvertSfenToLearningDataSearchDepth =
 		"ConvertSfenToLearningDataSearchDepth";
-	constexpr char* kOptionConvertSfenToLearningDataOutputFileName =
+	constexpr const char* kOptionConvertSfenToLearningDataOutputFileName =
 		"ConvertSfenToLearningDataOutputFileName";
 
 	std::vector<std::string> start_positions;
@@ -134,10 +140,16 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionGeneratorMeasureDepth] << Option(false);
-	o[kOptionGeneratorStartPositionMaxPlay] << Option(320, 1, 320);
+	o[kOptionGeneratorStartPositionMaxPlay] << Option(std::numeric_limits<int>::max(), 1, std::numeric_limits<int>::max());
 	o[kOptionConvertSfenToLearningDataInputSfenFileName] << Option("nyugyoku_win.sfen");
 	o[kOptionConvertSfenToLearningDataSearchDepth] << Option(12, 1, MAX_PLY);
 	o[kOptionConvertSfenToLearningDataOutputFileName] << Option("nyugyoku_win.bin");
+	o[kOptionGeneratorRandomMultiPV] << Option(1, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMinMultiPVPlay] << Option(1, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxMultiPVPlay] << Option(32, 1, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxMultiPVMoves] << Option(16, 0, std::numeric_limits<int>::max());
+	o[kOptionGeneratorMaxEvalDiff] << Option(30, 0, std::numeric_limits<int>::max());
+	o[kOptionGeneratorAdjustNodesLimit] << Option(false);
 }
 
 namespace {
@@ -191,7 +203,7 @@ void Tanuki::GenerateKifu() {
 	//Eval::load_eval();
 
 	std::string kifu_directory = (std::string)Options["KifuDir"];
-	_mkdir(kifu_directory.c_str());
+	std::filesystem::create_directories(kifu_directory);
 
 	int search_depth = Options[kOptionGeneratorSearchDepth];
 	int64_t num_positions = ParseOptionOrDie<int64_t>(kOptionGeneratorNumPositions);
@@ -200,6 +212,12 @@ void Tanuki::GenerateKifu() {
 	uint64_t optimum_nodes_searched =
 		ParseOptionOrDie<uint64_t>(kOptionGeneratorOptimumNodesSearched);
 	bool measure_depth = Options[kOptionGeneratorMeasureDepth];
+	int random_multi_pv = Options[kOptionGeneratorRandomMultiPV];
+	int min_multi_pv_play = Options[kOptionGeneratorMinMultiPVPlay];
+	int max_multi_pv_play = Options[kOptionGeneratorMaxMultiPVPlay];
+	int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPVMoves];
+	int max_eval_diff = Options[kOptionGeneratorMaxEvalDiff];
+	bool adjust_nodes_limit = Options[kOptionGeneratorAdjustNodesLimit];
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
@@ -207,6 +225,12 @@ void Tanuki::GenerateKifu() {
 	std::cout << "output_file_name_tag=" << output_file_name_tag << std::endl;
 	std::cout << "optimum_nodes_searched=" << optimum_nodes_searched << std::endl;
 	std::cout << "measure_depth=" << measure_depth << std::endl;
+	std::cout << "random_multi_pv=" << random_multi_pv << std::endl;
+	std::cout << "min_multi_pv_play=" << min_multi_pv_play << std::endl;
+	std::cout << "max_multi_pv_play=" << max_multi_pv_play << std::endl;
+	std::cout << "max_multi_pv_count=" << max_multi_pv_moves << std::endl;
+	std::cout << "max_eval_diff=" << max_eval_diff << std::endl;
+	std::cout << "adjust_nodes_limit=" << adjust_nodes_limit << std::endl;
 
 	Search::LimitsType limits;
 	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
@@ -229,6 +253,7 @@ void Tanuki::GenerateKifu() {
 	ProgressReport progress_report(num_positions, 60 * 60);
 	std::mutex mutex_game_play_to_depths;
 	std::atomic<bool> need_wait = false;
+	std::atomic<int> num_records = 0;
 
 #pragma omp parallel
 	{
@@ -245,33 +270,57 @@ void Tanuki::GenerateKifu() {
 		std::mt19937_64 mt19937_64(start_time + thread_index);
 
 		while (global_position_index < num_positions) {
+			++num_records;
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_infos[4096] = {};
-			StateInfo* state = state_infos + 8;
+			StateInfo state_info[1024];
 			Position& pos = thread.rootPos;
-			pos.set(start_positions[start_positions_index(mt19937_64)], state, &thread);
+			pos.set(start_positions[start_positions_index(mt19937_64)], &state_info[0], &thread);
 
-			RandomMove(pos, state, mt19937_64);
+			RandomMove(pos, state_info, mt19937_64);
 
 			std::vector<Learner::PackedSfenValue> records;
-			Value last_value;
-			while (pos.game_ply() < kMaxGamePlay && !pos.is_mated() &&
-				pos.DeclarationWin() == MOVE_NONE) {
-				Learner::search(pos, search_depth, 1, optimum_nodes_searched);
+			int num_multi_pv_move = 0;
+			while (
+				// 一定の手数に達していない
+				pos.game_ply() < kMaxGamePlay &&
+				// 詰まされていない
+				!pos.is_mated() &&
+				// 宣言勝ちができない
+				pos.DeclarationWin() == MOVE_NONE &&
+				// 千日手による引き分けではない
+				// 優等局面・劣等局面は、対局中に一瞬だけ現れ、その後通常通り対局が進むパターンがあるため、考慮しない
+				pos.is_repetition() != RepetitionState::REPETITION_DRAW &&
+				// 評価値の絶対値が一定値以内
+				(records.empty() || std::abs(records.back().score) < value_threshold)) {
 
-				const auto& root_moves = pos.this_thread()->rootMoves;
-				const auto& root_move = root_moves[0];
-				// 最も良かったスコアをこの局面のスコアとして記録する
-				last_value = root_move.score;
-				const std::vector<Move>& pv = root_move.pv;
-
-				// 評価値の絶対値が閾値を超えたら終了する
-				if (std::abs(last_value) > value_threshold) {
-					break;
+				int multi_pv = 1;
+				if (min_multi_pv_play <= pos.game_ply() &&
+					pos.game_ply() <= max_multi_pv_play &&
+					num_multi_pv_move < max_multi_pv_moves &&
+					std::uniform_int_distribution<int>(0, 1)(mt19937_64) == 1) {
+					multi_pv = random_multi_pv;
+					++num_multi_pv_move;
 				}
 
+				Learner::search(pos, search_depth, multi_pv, optimum_nodes_searched, adjust_nodes_limit);
+
+				const auto& root_moves = pos.this_thread()->rootMoves;
+				multi_pv = std::min<int>(multi_pv, root_moves.size());
+
+				int num_valid_moves = 0;
+				for (int pv_index = 0; pv_index < multi_pv; ++pv_index) {
+					if (root_moves[0].score - max_eval_diff <= root_moves[pv_index].score) {
+						num_valid_moves = pv_index + 1;
+					}
+				}
+
+				int selected_move_index = std::uniform_int_distribution<int>(
+					0, num_valid_moves - 1)(mt19937_64);
+				const auto& root_move = root_moves[selected_move_index];
+				// 選ばれた指し手のスコアをこの局面のスコアとして記録する
+				const std::vector<Move>& pv = root_move.pv;
+
 				// 詰みの場合はpvが空になる
-				// 上記の条件があるのでこれはいらないかもしれない
 				if (pv.empty()) {
 					break;
 				}
@@ -285,52 +334,52 @@ void Tanuki::GenerateKifu() {
 
 				Learner::PackedSfenValue record = {};
 				pos.sfen_pack(record.sfen);
-				record.score = last_value;
+				record.score = root_move.score;
 				record.gamePly = pos.game_ply();
 				record.move = pv_move;
 				records.push_back(record);
 
-				pos.do_move(pv_move, state[pos.game_ply()]);
+				pos.do_move(pv_move, state_info[pos.game_ply()]);
 				// 差分計算のためevaluate()を呼び出す
 				Eval::evaluate(pos);
 
 				// 手数毎の探索の深さを記録しておく
 				// 何らかの形で勝ちが決まっている局面は
 				// 探索深さが極端に深くなるため除外する
-				if (measure_depth && abs(last_value) < VALUE_KNOWN_WIN) {
+				if (measure_depth && abs(root_move.score) < VALUE_KNOWN_WIN) {
 					std::lock_guard<std::mutex> lock(mutex_game_play_to_depths);
 					game_play_to_depths[pos.game_ply()].push_back(thread.rootDepth);
 				}
 			}
 
 			int game_result = GameResultDraw;
-			Color win;
-			RepetitionState repetition_state = pos.is_repetition(0);
 			u8 entering_king = 0;
 			if (pos.is_mated()) {
 				// 負け
 				// 詰まされた
-				// 最後の局面は相手局面なので勝ち
+				// records.back()は相手局面なので勝ち
 				game_result = GameResultWin;
 			}
 			else if (pos.DeclarationWin() != MOVE_NONE) {
 				// 勝ち
 				// 入玉勝利
-				// 最後の局面は相手局面なので負け
+				// records.back()は相手局面なので負け
 				game_result = GameResultLose;
 				entering_king = 1;
 			}
-			else if (last_value > value_threshold) {
+			else if (!records.empty() && records.back().score > value_threshold) {
 				// 勝ち
-				// 最後の局面は相手局面なので負け
-				game_result = GameResultLose;
-			}
-			else if (last_value < -value_threshold) {
-				// 負け
-				// 最後の局面は相手局面なので勝ち
+				// records.back()は自分の局面なので勝ち
 				game_result = GameResultWin;
 			}
+			else if (!records.empty() && records.back().score < -value_threshold) {
+				// 負け
+				// records.back()は自分の局面なので負け
+				game_result = GameResultLose;
+			}
 			else {
+				// 引き分け、一定手数に到達した場合は
+				// 学習データに含めない。
 				continue;
 			}
 
@@ -383,6 +432,8 @@ void Tanuki::GenerateKifu() {
 		// こうしないと相入玉等合法手の多い局面で止まるまでに時間がかかる
 		Threads.stop = true;
 	}
+
+	std::cout << "Number of plays per record=" << global_position_index / num_records << std::endl;
 
 	if (measure_depth) {
 		char output_file_path[1024];
