@@ -130,6 +130,18 @@ extern void bench_cmd(Position& pos, istringstream& is);
 void gameover_handler(const string& cmd);
 #endif
 
+// ----------------------------------
+//   USI拡張コマンド "cluster"
+//     やねうら王 The Cluster
+// ----------------------------------
+
+#if defined(YANEURAOU_ENGINE_DEEP)
+namespace YaneuraouTheCluster
+{
+	// cluster時のUSIメッセージの処理ループ
+	void cluster_usi_loop(Position& pos, std::istringstream& is);
+}
+#endif
 
 namespace USI
 {
@@ -1013,6 +1025,12 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "gensfen2019") Learner::gen_sfen2019(pos, is);
 #endif
 
+#endif
+
+#if defined(YANEURAOU_ENGINE_DEEP)
+		else if (token == "cluster")
+			// cluster時のUSIメッセージの処理ループ
+			YaneuraouTheCluster::cluster_usi_loop(pos, is);
 #endif
 
 #ifdef EVAL_LEARN
