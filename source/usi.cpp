@@ -16,6 +16,7 @@
 #include "tanuki_kifu_generator.h"
 #include "tanuki_kifu_shuffler.h"
 #include "tanuki_progress.h"
+#include "denryu2_investigation.h"
 
 using namespace std;
 
@@ -1134,6 +1135,10 @@ void USI::loop(int argc, char* argv[])
 
 		else if (token == "analyze_progress") {
 			Tanuki::AnalyzeProgress();
+		}
+
+		else if (token == "denryu2_time") {
+			Denryu2::ExtractTime();
 		}
 #endif
 
