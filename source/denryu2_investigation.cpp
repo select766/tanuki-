@@ -159,7 +159,10 @@ void Denryu2::CalculateMoveMatchRatio(Position& pos, std::istringstream& is)
 		for (int trial = 0; trial < num_trials_per_game; ++trial) {
 			// 局面を初期化する。
 			StateListPtr states(new StateList(1));
-			position_cmd(pos, std::istringstream("startpos"), states);
+			{
+				std::istringstream iss("startpos");
+				position_cmd(pos, iss, states);
+			}
 			is_ready();
 
 			std::istringstream iss(game);
@@ -171,7 +174,10 @@ void Denryu2::CalculateMoveMatchRatio(Position& pos, std::istringstream& is)
 				int progress_type = static_cast<int>(progress->Estimate(pos) * 3.0);
 
 				// goコマンドを実行する
-				go_cmd(pos, std::istringstream("go byoyomi 5000"), states);
+				{
+					std::istringstream iss("go byoyomi 5000");
+					go_cmd(pos, iss, states);
+				}
 
 				// goコマンドを待機する
 				Threads.main()->wait_for_search_finished();
@@ -196,7 +202,10 @@ void Denryu2::CalculateMoveMatchRatio(Position& pos, std::istringstream& is)
 				position_command += " ";
 				position_command += move_str;
 
-				position_cmd(pos, std::istringstream(position_command), states);
+				{
+					std::istringstream iss(position_command);
+					position_cmd(pos, iss, states);
+				}
 			}
 		}
 	}
