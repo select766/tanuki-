@@ -1140,6 +1140,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "denryu2_time") {
 			Denryu2::ExtractTime();
 		}
+
+		else if (token == "denryu2_extract_games") {
+			Denryu2::ExtractGames();
+		}
 #endif
 
 		else

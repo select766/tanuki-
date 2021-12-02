@@ -1,6 +1,7 @@
 ﻿#include "denryu2_investigation.h"
 
 #include <filesystem>
+#include <random>
 
 #include "tanuki_progress.h"
 #include "position.h"
@@ -68,4 +69,56 @@ void Denryu2::ExtractTime()
 	}
 
 	std::cout << "done" << std::endl;
+}
+
+void Denryu2::ExtractGames()
+{
+	// 棋譜を読み込む
+	sync_cout << "Reading records..." << sync_endl;
+	std::string book_file = "C:\\shogi\\floodgate\\wdoor.sfen";
+	std::ifstream ifs(book_file);
+	if (!ifs) {
+		sync_cout << "info string Failed to read the progress book file." << sync_endl;
+		std::exit(-1);
+	}
+
+	std::vector<std::string> valid_games;
+	std::string line;
+	int index = 0;
+	while (std::getline(ifs, line)) {
+		std::istringstream iss(line);
+		std::string move_str;
+		Position pos;
+		std::vector<StateInfo> state_info(512);
+		pos.set_hirate(&state_info[0], Threads.main());
+		while (iss >> move_str) {
+			if (move_str == "startpos" || move_str == "moves") {
+				continue;
+			}
+
+			Move move = USI::to_move(pos, move_str);
+			if (!is_ok(move) || !pos.legal(move)) {
+				break;
+			}
+
+			pos.do_move(move, state_info[pos.game_ply()]);
+		}
+
+		if (pos.is_mated() || pos.DeclarationWin() != MOVE_NONE) {
+			valid_games.push_back(line);
+		}
+
+		if (++index % 10000 == 0) {
+			sync_cout << index << sync_endl;
+		}
+	}
+
+	sync_cout << "num_records: " << valid_games.size() << sync_endl;
+	std::random_device rd;
+	std::mt19937_64 mt(rd());
+	std::shuffle(valid_games.begin(), valid_games.end(), mt);
+
+	for (int game_index = 0; game_index < 10; ++game_index) {
+		sync_cout << valid_games[game_index] << sync_endl;
+	}
 }

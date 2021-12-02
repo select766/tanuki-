@@ -4,6 +4,7 @@
 namespace Denryu2
 {
 	void ExtractTime();
+	void ExtractGames();
 }
 
 #endif
