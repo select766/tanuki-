@@ -195,6 +195,7 @@ void Denryu2::CalculateMoveMatchRatio(Position& pos, std::istringstream& is)
 				}
 
 				std::printf("%d,%d,%d,%d,%d\n", game_index, trial, pos.game_ply(), progress_type, found ? 1 : 0);
+				std::fflush(nullptr);
 
 				if (pos.game_ply() == 1) {
 					position_command += " moves";
