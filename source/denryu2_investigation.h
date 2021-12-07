@@ -10,6 +10,7 @@ namespace Denryu2
 	void ExtractTime();
 	void ExtractGames();
 	void CalculateMoveMatchRatio(Position& pos, std::istringstream& is);
+	void CalculateMoveMatchRatio2(Position& pos);
 }
 
 #endif

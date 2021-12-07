@@ -1148,6 +1148,10 @@ void USI::loop(int argc, char* argv[])
 		else if (token == "denryu2_calculate_move_match_ratio") {
 			Denryu2::CalculateMoveMatchRatio(pos, is);
 		}
+
+		else if (token == "denryu2_calculate_move_match_ratio2") {
+			Denryu2::CalculateMoveMatchRatio2(pos);
+		}
 #endif
 
 		else

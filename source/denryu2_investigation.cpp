@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <random>
+#include <cassert>
 
 #include "tanuki_progress.h"
 #include "position.h"
@@ -210,4 +211,114 @@ void Denryu2::CalculateMoveMatchRatio(Position& pos, std::istringstream& is)
 			}
 		}
 	}
+}
+
+void Denryu2::CalculateMoveMatchRatio2(Position& pos)
+{
+	auto progress = std::make_unique<Tanuki::Progress>();
+	if (!progress->Load()) {
+		std::exit(1);
+	}
+
+	constexpr int num_trials_per_game = 10;
+	constexpr int multi_pv = 1;
+
+	int game_index = 0;
+	//std::string directory_path = "C:\\shogi\\dr2_kifu_csa";
+	std::string directory_path = "D:\\hnoda\\dr2_kifu_csa";
+	for (const auto& directory_entry : std::filesystem::directory_iterator(directory_path)) {
+		const auto& path = directory_entry.path();
+		const auto& filename = path.filename().string();
+
+		Color toarubaito_color;
+		if (filename.find("_toarubaito_") != std::string::npos) {
+			toarubaito_color = BLACK;
+		}
+		else if (filename.find("_toarubaito-") != std::string::npos) {
+			toarubaito_color = WHITE;
+		}
+		else {
+			continue;
+		}
+
+		int day;
+		if (filename.find("+dr2prdy1-") != std::string::npos) {
+			day = 1;
+		}
+		else {
+			day = 2;
+		}
+
+		for (int trial = 0; trial < num_trials_per_game; ++trial) {
+			std::ifstream ifs(path);
+			assert(ifs);
+
+			std::string line;
+			while (std::getline(ifs, line) && line != "+")
+				;
+
+			// 局面を初期化する。
+			StateListPtr states(new StateList(1));
+			{
+				std::istringstream iss("startpos");
+				position_cmd(pos, iss, states);
+			}
+			is_ready();
+
+			Color color = BLACK;
+			std::string position_command = "startpos";
+			while (std::getline(ifs, line) && line.find("%") != 0) {
+				auto csa_move_str = line.substr(1);
+				auto move = CSA::to_move(pos, csa_move_str);
+
+				std::string time_str;
+				std::getline(ifs, time_str);
+
+				if (toarubaito_color == color) {
+					int progress_type = static_cast<int>(progress->Estimate(pos) * 3.0);
+
+					// goコマンドを実行する
+					{
+						std::istringstream iss("go byoyomi 5000");
+						go_cmd(pos, iss, states);
+					}
+
+					// goコマンドを待機する
+					Threads.main()->wait_for_search_finished();
+
+					// 棋譜の指し手が読み筋に含まれているかどうか調べる。
+					bool found = false;
+					const auto& root_moves = Threads.main()->rootMoves;
+					for (int pv_index = 0; !found && pv_index < multi_pv && pv_index < root_moves.size(); ++pv_index) {
+						const auto& pv = root_moves[pv_index].pv;
+						if (pv.empty()) {
+							continue;
+						}
+
+						found = (pv[0] == move);
+					}
+
+					std::printf("%d,%d,%d,%d,%d,%d\n", day, game_index, trial, pos.game_ply(), progress_type, found ? 1 : 0);
+					std::fflush(nullptr);
+				}
+
+				if (pos.game_ply() == 1) {
+					position_command += " moves";
+				}
+				position_command += " ";
+				position_command += to_usi_string(move);
+
+				{
+					std::istringstream iss(position_command);
+					position_cmd(pos, iss, states);
+				}
+
+				color = ~color;
+			}
+		}
+
+		++game_index;
+	}
+
+	std::cout << "done" << std::endl;
 }
