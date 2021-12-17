@@ -55,6 +55,7 @@ namespace {
 	constexpr const char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
 	constexpr const char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
 	constexpr const char* kOptionGeneratorAdjustNodesLimit = "GeneratorAdjustNodesLimit";
+	constexpr const char* kOptionGeneratorRandomMove = "GeneratorRandomMove";
 	constexpr const char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr const char* kOptionConvertSfenToLearningDataSearchDepth =
@@ -150,6 +151,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorMaxMultiPVMoves] << Option(16, 0, std::numeric_limits<int>::max());
 	o[kOptionGeneratorMaxEvalDiff] << Option(30, 0, std::numeric_limits<int>::max());
 	o[kOptionGeneratorAdjustNodesLimit] << Option(false);
+	o[kOptionGeneratorRandomMove] << Option(true);
 }
 
 namespace {
@@ -218,6 +220,7 @@ void Tanuki::GenerateKifu() {
 	int max_multi_pv_moves = Options[kOptionGeneratorMaxMultiPVMoves];
 	int max_eval_diff = Options[kOptionGeneratorMaxEvalDiff];
 	bool adjust_nodes_limit = Options[kOptionGeneratorAdjustNodesLimit];
+	bool random_move = Options[kOptionGeneratorRandomMove];
 
 	std::cout << "search_depth=" << search_depth << std::endl;
 	std::cout << "num_positions=" << num_positions << std::endl;
@@ -231,6 +234,7 @@ void Tanuki::GenerateKifu() {
 	std::cout << "max_multi_pv_count=" << max_multi_pv_moves << std::endl;
 	std::cout << "max_eval_diff=" << max_eval_diff << std::endl;
 	std::cout << "adjust_nodes_limit=" << adjust_nodes_limit << std::endl;
+	std::cout << "random_move=" << random_move << std::endl;
 
 	Search::LimitsType limits;
 	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
@@ -276,7 +280,9 @@ void Tanuki::GenerateKifu() {
 			Position& pos = thread.rootPos;
 			pos.set(start_positions[start_positions_index(mt19937_64)], &state_info[0], &thread);
 
-			RandomMove(pos, state_info, mt19937_64);
+			if (random_move) {
+				RandomMove(pos, state_info, mt19937_64);
+			}
 
 			std::vector<Learner::PackedSfenValue> records;
 			int num_multi_pv_move = 0;
