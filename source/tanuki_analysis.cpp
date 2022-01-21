@@ -11,6 +11,7 @@
 namespace
 {
 	const int kNumBars = 100;
+	const int kValuePerBucket = 100;
 	const int kNumPositions = 10000000;
 }
 
@@ -33,17 +34,20 @@ void Tanuki::AnalyzeProgress()
 		StateInfo state_info = {};
 		position.set_from_packed_sfen(packed_sfen_value.sfen, &state_info, Threads[0]);
 		double p = progress.Estimate(position);
-		++count[static_cast<int>(p * kNumBars)];
+		int bucket_index = std::abs(packed_sfen_value.score) / kValuePerBucket;
+		if (bucket_index >= kNumBars) {
+			continue;
+		}
+		++count[bucket_index];
 		++num_positions;
 	}
 
-	double num_positions_adjusted = 0.0;
-	for (int i = 0; i < kNumBars; ++i) {
-		num_positions_adjusted += count[i] * (kNumBars - i) / static_cast<double>(kNumBars);
-	}
+	//for (int i = 0; i < kNumBars; ++i) {
+	//	printf("%f\n", count[i] / static_cast<double>(num_positions));
+	//}
 
 	for (int i = 0; i < kNumBars; ++i) {
-		printf("%f\n",count[i] / static_cast<double>(num_positions));
+		printf("%f\n", count[i] / static_cast<double>(num_positions));
 	}
 }
 
