@@ -1,4 +1,4 @@
-#include "tanuki_analysis.h"
+﻿#include "tanuki_analysis.h"
 #include "config.h"
 
 #include "tanuki_kifu_reader.h"
@@ -25,7 +25,6 @@ void Tanuki::AnalyzeProgress()
 	}
 
 	int count[kNumBars] = {};
-	int64_t sum_abs_value[kNumBars] = {};
 
 	Learner::PackedSfenValue packed_sfen_value;
 	auto& position = Threads[0]->rootPos;
@@ -36,7 +35,6 @@ void Tanuki::AnalyzeProgress()
 		double p = progress.Estimate(position);
 		++count[static_cast<int>(p * kNumBars)];
 		++num_positions;
-		sum_abs_value[static_cast<int>(p * kNumBars)] += std::abs(packed_sfen_value.score);
 	}
 
 	double num_positions_adjusted = 0.0;
@@ -45,10 +43,7 @@ void Tanuki::AnalyzeProgress()
 	}
 
 	for (int i = 0; i < kNumBars; ++i) {
-		printf("%f,%f,%f\n",
-			i / static_cast<double>(kNumBars),
-			count[i] / static_cast<double>(num_positions),
-			count[i] ? sum_abs_value[i] / static_cast<double>(count[i]) : 0.0);
+		printf("%f\n",count[i] / static_cast<double>(num_positions));
 	}
 }
 
