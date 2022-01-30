@@ -387,7 +387,7 @@ void Tanuki::Train(std::istringstream& is)
 
     std::cout << "init_training.." << std::endl;
     Eval::NNUE::InitializeTraining(eta1, eta1_epoch, eta2, eta2_epoch, eta3);
-    Eval::NNUE::SetBatchSize(mini_batch_size);
+    Eval::NNUE::SetBatchSize(nn_batch_size);
     Eval::NNUE::SetOptions(nn_options);
     // これまでに最も検証ロスが下がった評価関数が含まれるフォルダパス。
     std::string best_nn_directory;
@@ -440,7 +440,7 @@ void Tanuki::Train(std::istringstream& is)
         << " , test_cross_entropy = " << test_cross_entropy
         << " , test_entropy = " << test_entropy
         << " , test_norm = " << test_norm
-        << " , move_accuracy = " << move_accord_ratio << "%"
+        << " , move_accuracy = " << move_accord_ratio * 100.0 << "%"
         << std::endl;
 
     double best_loss = std::numeric_limits<double>::max();
@@ -615,7 +615,7 @@ void Tanuki::Train(std::istringstream& is)
                 << " , test_cross_entropy = " << test_cross_entropy
                 << " , test_entropy = " << test_entropy
                 << " , test_norm = " << test_norm
-                << " , move_accuracy = " << move_accord_ratio << "%"
+                << " , move_accuracy = " << move_accord_ratio * 100.0 << "%"
                 << " , learn_cross_entropy_eval = " << learn_cross_entropy_eval
                 << " , learn_cross_entropy_win = " << learn_cross_entropy_win
                 << " , learn_entropy_eval = " << learn_cross_entropy
@@ -632,6 +632,8 @@ void Tanuki::Train(std::istringstream& is)
             learn_sum_entropy = 0.0;
             latest_loss_count = num_processed_sfens - last_loss_output;
             last_loss_output = num_processed_sfens;
+
+            Eval::NNUE::CheckHealth();
         }
 
         if (last_eval_save + eval_save_interval <= num_processed_sfens) {
