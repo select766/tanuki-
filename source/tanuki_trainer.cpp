@@ -1,5 +1,3 @@
-//#pragma optimize( "", off )
-
 #ifdef EVAL_LEARN
 
 #include <chrono>
@@ -123,7 +121,7 @@ namespace {
                 auto shallow_value = r.first;
                 const auto rootColor = pos.side_to_move();
                 const auto pv = r.second;
-                std::vector<StateInfo> states(pv.size());
+                StateInfo states[MAX_PLY];
                 for (size_t i = 0; i < pv.size(); ++i)
                 {
                     pos.do_move(pv[i], states[i]);
@@ -453,7 +451,7 @@ void Tanuki::Train(std::istringstream& is)
     //   評価関数パラメーターの学習の開始
     // -----------------------------------
 
-    Tanuki::KifuReader training_data_reader(training_data_folder_path, loop);
+    Tanuki::KifuReader training_data_reader(training_data_folder_path, loop, num_threads);
 
     // 学習開始。
     std::random_device random_device;
@@ -490,8 +488,7 @@ void Tanuki::Train(std::istringstream& is)
                 // goto好きではないので、for(;;)とcontinueで代用する。
                 for (;;) {
                     Learner::PackedSfenValue ps;
-#pragma omp critical
-                    training_data_reader.Read(ps);
+                    training_data_reader.Read(ps, thread_index);
 
                     // 評価値が学習対象の値を超えている。
                     // この局面情報を無視する。
@@ -540,7 +537,7 @@ void Tanuki::Train(std::istringstream& is)
 
                     int ply = 0;
 
-                    std::vector<StateInfo> state(MAX_PLY); // qsearchのPVがそんなに長くなることはありえない。
+                    StateInfo state[MAX_PLY]; // qsearchのPVがそんなに長くなることはありえない。
                     for (auto m : pv)
                     {
                         // 非合法手はやってこないはずなのだが。
@@ -592,7 +589,7 @@ void Tanuki::Train(std::istringstream& is)
 
         num_processed_sfens += mini_batch_size;
 
-        if (num_processed_sfens <= last_loss_output + loss_output_interval) {
+        if (last_loss_output + loss_output_interval <= num_processed_sfens) {
             MeasureTestLoss(validation_data, test_cross_entropy_eval, test_cross_entropy_win, test_cross_entropy,
                 test_entropy_eval, test_entropy_win, test_entropy, test_norm, move_accord_ratio);
 
@@ -637,7 +634,7 @@ void Tanuki::Train(std::istringstream& is)
             last_loss_output = num_processed_sfens;
         }
 
-        if (num_processed_sfens <= last_eval_save + eval_save_interval) {
+        if (last_eval_save + eval_save_interval <= num_processed_sfens) {
             if (Save(false, newbob_decay, newbob_num_trials, best_loss, latest_loss_sum, latest_loss_count, best_nn_directory, newbob_scale)) {
                 break;
             }

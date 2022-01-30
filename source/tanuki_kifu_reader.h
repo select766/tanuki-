@@ -15,21 +15,21 @@
 namespace Tanuki {
 	class KifuReader {
 	public:
-		KifuReader(const std::string& folder_name, int num_loops);
+		KifuReader(const std::string& folder_name, int num_loops, int num_threads = 1);
 		virtual ~KifuReader();
-		bool Read(Learner::PackedSfenValue& record);
-		bool Read(int num_records, std::vector<Learner::PackedSfenValue>& records);
+		bool Read(Learner::PackedSfenValue& record, int thread_index = 0);
+		bool Read(int num_records, std::vector<Learner::PackedSfenValue>& records, int thread_index = 0);
 		bool Close();
 
 	private:
-		bool EnsureOpen();
-
 		const std::string folder_name_;
 		const int num_loops_;
 		std::vector<std::string> file_paths_;
-		FILE* file_;
-		int loop_ = 0;
-		int file_index_ = 0;
+		std::vector<FILE*> files_;
+		// file_index_ >= file_paths_.size()となる場合もある。
+		// int local_file_index = file_index_++ % file_paths_.size()等として使うこと。
+		// file_index_ > file_paths_.size() * num_loops_が終了条件
+		std::atomic<int> file_index_;
 	};
 }
 
