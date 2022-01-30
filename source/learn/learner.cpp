@@ -1771,11 +1771,11 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 #endif
 
 				// 教師の指し手と浅い探索のスコアが一致するかの判定
-				{
-					auto r = search(pos, 1);
-					if ((u16)r.second[0] == ps.move)
-						++local_move_accord_count;
-				}
+				//{
+				//	auto r = search(pos, 1);
+				//	if ((u16)r.second[0] == ps.move)
+				//		++local_move_accord_count;
+				//}
 			}
 
 			// グローバルな総和にまとめて足し合わせる。
