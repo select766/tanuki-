@@ -35,7 +35,7 @@ constexpr std::size_t kMaxSimdWidth = 32;
 using TransformedFeatureType = std::uint8_t;
 
 // インデックスの型
-using IndexType = std::uint32_t;
+using IndexType = std::int32_t;
 
 // 学習用クラステンプレートの前方宣言
 template <typename Layer>

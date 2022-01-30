@@ -33,6 +33,15 @@ void RestoreParameters(const std::string& dir_name);
 void AddExample(Position& pos, Color rootColor,
                 const Learner::PackedSfenValue& psv, double weight);
 
+// 学習データを1サンプル設定する
+// マルチスレッドで並列に実行する事を意図している。
+void SetExample(Position& pos, Color rootColor,
+    const Learner::PackedSfenValue& psv, double weight, int index);
+
+// 学習データ配列をリサイズする
+// SetExample()を呼び出す前にこちらを呼び出さなければならない
+void ResizeExamples(int size);
+
 // 評価関数パラメータを更新する
 void UpdateParameters(u64 epoch);
 

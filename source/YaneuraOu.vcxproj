@@ -312,8 +312,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release-NNUE-LEARN|x64'">
     <ClCompile>
-      <OpenMPSupport>
-      </OpenMPSupport>
+      <OpenMPSupport>true</OpenMPSupport>
       <PreprocessorDefinitions>USE_AVX2;USE_BLAS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -452,6 +451,7 @@
     <ClInclude Include="movepick.h" />
     <ClInclude Include="search.h" />
     <ClInclude Include="tanuki_filesystem.h" />
+    <ClInclude Include="tanuki_trainer.h" />
     <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="tanuki_analysis.h" />
     <ClInclude Include="tanuki_book.h" />
@@ -518,6 +518,7 @@
     <ClCompile Include="tanuki_kifu_writer.cpp" />
     <ClCompile Include="tanuki_progress.cpp" />
     <ClCompile Include="tanuki_progress_report.cpp" />
+    <ClCompile Include="tanuki_trainer.cpp" />
     <ClCompile Include="timeman.cpp" />
     <ClCompile Include="types.cpp" />
     <ClCompile Include="position.cpp" />

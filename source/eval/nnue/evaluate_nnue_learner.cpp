@@ -165,6 +165,57 @@ void AddExample(Position& pos, Color rootColor,
   examples.push_back(std::move(example));
 }
 
+// 学習データを1サンプル設定する
+// マルチスレッドで並列に実行する事を意図している。
+void SetExample(Position& pos, Color rootColor,
+    const Learner::PackedSfenValue& psv, double weight, int index) {
+    Example& example = examples[index];
+    if (rootColor == pos.side_to_move()) {
+        example.sign = 1;
+    }
+    else {
+        example.sign = -1;
+    }
+    example.psv = psv;
+    example.weight = weight;
+
+    Features::IndexList active_indices[2];
+    for (const auto trigger : kRefreshTriggers) {
+        RawFeatures::AppendActiveIndices(pos, trigger, active_indices);
+    }
+    if (pos.side_to_move() != BLACK) {
+        active_indices[0].swap(active_indices[1]);
+    }
+    for (const auto color : COLOR) {
+        std::vector<TrainingFeature> training_features;
+        for (const auto base_index : active_indices[color]) {
+            static_assert(Features::Factorizer<RawFeatures>::GetDimensions() <
+                (1 << TrainingFeature::kIndexBits), "");
+            Features::Factorizer<RawFeatures>::AppendTrainingFeatures(
+                base_index, &training_features);
+        }
+        std::sort(training_features.begin(), training_features.end());
+
+        auto& unique_features = example.training_features[color];
+        for (const auto& feature : training_features) {
+            if (!unique_features.empty() &&
+                feature.GetIndex() == unique_features.back().GetIndex()) {
+                unique_features.back() += feature;
+            }
+            else {
+                unique_features.push_back(feature);
+            }
+        }
+    }
+}
+
+// 学習データ配列をリサイズする
+// SetExample()を呼び出す前にこちらを呼び出さなければならない
+void ResizeExamples(int size) {
+    ASSERT_LV3(examples.empty());
+    examples.resize(size);
+}
+
 // 評価関数パラメーターを更新する
 void UpdateParameters(u64 epoch) {
   ASSERT_LV3(batch_size > 0);
