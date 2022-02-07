@@ -5,6 +5,7 @@
 
 #ifdef EVAL_LEARN
 
+#include <atomic>
 #include <fstream>
 #include <mutex>
 #include <string>
