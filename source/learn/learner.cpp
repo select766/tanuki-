@@ -362,6 +362,8 @@ struct MultiThinkGenSfen : public MultiThink
 //  thread_id    = 0..Threads.size()-1
 void MultiThinkGenSfen::thread_worker(size_t thread_id)
 {
+	WinProcGroup::bindThisThread(thread_id);
+
 	// とりあえず、書き出す手数の最大のところで引き分け扱いになるものとする。
 	const int MAX_PLY2 = write_maxply;
 
@@ -1867,6 +1869,8 @@ void LearnerThink::thread_worker(size_t thread_id)
 #if defined(_OPENMP)
 	omp_set_num_threads((int)Options["Threads"]);
 #endif
+
+	WinProcGroup::bindThisThread(thread_id);
 
 	auto th = Threads[thread_id];
 	auto& pos = th->rootPos;
