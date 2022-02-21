@@ -3,11 +3,9 @@
 
 #ifdef EVAL_LEARN
 
+#include <filesystem>
 #include <numeric>
 #include <sstream>
-#define NOMINMAX
-#include <Windows.h>
-#undef NOMINMAX
 
 #include "misc.h"
 #include "usi.h"
@@ -22,30 +20,9 @@ namespace {
 
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops, int num_threads)
 	: folder_name_(folder_name), num_loops_(num_loops), files_(num_threads) {
-	// http://qiita.com/tkymx/items/f9190c16be84d4a48f8a
-	HANDLE find = nullptr;
-	WIN32_FIND_DATAA find_data = {};
-
-	std::string search_name = folder_name_ + "/*.*";
-	find = FindFirstFileA(search_name.c_str(), &find_data);
-
-	if (find == INVALID_HANDLE_VALUE) {
-		sync_cout << "Failed to find kifu files." << sync_endl;
-		sync_cout << "search_name=" << search_name << sync_endl;
-		return;
+	for (const auto& file : std::filesystem::directory_iterator(folder_name)) {
+		file_paths_.push_back(file.path().string());
 	}
-
-	do {
-		if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			continue;
-		}
-
-		std::string file_path = folder_name_ + "/" + find_data.cFileName;
-		file_paths_.push_back(file_path);
-	} while (FindNextFileA(find, &find_data));
-
-	FindClose(find);
-	find = nullptr;
 }
 
 Tanuki::KifuReader::~KifuReader() { Close(); }
