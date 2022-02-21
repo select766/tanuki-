@@ -20,9 +20,9 @@ namespace {
 
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops, int num_threads)
 	: folder_name_(folder_name), num_loops_(num_loops), files_(num_threads), file_index_(0) {
-	sync_cout << "info string Enumerating the files in " << folder_name << sync_endl;
+	//sync_cout << "info string Enumerating the files in " << folder_name << sync_endl;
 	for (const auto& file : std::filesystem::directory_iterator(folder_name)) {
-		sync_cout << file.path() << sync_endl;
+		//sync_cout << file.path() << sync_endl;
 		file_paths_.push_back(file.path().string());
 	}
 }
@@ -45,8 +45,8 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 	// まだファイルを開いていない場合、ファイルを開く
 	if (file == nullptr) {
 		int local_file_index = file_index_++ % file_paths_.size();
-		sync_cout << "info string local_file_index=" << local_file_index << " file_index_=" << file_index_ << sync_endl;
-		sync_cout << "info string Opening " << file_paths_[local_file_index] << sync_endl;
+		//sync_cout << "info string local_file_index=" << local_file_index << " file_index_=" << file_index_ << sync_endl;
+		//sync_cout << "info string Opening " << file_paths_[local_file_index] << sync_endl;
 		file = std::fopen(file_paths_[local_file_index].c_str(), "rb");
 
 		if (!file) {
@@ -85,8 +85,8 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 		return false;
 	}
 
-	sync_cout << "info string local_file_index=" << local_file_index << " file_index_=" << file_index_ << sync_endl;
-	sync_cout << "info string Opening " << file_paths_[local_file_index] << sync_endl;
+	//sync_cout << "info string local_file_index=" << local_file_index << " file_index_=" << file_index_ << sync_endl;
+	//sync_cout << "info string Opening " << file_paths_[local_file_index] << sync_endl;
 	file = std::fopen(file_paths_[local_file_index].c_str(), "rb");
 	if (file == nullptr) {
 		// ファイルを開くのに失敗したら
