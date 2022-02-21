@@ -21,6 +21,7 @@ namespace {
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops, int num_threads)
 	: folder_name_(folder_name), num_loops_(num_loops), files_(num_threads) {
 	for (const auto& file : std::filesystem::directory_iterator(folder_name)) {
+		sync_cout << file.path() << sync_endl;
 		file_paths_.push_back(file.path().string());
 	}
 }

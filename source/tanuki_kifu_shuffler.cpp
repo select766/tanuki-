@@ -34,6 +34,9 @@ void Tanuki::ShuffleKifu() {
 	std::string kifu_dir = Options["KifuDir"];
 	std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
 
+	sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
+	sync_cout << "shuffled_kifu_dir=" << shuffled_kifu_dir << sync_endl;
+
 	auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
 	_mkdir(shuffled_kifu_dir.c_str());
 
