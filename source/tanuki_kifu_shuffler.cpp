@@ -49,8 +49,11 @@ void Tanuki::ShuffleKifu() {
 
 	std::vector<std::shared_ptr<KifuWriter> > writers;
 	for (const auto& file_path : file_paths) {
+		sync_cout << "file_path=" << file_path << sync_endl;
 		writers.push_back(std::make_shared<KifuWriter>(file_path));
 	}
+
+	sync_cout << "info string Starting dividing..." << sync_endl;
 
 	std::mt19937_64 mt(std::time(nullptr));
 	std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
@@ -82,6 +85,8 @@ void Tanuki::ShuffleKifu() {
 	for (auto& writer : writers) {
 		writer->Close();
 	}
+
+	sync_cout << "info string Starting shuffling..." << sync_endl;
 
 	// 各ファイルをシャッフルする
 	for (const auto& file_path : file_paths) {
