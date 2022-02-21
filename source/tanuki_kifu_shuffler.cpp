@@ -47,6 +47,7 @@ void Tanuki::ShuffleKifu() {
 		file_paths.push_back(file_path);
 	}
 
+	sync_cout << "info string Opening output files..." << sync_endl;
 	std::vector<std::shared_ptr<KifuWriter> > writers;
 	for (const auto& file_path : file_paths) {
 		sync_cout << "file_path=" << file_path << sync_endl;

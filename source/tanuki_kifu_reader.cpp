@@ -20,6 +20,7 @@ namespace {
 
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops, int num_threads)
 	: folder_name_(folder_name), num_loops_(num_loops), files_(num_threads) {
+	sync_cout << "info string Enumerating the files in " << folder_name << sync_endl;
 	for (const auto& file : std::filesystem::directory_iterator(folder_name)) {
 		sync_cout << file.path() << sync_endl;
 		file_paths_.push_back(file.path().string());
@@ -57,7 +58,7 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 		}
 	}
 
-	// ループ終了条件は以下の通りとする
+	// すべてのファイルをnum_loops_回開いたら終了する
 	if (file_index_ > static_cast<int>(file_paths_.size()) * num_loops_) {
 		return false;
 	}
@@ -67,15 +68,19 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 		return true;
 	}
 
-	int local_file_index = file_index_++ % file_paths_.size();
-
-	// ループ終了条件は以下の通りとする
-	if (file_index_ > static_cast<int>(file_paths_.size()) * num_loops_) {
+	// 読み込みに失敗したらファイルを閉じ、次のファイルを開く準備をする
+	if (std::fclose(file)) {
+		sync_cout << "info string Failed to close a kifu file." << sync_endl;
 		return false;
 	}
 
-	if (std::fclose(file)) {
-		sync_cout << "info string Failed to close a kifu file." << sync_endl;
+	file = nullptr;
+
+	// 次のファイルを開く
+	int local_file_index = file_index_++ % file_paths_.size();
+
+	// すべてのファイルをnum_loops_回開いたら終了する
+	if (file_index_ > static_cast<int>(file_paths_.size()) * num_loops_) {
 		return false;
 	}
 
