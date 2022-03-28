@@ -5,7 +5,9 @@
 
 #include "tanuki_book.h"
 #include "tanuki_kifu_generator.h"
+#include "tanuki_kifu_reader.h"
 #include "tanuki_kifu_shuffler.h"
+#include "tanuki_kifu_writer.h"
 #include "tanuki_lazy_cluster.h"
 #include "tanuki_progress.h"
 
@@ -197,8 +199,11 @@ namespace USI {
 		Tanuki::InitializeBook(o);
 		Tanuki::InitializeGenerator(o);
 		Tanuki::InitializeShuffler(o);
+		Tanuki::KifuReader::Initialize(o);
+		Tanuki::KifuWriter::Initialize(o);
 		Tanuki::Progress::Initialize(o);
 #endif
+
 		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options();
 	}

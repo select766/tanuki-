@@ -15,7 +15,7 @@ using USI::OptionsMap;
 using Learner::PackedSfenValue;
 
 namespace {
-	constexpr int kBufferSize = 1024 * 1024;
+	static const constexpr char* kKifuReaderBufferSize = "KifuReaderBufferSize";
 }
 
 Tanuki::KifuReader::KifuReader(const std::string& folder_name, int num_loops, int num_threads)
@@ -54,7 +54,8 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 			return false;
 		}
 
-		if (std::setvbuf(file, nullptr, _IOFBF, kBufferSize)) {
+		int buffer_size = Options[kKifuReaderBufferSize];
+		if (std::setvbuf(file, nullptr, _IOFBF, buffer_size)) {
 			sync_cout << "into string Failed to set a file buffer: " << file_paths_[local_file_index] << sync_endl;
 		}
 	}
@@ -96,7 +97,8 @@ bool Tanuki::KifuReader::Read(PackedSfenValue& record, int thread_index) {
 		return false;
 	}
 
-	if (std::setvbuf(file, nullptr, _IOFBF, kBufferSize)) {
+	int buffer_size = Options[kKifuReaderBufferSize];
+	if (std::setvbuf(file, nullptr, _IOFBF, buffer_size)) {
 		sync_cout << "into string Failed to set a file buffer: " << file_paths_[local_file_index]
 			<< sync_endl;
 	}
@@ -122,6 +124,10 @@ bool Tanuki::KifuReader::Close() {
 	}
 
 	return true;
+}
+
+void Tanuki::KifuReader::Initialize(USI::OptionsMap& o) {
+	o[kKifuReaderBufferSize] << USI::Option(1024 * 1024, 0, std::numeric_limits<int>::max());
 }
 
 #endif
