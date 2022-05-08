@@ -102,8 +102,10 @@ void Tanuki::ShuffleKifu() {
 				Position& pos = Threads[thread_index]->rootPos;
 				std::atomic<int> global_record_index;
 				global_record_index = 0;
-				for (int record_index = 0; record_index < global_record_index++; ++record_index) {
-					PackedSfenValue& record = records[record_index];
+				for (int local_record_index = global_record_index++;
+					local_record_index < static_cast<int>(records.size());
+					local_record_index = global_record_index++) {
+					PackedSfenValue& record = records[local_record_index];
 					pos.set_from_packed_sfen(record.sfen, &state_info[0], Threads.main());
 
 					auto root_color = pos.side_to_move();
