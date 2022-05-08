@@ -1,3 +1,5 @@
+#pragma optimize( "", off )
+
 #include "tanuki_kifu_shuffler.h"
 #include "config.h"
 
@@ -8,14 +10,17 @@
 #include <random>
 #include <ctime>
 
+#include "learn/learn.h"
+#include "misc.h"
 #include "tanuki_kifu_reader.h"
 #include "tanuki_kifu_writer.h"
-#include "misc.h"
+#include "thread.h"
 
 using Learner::PackedSfenValue;
 
 namespace {
 	static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
+	static const constexpr char* kApplyQSearch = "ApplyQSearch";
 	// シャッフル後のファイル数
 	// Windowsでは一度に512個までのファイルしか開けないため
 	// 256個に制限しておく
@@ -25,14 +30,20 @@ namespace {
 
 void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
 	o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
+	o[kApplyQSearch] << USI::Option(false);
 }
 
 void Tanuki::ShuffleKifu() {
+	GlobalOptions_ old_global_options = GlobalOptions;
+	GlobalOptions.use_eval_hash = false;
+	GlobalOptions.use_hash_probe = false;
+
 	// 棋譜を入力し、複数のファイルにランダムに追加していく
 	sync_cout << "info string Reading and dividing kifu files..." << sync_endl;
 
 	std::string kifu_dir = Options["KifuDir"];
 	std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
+	bool apply_qsearch = Options[kApplyQSearch];
 
 	sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
 	sync_cout << "shuffled_kifu_dir=" << shuffled_kifu_dir << sync_endl;
@@ -59,10 +70,39 @@ void Tanuki::ShuffleKifu() {
 	std::mt19937_64 mt(std::time(nullptr));
 	std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
 	int64_t num_records = 0;
+	Position pos;
+	std::vector<StateInfo> state_info(MAX_PLY * 2);
 	for (;;) {
 		std::vector<PackedSfenValue> records;
 		PackedSfenValue record;
 		while (reader->Read(record)) {
+			if (apply_qsearch) {
+				pos.set_from_packed_sfen(record.sfen, &state_info[0], Threads.main());
+
+				auto root_color = pos.side_to_move();
+
+				auto value_and_pv = Learner::qsearch(pos);
+
+				int ply = 1;
+				for (auto m : value_and_pv.second)
+				{
+					ASSERT_LV3(pos.pseudo_legal(m) && pos.legal(m));
+					pos.do_move(m, state_info[ply++]);
+				}
+
+				pos.sfen_pack(record.sfen);
+
+				auto leaf_color = pos.side_to_move();
+
+				record.move = MOVE_NONE;
+
+				// Root局面と末端局面の手番が異なる場合、評価値と勝敗を反転する。
+				if (root_color != leaf_color) {
+					record.score = -record.score;
+					record.game_result = -record.game_result;
+				}
+			}
+
 			records.push_back(record);
 			if (record.last_position || static_cast<int>(records.size()) > kMaxPackedSfenValues) {
 				break;
@@ -124,6 +164,8 @@ void Tanuki::ShuffleKifu() {
 		std::fclose(file);
 		file = nullptr;
 	}
+
+	GlobalOptions = old_global_options;
 }
 
 #endif
