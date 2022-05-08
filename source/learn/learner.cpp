@@ -1709,25 +1709,8 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 				}
 
 				// 浅い探索の評価値
-				// evaluate()の値を用いても良いのだが、ロスを計算するときにlearn_cross_entropyと
-				// 値が比較しにくくて困るのでqsearch()を用いる。
-				// EvalHashは事前に無効化してある。(そうしないと毎回同じ値が返ってしまう)
-				auto r = qsearch(pos);
-
-				auto shallow_value = r.first;
-				{
-					const auto rootColor = pos.side_to_move();
-					const auto pv = r.second;
-					std::vector<StateInfo> states(pv.size());
-					for (size_t i = 0; i < pv.size(); ++i)
-					{
-						pos.do_move(pv[i], states[i]);
-						Eval::evaluate_with_no_return(pos);
-					}
-					shallow_value = (rootColor == pos.side_to_move()) ? Eval::evaluate(pos) : -Eval::evaluate(pos);
-					for (auto it = pv.rbegin(); it != pv.rend(); ++it)
-						pos.undo_move(*it);
-				}
+				// シャッフル時にqsearch()を行っている前提で、evaluate()を使用する。
+				auto shallow_value = Eval::evaluate(pos);
 
 				// 深い探索の評価値
 				auto deep_value = (Value)ps.score;
@@ -2049,17 +2032,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 		//		cout << pos << value << endl;
 
 		// 浅い探索(qsearch)の評価値
-		auto r = qsearch(pos);
-
-		if ((++qsearch_count % 1000) == 0)
-		{
-			// qsearch()を1000回呼び出すごとに置換表をクリアする。
-			// qsearch()で汚れる置換表はたかだか知れてるとは思うが、
-			// 定期的にクリアはしたほうが良いと思われる。
-			th->tt.clear();
-		}
-
-		auto pv = r.second;
+		// シャッフル時にqsearch()を行っている前提で、evaluate()を使用する。
 
 		// 深い探索の評価値
 		auto deep_value = (Value)ps.score;
@@ -2138,8 +2111,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 			// 勾配に基づくupdateはのちほど行なう。
 			Eval::add_grad(pos, rootColor, dj_dw, freeze);
 #else
-			double example_weight =
-			    (discount_rate != 0 && ply != (int)pv.size()) ? discount_rate : 1.0;
+			double example_weight = 1.0;
 
 			// 進捗度に応じて学習率を調整する。
 			// WSCOC2020 elmo・水匠2
@@ -2152,33 +2124,8 @@ void LearnerThink::thread_worker(size_t thread_id)
 			sr.total_done++;
 		};
 
-		StateInfo state[MAX_PLY]; // qsearchのPVがそんなに長くなることはありえない。
-		for (auto m : pv)
-		{
-			// 非合法手はやってこないはずなのだが。
-			if (!pos.pseudo_legal(m) || !pos.legal(m))
-			{
-				cout << pos << m << endl;
-				ASSERT_LV3(false);
-			}
-
-			// 各PV上のnodeでも勾配を加算する場合の処理。
-			// discount_rateが0のときはこの処理は行わない。
-			if (discount_rate != 0)
-				pos_add_grad();
-
-			pos.do_move(m, state[ply++]);
-			
-			// leafでのevaluateの値を用いるので差分更新していく。
-			Eval::evaluate_with_no_return(pos);
-		}
-
 		// PVの終端局面に達したので、ここで勾配を加算する。
 		pos_add_grad();
-
-		// 局面を巻き戻す
-		for (auto it = pv.rbegin(); it != pv.rend(); ++it)
-			pos.undo_move(*it);
 
 #if 0
 		// rootの局面にも勾配を加算する場合
