@@ -5,10 +5,11 @@
 
 #ifdef EVAL_LEARN
 
-#include <direct.h>
 #include <cstdio>
-#include <random>
 #include <ctime>
+#include <direct.h>
+#include <omp.h>
+#include <random>
 
 #include "learn/learn.h"
 #include "misc.h"
@@ -37,6 +38,17 @@ void Tanuki::ShuffleKifu() {
 	GlobalOptions_ old_global_options = GlobalOptions;
 	GlobalOptions.use_eval_hash = false;
 	GlobalOptions.use_hash_probe = false;
+
+	int num_threads = (int)Options["Threads"];
+	omp_set_num_threads(num_threads);
+
+	Search::LimitsType limits;
+	// 引き分けの手数付近で引き分けの値が返るのを防ぐため1 << 16にする
+	limits.max_game_ply = 1 << 16;
+	limits.depth = MAX_PLY;
+	limits.silent = true;
+	limits.enteringKingRule = EKR_27_POINT;
+	Search::Limits = limits;
 
 	// 棋譜を入力し、複数のファイルにランダムに追加していく
 	sync_cout << "info string Reading and dividing kifu files..." << sync_endl;
@@ -70,47 +82,54 @@ void Tanuki::ShuffleKifu() {
 	std::mt19937_64 mt(std::time(nullptr));
 	std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
 	int64_t num_records = 0;
-	Position pos;
-	std::vector<StateInfo> state_info(MAX_PLY * 2);
 	for (;;) {
 		std::vector<PackedSfenValue> records;
 		PackedSfenValue record;
-		while (reader->Read(record)) {
-			if (apply_qsearch) {
-				pos.set_from_packed_sfen(record.sfen, &state_info[0], Threads.main());
-
-				auto root_color = pos.side_to_move();
-
-				auto value_and_pv = Learner::qsearch(pos);
-
-				int ply = 1;
-				for (auto m : value_and_pv.second)
-				{
-					ASSERT_LV3(pos.pseudo_legal(m) && pos.legal(m));
-					pos.do_move(m, state_info[ply++]);
-				}
-
-				pos.sfen_pack(record.sfen);
-
-				auto leaf_color = pos.side_to_move();
-
-				record.move = MOVE_NONE;
-
-				// Root局面と末端局面の手番が異なる場合、評価値と勝敗を反転する。
-				if (root_color != leaf_color) {
-					record.score = -record.score;
-					record.game_result = -record.game_result;
-				}
-			}
-
+		while (static_cast<int>(records.size()) < kMaxPackedSfenValues && reader->Read(record)) {
 			records.push_back(record);
-			if (record.last_position || static_cast<int>(records.size()) > kMaxPackedSfenValues) {
-				break;
-			}
 		}
 
 		if (records.empty()) {
 			break;
+		}
+
+		if (apply_qsearch) {
+#pragma omp parallel
+			{
+				int thread_index = ::omp_get_thread_num();
+				WinProcGroup::bindThisThread(thread_index);
+				std::vector<StateInfo> state_info(MAX_PLY * 2);
+				Position& pos = Threads[thread_index]->rootPos;
+				std::atomic<int> global_record_index;
+				global_record_index = 0;
+				for (int record_index = 0; record_index < global_record_index++; ++record_index) {
+					PackedSfenValue& record = records[record_index];
+					pos.set_from_packed_sfen(record.sfen, &state_info[0], Threads.main());
+
+					auto root_color = pos.side_to_move();
+
+					auto value_and_pv = Learner::qsearch(pos);
+
+					int ply = 1;
+					for (auto m : value_and_pv.second)
+					{
+						ASSERT_LV3(pos.pseudo_legal(m) && pos.legal(m));
+						pos.do_move(m, state_info[ply++]);
+					}
+
+					pos.sfen_pack(record.sfen);
+
+					auto leaf_color = pos.side_to_move();
+
+					record.move = MOVE_NONE;
+
+					// Root局面と末端局面の手番が異なる場合、評価値と勝敗を反転する。
+					if (root_color != leaf_color) {
+						record.score = -record.score;
+						record.game_result = -record.game_result;
+					}
+				}
+			}
 		}
 
 		for (const auto& record : records) {
