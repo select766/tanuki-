@@ -36,8 +36,8 @@ void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
 
 void Tanuki::ShuffleKifu() {
     GlobalOptions_ old_global_options = GlobalOptions;
-    GlobalOptions.use_eval_hash = false;
-    GlobalOptions.use_hash_probe = false;
+    //GlobalOptions.use_eval_hash = false;
+    //GlobalOptions.use_hash_probe = false;
 
     int num_threads = (int)Options["Threads"];
     omp_set_num_threads(num_threads);
