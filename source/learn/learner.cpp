@@ -2028,10 +2028,6 @@ void LearnerThink::thread_worker(size_t thread_id)
 		if (pos.is_mated() || pos.DeclarationWin() != MOVE_NONE)
 			goto RetryRead;
 
-		// best moveが駒を取る指し手となっている局面は除外する。
-		if (pos.capture(pos.to_move(Move16(ps.move))))
-			goto RetryRead;
-
 		// 読み込めたので試しに表示してみる。
 		//		cout << pos << value << endl;
 
