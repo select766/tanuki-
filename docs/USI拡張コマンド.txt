@@ -1,7 +1,9 @@
-﻿
-USIプロトコルの独自拡張コマンド
+﻿ここにあったテキストは、やねうら王Wikiに移動しました。
 
+やねうら王Wiki
+https://github.com/yaneurao/YaneuraOu/wiki
 
+<<<<<<< HEAD
 ■　USI options関連
 
 
@@ -867,4 +869,9 @@ USIプロトコルの独自拡張コマンド
 
 			複数台のPCで教師局面を生成するときに、各PCは生成直後に"learn shufflem"しているとして、
 			それらのファイルをホスト側で"learn shuffleq"してから学習に使うというような使い方を想定している。
+=======
+USI拡張コマンド - やねうら王Wiki
+https://github.com/yaneurao/YaneuraOu/wiki/USI%E6%8B%A1%E5%BC%B5%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
+リンク貼り替えにご協力お願い致します。m(_ _)m

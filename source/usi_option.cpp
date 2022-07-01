@@ -31,11 +31,24 @@ namespace USI {
 	// 前回のOptions["EvalDir"]
 	std::string last_eval_dir;
 
+#if defined(__EMSCRIPTEN__) && defined(EVAL_NNUE)
+	// WASM NNUE
+	// 前回のOptions["EvalFile"]
+	std::string last_eval_file;
+#endif
+
 	// optionのdefault値を設定する。
 	void init(OptionsMap& o)
 	{
+#if !defined(__EMSCRIPTEN__)
 		// Hash上限。32bitモードなら2GB、64bitモードなら33TB
 		constexpr int MaxHashMB = Is64Bit ? 33554432 : 2048;
+#else
+		// yaneuraou.wasm
+		// メモリの調整
+		// stockfish.wasmの数値を基本的に使用している
+		constexpr int MaxHashMB = 2048;
+#endif
 
 		// 並列探索するときのスレッド数
 		// CPUの搭載コア数をデフォルトとすべきかも知れないが余計なお世話のような気もするのでしていない。
@@ -49,23 +62,30 @@ namespace USI {
 		// そもそもで言うとsetoptionに対してそんなに時間のかかることをするとGUI側がtimeoutになる懸念もある。
 		// Stockfishもこうすべきだと思う。
 
+#if !defined(__EMSCRIPTEN__)
 		o["Threads"] << Option(4, 1, 512, [](const Option& o) { /* Threads.set(o); */ });
+#else
+		// yaneuraou.wasm
+		// スレッド数などの調整
+		// stockfish.wasmの数値を基本的に使用している
+		o["Threads"] << Option(1, 1, 32, [](const Option& o) { /* Threads.set(o); */ });
+#endif
 #endif
 
 #if !defined(TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
 		// 置換表のサイズ。[MB]で指定。
-		o["USI_Hash"] << Option(16, 1, MaxHashMB, [](const Option&o) { /* TT.resize(o); */ });
+		o["USI_Hash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { /* TT.resize(o); */ });
 
-	#if defined(USE_EVAL_HASH)
-			// 評価値用のcacheサイズ。[MB]で指定。
+#if defined(USE_EVAL_HASH)
+		// 評価値用のcacheサイズ。[MB]で指定。
 
-		#if defined(FOR_TOURNAMENT)
-				// トーナメント用は少し大きなサイズ
-				o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
-		#else
-				o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
-		#endif // defined(FOR_TOURNAMENT)
-	#endif // defined(USE_EVAL_HASH)
+#if defined(FOR_TOURNAMENT)
+		// トーナメント用は少し大きなサイズ
+		o["EvalHash"] << Option(1024, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+#else
+		o["EvalHash"] << Option(128, 1, MaxHashMB, [](const Option& o) { Eval::EvalHash_Resize(o); });
+#endif // defined(FOR_TOURNAMENT)
+#endif // defined(USE_EVAL_HASH)
 
 		// ponderの有無
 		o["USI_Ponder"] << Option(false);
@@ -77,12 +97,12 @@ namespace USI {
 		o["MultiPV"] << Option(1, 1, 800);
 
 		// 指し手がGUIに届くまでの時間。
-	#if defined(YANEURAOU_ENGINE_DEEP)
-			// GPUからの結果を待っている時間も込みなので少し上げておく。
-			int time_margin = 400;
-	#else
-			int time_margin = 120;
-	#endif
+#if defined(YANEURAOU_ENGINE_DEEP)
+		// GPUからの結果を待っている時間も込みなので少し上げておく。
+		int time_margin = 400;
+#else
+		int time_margin = 120;
+#endif
 
 		// ネットワークの平均遅延時間[ms]
 		// この時間だけ早めに指せばだいたい間に合う。
@@ -106,12 +126,13 @@ namespace USI {
 		o["MaxMovesToDraw"] << Option(0, 0, 100000);
 
 		// 探索深さ制限。0なら無制限。
-		o["DepthLimit"] << Option(0, 0, INT_MAX);
+		o["DepthLimit"] << Option(0, 0, int_max);
 
 		// 探索ノード制限。0なら無制限。
-		o["NodesLimit"] << Option(0, 0, INT64_MAX);
+		o["NodesLimit"] << Option(0, 0, int64_max);
 
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
+<<<<<<< HEAD
 	#if defined(EVAL_EMBEDDING)
 		const char *default_eval_dir = "<internal>";
 	#else
@@ -119,6 +140,18 @@ namespace USI {
 	#endif
 		last_eval_dir = default_eval_dir;
 		o["EvalDir"] << Option(default_eval_dir, [](const USI::Option&o) {
+=======
+#if defined(EVAL_EMBEDDING)
+		const char* default_eval_dir = "<internal>";
+#elif !defined(__EMSCRIPTEN__)
+		const char* default_eval_dir = "eval";
+#else
+		// WASM
+		const char* default_eval_dir = ".";
+#endif
+		last_eval_dir = default_eval_dir;
+		o["EvalDir"] << Option(default_eval_dir, [](const USI::Option& o) {
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			if (last_eval_dir != string(o))
 			{
 				// 評価関数フォルダ名の変更に際して、評価関数ファイルの読み込みフラグをクリアする。
@@ -126,11 +159,24 @@ namespace USI {
 				load_eval_finished = false;
 			}
 		});
+#if defined(__EMSCRIPTEN__) && defined(EVAL_NNUE)
+		// WASM NNUE
+		const char* default_eval_file = "nn.bin";
+		last_eval_file = default_eval_file;
+		o["EvalFile"] << Option(default_eval_file, [](const USI::Option& o) {
+			if (last_eval_file != string(o))
+			{
+				// 評価関数ファイル名の変更に際して、評価関数ファイルの読み込みフラグをクリアする。
+				last_eval_file = string(o);
+				load_eval_finished = false;
+			}
+		});
+#endif
 
 #else
 
 		// TANUKI_MATE_ENGINEのとき
-		o["USI_Hash"] << Option(4096, 1, MaxHashMB);
+		o["USI_Hash"] << Option(std::min(4096, MaxHashMB), 1, MaxHashMB);
 
 #endif // !defined(TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
 
@@ -197,12 +243,20 @@ namespace USI {
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
+<<<<<<< HEAD
 #ifdef EVAL_LEARN
 		Tanuki::InitializeBook(o);
 		Tanuki::InitializeGenerator(o);
 		Tanuki::InitializeShuffler(o);
 		Tanuki::Progress::Initialize(o);
 #endif
+=======
+#if defined(ENGINE_OPTIONS)
+		const string opt = ENGINE_OPTIONS;
+		set_engine_options(opt);
+#endif
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options("engine_options.txt");
 	}
@@ -418,6 +472,17 @@ namespace USI {
 				std::cout << "Error : option name not found : " << name << std::endl;
 		}
 
+	}
+
+	// エンジンオプションをコンパイル時に設定する機能
+	// "ENGINE_OPTIONS"で指定した内容を設定する。
+	// 例) #define ENGINE_OPTIONS "FV_SCALE=24;BookFile=no_book"
+	void set_engine_options(const string& options)
+	{
+		// ";"で区切って複数指定できるものとする。
+		auto v = StringExtension::Split(options, ";");
+		for (auto line : v)
+			build_option(line);
 	}
 
 	// カレントフォルダに"engine_options.txt"(これは引数で指定されている)が

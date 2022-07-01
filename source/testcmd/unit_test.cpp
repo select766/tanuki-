@@ -32,7 +32,7 @@ namespace Test
 		cout << "Summary : " << passed << " / " << test_count << " passed." << endl;
 
 		if (errors.empty())
-			cout << "-> Passed all UnitTest." << endl;
+			cout << "-> Passed all UnitTests." << endl;
 		else
 		{
 			cout << "Error List : " << endl;
@@ -135,6 +135,12 @@ namespace Test
 
 		// --- 各classに対するUnitTest
 
+<<<<<<< HEAD
+=======
+		// Book namespace
+		tester.run(Book::UnitTest);
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// Bitboard class
 		tester.run(Bitboard::UnitTest);
 		tester.run(Bitboard256::UnitTest);
@@ -150,9 +156,6 @@ namespace Test
 
 		// 指し手生成のテスト
 		//tester.run(MoveGen::UnitTest)
-
-		// Book namespace
-		tester.run(Book::UnitTest);
 
 	}
 

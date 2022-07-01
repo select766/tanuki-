@@ -19,7 +19,21 @@
 #include <iostream>     // iostreamに対する<<使うので仕方ない
 #include <string>       // std::string使うので仕方ない
 #include <algorithm>    // std::max()を使うので仕方ない
-#include <climits>		// INT_MAXがこのheaderで必要なので仕方ない
+#include <limits>		// std::numeric_limitsを使うので仕方ない
+
+// --------------------
+//  型の最小値・最大値
+// --------------------
+
+// "windows.h"をincludeしていると、maxがマクロによって置換され、そのためstd::max()がコンパイルエラーとなるので、
+// それを回避するために(std::max)() と書くテクニックがある。以下で、(std::...::max)() のように書いてあるのはそのため。
+
+constexpr int     int_max   = (std::numeric_limits<int>    ::max)();
+constexpr int     int_min   = (std::numeric_limits<int>    ::min)();
+constexpr int64_t int64_max = (std::numeric_limits<int64_t>::max)();
+constexpr int64_t int64_min = (std::numeric_limits<int64_t>::min)();
+constexpr size_t  size_max  = (std::numeric_limits<size_t> ::max)();
+constexpr size_t  size_min  = (std::numeric_limits<size_t> ::min)();
 
 // --------------------
 //      手番
@@ -184,8 +198,8 @@ constexpr Rank rank_of(Square sq) { /* return (Rank)(sq % 9); */ /*ASSERT_LV2(is
 // 筋(File)と段(Rank)から、それに対応する升(Square)を返す。
 constexpr Square operator | (File f, Rank r) { Square sq = (Square)(f * 9 + r); /* ASSERT_LV2(is_ok(sq));*/ return sq; }
 
-// ２つの升のfileの差、rankの差のうち大きいほうの距離を返す。sq1,sq2のどちらかが盤外ならINT_MAXが返る。
-constexpr int dist(Square sq1, Square sq2) { return (!is_ok(sq1) || !is_ok(sq2)) ? INT_MAX : std::max(abs(file_of(sq1) - file_of(sq2)), abs(rank_of(sq1) - rank_of(sq2))); }
+// ２つの升のfileの差、rankの差のうち大きいほうの距離を返す。sq1,sq2のどちらかが盤外ならint_maxが返る。
+constexpr int dist(Square sq1, Square sq2) { return (!is_ok(sq1) || !is_ok(sq2)) ? int_max : (std::max)(abs(file_of(sq1) - file_of(sq2)), abs(rank_of(sq1) - rank_of(sq2))); }
 
 // 移動元、もしくは移動先の升sqを与えたときに、そこが成れるかどうかを判定する。
 constexpr bool canPromote(const Color c, const Square fromOrTo) {
@@ -250,10 +264,11 @@ enum SquareWithWall: int32_t {
 // 型変換。下位8bit == Square
 constexpr Square sqww_to_sq(SquareWithWall sqww) { return Square(sqww & 0xff); }
 
-extern SquareWithWall sqww_table[SQ_NB_PLUS1];
+// to_sqww()で使うテーブル。直接アクセスしないようにnamespaceに入れてある。
+namespace BB_Table { extern SquareWithWall sqww_table[SQ_NB_PLUS1]; }
 
 // 型変換。Square型から。
-static SquareWithWall to_sqww(Square sq) { return sqww_table[sq]; }
+static SquareWithWall to_sqww(Square sq) { return BB_Table::sqww_table[sq]; }
 
 // 盤内か。壁(盤外)だとfalseになる。
 constexpr bool is_ok(SquareWithWall sqww) { return (sqww & SQWW_BORROW_MASK) == 0; }
@@ -295,6 +310,15 @@ namespace Effect8
 
 	// Directionsに相当するものを引数に渡して1つ方角を取り出す。
 	static Direct pop_directions(Directions& d) { return (Direct)pop_lsb(d); }
+
+	// sq1にとってsq2がどの方角であるかを返す。
+	// sq1がsq2に対して八方向のいずれかであることがわかっている時に用いる。
+	static Direct direct_of(Square sq1, Square sq2)
+	{
+		auto d = directions_of(sq1, sq2);
+		ASSERT_LV3(d != DIRECTIONS_ZERO);
+		return pop_directions(d);
+	}
 
 	// ある方角の反対の方角(180度回転させた方角)を得る。
 	constexpr Direct operator~(Direct d) {
@@ -366,16 +390,6 @@ enum Bound {
 	BOUND_UPPER, // 上界(真の評価値はこれより小さい) = 詰みのスコアや、nonPVで評価値があまり信用ならない状態であることを表現する。
 	BOUND_LOWER, // 下界(真の評価値はこれより大きい)
 	BOUND_EXACT = BOUND_UPPER | BOUND_LOWER // 真の評価値と一致している。PV nodeでかつ詰みのスコアでないことを表現する。
-};
-
-// --------------------
-//    探索用のフラグ
-// --------------------
-
-// 探索で組合せ爆発が起きていないかの状態
-enum ExplosionState {
-	EXPLOSION_NONE, // 平常運転
-	MUST_CALM_DOWN  // 組合せ爆発が起きているのでいったん冷静になれ
 };
 
 // --------------------
@@ -467,7 +481,8 @@ enum PieceType : uint32_t
 	GPM_GHD = 18,     // Gold Horse Dragon
 	GPM_GHDK = 19,     // Gold Horse Dragon King
 
-	// --- Position::pieces()で用いる定数。空いてるところを順番に用いる。
+	// --- Position::pieces()で用いる特殊な定数。空いてるところを順番に用いる。
+	// Position::pieces()では、PAWN , LANCE , … , DRAGONはそのまま用いるが、それ以外に↓の定数が使える。
 	ALL_PIECES = 0,			// 駒がある升を示すBitboardが返る。
 	GOLDS = QUEEN,			// 金と同じ移動特性を持つ駒のBitboardが返る。
 	HDK,				    // H=Horse,D=Dragon,K=Kingの合体したBitboardが返る。
@@ -475,7 +490,7 @@ enum PieceType : uint32_t
 	ROOK_DRAGON,			// ROOK,DRAGONを合成したBitboardが返る。
 	SILVER_HDK,				// SILVER,HDKを合成したBitboardが返る。
 	GOLDS_HDK,				// GOLDS,HDKを合成したBitboardが返る。
-	PIECE_BB_NB,			// デリミタ
+	PIECE_BB_NB,			// 終端
 };
 
 // 駒(先後の区別あり)
@@ -484,8 +499,8 @@ enum Piece : uint32_t
 	NO_PIECE = 0,
 
 	// 以下、先後の区別のある駒(Bがついているのは先手、Wがついているのは後手)
-	B_PAWN = 1, B_LANCE, B_KNIGHT, B_SILVER, B_BISHOP, B_ROOK, B_GOLD, B_KING, B_PRO_PAWN, B_PRO_LANCE, B_PRO_KNIGHT, B_PRO_SILVER, B_HORSE, B_DRAGON, B_QUEEN,
-	W_PAWN = 17, W_LANCE, W_KNIGHT, W_SILVER, W_BISHOP, W_ROOK, W_GOLD, W_KING, W_PRO_PAWN, W_PRO_LANCE, W_PRO_KNIGHT, W_PRO_SILVER, W_HORSE, W_DRAGON, W_QUEEN,
+	B_PAWN = 1 , B_LANCE, B_KNIGHT, B_SILVER, B_BISHOP, B_ROOK, B_GOLD, B_KING, B_PRO_PAWN, B_PRO_LANCE, B_PRO_KNIGHT, B_PRO_SILVER, B_HORSE, B_DRAGON, B_GOLDS/*金相当の駒*/,
+	W_PAWN = 17, W_LANCE, W_KNIGHT, W_SILVER, W_BISHOP, W_ROOK, W_GOLD, W_KING, W_PRO_PAWN, W_PRO_LANCE, W_PRO_KNIGHT, W_PRO_SILVER, W_HORSE, W_DRAGON, W_GOLDS/*金相当の駒*/,
 	PIECE_NB, // 終端
 	PIECE_ZERO = 0,
 
@@ -512,6 +527,13 @@ constexpr Color color_of(Piece pc)
 // 後手の歩→先手の歩のように、後手という属性を取り払った(先後の区別をなくした)駒種を返す
 constexpr PieceType type_of(Piece pc) { return (PieceType)(pc & 15); }
 
+// 駒に対して成れない駒かどうかを判定する。(玉、金に対してもtrueが返る)
+constexpr bool is_promoted_piece(Piece pc)
+{
+	static_assert(GOLD == 7, "GOLD must be 7.");
+	return (type_of(pc) >= GOLD) ? true : false;
+}
+
 // 成ってない駒を返す。後手という属性も消去する。
 // 例) 成銀→銀 , 後手の馬→先手の角
 // ただし、pc == KINGでの呼び出しはNO_PIECEが返るものとする。
@@ -525,11 +547,15 @@ constexpr Piece raw_of(Piece pc) { return (Piece)(pc & ~8); }
 // pcとして先手の駒を渡し、cが後手なら後手の駒を返す。cが先手なら先手の駒のまま。pcとしてNO_PIECEは渡してはならない。
 constexpr Piece make_piece(Color c, PieceType pt) { /*ASSERT_LV3(color_of(pt) == BLACK && pt!=NO_PIECE); */ return (Piece)((c << 4) + pt); }
 
+// 成り駒を返す。与えられたpcが成り駒の場合はそのまま返す。
+constexpr Piece make_promoted_piece(Piece pc) { return (Piece)(pc | PIECE_PROMOTE); }
+
 // pcが遠方駒であるかを判定する。LANCE,BISHOP(5),ROOK(6),HORSE(13),DRAGON(14)
 constexpr bool has_long_effect(Piece pc) { return (type_of(pc) == LANCE) || (((pc+1) & 6)==6); }
 
 // Pieceの整合性の検査。assert用。
-constexpr bool is_ok(Piece pc) { return NO_PIECE <= pc && pc < PIECE_NB; }
+// Pieceはuintなので "NO_PIECE <= pc"は意味をなさない比較なのでコメントアウトしてある。(コンパイラの警告がでる)
+constexpr bool is_ok(Piece pc) { return /* NO_PIECE <= pc && */ pc < PIECE_NB; }
 
 // Pieceを綺麗に出力する(USI形式ではない) 先手の駒は大文字、後手の駒は小文字、成り駒は先頭に+がつく。盤面表示に使う。
 // "PRETTY_JP"をdefineしていれば、日本語文字での表示になる。
@@ -879,11 +905,7 @@ enum MOVE_GEN_TYPE
 	// 本ソースコードでは、NON_CAPTURESとCAPTURESは使わず、CAPTURES_PRO_PLUSとNON_CAPTURES_PRO_MINUSを使う。
 
 	// note : NON_CAPTURESとCAPTURESとの生成される指し手の集合は被覆していない。
-	// note : CAPTURES_PRO_PLUSとNON_CAPTURES_PRO_MINUSとの生成される指し手の集合も被覆していない。
 	// →　被覆させないことで、二段階に指し手生成を分解することが出来る。
-
-	CAPTURES_PRO_PLUS_ALL,      // CAPTURES_PRO_PLUS + 歩の不成なども含む
-	NON_CAPTURES_PRO_MINUS_ALL, // NON_CAPTURES_PRO_MINUS + 歩の不成なども含む
 	
 	EVASIONS,              // 王手の回避(指し手生成元で王手されている局面であることがわかっているときはこちらを呼び出す)
 	EVASIONS_ALL,          // EVASIONS + 歩の不成なども含む。

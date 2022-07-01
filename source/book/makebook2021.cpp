@@ -84,11 +84,16 @@
 #include "../book/book.h"
 #include "../learn/learn.h"
 #include "../mate/mate.h"
+<<<<<<< HEAD
+=======
+#include "../engine/dlshogi-engine/dlshogi_min.h"
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 using namespace std;
 using namespace Book;
 using namespace Concurrent; // concurrent library from misc.h
 
+<<<<<<< HEAD
 // positionコマンドのparserを呼び出したい。
 extern void position_cmd(Position& pos, istringstream& is, StateListPtr& states);
 
@@ -112,6 +117,8 @@ namespace Eval::dlshogi {
 	Value value_to_cp(const float score, float eval_coef);
 }
 
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 namespace MakeBook2021
 {
 	// ValueとDepthが一体になった型
@@ -192,7 +199,13 @@ namespace MakeBook2021
 		// ↑のsearch_valueは循環を経て(千日手などで)得られたスコアであるかのフラグ。
 		// これがfalseであり、かつ、search_value!=VALUE_NONEであるなら、
 		// このNodeをleaf node扱いして良い。(探索で得られたスコアなので)
+<<<<<<< HEAD
 		bool is_cyclic;
+=======
+		// 何手前からの循環であるか。(最大でも127)
+		// 0なら、循環ではない。
+		s8 cyclic;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		// この局面での最善手。保存する時などには使わないけど、PV表示したりする時にあれば便利。
 		Move best_move;
@@ -201,7 +214,11 @@ namespace MakeBook2021
 		Bound bound;
 
 		// このクラスのメンバー変数の世代。
+<<<<<<< HEAD
 		// search_value,is_cyclic,best_move は、generationが合致しなければ無視する。
+=======
+		// search_value,cyclic,best_move は、generationが合致しなければ無視する。
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// 全域に渡って、Nodeの↑の3つの変数をクリアするのが大変なのでgenerationカウンターで管理する。
 		u32 generation = 0;
 
@@ -294,7 +311,11 @@ namespace MakeBook2021
 		// Nodeを新規に生成して、そのNode*を返す。
 		Node* create_node(Position& pos)
 		{
+<<<<<<< HEAD
 			auto key = pos.long_key();
+=======
+			auto key = pos.hash_key();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			auto r = hashkey_to_node.emplace(key, Node());
 			auto& node = r.first->second;
 			return &node;
@@ -303,7 +324,11 @@ namespace MakeBook2021
 		// Nodeを削除する。
 		void remove_node(Position& pos)
 		{
+<<<<<<< HEAD
 			auto key = pos.long_key();
+=======
+			auto key = pos.hash_key();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			hashkey_to_node.erase(key);
 		}
 
@@ -323,7 +348,11 @@ namespace MakeBook2021
 		// 指定された局面の情報を表示させてみる。(デバッグ用)
 		void dump(Position& pos)
 		{
+<<<<<<< HEAD
 			auto key = pos.long_key();
+=======
+			auto key = pos.hash_key();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			auto* node = probe(key);
 			if (node == nullptr)
@@ -351,7 +380,11 @@ namespace MakeBook2021
 			if (ply >= MAX_PLY)
 				return;
 
+<<<<<<< HEAD
 			auto key = pos.long_key();
+=======
+			auto key = pos.hash_key();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			auto* node = probe(key);
 			if (node == nullptr)
@@ -447,7 +480,11 @@ namespace MakeBook2021
 					// このnodeから1手進めて、次の局面のbestを広い、ponderを確定させる。
 					StateInfo si;
 					pos.set(sfen, &si, Threads.main());
+<<<<<<< HEAD
 					HASH_KEY next_key = pos.long_key_after(pos.to_move(move));
+=======
+					HASH_KEY next_key = pos.hash_key_after(pos.to_move(move));
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					auto it = hashkey_to_node.find(next_key);
 					if (it != hashkey_to_node.end())
 						ponder = it->second.best_move;
@@ -474,7 +511,11 @@ namespace MakeBook2021
 				auto& node = it.second;
 
 				node.search_value = ValueDepth(VALUE_NONE, 0);
+<<<<<<< HEAD
 				node.is_cyclic = false;
+=======
+				node.cyclic = 0;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 		}
 
@@ -653,14 +694,24 @@ namespace MakeBook2021 {
 			
 			// ↓の局面数を思考するごとにsaveする。
 			// 15分に1回ぐらいで良いような？
+<<<<<<< HEAD
+=======
+			// 定跡ファイルが大きくなってきたら数時間に1回でいいと思う。
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			u64 book_save_interval = 30000/*nps*/ / nodes_limit * 30*60 /* 30分 */;
 
 			// 探索局面数
 			u64 think_limit = 10000000;
 
 			// 1つのroot局面に対して、何回ranged alpha searchを連続して行うのか。
+<<<<<<< HEAD
 			// これ、同じ局面にhitし続けるようなら加算していくほうが健全だと思う。
 			u64 ranged_alpha_beta_loop = 5;
+=======
+			// このloop回数分は、Nodeの値を信じるかどうかを判定するためのgenerationが
+			// 変わらないので探索効率が良い。
+			u64 ranged_alpha_beta_loop = 100;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// ranged alpha beta searchの時に棋譜上に出現したleaf nodeに加点するスコア。
 			// そのleaf nodeが選ばれやすくなる。
@@ -740,7 +791,11 @@ namespace MakeBook2021 {
 			else {
 				// 棋譜に出現した局面を this->kif_hashに追加する。
 				// (これはコマンド実行時の最初に1度行えば良い)
+<<<<<<< HEAD
 				vector<StateInfo> si(1024 /* above MAX_PLY */);
+=======
+				deque<StateInfo> si;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				for (auto kif : kif_sfens)
 					set_root(pos, kif, si, true);
 			}
@@ -833,13 +888,21 @@ namespace MakeBook2021 {
 
 			sync_cout << "root_sfens.size() == " << root_sfens.size() << sync_endl;
 
+<<<<<<< HEAD
 			vector<StateInfo> si(1024);
+=======
+			deque<StateInfo> si;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			for (auto root_sfen : root_sfens)
 			{
 				BookTools::feed_position_string(pos, root_sfen, si);
 
 				// Node is not found in Book DB , skipped.
+<<<<<<< HEAD
 				if (pm.probe(pos.long_key()) == nullptr)
+=======
+				if (pm.probe(pos.hash_key()) == nullptr)
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					continue;
 
 				sync_cout << "[Step 1] set root , root sfen = " << root_sfen << sync_endl;
@@ -870,13 +933,21 @@ namespace MakeBook2021 {
 		// いずれでも解釈できるものとする。
 		// 
 		// append_to_kif = trueのとき、その局面のhash keyがkif_hashにappendされる。
+<<<<<<< HEAD
 		void set_root(Position& pos, const string& root_sfen, vector<StateInfo>& si , bool append_to_kif = false)
+=======
+		void set_root(Position& pos, const string& root_sfen, deque<StateInfo>& si , bool append_to_kif = false)
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		{
 			// append_to_kif == trueならば現在の局面のhash keyを、kif_hashに追加する。
 			auto append_to_kif_hash = [&](Position& pos) {
 				if (append_to_kif)
 				{
+<<<<<<< HEAD
 					HASH_KEY key = pos.long_key();
+=======
+					HASH_KEY key = pos.hash_key();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					if (kif_hash.find(key) == kif_hash.end())
 						kif_hash.emplace(key);
 				}
@@ -916,7 +987,11 @@ namespace MakeBook2021 {
 					for (size_t i = 0; i < search_option.ranged_alpha_beta_loop; ++i)
 					{
 						// 局面の初期化
+<<<<<<< HEAD
 						vector<StateInfo> si(1024 /* above MAX_PLY */);
+=======
+						deque<StateInfo> si;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 						Position root_pos;
 						set_root(root_pos, root_sfen, si);
 
@@ -933,10 +1008,20 @@ namespace MakeBook2021 {
 						// 無い。おそらく初期局面ですべての指し手がqueueに入っている、みたいな状況。
 						if (search_pv.size() == 0)
 						{
+<<<<<<< HEAD
 							--i; continue;
 						}
 
 						const auto next = search_pv.back();
+=======
+							// 空の指し手を積んでおく。
+							// こうしないとpopする回数と数が合わなくてdead lockになる。
+							search_nodes.push(SearchNode(nullptr,MOVE_NONE,HASH_KEY()));
+							continue;
+						}
+
+						const auto& next = search_pv.back();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 						sync_cout << "leaf node , sfen = " << next.node->sfen << " , move = " << next.move << sync_endl;
 
@@ -955,6 +1040,13 @@ namespace MakeBook2021 {
 			{
 				// 思考するための局面queueから取り出す。
 				auto s_node = search_nodes.pop();
+<<<<<<< HEAD
+=======
+				// 空の指し手(該当がなかった)
+				if (s_node.move == MOVE_NONE)
+					continue;
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				time.reset();
 				bool already_exists,banned_node=false;
 				think(pos,&s_node,already_exists);
@@ -989,7 +1081,11 @@ namespace MakeBook2021 {
 			pos.set(rootSfen, &si, Threads.main());
 
 			// RootNode
+<<<<<<< HEAD
 			Node* node = pm.probe(pos.long_key());
+=======
+			Node* node = pm.probe(pos.hash_key());
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			if (node == nullptr)
 			{
 				// これが存在しない時は、生成しなくてはならない。
@@ -1003,7 +1099,11 @@ namespace MakeBook2021 {
 		ValueDepth search_start(Position& pos, Value alpha, Value beta)
 		{
 			// RootNode
+<<<<<<< HEAD
 			Node* node = pm.probe(pos.long_key());
+=======
+			Node* node = pm.probe(pos.hash_key());
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// →　存在は保証されている。
 			ASSERT_LV3(node != nullptr);
@@ -1049,9 +1149,14 @@ namespace MakeBook2021 {
 			// (generationが合致した時のみ)
 			if (    nodeType == NonPV
 				&&  node->generation == search_option.generation
+<<<<<<< HEAD
 				//&& !node->is_cyclic
 				// 木が大きくなってくると、この条件↑を入れていると時間すごくかかるかも知れない。
 				// この条件、いったん外す。
+=======
+				//&&  node->cyclic == 0
+				// ↑この条件はわりときついかも…。
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				&&  node->search_value.value != VALUE_NONE)
 			{
 				if (   node->bound == Bound::BOUND_EXACT
@@ -1061,17 +1166,39 @@ namespace MakeBook2021 {
 					return node->search_value;
 			}
 
+<<<<<<< HEAD
+=======
+			// TeraShock searchの時は、PVであっても、cyclic == 0であれば枝刈りしていいと思う。
+			// (通常searchの時は、PV leafが書き換わるのでこれをやるなら、前回のPV lineをクリアする必要がある)
+			if (   searchMode == SearchMode::TeraShockSearch
+				&& nodeType == PV
+				&& node->generation == search_option.generation
+				&& node->cyclic == 0
+				&& node->search_value.value != VALUE_NONE)
+			{
+				if (   node->bound == Bound::BOUND_EXACT
+					||(node->bound == Bound::BOUND_LOWER && node->search_value >= beta /* beta cut*/)
+					||(node->bound == Bound::BOUND_UPPER && node->search_value <= alpha /* 更新する可能性がない */)
+					)
+					return node->search_value;
+			}
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			// =========================================
 			//            nodeの初期化
 			// =========================================
 
+<<<<<<< HEAD
 			// このnodeで得られたsearch_scoreは、循環が絡んだスコアなのか
 			node->is_cyclic = true;
 
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			// 手数制限による引き分け
 
 			int game_ply = pos.game_ply();
 			if (game_ply >= 512)
+<<<<<<< HEAD
 				return VALUE_DRAW; // 最大手数で引き分け。
 
 			// 千日手の処理
@@ -1080,6 +1207,13 @@ namespace MakeBook2021 {
 			if (draw_type != REPETITION_NONE)
 				// draw_value()はデフォルトのままでいいや。すなわち千日手引き分けは VALUE_ZERO。
 				return draw_value(draw_type, pos.side_to_move());
+=======
+			{
+				// このnodeで得られたsearch_scoreは、循環が絡んだスコアなのか
+				node->cyclic = 127; // 循環は絡んでいないが経路には依存しうるので最大にしておく。
+				return VALUE_DRAW; // 最大手数で引き分け。
+			}
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// Mate distance pruning.
 			//
@@ -1095,9 +1229,31 @@ namespace MakeBook2021 {
 			alpha = std::max(ValueDepth::mated_in(ply    ), alpha);
 			beta  = std::min(ValueDepth::mate_in (ply + 1), beta );
 			if (alpha >= beta)
+<<<<<<< HEAD
 				return alpha;
 
 			node->is_cyclic = false;
+=======
+			{
+				node->cyclic = ply; // 循環は絡んでいないが経路には依存しうる
+				return alpha;
+			}
+
+			// 千日手の処理
+
+			int found_ply;
+			auto draw_type = pos.is_repetition(game_ply /* 千日手判定のために遡れる限り遡って良い */ , found_ply);
+			if (draw_type != REPETITION_NONE)
+			{
+				// 何手前からの循環であるか
+				node->cyclic = found_ply;
+
+				// draw_value()はデフォルトのままでいいや。すなわち千日手引き分けは VALUE_ZERO。
+				return draw_value(draw_type, pos.side_to_move());
+			}
+
+			node->cyclic = 0;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			ASSERT_LV3(node != nullptr);
 
@@ -1138,13 +1294,21 @@ namespace MakeBook2021 {
 
 				Move16 m16 = child.move;
 				Move m = pos.to_move(m16);
+<<<<<<< HEAD
 				bool is_cyclic = false;
+=======
+				s8 cyclic = 0;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 				// search_pvを巻き戻すために1手進める前のsearch_pvの要素数を記録しておく。
 				size_t search_pv_index2 = search_pv.size();
 
 				// 指し手mで進めた時のhash key。
+<<<<<<< HEAD
 				const HASH_KEY key_next = pos.long_key_after(m);
+=======
+				const HASH_KEY key_next = pos.hash_key_after(m);
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 				Node* next_node = pm.probe(key_next);
 
@@ -1192,6 +1356,7 @@ namespace MakeBook2021 {
 					// 1) 探索Windowは全域。(alpha-betaのWindowでの枝刈りをしてはならない)
 					//  →　Windowが全域になっているのでβcutは発生しないはず。
 					// 2) 探索結果のvalueをこのchild.evalに反映させる必要がある。(定跡DBに書き出す時に用いるため)
+<<<<<<< HEAD
 					// 3) ただしrootではすべてPVとして探索する。
 
 					// 1)
@@ -1216,6 +1381,31 @@ namespace MakeBook2021 {
 							value = -search<PV, searchMode>(pos, next_node, new_alpha, new_beta, ply + 1);
 							value.depth++;
 						}
+=======
+
+					// 1)
+					ValueDepth new_alpha = (searchMode == NormalAlphaBeta) ? - beta : -VALUE_INFINITE;
+					ValueDepth new_beta  = (searchMode == NormalAlphaBeta) ? -alpha :  VALUE_INFINITE;
+
+					bool skipNonPV = (alpha == -VALUE_INFINITE) && nodeType == PV;
+
+					// 直後にPVで探索しなおすことになるのでNonPVでの探索はskipする。
+					if (skipNonPV)
+					{
+						value = ValueDepth(VALUE_ZERO); // alpha == -VALUE_INFINITEなので次のifの条件を確実に満たす。
+					}
+					else {
+						value = -search<NonPV, searchMode>(pos, next_node, new_alpha, new_beta, ply + 1);
+						value.depth++;
+					}
+
+					// alpha値を更新するなら、PVとして探索しなおす。
+					// テラショック化の時はalpha == valueでもPVとして探索しなおす。
+					if (nodeType == PV && (alpha < value || ((searchMode == TeraShockSearch) && alpha == value)))
+					{
+						value = -search<PV, searchMode>(pos, next_node, new_alpha, new_beta, ply + 1);
+						value.depth++;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					}
 
 					// 2)
@@ -1223,7 +1413,11 @@ namespace MakeBook2021 {
 						child.eval = value;
 
 					// 子ノードのスコアが循環が絡んだスコアであるなら、このnodeにも伝播すべき。
+<<<<<<< HEAD
 					is_cyclic = next_node->is_cyclic;
+=======
+					cyclic = next_node->cyclic;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					pos.undo_move(m);
 				}
 
@@ -1239,6 +1433,7 @@ namespace MakeBook2021 {
 				}
 
 				// alpha値を更新するのか？
+<<<<<<< HEAD
 				if (alpha < value)
 				{
 					// --- nodeの更新
@@ -1247,6 +1442,24 @@ namespace MakeBook2021 {
 					// そこまでにis_cyclicな子がいても最終的にこのnodeのalphaを更新しないなら、その指し手は選択しないわけだから
 					// このnodeを循環ノードとみなさなくて良いと思う。
 					node->is_cyclic = is_cyclic;
+=======
+				// テラショック化の時は、alpha == valueのケースもupdateする。
+				// なぜなら、同じ評価値をつけた上位の指し手(引き分けで上位の数手がVALUE_ZEROを想定)に対しては
+				// PVで探索したいし、その探索の時のcyclicをこのnodeのcyclicに伝播されて欲しいから。
+				if (alpha < value || ((searchMode == TeraShockSearch) && alpha == value))
+				{
+					// --- nodeの更新
+
+					// alpha値を更新するのに用いた最後の子nodeに関するcyclic - 1 をこのノードに伝播させる。
+					// そこまでにcyclicな子がいても最終的にこのnodeのalphaを更新しないなら、その指し手は選択しないわけだから
+					// このnodeを循環ノードとみなさなくて良いと思う。
+					// 
+					// TODO :  ここ注意深く考えないと、GHI問題に遭遇する。
+					if (alpha < value)
+						node->cyclic = 0; // ベストな指し手以外のcyclicは忘れる。
+
+					node->cyclic = std::max(node->cyclic, (s8)(cyclic - 1));
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 					// update alpha
 					alpha = value;
@@ -1347,7 +1560,11 @@ namespace MakeBook2021 {
 			position_cmd(pos, is, states);
 
 			// すでにあるのでskip
+<<<<<<< HEAD
 			Node* n = pm.probe(pos.long_key());
+=======
+			Node* n = pm.probe(pos.hash_key());
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// すでに思考したあとの局面であった。
 			already_exists = (n != nullptr);
@@ -1362,7 +1579,12 @@ namespace MakeBook2021 {
 			//        探索結果の取得
 			// ================================
 
+<<<<<<< HEAD
 			auto search_result = dlshogi::GetSearchResult();
+=======
+			std::vector<std::pair<Move, float>> search_result;
+			dlshogi::GetSearchResult(search_result);
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			Node* node_;
 
 			// 新規にNodeを作成してそこに書き出す
@@ -1599,7 +1821,11 @@ namespace MakeBook2021 {
 
 			// この行の棋譜の各局面をsfenにして書き出す。
 
+<<<<<<< HEAD
 			std::vector<StateInfo> si(1024);
+=======
+			std::deque<StateInfo> si;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			BookTools::feed_position_string(pos, line , si,[&](Position& pos){
 				// 各局面でcallbackがかかるので、sfen化したものを書き出す。
 				auto sfen = pos.sfen();

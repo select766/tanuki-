@@ -13,7 +13,11 @@ jobs:
   build-mingw:
     # ubuntu-latest = ubuntu-20.04
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
+<<<<<<< HEAD
     # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
+=======
+    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     runs-on: ubuntu-20.04
 
     strategy:
@@ -25,7 +29,8 @@ jobs:
           - YANEURAOU_ENGINE_NNUE_KP256
           - YANEURAOU_ENGINE_KPPT
           - YANEURAOU_ENGINE_KPP_KKPT
-          - YANEURAOU_ENGINE_MATERIAL*
+          #- YANEURAOU_ENGINE_MATERIAL*
+          - "YANEURAOU_ENGINE_MATERIAL,YANEURAOU_ENGINE_MATERIAL9"
           - YANEURAOU_MATE_ENGINE
           - TANUKI_MATE_ENGINE
           - USER_ENGINE
@@ -34,7 +39,10 @@ jobs:
           - i686-w64-mingw32-g++-posix
         target:
           - "normal,tournament"
+<<<<<<< HEAD
           - gensfen
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - evallearn
         archcpu:
           - "AVX512VNNI,AVX512"
@@ -54,6 +62,7 @@ jobs:
             target: evallearn
           - edition: YANEURAOU_ENGINE_NNUE_KP256
             target: evallearn
+<<<<<<< HEAD
           - edition: YANEURAOU_ENGINE_NNUE
             target: gensfen
           - edition: YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32
@@ -62,23 +71,16 @@ jobs:
             target: gensfen
           - edition: YANEURAOU_ENGINE_NNUE_KP256
             target: gensfen
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           # 以下のエディションには機械学習の実装が存在しない
           # There is no machine learning implementation for the following editions
-          - edition: YANEURAOU_ENGINE_MATERIAL*
-            target: evallearn
           - edition: YANEURAOU_MATE_ENGINE
             target: evallearn
           - edition: TANUKI_MATE_ENGINE
             target: evallearn
           - edition: USER_ENGINE
             target: evallearn
-          # 以下のエディションはgensfenに対応しない
-          - edition: YANEURAOU_MATE_ENGINE
-            target: gensfen
-          - edition: TANUKI_MATE_ENGINE
-            target: gensfen
-          - edition: USER_ENGINE
-            target: gensfen
           # 32bit compiler x 64bit archcpu
           - compiler: i686-w64-mingw32-g++-posix
             archcpu: "AVX512VNNI,AVX512"

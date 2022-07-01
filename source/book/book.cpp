@@ -338,7 +338,7 @@ namespace Book
 						// ※　定跡DBはsfen文字列順にソートされているので、手数違いのエントリーは連続していると仮定できる。
 
 						if (last_sfen != sfen)
-							last_sfen_ply = INT_MAX;
+							last_sfen_ply = int_max;
 						else if (last_sfen_ply < ply)
 							sfen = "";
 
@@ -400,7 +400,7 @@ namespace Book
 		writer.WriteLine("#YANEURAOU-DB2016 1.00");
 
 		vector<pair<string, BookMovesPtr> > vectored_book;
-		
+
 		// 重複局面の手数違いを除去するのに用いる。
 		// 手数違いの重複局面はOptions["IgnoreBookPly"]==trueのときに有害であるため、plyが最小のもの以外を削除する必要がある。
 		// (Options["BookOnTheFly"]==true かつ Options["IgnoreBookPly"] == true のときに、手数違いのものがヒットするだとか、そういう問題と、
@@ -517,7 +517,7 @@ namespace Book
 		// "no_book"は定跡なしという意味なので定跡の指し手が見つからなかったことにする。
 		if (pure_book_name == "no_book")
 			return BookMovesPtr();
-		 
+
 		if (pure_book_name == kAperyBookName) {
 
 			BookMovesPtr pml_entry(new BookMoves());
@@ -644,7 +644,11 @@ namespace Book
 				//
 				// 区間 [s,e) で解を求める。現時点での中間地点がm。
 				// 解とは、探しているsfen文字列が書いてある行の先頭のファイルポジションのことである。
+<<<<<<< HEAD
 				// 
+=======
+				//
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				// next_sfen()でm以降にある"sfen"で始まる行を読み込んだ時、そのあとのファイルポジションがlast_pos。
 
 				s64 s = 0, e = file_size, m , last_pos;
@@ -956,9 +960,19 @@ namespace Book
 			, "yaneura_book1.db" , "yaneura_book2.db" , "yaneura_book3.db", "yaneura_book4.db"
 			, "user_book1.db", "user_book2.db", "user_book3.db", "book.bin" };
 
+#if !defined(__EMSCRIPTEN__)
 		o["BookFile"] << Option(book_list, book_list[1]);
-		
+#else
+		// WASM では no_book をデフォルトにする
+		o["BookFile"] << Option(book_list, book_list[0]);
+#endif
+
+#if !defined(__EMSCRIPTEN__)
 		o["BookDir"] << Option("book");
+#else
+		// WASM
+		o["BookDir"] << Option(".");
+#endif
 
 		//  BookEvalDiff: 定跡の指し手で1番目の候補の指し手と、2番目以降の候補の指し手との評価値の差が、
 		//    この範囲内であれば採用する。(1番目の候補の指し手しか選ばれて欲しくないときは0を指定する)
@@ -1045,7 +1059,7 @@ namespace Book
 		// 定跡にhitした。逆順で出力しないと将棋所だと逆順にならないという問題があるので逆順で出力する。
 		// →　将棋所、updateでMultiPVに対応して改良された
 		// 　ShogiGUIでの表示も問題ないようなので正順に変更する。
-		
+
 		// また、it->size()!=0をチェックしておかないと指し手のない定跡が登録されていたときに困る。
 
 		// 1) やねうら標準定跡のように評価値なしの定跡DBにおいては
@@ -1075,7 +1089,7 @@ namespace Book
 					// Position::legal()を用いて合法手判定をする時、これが連続王手の千日手を弾かないが、
 					// 定跡で連続王手の千日手の指し手があると指してしまう。
 					// これは回避が難しいので、仕様であるものとする。
-					// 
+					//
 					// "position"コマンドでも千日手局面は弾かないし、この仕様は仕方ない意味はある。
 				}
 				else {
@@ -1123,7 +1137,7 @@ namespace Book
 				sync_cout << "info"
 #if !defined(NICONICO)
 					<< " multipv " << (i + 1)
-#endif					
+#endif
 					<< " score cp " << it.value << " depth " << it.depth
 					<< " pv " << pv_string
 					<< " (" << fixed << std::setprecision(2) << (100 * it.move_count / double(move_count_total)) << "%" << ")" // 採択確率
@@ -1316,6 +1330,12 @@ namespace Book
 			auto it_move = std::find(rootMoves.begin(), rootMoves.end(), bestMove);
 			if (it_move != rootMoves.end())
 			{
+				// swapしておかないと同じ指し手が複数rootMoves[]に残ってしまう。
+				// MultiPVで探索してrootMoves自体を取得しようとした時に困る。
+
+				// この意味では、
+				// MultiPVでの探索の時は定跡の上位の指し手をrootMoves[0..N-1]に反映させたほうが良いかも？
+
 				std::swap(rootMoves[0], *it_move);
 
 				// 2手目の指し手も与えないとponder出来ない。
@@ -1367,7 +1387,122 @@ namespace Book
 			tester.test("pawn's unpromoted move", true);
 		}
 #endif
+
+		// BookToolsのテスト
+		auto s1 = tester.section("BookTools");
+
+		Position pos;
+		string root_sfen = "startpos moves 7g7f 3c3d 6g6f 8b3b 8h7g 5a6b 2h8h 6b7b 8g8f 3d3e 8f8e 3e3f 3i2h 3f3g+ 2h3g 3a4b 4i3h P*3f 3g2h 4b3c 6i5h 3c4d 7i6h 1c1d P*3g 7a8b";
+		deque<StateInfo> si;
+		BookTools::feed_position_string(pos, root_sfen, si, [](Position&){});
+
+		string moves1 = "1g1f 2g2f 3g3f 4g4f 5g5f 6f6e 7f7e 8e8d 9g9f 1i1h 9i9h 2h3i 6h6g 6h7i 7g8f 7g9e 8h7h 8h8f 8h8g 8h9h 3h3i 3h4h 5h4h 5h6g 5i4h 5i4i 5i6i";
+		string moves2 = string();
+		for(auto m : MoveList<LEGAL_ALL>(pos))
+			moves2 += (moves2.empty() ? "" : " ") + to_usi_string(m.move);
+
+		tester.test("feed_position_string" , moves1 == moves2);
 	}
+}
+
+// ===================================================
+//                  BookTools
+// ===================================================
+
+// 定跡関係の処理のための補助ツール群
+namespace BookTools
+{
+	// USIの"position"コマンドに設定できる文字列で、局面を初期化する。
+	// 例)
+	// "startpos"
+	// "startpos moves xxx ..."
+	// "sfen xxx"
+	// "sfen xxx moves yyy ..."
+	// また、局面を1つ進めるごとにposition_callback関数が呼び出される。
+	// 辿った局面すべてに対して何かを行いたい場合は、これを利用すると良い。
+	void feed_position_string(Position& pos, const std::string& root_sfen, std::deque<StateInfo>& si, const std::function<void(Position&)>& position_callback)
+	{
+		// issから次のtokenを取得する
+		auto feed_next = [](Parser::LineScanner& iss)
+		{
+			return iss.get_text();
+		};
+
+		// "sfen"に後続するsfen文字列をissからfeedする
+		auto feed_sfen = [&feed_next](Parser::LineScanner& iss)
+		{
+			stringstream sfen;
+
+			// ループではないが条件外であるときにbreakでreturnのところに行くためのhack
+			while(true)
+			{
+				string token;
+
+				// 盤面を表すsfen文字列
+				sfen << feed_next(iss);
+
+				// 手番
+				token = feed_next(iss);
+				if (token != "w" && token != "b")
+					break;
+				sfen << " " << token;
+
+				// 手駒
+				sfen << " " << feed_next(iss);
+
+				// 初期局面からの手数
+				sfen <<  " " << feed_next(iss);
+
+				break;
+			}
+			return sfen.str();
+		};
+
+		si.clear();
+		si.emplace_back(StateInfo()); // このあとPosition::set()かset_hirate()を呼び出すので一つは必要。
+
+		Parser::LineScanner iss(root_sfen);
+		string token;
+		do {
+			token = feed_next(iss);
+			if (token == "sfen")
+			{
+				// 駒落ちなどではsfen xxx movesとなるのでこれをfeedしなければならない。
+				auto sfen = feed_sfen(iss);
+				pos.set(sfen, &si.back(), Threads.main());
+			}
+			else if (token == "startpos")
+			{
+				// 平手初期化
+				pos.set_hirate(&si.back(), Threads.main());
+			}
+		} while (token == "startpos" || token == "sfen" || token == "moves"/* movesは無視してループを回る*/ );
+
+		// callbackを呼び出してやる。
+		position_callback(pos);
+
+		// moves以降は1手ずつ進める
+		while (token != "")
+		{
+			// 非合法手ならUSI::to_moveはMOVE_NONEを返すはず…。
+			Move move = USI::to_move(pos, token);
+			if (move == MOVE_NONE)
+				break;
+
+			// MOVE_NULL,MOVE_WINでは局面を進められないのでここで終了。
+			if (!is_ok(move))
+				break;
+
+			si.emplace_back(StateInfo());
+			pos.do_move(move, si.back());
+
+			// callbackを呼び出してやる。
+			position_callback(pos);
+
+			token = feed_next(iss);
+		}
+	}
+<<<<<<< HEAD
 }
 
 // ===================================================
@@ -1469,12 +1604,15 @@ namespace BookTools
 			token = feed_next(iss);
 		}
 	}
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// 平手、駒落ちの開始局面集
 	// ここで返ってきた配列の、[0]は平手のsfenであることは保証されている。
 	std::vector<std::string> get_start_sfens()
 	{
 		std::vector<std::string> start_sfens = {
+<<<<<<< HEAD
 			/*public static readonly string HIRATE = */       "sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1" ,
 			/*public static readonly string HANDICAP_KYO = */ "sfen lnsgkgsn1/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1" ,
 			/*public static readonly string HANDICAP_RIGHT_KYO = */ "sfen 1nsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
@@ -1490,6 +1628,23 @@ namespace BookTools
 			/*public static readonly string HANDICAP_8 =      */ "sfen 3gkg3/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
 			/*public static readonly string HANDICAP_10 =     */ "sfen 4k4/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
 			/*public static readonly string HANDICAP_PAWN3 =  */ "sfen 4k4/9/9/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w 3p 1",
+=======
+			/*public static readonly string HIRATE             = */ "sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1" ,
+			/*public static readonly string HANDICAP_KYO       = */ "sfen lnsgkgsn1/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1" ,
+			/*public static readonly string HANDICAP_RIGHT_KYO = */ "sfen 1nsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_KAKU      = */ "sfen lnsgkgsnl/1r7/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_HISYA     = */ "sfen lnsgkgsnl/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_HISYA_KYO = */ "sfen lnsgkgsn1/7b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_2         = */ "sfen lnsgkgsnl/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_3         = */ "sfen lnsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_4         = */ "sfen 1nsgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_5         = */ "sfen 2sgkgsn1/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_LEFT_5    = */ "sfen 1nsgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_6         = */ "sfen 2sgkgs2/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_8         = */ "sfen 3gkg3/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_10        = */ "sfen 4k4/9/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1",
+			/*public static readonly string HANDICAP_PAWN3     = */ "sfen 4k4/9/9/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w 3p 1",
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		};
 
 		return start_sfens;
@@ -1499,7 +1654,11 @@ namespace BookTools
 	std::vector<std::string> get_next_sfens(std::string root_sfen)
 	{
 		Position pos;
+<<<<<<< HEAD
 		std::vector<StateInfo> si;
+=======
+		std::deque<StateInfo> si;
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		feed_position_string(pos, root_sfen, si);
 		StateInfo si2;
 		vector<string> sfens;

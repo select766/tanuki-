@@ -28,17 +28,45 @@ namespace Eval::dlshogi
 	PieceType HandPiece2PieceType[HandPieceNum ] = { PAWN , LANCE , KNIGHT , SILVER , GOLD , BISHOP , ROOK };
 	//int       PieceType2HandPiece[PIECE_TYPE_NB] = { 0 , 1 , 2 , 3 , 4 , 6 , 7 , 5 };
 
+#if defined(TRT_NN_FP16)
+	const DType dtype_zero = __float2half(0.0f);
+	const DType dtype_one = __float2half(1.0f);
+#endif
+
+#if 0 // dlshogiに忠実に書かれたコード
 
 	// 入力特徴量を生成する。
 	//   position  : このあとEvalNode()を呼び出したい局面
-	//   features1 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
-	//   features2 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
-	void make_input_features(const Position& position, NN_Input1* features1, NN_Input2* features2)
+	//   packed_features1 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
+	//   packed_features2 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
+	void make_input_features(const Position& position, int batch_index, PType* packed_features1, PType* packed_features2)
 	{
+		int f1idx_b = batch_index * ((int)COLOR_NB * (int)MAX_FEATURES1_NUM * (int)SQ_NB);
+		int f2idx_b = batch_index * ((int)MAX_FEATURES2_NUM);
 		// set all zero
 		// 特徴量の配列をゼロ初期化
-		std::fill_n((DType*)features1, sizeof(NN_Input1)/sizeof(DType) , dtype_zero );
-		std::fill_n((DType*)features2, sizeof(NN_Input2)/sizeof(DType) , dtype_zero );
+		{
+			// std::fill_n((DType*)features1, sizeof(NN_Input1)/sizeof(DType) , dtype_zero );
+			// std::fill_n((DType*)features2, sizeof(NN_Input2)/sizeof(DType) , dtype_zero );
+			const PType bmask[8] = { 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f };
+			const PType emask[8] = { 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x80, 0x00 };
+			int f1idx_e = f1idx_b + ((int)COLOR_NB * (int)MAX_FEATURES1_NUM * (int)SQ_NB - 1);
+			int f2idx_e = f2idx_b + ((int)MAX_FEATURES2_NUM - 1);
+			int f1idx_bu = f1idx_b >> 3;
+			int f1idx_bl = f1idx_b & 7;
+			int f1idx_eu = f1idx_e >> 3;
+			int f1idx_el = f1idx_e & 7;
+			int f2idx_bu = f2idx_b >> 3;
+			int f2idx_bl = f2idx_b & 7;
+			int f2idx_eu = f2idx_e >> 3;
+			int f2idx_el = f2idx_e & 7;
+			packed_features1[f1idx_bu] &= bmask[f1idx_bl];
+			std::fill_n(&packed_features1[f1idx_bu + 1], f1idx_eu - f1idx_bu - 1, (PType)0);
+			packed_features1[f1idx_eu] &= emask[f1idx_el];
+			packed_features2[f2idx_bu] &= bmask[f2idx_bl];
+			std::fill_n(&packed_features2[f2idx_bu + 1], f2idx_eu - f2idx_bu - 1, (PType)0);
+			packed_features2[f2idx_eu] &= emask[f2idx_el];
+		}
 
 		const Bitboard occupied_bb = position.pieces();
 
@@ -78,18 +106,29 @@ namespace Eval::dlshogi
 				{
 					// 駒の配置
 					if (bb[pt].test(sq))
-						(*features1)[c2][pt - 1][sq2] = dtype_one;
-
+					{
+						// (*features1)[c2][pt - 1][sq2] = dtype_one;
+						int f1idx = f1idx_b + (int)c2 * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)pt - 1) * ((int)SQ_NB) + (int)sq2;
+						packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+					}
 					// 駒種ごとの利き(有るか無いか)
 					if (attacks[c][pt].test(sq))
-						(*features1)[c2][PIECETYPE_NUM + pt - 1][sq2] = dtype_one;
+					{
+						// (*features1)[c2][PIECETYPE_NUM + pt - 1][sq2] = dtype_one;
+						int f1idx = f1idx_b + (int)c2 * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + (PIECETYPE_NUM + pt - 1) * ((int)SQ_NB) + (int)sq2;
+						packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+					}
 				}
 
 				// ある升sqに対するc側の利き数。MAX_ATTACK_NUM以上の利きは、MAX_ATTACK_NUM個であるとみなす。
 				const int num = std::min(MAX_ATTACK_NUM, position.attackers_to(c, sq, occupied_bb).pop_count());
 				for (int k = 0; k < num; k++)
+				{
 					// 利きの数のlayer数だけ、各layerに対してその升を1にしておく。
-					(*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + k][sq2] = dtype_one;
+					// (*features1)[c2][PIECETYPE_NUM + PIECETYPE_NUM + k][sq2] = dtype_one;
+					int f1idx = f1idx_b + (int)c2 * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + (PIECETYPE_NUM + PIECETYPE_NUM + k) * ((int)SQ_NB) + (int)sq2;
+					packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+				}
 			}
 
 			// 手駒
@@ -111,21 +150,276 @@ namespace Eval::dlshogi
 			// NN_Input2は、[COLOR_NB * MAX_PIECES_IN_HAND_SUM + 王手か(1) ][SQ_NB]
 			// なので、この一つ目のindexを[COLOR_NB][MAX_PIECES_IN_HAND_SUM]と解釈しなおす。
 			// ※　こうしたほうがコードが簡単になるので。
-			auto features2_hand = reinterpret_cast<DType(*)[COLOR_NB][MAX_PIECES_IN_HAND_SUM][SQ_NB]>(features2);
+			// auto features2_hand = reinterpret_cast<DType(*)[COLOR_NB][MAX_PIECES_IN_HAND_SUM][SQ_NB]>(features2);
 			Hand hand = position.hand_of(c);
 			int p = 0;
 			for (int hp = 0; hp < HandPieceNum; ++hp)
 			{
 				PieceType pt = HandPiece2PieceType[hp];
 				int num = std::min(hand_count(hand, pt), MAX_PIECES_IN_HAND[hp]);
-				std::fill_n((*features2_hand)[c2][p], (int)SQ_NB * num, dtype_one);
+				{
+					// std::fill_n((*features2_hand)[c2][p], (int)SQ_NB * num, dtype_one);
+					int f2idx = f2idx_b + (int)c2 * ((int)MAX_PIECES_IN_HAND_SUM) + p;
+					for (int i = 0; i < num; ++i) {
+						packed_features2[(f2idx + i) >> 3] |= (1 << ((f2idx + i) & 7));
+					}
+				}
 				p += MAX_PIECES_IN_HAND[hp]; // 駒種ごとに割り当てられているlayer数が決まっているので、次の駒種用のlayerにいく。
 			}
 		}
 
 		// 王手がかかっているか(のlayerが1枚)
 		if (position.in_check()) {
- 			std::fill_n((*features2)[MAX_FEATURES2_HAND_NUM], SQ_NB, dtype_one);
+			// std::fill_n((*features2)[MAX_FEATURES2_HAND_NUM], SQ_NB, dtype_one);
+			int f2idx = f2idx_b + (int)MAX_FEATURES2_HAND_NUM;
+			packed_features2[f2idx >> 3] |= (1 << (f2idx & 7));
+		}
+	}
+
+#endif
+
+#if 1 // 頑張って独自の最適化を行ったコード
+
+	// make_input_features()の下請け。
+	// SideToMove : 現局面の手番。
+	// 引数の意味は、make_input_features()と同じ。
+	template <Color SideToMove>
+	void make_input_features_sub(const Position& position, int batch_index, PType* packed_features1, PType* packed_features2)
+	{
+		int f1idx_b = batch_index * ((int)COLOR_NB * (int)MAX_FEATURES1_NUM * (int)SQ_NB);
+		int f2idx_b = batch_index * ((int)MAX_FEATURES2_NUM);
+		// set all zero
+		// 特徴量の配列をゼロ初期化
+		{
+			// std::fill_n((DType*)features1, sizeof(NN_Input1)/sizeof(DType) , dtype_zero );
+			// std::fill_n((DType*)features2, sizeof(NN_Input2)/sizeof(DType) , dtype_zero );
+			const PType bmask[8] = { 0x00, 0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f };
+			const PType emask[8] = { 0xfe, 0xfc, 0xf8, 0xf0, 0xe0, 0xc0, 0x80, 0x00 };
+			int f1idx_e = f1idx_b + ((int)COLOR_NB * (int)MAX_FEATURES1_NUM * (int)SQ_NB - 1);
+			int f2idx_e = f2idx_b + ((int)MAX_FEATURES2_NUM - 1);
+			int f1idx_bu = f1idx_b >> 3;
+			int f1idx_bl = f1idx_b & 7;
+			int f1idx_eu = f1idx_e >> 3;
+			int f1idx_el = f1idx_e & 7;
+			int f2idx_bu = f2idx_b >> 3;
+			int f2idx_bl = f2idx_b & 7;
+			int f2idx_eu = f2idx_e >> 3;
+			int f2idx_el = f2idx_e & 7;
+			packed_features1[f1idx_bu] &= bmask[f1idx_bl];
+			std::fill_n(&packed_features1[f1idx_bu + 1], f1idx_eu - f1idx_bu - 1, (PType)0);
+			packed_features1[f1idx_eu] &= emask[f1idx_el];
+			packed_features2[f2idx_bu] &= bmask[f2idx_bl];
+			std::fill_n(&packed_features2[f2idx_bu + 1], f2idx_eu - f2idx_bu - 1, (PType)0);
+			packed_features2[f2idx_eu] &= emask[f2idx_el];
+		}
+
+		// 各升の利きの数の集計用の配列
+		u8 effect_num[SQ_NB][COLOR_NB] = {};
+
+		// 盤上の駒のある場所
+		const Bitboard pieces = position.pieces();
+
+		// 歩
+		auto pawn_bb = position.pieces(PAWN);
+
+		// 歩以外の盤上の駒
+		auto pieces_without_pawns = position.pieces() & ~pawn_bb;
+
+		// 先手の歩 , 後手の歩
+		auto pawn_black = pawn_bb & position.pieces(BLACK);
+		auto pawn_white = pawn_bb & position.pieces(WHITE);
+
+		// 歩以外の駒それぞれに対して
+		pieces_without_pawns.foreach([&](Square sq) {
+			Piece pc = position.piece_on(sq);
+			auto attacks = effects_from(pc, sq, pieces);
+			Color c = color_of(pc);
+
+			/*後手なら符号を反転させる*/;
+			if (SideToMove == WHITE)
+			{
+				c = ~c;
+				sq = Flip(sq);
+			}
+
+			{
+				// この駒のある場所を1にする
+				// (*features1)[c][type_of(pc) - 1][sq] = dtype_one;
+				int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)type_of(pc) - 1) * ((int)SQ_NB) + (int)sq;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+
+			// この駒の利きを1にする
+			attacks.foreach([&](Square to) {
+				// 後手なら、180度盤面を回転させた場所に
+				if (SideToMove == WHITE)
+					to = Flip(to);
+
+				{
+					// この駒の利きのある場所を1にする
+					// (*features1)[c][PIECETYPE_NUM + type_of(pc) - 1][to] = dtype_one;
+					int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PIECETYPE_NUM + (int)type_of(pc) - 1) * ((int)SQ_NB) + (int)to;
+					packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+				}
+
+				// 各升の利きの数の集計用
+				effect_num[to][c]++;
+			});
+		});
+
+		// 先手の歩
+
+		pawn_black.foreach([&](Square sq) {
+			if (SideToMove == WHITE)
+				sq = Flip(sq);
+			Color c = SideToMove;
+
+			// 歩の升を1にする
+			{
+				// (*features1)[c][PAWN - 1][sq] = dtype_one;
+				int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PAWN - 1) * ((int)SQ_NB) + (int)sq;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+
+			// 歩の利きのある升を1にする。
+			Square to = (Square)(sq + (SideToMove == BLACK ? -1 : +1)) /*1升上*/;
+			{
+				// (*features1)[c][PIECETYPE_NUM + PAWN - 1][to] = dtype_one;
+				int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PIECETYPE_NUM + (int)PAWN - 1) * ((int)SQ_NB) + (int)to;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+
+			// 各升の利きの数の集計用
+			effect_num[to][c]++;
+		});
+
+		// 後手の歩
+
+		pawn_white.foreach([&](Square sq) {
+			if (SideToMove == WHITE)
+				sq = Flip(sq);
+			Color c = ~SideToMove;
+
+			{
+				// (*features1)[c][PAWN - 1][sq] = dtype_one;
+				int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PAWN - 1) * ((int)SQ_NB) + (int)sq;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+			Square to = (Square)(sq + (SideToMove == BLACK ? +1 : -1)) /*1升下*/;
+			{
+				// (*features1)[c][PIECETYPE_NUM + PAWN - 1][to] = dtype_one;
+				int f1idx = f1idx_b + (int)c * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PIECETYPE_NUM + (int)PAWN - 1) * ((int)SQ_NB) + (int)to;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+
+			effect_num[to][c]++;
+		});
+
+		// 利きの数を書いたlayerを生成する。
+		// effect_numの集計結果が入っている。後手番なら盤面を180度回転させた時の値(先後が逆、升も逆)が入っている。
+		for (Square sq = SQ_11; sq < SQ_NB; ++sq)
+		{
+			// ある升sqに対するc側の利き数。MAX_ATTACK_NUM以上の利きは、MAX_ATTACK_NUM個であるとみなす。
+			int num = std::min(MAX_ATTACK_NUM, (int)effect_num[sq][BLACK]);
+			for (int k = 0; k < num; k++)
+			{
+				// 利きの数のlayer数だけ、各layerに対してその升を1にしておく。
+				// (*features1)[BLACK][PIECETYPE_NUM + PIECETYPE_NUM + k][sq] = dtype_one;
+				int f1idx = f1idx_b + (int)BLACK * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PIECETYPE_NUM + (int)PIECETYPE_NUM + k) * ((int)SQ_NB) + (int)sq;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+
+			// 後手も同様
+			num = std::min(MAX_ATTACK_NUM, (int)effect_num[sq][WHITE]);
+			for (int k = 0; k < num; k++)
+			{
+				// (*features1)[WHITE][PIECETYPE_NUM + PIECETYPE_NUM + k][sq] = dtype_one;
+				int f1idx = f1idx_b + (int)WHITE * ((int)MAX_FEATURES1_NUM * (int)SQ_NB) + ((int)PIECETYPE_NUM + (int)PIECETYPE_NUM + k) * ((int)SQ_NB) + (int)sq;
+				packed_features1[f1idx >> 3] |= (1 << (f1idx & 7));
+			}
+		}
+
+		// 手駒
+		for (Color c = BLACK; c < COLOR_NB ; ++c)
+		{
+			// 手番が後手の場合、色を反転して考える。
+			Color c2 = (position.side_to_move() == BLACK) ? c : ~c;
+			/*
+				dlshogiのNNへの入力特徴量の手駒、順番がAperyのHandPiece enumの順になってて、これが普通に駒順(PieceType)と異なり、
+				末尾がRookなのでわりと嫌らしい。(これに気づくのに1時間ぐらい要した)
+				※ PieceTypeは末尾がGold。
+
+				そもそもで言うと、Aperyが手駒をいつまでもPieceTypeと異なる順にしているのが悪いのだけども(Aperyのpiece.hppに
+				次のようなコメントがある)、dlshogiでは、これはどちらかに統一したほうが良かったのではなかろうか。
+				(やねうら王的には前者に統一してあるほうが嬉しい)
+
+				> // 持ち駒を表すときに使用する。
+				> // todo: HGold を HRook の後ろに持っていき、PieceType との変換を簡単に出来るようにする。
+
+				これ、あとでdlshogiのNNを自分の探索部で使おうとする人は、同じ問題でハマると思う。😥
+			*/
+
+			// NN_Input2は、[COLOR_NB * MAX_PIECES_IN_HAND_SUM + 王手か(1) ][SQ_NB]
+			// なので、この一つ目のindexを[COLOR_NB][MAX_PIECES_IN_HAND_SUM]と解釈しなおす。
+			// ※　こうしたほうがコードが簡単になるので。
+			// auto features2_hand = reinterpret_cast<DType(*)[COLOR_NB][MAX_PIECES_IN_HAND_SUM][SQ_NB]>(features2);
+			Hand hand = position.hand_of(c);
+			int p = 0;
+			for (int hp = 0; hp < HandPieceNum; ++hp)
+			{
+				PieceType pt = HandPiece2PieceType[hp];
+				const int mp = MAX_PIECES_IN_HAND[hp];
+				int num = std::min(hand_count(hand, pt), mp);
+				// std::fill_n((*features2_hand)[c2][p] , (int)SQ_NB * num, dtype_one);
+				int f2idx = f2idx_b + (int)c2 * ((int)MAX_PIECES_IN_HAND_SUM) + p;
+				for (int i = 0; i < num; ++i) {
+					packed_features2[(f2idx + i) >> 3] |= (1 << ((f2idx + i) & 7));
+				}
+
+				// そこから後ろをゼロクリア
+				// int rest = mp - num;
+				// if (rest)
+				//	std::fill_n((*features2_hand)[c2][p+num] ,(int)SQ_NB * rest, dtype_zero);
+
+				p += MAX_PIECES_IN_HAND[hp]; // 駒種ごとに割り当てられているlayer数が決まっているので、次の駒種用のlayerにいく。
+			}
+		}
+
+		if (position.in_check()) {
+			// 王手がかかっているか(のlayerが1枚)
+			// std::fill_n((*features2)[MAX_FEATURES2_HAND_NUM], SQ_NB, position.in_check() ? dtype_one : dtype_zero);
+			int f2idx = f2idx_b + (int)MAX_FEATURES2_HAND_NUM;
+			packed_features2[f2idx >> 3] |= (1 << (f2idx & 7));
+		}
+	}
+
+
+	// 入力特徴量を生成する。
+	//   position  : このあとEvalNode()を呼び出したい局面
+	//   packed_features1 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
+	//   packed_features2 : ここに書き出す。(事前に呼び出し元でバッファを確保しておくこと)
+	void make_input_features(const Position& position, int batch_index, PType* packed_features1, PType* packed_features2)
+	{
+		position.side_to_move() == BLACK
+			? make_input_features_sub<BLACK>(position, batch_index, packed_features1, packed_features2)
+			: make_input_features_sub<WHITE>(position, batch_index, packed_features1, packed_features2);
+	}
+#endif
+
+	// 入力特徴量を展開する。GPU側で展開する場合は不要。
+	void extract_input_features(int batch_size, PType* packed_features1, PType* packed_features2, NN_Input1* features1, NN_Input2* features2)
+	{
+		int p1len = batch_size * ((int)COLOR_NB * (int)MAX_FEATURES1_NUM * (int)SQ_NB);
+		int p2len = batch_size * ((int)MAX_FEATURES2_NUM);
+		DType* f1 = (DType*)features1;
+		DType* f2 = (DType*)features2;
+		for (int i = 0; i < p1len; ++i)
+		{
+			f1[i] = ((packed_features1[i >> 3] >> (i & 7)) & 1) != 0 ? dtype_one : dtype_zero;
+		}
+		for (int i = 0; i < p2len; ++i)
+		{
+			std::fill_n(&f2[i * (int)SQ_NB], (int)SQ_NB, ((packed_features2[i >> 3] >> (i & 7)) & 1) != 0 ? dtype_one : dtype_zero);
 		}
 	}
 

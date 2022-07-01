@@ -3,6 +3,7 @@
 #include "tt.h"
 #include "thread.h"
 #include "mate/mate.h"
+#include "book/book.h"
 #include "testcmd/unit_test.h"
 
 #include <iostream>
@@ -211,7 +212,7 @@ void Position::set(std::string sfen , StateInfo* si , Thread* th)
 		{
 			// 盤面の(f,r)の駒を設定する
 			auto sq = f | r;
-			auto pc = Piece(idx + (promote ? u32(PIECE_PROMOTE) : 0));
+			auto pc = promote ? make_promoted_piece(Piece(idx)) : Piece(idx);
 			put_piece(sq, pc);
 
 #if defined (USE_EVAL_LIST)
@@ -561,7 +562,7 @@ Bitboard Position::slider_blockers(Color c, Square s , Bitboard& pinners) const 
 		Bitboard b = between_bb(s, sniperSq) & pieces() /* occupancy */;
 
 		// snipperと玉との間にある駒が1個であるなら。
-		if (b && !more_than_one(b))
+		if (b && !b.more_than_one())
 		{
 			blockers |= b;
 			if (b & pieces(~c))
@@ -575,7 +576,7 @@ Bitboard Position::slider_blockers(Color c, Square s , Bitboard& pinners) const 
 
 // sに利きのあるc側の駒を列挙する。先後両方。
 // (occが指定されていなければ現在の盤面において。occが指定されていればそれをoccupied bitboardとして)
-// sq == SQ_NBでの呼び出しは合法。ZERO_BBが返る。
+// sq == SQ_NBでの呼び出しは合法。Bitboard(ZERO)が返る。
 Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const
 {
 	ASSERT_LV3(sq <= SQ_NB);
@@ -630,7 +631,6 @@ inline Bitboard Position::attackers_to_pawn(Color c, Square pawn_sq) const
 			| (rookEffect(pawn_sq, occ)    &  pieces(ROOK_DRAGON)     )
 			) & pieces(c);
 }
-
 
 // 指し手が、(敵玉に)王手になるかをテストする。
 
@@ -689,7 +689,7 @@ bool Position::legal_drop(const Square to) const
 	Bitboard pinned = blockers_for_king(~us);
 
 	// pinされていない駒が1つでもあるなら、相手はその駒で取って何事もない。
-	if (b & (~pinned | FILE_BB[file_of(to)]))
+	if (b & (~pinned | file_bb(file_of(to))))
 		return true;
 
 	// 攻撃駒はすべてpinされていたということであり、
@@ -722,7 +722,7 @@ bool Position::legal_drop(const Square to) const
 	// 相手玉の場所
 	Square sq_king = king_square(~us);
 
-#ifndef LONG_EFFECT_LIBRARY
+#if !defined(LONG_EFFECT_LIBRARY)
 	// LONG EFFECT LIBRARYがない場合、愚直に8方向のうち逃げられそうな場所を探すしかない。
 
 	Bitboard escape_bb = kingEffect(sq_king) & ~pieces(~us);
@@ -761,6 +761,13 @@ bool Position::legal_drop(const Square to) const
 #endif
 }
 
+// 二歩でなく、かつ打ち歩詰めでないならtrueを返す。
+bool Position::legal_pawn_drop(const Color us, const Square to) const
+{
+	return !((pieces(us, PAWN) & file_bb(file_of(to)))                               // 二歩
+		|| ((pawnEffect(us, to) == Bitboard(king_square(~us)) && !legal_drop(to)))); // 打ち歩詰め
+}
+
 // mがpseudo_legalな指し手であるかを判定する。
 // ※　pseudo_legalとは、擬似合法手(自殺手が含まれていて良い)
 // 置換表の指し手でdo_move()して良いのかの事前判定のために使われる。
@@ -794,7 +801,7 @@ bool Position::pseudo_legal_s(const Move m) const {
 		// KING打ちのような値であることはないものとする。
 
 		// 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
-		if (moved_piece_after(m) != Piece(pr + (us == WHITE ? u32(PIECE_WHITE) : 0) ))
+		if (moved_piece_after(m) != make_piece(us, pr))
 			return false;
 
 		ASSERT_LV3(PAWN <= pr && pr < KING);
@@ -858,13 +865,11 @@ bool Position::pseudo_legal_s(const Move m) const {
 			// --- 成る指し手
 
 			// 成れない駒の成りではないことを確かめないといけない。
-			static_assert(GOLD == 7, "GOLD must be 7.");
-			if (pt >= GOLD)
+			if (is_promoted_piece(pc))
 				return false;
 
 			// 上位32bitに移動後の駒が格納されている。それと一致するかのテスト
-			// pcが成っていない駒であることは上で確認してあるので、"+ PIECE_PROMOTE"でも十分。
-			if (moved_piece_after(m) != Piece(pc + PIECE_PROMOTE))
+			if (moved_piece_after(m) != make_promoted_piece(pc))
 				return false;
 		}
 		else {
@@ -939,7 +944,7 @@ bool Position::pseudo_legal_s(const Move m) const {
 			if (type_of(pc) != KING)
 			{
 				// 両王手なら王の移動をさせなければならない。
-				if (more_than_one(checkers()))
+				if (checkers().more_than_one())
 					return false;
 
 				// 指し手は、王手を遮断しているか、王手している駒の捕獲でなければならない。
@@ -984,6 +989,24 @@ bool Position::legal(Move m) const
 	}
 }
 
+// leagl()では、成れるかどうかのチェックをしていない。
+// (先手の指し手を後手の指し手と混同しない限り、指し手生成された段階で
+// 成れるという条件は満たしているはずだから)
+// しかし、先手の指し手を後手の指し手と取り違えた場合、この前提が崩れるので
+// これをチェックするための関数。成れる条件を満たしていない場合、falseが返る。
+bool Position::legal_promote(Move m) const
+{
+	// 成りの指し手にしか関与しない
+	if (!is_promote(m))
+		return true;
+
+	Color us = sideToMove;
+	Square from = from_sq(m);
+	Square to   =   to_sq(m);
+
+	// 移動元か移動先が敵陣でなければ成れる条件を満たしていない。
+	return enemy_field(us) & (Bitboard(from) | Bitboard(to));
+}
 
 // 置換表から取り出したMoveを32bit化する。
 Move Position::to_move(Move16 m16) const
@@ -1003,20 +1026,29 @@ Move Position::to_move(Move16 m16) const
 	if (!is_ok(m))
 		return m;
 
-	return
-		Move(u16(m) +
-			((is_drop(m) ? (Piece)(make_piece(sideToMove, move_dropped_piece(m)))
-			: is_promote(m) ? (Piece)(piece_on(from_sq(m)) | PIECE_PROMOTE) : piece_on(from_sq(m))) << 16)
-		// "+ PIECE_PROMOTE" だと、玉や成り駒に対して 8足しておかしくなってしまう。(置換表の指し手をpseudo-legalか
-		// 確認せずに置換表の値で枝刈りして、そのあとupdate_statsを行う時に配列境界を超えかねない)
-		// " | PIECE_PROMOTE"が正しいコード。 WCSC29で平岡さんから教えてもらった。[2019/05/04]
+	if (is_drop(m))
+		return Move(u16(m) + ((u32)make_piece(side_to_move(), move_dropped_piece(m)) << 16));
 		// また、move_dropped_piece()はおかしい値になっていないことは保証されている(置換表に自分で書き出した値のため)
-		// これにより、配列境界の外側に書き出してしまうことはない。
+		// これにより、配列境界の外側に書き出してしまう心配はない。
 
-		// m==MOVE_NONE(0)の場合、piece_on(SQ_ZERO)の駒が上位16bitに格納されると少し気持ち悪いが、
-		// 移動元と移動先が SQ_11なので実質的に無害。
-	);
+	// 移動元にある駒が、現在の手番の駒であることを保証する。
+	// 現在の手番の駒でないか、駒がなければMOVE_NONEを返す。
+	Piece moved_piece = piece_on(from_sq(m));
+	if (color_of(moved_piece) != side_to_move() || moved_piece == NO_PIECE)
+		return MOVE_NONE;
 
+	// promoteで成ろうとしている駒は成れる駒であることを保証する。
+	if (is_promote(m))
+	{
+		// 成駒や金・玉であるなら、これ以上成れない。これは非合法手である。
+		if (is_promoted_piece(moved_piece))
+			return MOVE_NONE;
+
+		return Move(u16(m) + ((u32)(make_promoted_piece(moved_piece) << 16)));
+	}
+
+	// 通常の移動
+	return Move(u16(m) + ((u32)moved_piece << 16));
 }
 
 
@@ -1126,10 +1158,10 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 		// なるべく早い段階でのTTに対するprefetch
 		// 駒打ちのときはこの時点でTT entryのアドレスが確定できる
-		const Key key = k + h;
+		const HASH_KEY key = k + h;
 		prefetch(TT.first_entry(key));
 #if defined(USE_EVAL_HASH)
-		Eval::prefetch_evalhash(key);
+		Eval::prefetch_evalhash(hash_key_to_key(key));
 #endif
 
 		put_piece(to, pc);
@@ -1291,10 +1323,10 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 		k += Zobrist::psq[to][moved_after_pc];
 
 		// 駒打ちでないときはprefetchはこの時点まで延期される。
-		const Key key = k + h;
+		const HASH_KEY key = k + h;
 		prefetch(TT.first_entry(key));
 #if defined(USE_EVAL_HASH)
-		Eval::prefetch_evalhash(key);
+		Eval::prefetch_evalhash(hash_key_to_key(key));
 #endif
 
 		// put_piece()などを用いたのでupdateする。
@@ -1320,13 +1352,14 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 			if (discovered(from, to, ksq, prevSt->blockersForKing[Them] & from))
 			{
-				auto directions = directions_of(from, ksq);
-				switch (pop_directions(directions)) {
+				// fromと敵玉とは同じ筋にあり、かつfromから駒を移動させて空き王手になる。
+				// つまりfromから上下を見ると、敵玉と、自分の開き王手をしている遠方駒(飛車 or 香)があるはずなのでこれを追加する。
+				// 敵玉はpieces(Us)なので含まれないはずであり、結果として自分の開き王手している駒だけが足される。
 
-					// fromと敵玉とは同じ筋にあり、かつfromから駒を移動させて空き王手になる。
-					// つまりfromから上下を見ると、敵玉と、自分の開き王手をしている遠方駒(飛車 or 香)があるはずなのでこれを追加する。
-					// 敵玉はpieces(Us)なので含まれないはずであり、結果として自分の開き王手している駒だけが足される。
+				// rookEffect()を用いると、香での王手に対応するのが難しくなるので、
+				// 利きの方向ごとに場合分けするほうが簡単
 
+<<<<<<< HEAD
 					// rookEffect()を用いると、香での王手に対応するのが難しくなるので、
 					// 利きの方向ごとに場合分けするほうが簡単
 
@@ -1363,6 +1396,17 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 					
 				default: UNREACHABLE;
 				}
+=======
+				//   玉
+				//   □
+				//   駒 ← 今回動かした駒のfrom
+				//   □
+				//   香
+				// のようになっているとして、玉から見て駒のfromが(DIRECT_D)にあるということは、
+				// 駒のfromの下に王手している駒があって、それによって開き王手になったということ。
+
+				st->checkersBB |= directEffect(from, direct_of(ksq, from), pieces()) & pieces<Us>();
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 
 			// 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
@@ -1407,11 +1451,19 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 // ある指し手を指した後のhash keyを返す。
 Key Position::key_after(Move m) const {
+<<<<<<< HEAD
 	return (Key)long_key_after(m);
 }
 
 // ある指し手を指した後のhash keyを返す。
 HASH_KEY Position::long_key_after(Move m) const {
+=======
+	return hash_key_to_key(hash_key_after(m));
+}
+
+// ある指し手を指した後のhash keyを返す。
+HASH_KEY Position::hash_key_after(Move m) const {
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	Color Us = side_to_move();
 	auto k = st->board_key_ ^ Zobrist::side;
@@ -1445,15 +1497,7 @@ HASH_KEY Position::long_key_after(Move m) const {
 
 		// 移動先に駒の配置
 		// もし成る指し手であるなら、成った後の駒を配置する。
-		Piece moved_after_pc;
-
-		if (is_promote(m))
-		{
-			moved_after_pc = moved_pc + PIECE_PROMOTE;
-		}
-		else {
-			moved_after_pc = moved_pc;
-		}
+		Piece moved_after_pc = is_promote(m) ? make_promoted_piece(moved_pc) : moved_pc;
 
 		// 移動先の升にある駒
 		Piece to_pc = piece_on(to);
@@ -1462,13 +1506,13 @@ HASH_KEY Position::long_key_after(Move m) const {
 			PieceType pr = raw_type_of(to_pc);
 
 			// 捕獲された駒が盤上から消えるので局面のhash keyを更新する
-			k -= Zobrist::psq[to][to_pc];
-			h += Zobrist::hand[Us][pr];
+			k -= Zobrist::psq [to][to_pc];
+			h += Zobrist::hand[Us][pr   ];
 		}
 
 		// fromにあったmoved_pcがtoにmoved_after_pcとして移動した。
-		k -= Zobrist::psq[from][moved_pc];
-		k += Zobrist::psq[to][moved_after_pc];
+		k -= Zobrist::psq[from][moved_pc      ];
+		k += Zobrist::psq[to  ][moved_after_pc];
 	}
 
 	return k + h;
@@ -1648,7 +1692,7 @@ void Position::do_null_move(StateInfo& newSt) {
 	// 　prefetchのスケジューラーが処理しきれない可能性が…。
 	// CPUによっては有効なので一応やっておく。
 
-	const Key key = st->key();
+	const HASH_KEY key = st->hash_key();
 	prefetch(TT.first_entry(key));
 
 	// これは、さっきアクセスしたところのはずなので意味がない。
@@ -1745,61 +1789,25 @@ namespace {
 		// sqにあった駒が消えるので、toから見てsqの延長線上にある駒を追加する。
 
 		auto dirs = directions_of(to, sq);
-		if (dirs) switch (pop_directions(dirs))
+		if (dirs) switch(pop_directions(dirs))
 		{
-
-#if defined(USE_OLD_YANEURAOU_EFFECT)
-		case DIRECT_RU: case DIRECT_LD:
-			// 斜め方向なら斜め方向の升をスキャンしてその上にある角・馬を足す
-			attackers |= bishopEffect0(to, occupied) & pos.pieces(BISHOP_HORSE);
-
-			ASSERT_LV3((bishopStepEffect(to) & sq));
-			break;
-
-		case DIRECT_RD: case DIRECT_LU:
-			attackers |= bishopEffect1(to, occupied) & pos.pieces(BISHOP_HORSE);
-			ASSERT_LV3((bishopStepEffect(to) & sq));
-			break;
-#else
-		// Aperyの利き実装を用いる場合
-		// bishopEffect()で斜め四方向の利きが一気に求まるのでこれを分かつことはできない。
-			
 		// 斜め方向なら斜め方向の升をスキャンしてその上にある角・馬を足す
-		case DIRECT_RU: case DIRECT_LD:
-		case DIRECT_RD: case DIRECT_LU:
-			attackers |= bishopEffect(to, occupied) & pos.pieces(BISHOP_HORSE);
-			ASSERT_LV3((bishopStepEffect(to) & sq));
-			break;
+		case DIRECT_RU: attackers |= rayEffect<DIRECT_RU>(to, occupied) & pos.pieces<BISHOP_HORSE>(); break;
+		case DIRECT_LD: attackers |= rayEffect<DIRECT_LD>(to, occupied) & pos.pieces<BISHOP_HORSE>(); break;
+		case DIRECT_RD: attackers |= rayEffect<DIRECT_RD>(to, occupied) & pos.pieces<BISHOP_HORSE>(); break;
+		case DIRECT_LU: attackers |= rayEffect<DIRECT_LU>(to, occupied) & pos.pieces<BISHOP_HORSE>(); break;
 
-#endif
-		case DIRECT_U:
-			// 後手の香 + 先後の飛車
-			attackers |= lanceEffect(BLACK, to, occupied) & (pos.pieces(ROOK_DRAGON) | pos.pieces(WHITE, LANCE));
+		// 上方向に移動した時の背後の駒によってtoの地点に利くのは、後手の香 + 先後の飛車
+		case DIRECT_U : attackers |= rayEffect<DIRECT_U >(to, occupied) & (pos.pieces<ROOK_DRAGON>() | pos.pieces<WHITE, LANCE>()); break;
 
-			ASSERT_LV3((lanceStepEffect(BLACK, to) & sq));
-			break;
+		// 下方向に移動した時の背後の駒によってtoの地点に利くのは、先手の香 + 先後の飛車
+		case DIRECT_D : attackers |= rayEffect<DIRECT_D >(to, occupied) & (pos.pieces<ROOK_DRAGON>() | pos.pieces<BLACK, LANCE>()); break;
 
-		case DIRECT_D:
-			// 先手の香 + 先後の飛車
-			attackers |= lanceEffect(WHITE, to, occupied) & (pos.pieces(ROOK_DRAGON) | pos.pieces(BLACK, LANCE));
+		// 左右方向に移動した時の背後の駒によってtoの地点に利くのは、飛車・龍。
+		case DIRECT_L : attackers |= rayEffect<DIRECT_L> (to, occupied) & pos.pieces<ROOK_DRAGON>(); break;
+		case DIRECT_R : attackers |= rayEffect<DIRECT_R> (to, occupied) & pos.pieces<ROOK_DRAGON>(); break;
 
-			ASSERT_LV3((lanceStepEffect(WHITE, to) & sq));
-			break;
-
-		case DIRECT_L: case DIRECT_R:
-			// 左右なので先後の飛車
-
-#if defined(USE_OLD_YANEURAOU_EFFECT)
-			attackers |= rookRankEffect(to, occupied) & pos.pieces(ROOK_DRAGON);
-#else
-			attackers |= rookEffect(to, occupied) & pos.pieces(ROOK_DRAGON);
-#endif
-
-			ASSERT_LV3(((rookStepEffect(to) & sq)));
-			break;
-
-		default:
-			UNREACHABLE;
+		default: UNREACHABLE; break;
 		}
 		else {
 			// DIRECT_MISC
@@ -2011,6 +2019,64 @@ RepetitionState Position::is_repetition(int repPly /* = 16 */) const
 	return REPETITION_NONE;
 }
 
+<<<<<<< HEAD
+=======
+// is_repetition()の、千日手が見つかった時に、原局面から何手遡ったかを返すバージョン。
+// found_plyにその値が返ってくる。
+RepetitionState Position::is_repetition(int repPly, int& found_ply) const
+{
+	// pliesFromNullが未初期化になっていないかのチェックのためのassert
+	ASSERT_LV3(st->pliesFromNull >= 0);
+
+	// 遡り可能な手数。
+	// 最大でもrepPly手までしか遡らないことにする。
+	int end = std::min(repPly, st->pliesFromNull);
+
+	found_ply = 0;
+
+	// 少なくとも4手かけないと千日手にはならないから、4手前から調べていく。
+	if (end < 4)
+		return REPETITION_NONE;
+
+	StateInfo* stp = st->previous->previous;
+
+	for (found_ply = 4; found_ply <= end ; found_ply += 2)
+	{
+		stp = stp->previous->previous;
+
+		// board_key : 盤上の駒のみのhash(手駒を除く)
+		// 盤上の駒が同じ状態であるかを判定する。
+		if (stp->board_key() == st->board_key())
+		{
+			// 手駒が一致するなら同一局面である。(2手ずつ遡っているので手番は同じである)
+			if (stp->hand == st->hand)
+			{
+				// 自分が王手をしている連続王手の千日手なのか？
+				if (found_ply <= st->continuousCheck[sideToMove])
+					return REPETITION_LOSE;
+
+				// 相手が王手をしている連続王手の千日手なのか？
+				if (found_ply <= st->continuousCheck[~sideToMove])
+					return REPETITION_WIN;
+
+				return REPETITION_DRAW;
+			}
+			else {
+				// 優等局面か劣等局面であるか。(手番が相手番になっている場合はいま考えない)
+				if (hand_is_equal_or_superior(st->hand, stp->hand))
+					return REPETITION_SUPERIOR;
+				if (hand_is_equal_or_superior(stp->hand, st->hand))
+					return REPETITION_INFERIOR;
+			}
+		}
+	}
+
+	// 同じhash keyの局面が見つからなかったので…。
+	return REPETITION_NONE;
+}
+
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // ----------------------------------
 //      入玉判定
 // ----------------------------------
@@ -2300,6 +2366,9 @@ void Position::UnitTest(Test::UnitTester& tester)
 	Position pos;
 	StateInfo si;
 
+	// 任意局面での初期化。
+	auto pos_init = [&](const std::string& sfen_) { pos.set(sfen_, &si, Threads.main()); };
+
 	// 平手初期化
 	auto hirate_init  = [&] { pos.set_hirate(&si, Threads.main()); };
 	// 2枚落ち初期化
@@ -2342,16 +2411,23 @@ void Position::UnitTest(Test::UnitTester& tester)
 
 		// 22の角を88に不成で移動。(非合法手) 移動後の駒は後手の角。
 		m16 = make_move16(SQ_22, SQ_88);
-		tester.test("make_move16(SQ_22, SQ_88)", pos.to_move(m16) == (Move)((u32)m16.to_u16() + (u32)(W_BISHOP << 16)));
+		tester.test("make_move16(SQ_22, SQ_88)", pos.to_move(m16) == MOVE_NONE);
 
 		// 22の角を88に成る移動。(非合法手) 移動後の駒は後手の馬。
 		m16 = make_move_promote16(SQ_22, SQ_88);
-		tester.test("make_move_promote16(SQ_22, SQ_88)", pos.to_move(m16) == (Move)((u32)m16.to_u16() + (u32)(W_HORSE << 16)));
+		tester.test("make_move_promote16(SQ_22, SQ_88)", pos.to_move(m16) == MOVE_NONE);
+
+		matsuri_init();
+		m16 = make_move_drop16(GOLD,SQ_55);
+		tester.test("make_move_drop(SQ_55,GOLD)", pos.to_move(m16) == (Move)((u32)m16.to_u16() + (u32)(W_GOLD << 16)));
 	}
 
 	// pseudo_legal() , legal() のテスト
 	{
 		auto section2 = tester.section("legality");
+
+		// 平手初期化
+		hirate_init();
 
 		// 77の歩を76に移動。(合法手)
 		// これはpseudo_legalではある。
@@ -2369,6 +2445,39 @@ void Position::UnitTest(Test::UnitTester& tester)
 		m16 = make_move16(SQ_88, SQ_22);
 		m = pos.to_move(m16);
 		tester.test("make_move(SQ_88, SQ_22) is pseudo_legal == false", pos.pseudo_legal(m) == false);
+	}
+
+	// attacks_bb() のテスト
+	{
+		auto section2 = tester.section("attacks_bb");
+		hirate_init();
+		tester.test("attacks_by<BLACK,PAWN>"  , pos.attacks_by<BLACK,PAWN>() == BB_Table::RANK6_BB);
+		tester.test("attacks_by<WHITE,PAWN>"  , pos.attacks_by<WHITE,PAWN>() == BB_Table::RANK4_BB);
+		tester.test("attacks_by<BLACK,KNIGHT>", pos.attacks_by<BLACK,KNIGHT>() ==
+			(Bitboard(SQ_97) | Bitboard(SQ_77) | Bitboard(SQ_37) | Bitboard(SQ_17))
+		);
+		tester.test("attacks_by<BLACK,GOLDS>", pos.attacks_by<BLACK,GOLDS>() ==
+			(goldEffect<BLACK>(SQ_69) | goldEffect<BLACK>(SQ_49))
+		);
+		tester.test("attacks_by<WHITE,GOLDS>", pos.attacks_by<WHITE,GOLDS>() ==
+			(goldEffect<WHITE>(SQ_61) | goldEffect<WHITE>(SQ_41))
+		);
+
+	}
+
+	// 千日手検出のテスト
+	{
+		auto section2 = tester.section("is_repetition");
+
+		std::deque<StateInfo> sis;
+
+		// 4手前の局面に戻っているパターン
+		BookTools::feed_position_string(pos, "startpos moves 5i5h 5a5b 5h5i 5b5a", sis);
+
+		int found_ply;
+		auto rep = pos.is_repetition(16, found_ply);
+
+		tester.test("REPETITION_DRAW", rep == REPETITION_DRAW && found_ply == 4);
 	}
 
 	// 入玉のテスト
@@ -2473,6 +2582,62 @@ void Position::UnitTest(Test::UnitTester& tester)
 		}
 	}
 
+<<<<<<< HEAD
+=======
+	{
+		// 指し手生成のテスト
+		auto section2 = tester.section("GenMove");
+
+		{
+			// 23歩不成ができ、かつ、23歩不成では駒の捕獲にはならない局面。
+			pos_init("lnsgk1snl/1r4g2/p1ppppb1p/6pP1/7R1/2P6/P2PPPP1P/1SG6/LN2KGSNL b BP2p 21");
+			Move move1 = make_move(SQ_24, SQ_23,B_PAWN);
+			Move move2 = make_move_promote(SQ_24, SQ_23,B_PAWN);
+
+			ExtMove move_buf[MAX_MOVES] , *move_last;
+			// move_bufからmove_lastのなかにmoveがあるかを探す。あればtrueを返す。
+			auto find_move = [&](Move m) {
+				for (ExtMove* em = &move_buf[0]; em != move_last; ++em)
+					if (em->move == m)
+						return true;
+				return false;
+			};
+
+			bool all = true;
+
+			move_last = generateMoves<NON_CAPTURES>(pos, move_buf);
+			all &= !find_move(move1);
+			all &=  find_move(move2);
+
+			move_last = generateMoves<CAPTURES>(pos, move_buf);
+			all &= !find_move(move1);
+			all &= !find_move(move2);
+
+			move_last = generateMoves<NON_EVASIONS>(pos, move_buf);
+			all &= !find_move(move1);
+			all &=  find_move(move2);
+
+			move_last = generateMoves<NON_EVASIONS_ALL>(pos, move_buf);
+			all &=  find_move(move1);
+			all &=  find_move(move2);
+
+			move_last = generateMoves<CAPTURES>(pos, move_buf);
+			all &= !find_move(move1);
+			all &= !find_move(move2);
+
+			move_last = generateMoves<CAPTURES_PRO_PLUS>(pos, move_buf);
+			all &= !find_move(move1);
+			all &=  find_move(move2);
+
+			move_last = generateMoves<NON_CAPTURES_PRO_MINUS>(pos, move_buf);
+			all &= !find_move(move1);
+			all &= !find_move(move2);
+
+			tester.test("pawn's unpromoted move", all);
+		}
+	}
+
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 #if 0
 	// ランダムプレイヤーでの対局

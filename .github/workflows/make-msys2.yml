@@ -11,10 +11,18 @@ on:
 
 jobs:
   build-msys2-windows:
+<<<<<<< HEAD
     # windows-latest = windows-2019
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     runs-on: windows-latest
+=======
+    # windows-latest = windows-2019 => windows-2022
+    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
+    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
+    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
+    runs-on: windows-2022
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     strategy:
       matrix:
@@ -25,7 +33,8 @@ jobs:
           - YANEURAOU_ENGINE_NNUE_KP256
           - YANEURAOU_ENGINE_KPPT
           - YANEURAOU_ENGINE_KPP_KKPT
-          - YANEURAOU_ENGINE_MATERIAL*
+          #- YANEURAOU_ENGINE_MATERIAL*
+          - "YANEURAOU_ENGINE_MATERIAL,YANEURAOU_ENGINE_MATERIAL9"
           - YANEURAOU_MATE_ENGINE
           - TANUKI_MATE_ENGINE
           - USER_ENGINE
@@ -34,7 +43,10 @@ jobs:
           - g++
         target:
           - "normal,tournament"
+<<<<<<< HEAD
           - gensfen
+=======
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - evallearn
         archcpu:
           - "AVX512VNNI,AVXVNNI,AVX512,AVX2,SSE42,SSE41,SSSE3,SSE2,ZEN1,ZEN2,ZEN3"
@@ -43,21 +55,12 @@ jobs:
         exclude:
           # 以下のエディションには機械学習の実装が存在しない
           # There is no machine learning implementation for the following editions
-          - edition: YANEURAOU_ENGINE_MATERIAL*
-            target: evallearn
           - edition: YANEURAOU_MATE_ENGINE
             target: evallearn
           - edition: TANUKI_MATE_ENGINE
             target: evallearn
           - edition: USER_ENGINE
             target: evallearn
-          # 以下のエディションはgensfenに対応しない
-          - edition: YANEURAOU_MATE_ENGINE
-            target: gensfen
-          - edition: TANUKI_MATE_ENGINE
-            target: gensfen
-          - edition: USER_ENGINE
-            target: gensfen
           # 自動ビルドチェックから除外
           # Build check exclude: archcpu ZEN3,AVXVNNI,OTHER
           # `-march=cascadelake`: LLVM8, GCC9 support (AVX512VNNI)
@@ -69,10 +72,12 @@ jobs:
           # https://gcc.gnu.org/pipermail/gcc-patches/2020-October/556110.html
           # https://twitter.com/herumi/status/1318418425295720448
           - archcpu: OTHER
+<<<<<<< HEAD
           # NO_SSEではevallearn,gensfenビルドを除外
+=======
+          # NO_SSEではevallearnビルドを除外
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - target: evallearn
-            archcpu: NO_SSE
-          - target: gensfen
             archcpu: NO_SSE
 
     steps:
@@ -87,7 +92,11 @@ jobs:
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu pactoys'
+<<<<<<< HEAD
           C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Sy clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
+=======
+          C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
+>>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           $ErrorActionPreference = 'Stop'
 
       - name: make
