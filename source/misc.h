@@ -637,11 +637,7 @@ namespace SystemIO
 
 		// 現在のファイルポジションを取得する。
 		// 先読みしているのでReadLineしている場所よりは先まで進んでいる。
-<<<<<<< HEAD
-		size_t GetFilePos() { return ftell(fp); }
-=======
 		size_t GetFilePos() { return ftell64(fp); }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		// 現在の行数を返す。(次のReadLine()で返すのがテキストファイルの何行目であるかを返す) 0 origin。
 		// またここで返す数値は空行で読み飛ばした時も、その空行を1行としてカウントしている。
@@ -766,10 +762,7 @@ namespace SystemIO
 		// ファイルの末尾に超えて読み込もうとしなかった場合、Okが返る。
 		// 引数で渡されたバイト数読み込むことができなかった場合、FileReadErrorが返る。
 		// size_of_read_bytesがnullptrでない場合、実際に読み込まれたバイト数が代入される。
-<<<<<<< HEAD
-=======
 		// ※　sizeは2GB制限があるので気をつけて。
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		Tools::Result Read(void* ptr , size_t size, size_t* size_of_read_bytes = nullptr);
 	};
 
@@ -781,10 +774,7 @@ namespace SystemIO
 		Tools::Result Open(const std::string& filename);
 
 		// ptrの指すメモリからsize[byte]だけファイルに書き込む。
-<<<<<<< HEAD
-=======
 		// ※　sizeは2GB制限があるので気をつけて。
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		Tools::Result Write(void* ptr, size_t size);
 	};
 };
@@ -802,11 +792,7 @@ namespace Path
 	// folder名のほうは空文字列でないときに、末尾に'/'か'\\'がなければそれを付与する。
 	// 与えられたfilenameが絶対Pathである場合、folderを連結せずに単にfilenameをそのまま返す。
 	// 与えられたfilenameが絶対Pathであるかの判定は、内部的にはPath::IsAbsolute()を用いて行う。
-<<<<<<< HEAD
-	// 
-=======
 	//
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 実際の連結のされ方については、UnitTestに例があるので、それも参考にすること。
 	extern std::string Combine(const std::string& folder, const std::string& filename);
 
@@ -950,11 +936,7 @@ namespace Parser
 	// istringstream isを食わせて、そのうしろを解析させて、所定の変数にその値を格納する。
 	// 使い方)
 	//  isに"min 10 max 80"のような文字列が入っているとする。
-<<<<<<< HEAD
-	// 
-=======
 	//
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	//   ArgumentParser parser;
 	//   int min=0,max=100;
 	//   parser.add_argument("min",min);
@@ -1071,24 +1053,18 @@ namespace StringExtension
 	// 文字列valueが、文字列endingで終了していればtrueを返す。
 	extern bool EndsWith(std::string const& value, std::string const& ending);
 
-<<<<<<< HEAD
-=======
 	// 文字列sのなかに文字列tが含まれるかを判定する。含まれていればtrueを返す。
 	extern bool Contains(const std::string& s, const std::string& t);
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 文字列valueに対して文字xを文字yに置換した新しい文字列を返す。
 	extern std::string Replace(std::string const& value, char x, char y);
 
 	// 文字列を大文字にして返す。
 	extern std::string ToUpper(std::string const& value);
 
-<<<<<<< HEAD
-=======
 	// sを文字列spで分割した文字列集合を返す。
 	extern std::vector<std::string> Split(const std::string& s , const std::string& sep);
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 };
 
 // --------------------
@@ -1219,8 +1195,6 @@ namespace Concurrent
 }
 
 // --------------------
-<<<<<<< HEAD
-=======
 // StandardInputWrapper
 // --------------------
 
@@ -1248,7 +1222,6 @@ private:
 extern StandardInput std_input;
 
 // --------------------
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 //     UnitTest
 // --------------------
 

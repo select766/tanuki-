@@ -566,11 +566,7 @@ namespace {
 		*/
 
 		// bbとtoと自駒のないところから移動先を探す
-<<<<<<< HEAD
-		Bitboard bb = kingEffect(sq_king) & ~(bb_avoid | to | pos.pieces<Us>());
-=======
 		Bitboard bb = (bb_avoid | to | pos.pieces<Us>()).andnot(kingEffect(sq_king));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		while (bb)
 		{
@@ -600,21 +596,13 @@ namespace {
 		// →　ああ、だめだ。fromの後ろにあった駒での開き王手が..
 
 		// bb_avoidとtoと自駒のないところから移動先を探す
-<<<<<<< HEAD
-		Bitboard bb = kingEffect(sq_king) & ~(bb_avoid | to | pos.pieces<Us>());
-=======
 		Bitboard bb = (bb_avoid | to | pos.pieces<Us>()).andnot(kingEffect(sq_king));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		while (bb)
 		{
 			Square escape = bb.pop();
 
-<<<<<<< HEAD
-			if (!(pos.attackers_to<~Us>(escape, slide) & ~Bitboard(from)))
-=======
 			if (!(Bitboard(from).andnot(pos.attackers_to<~Us>(escape, slide) )))
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				// fromにある攻撃駒は移動済なのでこれは対象外。
 				return true;
 			// 何も破壊していないので即座に返って良い。
@@ -642,13 +630,9 @@ namespace {
 		// →　ああ、だめだ。fromの後ろにあった駒での開き王手が..
 
 		// bb_avoid/*とto*/と自駒のないところから移動先を探す
-<<<<<<< HEAD
-		Bitboard bb = kingEffect(sq_king) & ~((bb_avoid /*| to*/ | pos.pieces<Us>()) & ~Bitboard(to));
-=======
 
 		// Bitboard bb = kingEffect(sq_king) & ~((bb_avoid /*| to*/ | pos.pieces<Us>()) & ~Bitboard(to));
 		Bitboard bb = ((bb_avoid /*| to*/ | pos.pieces<Us>()).andnot(Bitboard(to).andnot(kingEffect(sq_king))));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		// toには移動できるのだよ。pos.pieces(us)には玉側の駒がtoにあることがあって、これは取られるものとして
 		// 考える必要があるから、toを除外するコードが必要なのだよ。
@@ -657,11 +641,7 @@ namespace {
 		{
 			Square escape = bb.pop();
 
-<<<<<<< HEAD
-			if (!(pos.attackers_to<~Us>(escape, slide) & ~Bitboard(from)))
-=======
 			if (!(Bitboard(from).andnot(pos.attackers_to<Them>(escape, slide))))
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				// fromにある攻撃駒は移動済なのでこれは対象外。
 				return true;
 			// 何も破壊していないので即座に返って良い。
@@ -677,11 +657,7 @@ namespace {
 		Square sq_king = pos.king_square(Us);
 
 		// 玉以外の駒でこれが取れるのか？(toの地点には敵の利きがある or 届かないので玉では取れないものとする)
-<<<<<<< HEAD
-		Bitboard sum = pos.attackers_to<Us>(to, slide) & ~pos.pieces(KING);
-=======
 		Bitboard sum = pos.pieces<KING>().andnot(pos.attackers_to<Us>(to, slide));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		while (sum)
 		{
 			Square from = sum.pop();
@@ -707,11 +683,7 @@ namespace {
 		Square sq_king = pos.king_square<Us>();
 
 		// 玉以外の駒でこれが取れるのか？(toの地点には敵の利きがあるので玉では取れないものとする)
-<<<<<<< HEAD
-		Bitboard sum = pos.attackers_to<Us>(to, slide) & ~(pos.pieces(KING) | Bitboard(avoid));
-=======
 		Bitboard sum = (pos.pieces(KING) | Bitboard(avoid)).andnot(pos.attackers_to<Us>(to, slide));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		while (sum)
 		{
 			Square from = sum.pop();
@@ -840,11 +812,7 @@ namespace Mate {
 			// 飛車を持っているならすでに調べた上の升は除外して良い。
 			// (そこに金をおいて詰むなら飛車をおいて詰んでいるはずだから)
 			if (hand_count(ourHand, ROOK))
-<<<<<<< HEAD
-				bb &= ~pawnEffect<Us>(sq_king);
-=======
 				bb = pawnEffect<Us>(sq_king).andnot(bb);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			while (bb)
 			{
@@ -871,11 +839,7 @@ namespace Mate {
 					goto SILVER_DROP_END;
 
 				// 前方向を除外するために金のnotを用いる。
-<<<<<<< HEAD
-				bb = silverEffect<Them>(sq_king) & ~goldEffect<Them>(sq_king) & bb_drop;
-=======
 				bb = silverEffect<Them>(sq_king) & goldEffect<Them>(sq_king).andnot(bb_drop);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 			else {
 				bb = silverEffect<Them>(sq_king) &  bb_drop;
@@ -907,13 +871,8 @@ namespace Mate {
 				//      bb_attacks =knightEffect(Us, to);
 				// 桂馬はto以外は王が1手で移動できない場所なので求めるまでもない。
 
-<<<<<<< HEAD
-				if (can_king_escape  <Them>(pos, to, ZERO_BB, pos.pieces())) { continue; }
-				if (can_piece_capture<Them>(pos, to, pinned , pos.pieces())) { continue; }
-=======
 				if (can_king_escape  <Them>(pos, to, Bitboard(ZERO), pos.pieces())) { continue; }
 				if (can_piece_capture<Them>(pos, to, pinned        , pos.pieces())) { continue; }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				return make_move_drop(KNIGHT, to , Us);
 			}
 		}
@@ -1187,11 +1146,7 @@ namespace Mate {
 		if (hand_count(themHand, PAWN) == (int)themHand)
 		{
 			// 玉の8近傍の移動可能箇所の列挙
-<<<<<<< HEAD
-			Bitboard bb_king_movable = ~pos.pieces<Them>() & kingEffect(sq_king);
-=======
 			Bitboard bb_king_movable = pos.pieces<Them>().andnot(kingEffect(sq_king));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// 玉周辺の利きを列挙。(これ、せっかく求めたならできればあとで使いまわしたいが…)
 			// これ王手のかかっていない局面で呼び出すことを想定しているので貫通でなくてもいいか。
@@ -1353,11 +1308,7 @@ namespace Mate {
 						if (is_dragon)
 							bb |= kingEffect(to) & pos.pieces<Us, DRAGON>();
 						if (is_lance)
-<<<<<<< HEAD
-							bb |= lanceEffect<Them>( to, pos.pieces()) & pos.pieces<Us, LANCE>();
-=======
 							bb |= lanceEffect<Them>(to, pos.pieces()) & pos.pieces<Us, LANCE>();
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 						while (bb)
 						{
@@ -1574,11 +1525,7 @@ namespace Mate {
 			{
 				to = bb_check.pop();
 				bb_attacks = knightEffect<Us>(to);
-<<<<<<< HEAD
-				// 敵陣1,2段目からのStepAttackはZERO_BB相当なのでここへの不成りが生成されることはない
-=======
 				// 敵陣1,2段目からのStepAttackはBitboard(ZERO)相当なのでここへの不成りが生成されることはない
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				if (!(bb_attacks & sq_king)) { goto PRO_KNIGHT; }
 				// 桂馬の特性上、成りと不成の二通りの王手の両方が同時に可能になることはないので以下ではcontinueで良い。
 				//if (!(pos.attackers_to(Us, to, slide) ^ from)) { continue; }
@@ -1621,19 +1568,11 @@ namespace Mate {
 			if (canPromote(Us, to)) { goto SKIP_PAWN; }
 
 			Bitboard slide = pos.pieces() ^ from;
-<<<<<<< HEAD
-			if (!(pos.attackers_to<Us>(to, slide) ^ from)) { goto SKIP_PAWN; }
-			if (pos.discovered(from, to, our_king, our_pinned)) { goto SKIP_PAWN; }
-			if (can_king_escape<Them>(pos, from, to, ZERO_BB, slide)) { goto SKIP_PAWN; }
-			// 移動王手となるpinされている歩などはないので両王手は考慮しなくて良い。
-			if (can_piece_capture<Them>(pos, to, pinned, slide)) { goto SKIP_PAWN; }
-=======
 			if (!(pos.attackers_to<Us>(to, slide) ^ from))                   { goto SKIP_PAWN; }
 			if (pos.discovered(from, to, our_king, our_pinned))              { goto SKIP_PAWN; }
 			if (can_king_escape<Them>(pos, from, to, Bitboard(ZERO), slide)) { goto SKIP_PAWN; }
 			// 移動王手となるpinされている歩などはないので両王手は考慮しなくて良い。
 			if (can_piece_capture<Them>(pos, to, pinned, slide))             { goto SKIP_PAWN; }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			return make_move(from, to , Us , PAWN);
 		}
 	SKIP_PAWN:;

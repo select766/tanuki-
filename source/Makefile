@@ -65,10 +65,7 @@ TARGET_CPU = AVX2
 # -- ARMとか
 #TARGET_CPU = OTHER
 #TARGET_CPU = GRAVITON2
-<<<<<<< HEAD
-=======
 #TARGET_CPU = WASM
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 
 # デバッガーを使用するか (debugger)
@@ -78,14 +75,9 @@ DEBUG = OFF
 
 # 使用するコンパイラ (compiler)
 # ※ clangでコンパイルしたほうがgccより数%速いっぽい。
-<<<<<<< HEAD
 COMPILER = g++
 #COMPILER = clang++
-=======
-#COMPILER = g++
-COMPILER = clang++
 #COMPILER = em++
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 
 # エンジンの表示名 (engine displayname)
@@ -366,8 +358,7 @@ ifeq (,)
 		tanuki_progress.cpp                                                    \
 		tanuki_analysis.cpp                                                    \
 		tanuki_filesystem.cpp                                                  \
-		csa.cpp                                                                \
-		denryu2_investigation.cpp
+		csa.cpp
 endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
@@ -409,12 +400,8 @@ ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
 			CUDA_SOURCES += eval/deep/unpack.cu
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_CPU)
-<<<<<<< HEAD
-			CPPFLAGS += -DORT_CPU
-=======
 			CPPFLAGS += -DONNXRUNTIME -DORT_NO_EXCEPTIONS -DORT_CPU
 			LDFLAGS += -lonnxruntime
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_DML)
 			CPPFLAGS += -DONNXRUNTIME -DORT_NO_EXCEPTIONS -DORT_DML
@@ -429,9 +416,6 @@ ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
 			LDFLAGS += -framework Foundation -framework CoreML
 			OBJC_SOURCES += eval/deep/nn_coreml.mm
 
-		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_TRT)
-			CPPFLAGS += -DORT_TRT
-
 		endif
 	endif
 
@@ -445,8 +429,7 @@ ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
 		engine/dlshogi-engine/PrintInfo.cpp                             \
 		engine/dlshogi-engine/UctSearch.cpp                             \
 		engine/dlshogi-engine/Node.cpp                                  \
-		engine/dlshogi-engine/YaneuraOu_dlshogi_bridge.cpp              \
-		engine/dlshogi-engine/yo_cluster.cpp
+		engine/dlshogi-engine/YaneuraOu_dlshogi_bridge.cpp
 endif
 
 ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
@@ -482,13 +465,10 @@ ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
 		eval/nnue/features/pe9.cpp                                      \
 		engine/yaneuraou-engine/yaneuraou-search.cpp
 
-<<<<<<< HEAD
-=======
 	ifneq (,$(findstring em++,$(COMPILER)))
 		SOURCES += \
 			eval/nnue/wasm_simd.cpp
 	endif
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	ifeq ($(EVAL_EMBEDDING),ON)
 		SOURCES += \
 			eval/nnue/embedded_nnue.cpp
@@ -609,8 +589,6 @@ else ifeq ($(TARGET_CPU),GRAVITON2)
 	# for Amazon Web Servece EC2, the Graviton2 CPU [M6g/M6gd, C6g/C6gd/C6gn, R6g/R6gd, T4g, X2gd] instances
 	# https://github.com/aws/aws-graviton-getting-started/blob/main/c-c++.md
 	CPPFLAGS += -DIS_64BIT -DUSE_NEON -march=armv8.2-a+fp16+rcpc+dotprod+crypto
-<<<<<<< HEAD
-=======
 else ifeq ($(TARGET_CPU),APPLEAVX2)
 	CPPFLAGS += -DIS_64BIT -DUSE_AVX2 -DUSE_BMI2 -target x86_64-apple-macos11 -mbmi -mbmi2 -mavx2 -mpopcnt
 else ifeq ($(TARGET_CPU),APPLESSE42)
@@ -618,16 +596,10 @@ else ifeq ($(TARGET_CPU),APPLESSE42)
 else ifeq ($(TARGET_CPU),APPLEM1)
 	CPPFLAGS += -DIS_64BIT -DUSE_NEON -target arm64-apple-macos11
 else ifeq ($(TARGET_CPU),WASM)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 else ifeq ($(TARGET_CPU),OTHER)
 	CPPFLAGS += -DNO_SSE
 
-endif
-
-# 相対KPを有効・無効を指定する。
-ifeq ($(HALF_RELATIVE_KP),ON)
-	CPPFLAGS += -DENABLE_HALF_RELATIVE_KP
 endif
 
 # YANEURAOU_EDITION , CPUターゲット名 などのシンボルをコンパイル時に定義してやる。
@@ -672,14 +644,6 @@ evallearn:
 # トーナメント用
 tournament:
 	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(LTOFLAGS) -DFOR_TOURNAMENT' LDFLAGS='$(LDFLAGS) $(LTOFLAGS)' $(TARGET)
-<<<<<<< HEAD
-
-# 教師棋譜生成用(開発用なので非公開) // currently private
-gensfen:
-	$(MAKE) CPPFLAGS='$(CPPFLAGS) $(LTOFLAGS) $(OPENMP) $(BLAS_CPPFLAGS) -DEVAL_LEARN -DGENSFEN2019' LDFLAGS='$(LDFLAGS) $(OPENMP_LDFLAGS) $(BLAS_LDFLAGS) $(LTOFLAGS)' $(TARGET)
-
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 #　とりあえずPGOはAVX2とSSE4.2専用
 prof:

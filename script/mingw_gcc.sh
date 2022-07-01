@@ -188,13 +188,8 @@ for COMPILER in ${COMPILERSARR[@]}; do
                     set -f
                     echo "* archcpu: ${ARCHCPU}"
                     TGSTR=${FILESTR[$EDITION]}-windows-${CSTR}-${TARGET}-${ARCHCPU}
-<<<<<<< HEAD
-                    ${MAKE} -f ${MAKEFILE} clean OS=${OS} YANEURAOU_EDITION=${EDITIONSTR[$EDITION]}
-                    nice ${MAKE} -f ${MAKEFILE} -j${JOBS} ${TARGET} OS=${OS} TARGET_CPU=${ARCHCPU} YANEURAOU_EDITION=${EDITIONSTR[$EDITION]} COMPILER=${COMPILER} ${EXTRA} >& >(tee ${BUILDDIR}/${TGSTR}.log) || exit $?
-=======
                     ${MAKE} -f ${MAKEFILE} clean OS=${OS} YANEURAOU_EDITION=${EDITIONSTR[$EDITION]} ${EXTRA}
                     nice ${MAKE} -f ${MAKEFILE} -j$(nproc) ${TARGET} OS=${OS} TARGET_CPU=${ARCHCPU} YANEURAOU_EDITION=${EDITIONSTR[$EDITION]} COMPILER=${COMPILER} ${EXTRA} >& >(tee ${BUILDDIR}/${TGSTR}.log) || exit $?
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
                     cp YaneuraOu-by-gcc.exe ${BUILDDIR}/${TGSTR}.exe
                     ${MAKE} -f ${MAKEFILE} clean OS=${OS} YANEURAOU_EDITION=${EDITIONSTR[$EDITION]} ${EXTRA}
                     break

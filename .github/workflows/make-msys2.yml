@@ -11,18 +11,11 @@ on:
 
 jobs:
   build-msys2-windows:
-<<<<<<< HEAD
-    # windows-latest = windows-2019
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
     # windows-latest = windows-2019 => windows-2022
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     strategy:
       matrix:
@@ -43,10 +36,6 @@ jobs:
           - g++
         target:
           - "normal,tournament"
-<<<<<<< HEAD
-          - gensfen
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - evallearn
         archcpu:
           - "AVX512VNNI,AVXVNNI,AVX512,AVX2,SSE42,SSE41,SSSE3,SSE2,ZEN1,ZEN2,ZEN3"
@@ -72,11 +61,7 @@ jobs:
           # https://gcc.gnu.org/pipermail/gcc-patches/2020-October/556110.html
           # https://twitter.com/herumi/status/1318418425295720448
           - archcpu: OTHER
-<<<<<<< HEAD
-          # NO_SSEではevallearn,gensfenビルドを除外
-=======
           # NO_SSEではevallearnビルドを除外
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - target: evallearn
             archcpu: NO_SSE
 
@@ -92,11 +77,7 @@ jobs:
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu pactoys'
-<<<<<<< HEAD
-          C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Sy clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
-=======
           C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           $ErrorActionPreference = 'Stop'
 
       - name: make

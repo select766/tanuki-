@@ -194,13 +194,10 @@ namespace Book
 		// [ASYNC] このクラスの持つ定跡DBに対して、それぞれの局面を列挙する時に用いる
 		void foreach(std::function<void(std::string /*sfen*/, BookMovesPtr)> f);
 
-<<<<<<< HEAD
 		BookType& get_body() {
 			return book_body;
 		}
 
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// 保持している局面数を返す。これは、on the flyではない状態でread_book()した時にのみ有効。
 		size_t size() const { return book_body.size(); }
 
@@ -329,11 +326,7 @@ namespace BookTools
 	// "sfen xxx moves yyy ..."
 	// また、局面を1つ進めるごとにposition_callback関数が呼び出される。
 	// 辿った局面すべてに対して何かを行いたい場合は、これを利用すると良い。
-<<<<<<< HEAD
-	void feed_position_string(Position& pos, const std::string& root_sfen, std::vector<StateInfo>& si, const std::function<void(Position&)>& position_callback = [](Position&) {});
-=======
 	void feed_position_string(Position& pos, const std::string& root_sfen, std::deque<StateInfo>& si, const std::function<void(Position&)>& position_callback = [](Position&) {});
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// 平手、駒落ちの開始局面集
 	// ここで返ってきた配列の、[0]は平手のsfenであることは保証されている。

@@ -102,19 +102,6 @@ enum StatsType { NoCaptures, Captures };
 typedef Stats<int16_t, 14365, int(SQ_NB + 7) * int(SQ_NB) , COLOR_NB> ButterflyHistory;
 
 
-<<<<<<< HEAD
-// より高い探索深さにおいて、LowPlyHistoryは、root付近の成功したquietな指し手と
-// PV(ttPV)にある/あったquietな指し手を記録します。LowPlyHistoryは、反復深化の間に埋められ、
-// 新しい探索のたびに2手シフトダウンされる。
-//
-// Stockfishと異なり、from_to()は、int(SQ_NB + 7) * int(SQ_NB)の間の値が返るのでこの部分のサイズ変更してある。
-// [ply][from_to] これは逆順にしたほうが少し高速化が図れるのだが、Stockfishでこの順に依存するコードがあったので、
-// とりあえずStockfishと同じ順にしてある。
-constexpr int MAX_LPH = 4; // これ以下のdepthのときにこのテーブルを用いる。
-typedef Stats<int16_t, 10692, MAX_LPH,int(SQ_NB + 7)* int(SQ_NB)> LowPlyHistory;
-
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 /// CounterMoveHistoryは、直前の指し手の[to][piece]によってindexされるcounter moves(応手)を格納する。
 /// cf. http://chessprogramming.wikispaces.com/Countermove+Heuristic
 // ※　Stockfishとは、添字の順番を入れ替えてあるので注意。

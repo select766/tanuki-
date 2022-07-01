@@ -10,18 +10,11 @@ on:
 
 jobs:
   build-msys2-general:
-<<<<<<< HEAD
-    # windows-latest = windows-2019
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
     # windows-latest = windows-2019 => windows-2022
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     strategy:
       matrix:
@@ -29,10 +22,6 @@ jobs:
           - normal
           - tournament
           - evallearn
-<<<<<<< HEAD
-          - gensfen
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         archcpu:
           - "ZEN3,ZEN2,ZEN1,AVX512VNNI,AVXVNNI,AVX512,AVX2,SSE42"
           - "SSE41,SSSE3,SSE2,NO_SSE"
@@ -89,11 +78,7 @@ jobs:
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu pactoys'
-<<<<<<< HEAD
-          C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Sy clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
-=======
           C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           $ErrorActionPreference = 'Stop'
 
       - name: make
@@ -108,18 +93,11 @@ jobs:
           path: main/build/**/*
 
   build-msys2-material:
-<<<<<<< HEAD
-    # windows-latest = windows-2019
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
     # windows-latest = windows-2019 => windows-2022
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     strategy:
       matrix:
@@ -127,10 +105,6 @@ jobs:
           - normal
           - tournament
           - evallearn
-<<<<<<< HEAD
-          - gensfen
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         archcpu:
           - ZEN3
           - ZEN2
@@ -140,11 +114,7 @@ jobs:
           - SSE2
           - NO_SSE
         edition:
-<<<<<<< HEAD
-          - YANEURAOU_ENGINE_MATERIAL*
-=======
           - "YANEURAOU_ENGINE_MATERIAL,YANEURAOU_ENGINE_MATERIAL9"
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         compiler:
           - clang++
           - g++
@@ -189,11 +159,7 @@ jobs:
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu pactoys'
-<<<<<<< HEAD
-          C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Sy clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
-=======
           C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           $ErrorActionPreference = 'Stop'
 
       - name: make
@@ -205,26 +171,15 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: build-windows-material_${{ github.run_number }}_${{ github.sha }}
-<<<<<<< HEAD
-          path: ./main/build/**/*
-=======
           path: main/build/**/*
-
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 
   build-deep-windows:
-<<<<<<< HEAD
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
     # windows-latest = windows-2019 => windows-2022
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     steps:
       - uses: nuget/setup-nuget@v1
@@ -246,10 +201,6 @@ jobs:
         run: |
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-CPU /p:Platform=x64
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-DML /p:Platform=x64
-<<<<<<< HEAD
-          MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-MKL /p:Platform=x64
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-TRT /p:Platform=x64
         working-directory: main
 
@@ -262,11 +213,7 @@ jobs:
   build-android-general:
     # ubuntu-latest = ubuntu-20.04
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-<<<<<<< HEAD
-    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-=======
     # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     runs-on: ubuntu-20.04
 
     strategy:
@@ -305,14 +252,6 @@ jobs:
           name: build-android_${{ github.run_number }}_${{ github.sha }}
           path: main/build/**/*
 
-<<<<<<< HEAD
-
-  build-msys2-suisho:
-    # windows-latest = windows-2019
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
   build-macos-general:
     # macos-11
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
@@ -465,7 +404,6 @@ jobs:
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     strategy:
       matrix:
@@ -498,134 +436,34 @@ jobs:
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu'
           C:\msys64\usr\bin\bash.exe -lc 'pacman --needed --noconfirm -Syuu pactoys'
-<<<<<<< HEAD
-          C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Sy clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
-=======
           C:\msys64\usr\bin\bash.exe -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:'
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           $ErrorActionPreference = 'Stop'
 
       - name: suisho5 embedded_nnue
         run: |
-<<<<<<< HEAD
-          $FILE_ID="1T-Go2KImMfKD_4m_j4fQFXrEfaGgAcS_";
-          $FILE_NAME="suisho5_20211123.zip";
-          curl.exe -sc cookie "https://drive.google.com/uc?export=download&id=${FILE_ID}" -o NUL;
-          $CODE=(((Get-Content cookie) -split "\n"|?{$_ -match "_warning_"}) -split "\t")[-1];
-          curl.exe -Lb cookie "https://drive.google.com/uc?export=download&confirm=${CODE}&id=${FILE_ID}" -o ${FILE_NAME};
-          7z.exe e -y ${FILE_NAME} "**/source.rar";
-          7z.exe e -y source.rar "source/source/eval/nnue/embedded_nnue.cpp";
-          7z.exe a -t7z -mx9 embedded_nnue.7z embedded_nnue.cpp;
-          Copy-Item .\embedded_nnue.cpp .\main\source\eval\nnue\embedded_nnue.cpp;
-=======
           curl.exe -LRo main/source/eval/nnue/embedded_nnue.cpp.gz https://github.com/mizar/YaneuraOu/releases/download/resource/suisho5_20211123.halfkp.nnue.cpp.gz;
           gzip.exe -df main/source/eval/nnue/embedded_nnue.cpp.gz;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
       - name: make
         run: |
           $env:PATH+=';C:\msys64';
-<<<<<<< HEAD
-          .\main\script\msys2_build.ps1 -Edition ${{ matrix.edition }} -Compiler ${{ matrix.compiler }} -Target ${{ matrix.target }} -Cpu ${{ matrix.archcpu }} -Extra 'EVAL_EMBEDDING=ON';
-=======
           main\script\msys2_build.ps1 -Edition ${{ matrix.edition }} -Compiler ${{ matrix.compiler }} -Target ${{ matrix.target }} -Cpu ${{ matrix.archcpu }} -Extra 'EVAL_EMBEDDING=ON EXTRA_CPPFLAGS=''-DENGINE_OPTIONS=""\\""option=name=FV_SCALE=type=spin=default=24=min=1=max=128;option=name=BookFile=type=combo=default=no_book=var=no_book=var=standard_book.db=var=yaneura_book1.db=var=yaneura_book2.db=var=yaneura_book3.db=var=yaneura_book4.db=var=user_book1.db=var=user_book2.db=var=user_book3.db=var=book.bin\\""""''';
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         shell: pwsh
 
       - name: add resource
         run: |
-<<<<<<< HEAD
-          echo 'Suisho5(20211123)-${{ steps.version.outputs.filename }}' > ./main/build/windows/NNUE/engine_name.txt;
-          echo 'yaneurao, tayayan' >> .\main\build\windows\NNUE\engine_name.txt;
-          echo 'option name FV_SCALE type spin default 24 min 1 max 128' > ./main/build/windows/NNUE/engine_options.txt;
-          Copy-Item ./embedded_nnue.7z ./main/build/embedded_nnue.7z;
-=======
           echo 'Suisho5(20211123)-${{ steps.version.outputs.filename }}' > main/build/windows/NNUE/engine_name.txt;
           echo 'yaneurao, tayayan' >> main/build/windows/NNUE/engine_name.txt;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
       - uses: actions/upload-artifact@v2
         with:
           name: build-windows-suisho_${{ github.run_number }}_${{ github.sha }}
-<<<<<<< HEAD
-          path: ./main/build/**/*
-=======
           path: main/build/**/*
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
   build-android-suisho:
     # ubuntu-latest = ubuntu-20.04
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-<<<<<<< HEAD
-    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-    runs-on: ubuntu-20.04
-
-    strategy:
-      matrix:
-        edition:
-          - YANEURAOU_ENGINE_NNUE
-
-    steps:
-      - name: Set version
-        id: version
-        run: |
-          REPOSITORY=$(echo ${{ github.repository }} | sed -e "s#.*/##")
-          VERSION=$(echo ${{ github.ref }} | sed -e "s#refs/tags/##g")
-          echo ::set-output name=version::$VERSION
-          echo ::set-output name=filename::$REPOSITORY-$VERSION
-
-      - name: Setup Android NDK r23b
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r23b
-
-      - name: Checkout own repository
-        uses: actions/checkout@v2
-        with:
-          path: main
-
-      - name: suisho5 embedded_nnue
-        run: |
-          FILE_ID=1T-Go2KImMfKD_4m_j4fQFXrEfaGgAcS_;
-          FILE_NAME=suisho5_20211123.zip;
-          curl -sc cookie "https://drive.google.com/uc?export=download&id=${FILE_ID}" -o /dev/null;
-          CODE="$(awk '/_warning_/ {print $NF}' cookie)";
-          curl -Lb cookie "https://drive.google.com/uc?export=download&confirm=${CODE}&id=${FILE_ID}" -o ${FILE_NAME};
-          7z e -y ${FILE_NAME} "**/source.rar";
-          7z e -y source.rar "source/source/eval/nnue/embedded_nnue.cpp";
-          7z a -t7z -mx9 ./embedded_nnue.7z ./embedded_nnue.cpp;
-          cp ./embedded_nnue.cpp ./main/source/eval/nnue/embedded_nnue.cpp;
-
-      - name: ndk-build
-        run: ./main/script/android_build.sh -e ${{ matrix.edition }} -x "EVAL_EMBEDDING=ON"
-
-      - name: add resource
-        run: |
-          echo 'Suisho5(20211123)-${{ steps.version.outputs.filename }}' > ./main/build/android/NNUE/engine_name.txt;
-          echo 'yaneurao, tayayan' >> ./main/build/android/NNUE/engine_name.txt;
-          echo 'option name FV_SCALE type spin default 24 min 1 max 128' > ./main/build/android/NNUE/engine_options.txt;
-          cp ./embedded_nnue.7z ./main/build/embedded_nnue.7z;
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: build-android-suisho_${{ github.run_number }}_${{ github.sha }}
-          path: ./main/build/**/*
-
-  release-pkg:
-    name: Release package
-    needs:
-      - build-msys2-general
-      - build-msys2-material
-      - build-msys2-suisho
-      - build-deep-windows
-      - build-android-general
-      - build-android-suisho
-    # ubuntu-latest = ubuntu-20.04
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-=======
     # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     runs-on: ubuntu-20.04
 
     strategy:
@@ -888,58 +726,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: build-windows_${{ github.run_number }}_${{ github.sha }}
-<<<<<<< HEAD
-          path: release-windows
-      - name: Download artifact to get build-windows-material
-        uses: actions/download-artifact@v2
-        with:
-          name: build-windows-material_${{ github.run_number }}_${{ github.sha }}
-          path: release-windows-material
-      - name: Download artifact to get build-windows-suisho
-        uses: actions/download-artifact@v2
-        with:
-          name: build-windows-suisho_${{ github.run_number }}_${{ github.sha }}
-          path: release-windows-suisho
-      - name: Download artifact to get build-deep-windows
-        uses: actions/download-artifact@v2
-        with:
-          name: build-deep-windows_${{ github.run_number }}_${{ github.sha }}
-          path: release-deep-windows
-      - name: Download artifact to get build-android
-        uses: actions/download-artifact@v2
-        with:
-          name: build-android_${{ github.run_number }}_${{ github.sha }}
-          path: release-android
-      - name: Download artifact to get build-android-suisho
-        uses: actions/download-artifact@v2
-        with:
-          name: build-android-suisho_${{ github.run_number }}_${{ github.sha }}
-          path: release-android-suisho
-      - name: Display structure of downloaded files
-        run: ls -R release-windows release-windows-material release-windows-suisho release-deep-windows release-android release-android-suisho
-      - name: copy docs
-        run: |
-          cp main/Copying.txt release-windows/windows
-          cp -r main/source/ release-windows/windows
-          cp -r main/docs/ release-windows/windows
-          cp main/Copying.txt release-windows-material/windows
-          cp -r main/source/ release-windows-material/windows
-          cp -r main/docs/ release-windows-material/windows
-          cp main/Copying.txt release-windows-suisho/windows/NNUE
-          cp -r main/source/ release-windows-suisho/windows/NNUE
-          cp -r main/docs/ release-windows-suisho/windows/NNUE
-          cp main/Copying.txt release-deep-windows
-          cp -r main/source/ release-deep-windows
-          cp -r main/docs/ release-deep-windows
-          cp main/Copying.txt release-android/android
-          cp -r main/source/ release-android/andorid
-          cp -r main/docs/ release-android/android
-          cp main/Copying.txt release-android-suisho/android/NNUE
-          cp -r main/source/ release-android-suisho/android/NNUE
-          cp -r main/docs/ release-android-suisho/android/NNUE
-      - name: Display structure of downloaded files
-        run: ls -R release-windows release-windows-material release-windows-suisho release-deep-windows release-android release-android-suisho
-=======
           path: release
       - name: copy docs
         run: |
@@ -948,25 +734,10 @@ jobs:
           tar -Jcf release/windows/source.tar.xz -C main source
       - name: Display structure of downloaded files
         run: ls -R release
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
       - name: make build-windows zip/7z
         run: |
           7z a -tzip build-windows.zip windows
           7z a -t7z build-windows.7z windows
-<<<<<<< HEAD
-        working-directory: release-windows
-      - name: make build-windows-material zip/7z
-        run: |
-          7z a -tzip build-windows-material.zip windows
-          7z a -t7z build-windows-material.7z windows
-        working-directory: release-windows-material
-      - name: make build-windows-suisho zip/7z
-        run: |
-          cp ../../embedded_nnue.7z source/embedded_nnue.7z
-          7z a -tzip ../../build-windows-suisho.zip *
-          7z a -t7z ../../build-windows-suisho.7z *
-        working-directory: release-windows-suisho/windows/NNUE
-=======
         working-directory: release
       - uses: actions/upload-artifact@v2
         with:
@@ -1079,7 +850,6 @@ jobs:
           tar -Jcf release/source.tar.xz -C main source
       - name: Display structure of downloaded files
         run: ls -R release
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
       - name: make build-deep-windows zip/7z
         run: |
           7z a -tzip build-deep-windows.zip *
@@ -1122,15 +892,6 @@ jobs:
         run: |
           7z a -tzip build-android.zip android
           7z a -t7z build-android.7z android
-<<<<<<< HEAD
-        working-directory: release-android
-      - name: make build-android-suisho zip/7z
-        run: |
-          cp ../../embedded_nnue.7z source/embedded_nnue.7z
-          7z a -tzip ../../build-android-suisho.zip *
-          7z a -t7z ../../build-android-suisho.7z *
-        working-directory: release-android-suisho/android/NNUE
-=======
         working-directory: release
       - uses: actions/upload-artifact@v2
         with:
@@ -1463,7 +1224,6 @@ jobs:
           path: release-wasm-suishopetite
       - name: Display structure of downloaded files
         run: ls -R release-windows release-windows-material release-windows-suisho release-deep-windows release-android release-android-suisho release-macos-suisho release-macos-suisho release-wasm
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
       - name: Archive Size
         id: archive_size
         run: |
@@ -1479,8 +1239,6 @@ jobs:
           echo ::set-output name=android_7z::$(stat -c%s "release-android/build-android.7z" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=android_suisho_zip::$(stat -c%s "release-android-suisho/build-android-suisho.zip" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=android_suisho_7z::$(stat -c%s "release-android-suisho/build-android-suisho.7z" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
-<<<<<<< HEAD
-=======
           echo ::set-output name=macos_tar_xz::$(stat -c%s "release-macos/build-macos.tar.xz" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=macos_suisho_tar_xz::$(stat -c%s "release-macos-suisho/build-macos-suisho.tar.xz" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=wasm_zip::$(stat -c%s "release-wasm/build-wasm.zip" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
@@ -1489,7 +1247,6 @@ jobs:
           echo ::set-output name=wasm-suisho_7z::$(stat -c%s "release-wasm-suisho/build-wasm-suisho.7z" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=wasm-suishopetite_zip::$(stat -c%s "release-wasm-suishopetite/build-wasm-suishopetite.zip" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
           echo ::set-output name=wasm-suishopetite_7z::$(stat -c%s "release-wasm-suishopetite/build-wasm-suishopetite.7z" | awk '{ split( "B KB MB GB TB PB" , v ); s=1; while( $1>1024 ){ $1/=1024; s++ } printf "%.2f %s", $1, v[s] }')
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
@@ -1512,11 +1269,7 @@ jobs:
                  cf. [魚沼産やねうら王できました](http://yaneuraou.yaneu.com/2019/02/12/%e9%ad%9a%e6%b2%bc%e7%94%a3%e3%82%84%e3%81%ad%e3%81%86%e3%82%89%e7%8e%8b%e3%81%a7%e3%81%8d%e3%81%be%e3%81%97%e3%81%9f/)
               d. HalfKPvm型
                  cf. [tanuki-denryu2](https://github.com/nodchip/tanuki-/releases/tag/tanuki-denryu2)
-<<<<<<< HEAD
-            4. MaterialLv1～9
-=======
             4. MaterialLv1, MaterialLv9
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
               a. MaterialLv1 駒得のみ
               b. MaterialLv9 駒得＋手駒評価＋盤上の利きを評価＋複数の利きに減衰評価＋利きの価値合算テーブル＋KKPEE9テーブルに一本化＋味方・敵の駒の利きによる加減＋玉近傍への味方駒の利きと駒の有無、玉位置加点＋方角ごとの利き評価
                 - [【連載】評価関数を作ってみよう！その1](http://yaneuraou.yaneu.com/2020/11/17/make-evaluate-function/)
@@ -1540,12 +1293,6 @@ jobs:
 
             - [Suisho5-${{ steps.version.outputs.filename }}-windows.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-windows.zip) (${{ steps.archive_size.outputs.windows_suisho_zip }})
             - [Suisho5-${{ steps.version.outputs.filename }}-windows.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-windows.7z) (${{ steps.archive_size.outputs.windows_suisho_7z }})
-<<<<<<< HEAD
-              - 3.のトーナメントWindows版+水匠5(20211123)評価関数 (ZEN2/AVX2/SSE4.2)
-            - [Suisho5-${{ steps.version.outputs.filename }}-android.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-android.zip) (${{ steps.archive_size.outputs.android_suisho_zip }})
-            - [Suisho5-${{ steps.version.outputs.filename }}-android.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-android.7z) (${{ steps.archive_size.outputs.android_suisho_7z }})
-              - 3.の実行ファイルAndroid版+水匠5(20211123)評価関数 (arm64-v8a/armeabi-v7a/x86_64/x86)
-=======
               - 3.a.のトーナメントWindows版+水匠5(20211123)評価関数 (ZEN2/AVX2/SSE4.2)
             - [Suisho5-${{ steps.version.outputs.filename }}-android.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-android.zip) (${{ steps.archive_size.outputs.android_suisho_zip }})
             - [Suisho5-${{ steps.version.outputs.filename }}-android.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/Suisho5-${{ steps.version.outputs.filename }}-android.7z) (${{ steps.archive_size.outputs.android_suisho_7z }})
@@ -1558,61 +1305,25 @@ jobs:
             - [SuishoPetite-${{ steps.version.outputs.filename }}-wasm.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/SuishoPetite-${{ steps.version.outputs.filename }}-wasm.zip) (${{ steps.archive_size.outputs.wasm-suishopetite_zip }})
             - [SuishoPetite-${{ steps.version.outputs.filename }}-wasm.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/SuishoPetite-${{ steps.version.outputs.filename }}-wasm.7z) (${{ steps.archive_size.outputs.wasm-suishopetite_7z }})
               - 3.c.の実行ファイルWebAssembly版+SuishoPetite(20211123)評価関数 (testing)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
             - [${{ steps.version.outputs.filename }}-windows.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-windows.zip) (${{ steps.archive_size.outputs.windows_zip }})
             - [${{ steps.version.outputs.filename }}-windows.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-windows.7z) (${{ steps.archive_size.outputs.windows_7z }})
               - 1.2.3.5.6.の実行ファイルWindows版 各CPU向け(ZEN3/ZEN2/ZEN1/AVX512VNNI/AVXVNNI/AVX512/AVX2/SSE4.2/SSE4.1/SSSE3/SSE2/32bit環境用)
               - 1.2.3.5.6.のトーナメントWindows版 (ZEN3/ZEN2/ZEN1/AVX512VNNI/AVXVNNI/AVX512/AVX2/SSE4.2)
-<<<<<<< HEAD
-              - 1.2.3.の教師生成用実行ファイルWindows版 (ZEN3/ZEN2/ZEN1/AVX512VNNI/AVXVNNI/AVX512/AVX2/SSE4.2)
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
               - 1.2.3.の学習用実行ファイルWindows版 (ZEN3/ZEN2/ZEN1/AVX512VNNI/AVXVNNI/AVX512/AVX2/SSE4.2)
             - [${{ steps.version.outputs.filename }}-windows-material.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-windows-material.zip) (${{ steps.archive_size.outputs.windows_material_zip }})
             - [${{ steps.version.outputs.filename }}-windows-material.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-windows-material.7z) (${{ steps.archive_size.outputs.windows_material_7z }})
               - 4.の実行ファイルWindows版 各CPU向け(ZEN3/ZEN2/ZEN1/AVX2/SSE4.2/SSE2/32bit環境用)
               - 4.のトーナメントWindows版 (ZEN3/ZEN2/ZEN1/AVX2/SSE4.2)
-<<<<<<< HEAD
-              - 4.の教師生成用実行ファイルWindows版 (ZEN3/ZEN2/ZEN1/AVX2/SSE4.2)
-=======
               - 4.の学習用実行ファイルWindows版 (ZEN3/ZEN2/ZEN1/AVX2/SSE4.2)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
             - [${{ steps.version.outputs.filename }}-deep-windows.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-deep-windows.zip) (${{ steps.archive_size.outputs.deep_windows_zip }})
             - [${{ steps.version.outputs.filename }}-deep-windows.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-deep-windows.7z) (${{ steps.archive_size.outputs.deep_windows_7z }})
               - 7.の実行ファイルWindows版 (AVX2)
                 - ONNX Runtime (ORT) 版の実行には、Visual C++の実行ランタイムが別途必要です。エンジン実行時に「`VCRUNTIME140_1.dll`が見つからないため、コードの実行を続行できません。」のようなエラーが表示される場合、別途 [Microsoft Visual C++ 2015-2022 Redistributable (x64), `VC_redist.x64.exe`](https://aka.ms/vs/17/release/VC_redist.x64.exe) をダウンロード・実行してインストールして下さい。
-<<<<<<< HEAD
-                - ORT-CPU : ONNX Runtime (ORT) のデフォルト、CPU向け。（MKL向けの設定を別途適切に行えば、おそらくORT-MKLのが高速）
-                - ORT-MKL : Intel(R) Math Kernel Library (MKL) を使用、CPU向け。
-=======
                 - ORT-CPU : ONNX Runtime (ORT) のデフォルト、CPU向け。
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
                   cf. [ONNX Runtimeを使ってみる その2(性能測定)](https://tadaoyamaoka.hatenablog.com/entry/2020/06/06/190259)
                 - ORT-DML : Windows 10 DirectML (DML) 対応のGPU向け。（対応環境であればおそらくORT-TRT や TensorRTのが高速）
                   cf. [DirectML の概要](https://docs.microsoft.com/ja-jp/windows/win32/direct3d12/dml-intro)
                 - ORT-TRT : NVIDIA TensorRT 対応のGPU向け。CUDA, cuDNN, TensorRT の導入も必要です。
-<<<<<<< HEAD
-                  - CUDA (開発環境は 11.5.1)
-                    - [Latest CUDA Toolkit Download](https://developer.nvidia.com/cuda-downloads)
-                    - [CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
-                    - [CUDA Installation Guide for Microsoft Windows (CUDAインストール手順, CUDA 最新版)](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html)
-                    - CUDA Toolkit 11.5.1 の場合の導入例:
-                      - [Local Installer (2.4GB)](https://developer.download.nvidia.com/compute/cuda/11.5.1/local_installers/cuda_11.5.1_496.13_windows.exe) もしくは [Network Installer (28.7MB)](https://developer.download.nvidia.com/compute/cuda/11.5.1/network_installers/cuda_11.5.1_windows_network.exe) をダウンロード・実行してインストール
-                  - cuDNN (開発環境は v8.2.4 (Archive))
-                    - [cuDNN Download](https://developer.nvidia.com/rdp/cudnn-download) (要ログイン)
-                    - [cuDNN Archive](https://developer.nvidia.com/rdp/cudnn-archive) (要ログイン)
-                    - [Installing cuDNN On Windows (cuDNNインストール手順)](https://docs.nvidia.com/deeplearning/cudnn/install-guide/index.html#install-windows)
-                    - cuDNN v8.2.4 (`cudnn-11.4-windows-x64-x64-v8.2.4.15.zip`) の場合の導入例:
-                      - ダウンロードした `cudnn-11.4-windows-x64-x64-v8.2.4.15.zip` を右クリック → 「すべて展開」 → 展開時に展開されたファイルを表示する
-                      - `cudnn-11.4-windows-x64-x64-v8.2.4.15/cuda/bin` フォルダ階層を選択して表示
-                      - `cudnn_adv_infer64_8.dll`, `cudnn_cnn_infer64_8.dll`, `cudnn_ops_infer64_8.dll`, `cudnn64_8.dll` (種類: アプリケーション拡張) の4つのファイルを選択し、`YaneuraOu-Deep-ORT-TRT.exe` と同じフォルダにコピー
-                  - TensorRT (開発環境は 8.2.1 GA)
-                    - [NVIDIA TensorRT Download](https://developer.nvidia.com/nvidia-tensorrt-download) (要ログイン)
-                    - [Installing TensorRT (TensorRTインストール手順)](https://docs.nvidia.com/deeplearning/tensorrt/install-guide/index.html#installing-zip)
-                    - TensorRT 8.2.1 GA (`TensorRT-8.2.1.8.Windows10.x86_64.cuda-11.4.cudnn8.2.zip`) の場合の導入例:
-                      - ダウンロードした `TensorRT-8.2.1.8.Windows10.x86_64.cuda-11.4.cudnn8.2.zip` を右クリック → 「すべて展開」 → 展開時に展開されたファイルを表示する
-                      - `TensorRT-8.2.1.8/lib` フォルダ階層を選択して表示
-=======
                   - CUDA (開発環境は 11.7.0)
                     - [Latest CUDA Toolkit Download](https://developer.nvidia.com/cuda-downloads)
                     - [CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive)
@@ -1640,7 +1351,6 @@ jobs:
                     - TensorRT 8.2 GA Update 4 (`TensorRT-8.2.5.1.Windows10.x86_64.cuda-11.4.cudnn8.2.zip`) の場合の導入例:
                       - ダウンロードした `TensorRT-8.2.5.1.Windows10.x86_64.cuda-11.4.cudnn8.2.zip` を右クリック → 「すべて展開」 → 展開時に展開されたファイルを表示する
                       - `TensorRT-8.2.5.1/lib` フォルダ階層を選択して表示
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
                       - `nvinfer.dll`, `nvinfer_builder_resource.dll`, `nvinfer_plugin.dll`, `nvonnxparser.dll`, `nvparsers.dll` (種類: アプリケーション拡張) の5つのファイルを選択し、`YaneuraOu-Deep-ORT-TRT.exe` と同じフォルダにコピー
                   - [警告: 以下のような変更があった場合は、古いエンジンやプロファイルのキャッシュファイル(`.engine`, `.profile`)をクリーンアップしてください。](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html#environment-variables)
                     - モデルの変更（モデルのトポロジー、opsetのバージョン、演算子などに変更があった場合）
@@ -1651,16 +1361,12 @@ jobs:
                 - ~~TensorRT : NVIDIA TensorRT 対応のGPU向け(ORT無し版)。~~ 現在、TensorRT(ORT無し)版は自動ビルドの対象外です。
             - [${{ steps.version.outputs.filename }}-android.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-android.zip) (${{ steps.archive_size.outputs.android_zip }})
             - [${{ steps.version.outputs.filename }}-android.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-android.7z) (${{ steps.archive_size.outputs.android_7z }})
-<<<<<<< HEAD
-              - 1.2.3.4.5.の実行ファイルAndroid版 (arm64-v8a/armeabi-v7a/x86_64/x86)
-=======
               - 1.2.3.4.5.6.の実行ファイルAndroid版 (arm64-v8a/armeabi-v7a/x86_64/x86)
             - [${{ steps.version.outputs.filename }}-macos.tar.xz](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-macos.tar.xz) (${{ steps.archive_size.outputs.macos_tar_xz }})
               - 1.2.3.4.5.6.7.の実行ファイルMacOS版 (AVX2/SSE42/APPLEM1) (testing)
             - [${{ steps.version.outputs.filename }}-wasm.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-wasm.zip) (${{ steps.archive_size.outputs.wasm_zip }})
             - [${{ steps.version.outputs.filename }}-wasm.7z](https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.version }}/${{ steps.version.outputs.filename }}-wasm.7z) (${{ steps.archive_size.outputs.wasm_7z }})
               - 1.2.3.4.5.6.の実行ファイルWebAssembly版 (testing)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
             使い方などは添付ファイルの中にある
             docs
@@ -1688,11 +1394,7 @@ jobs:
           asset_name: ${{ steps.version.outputs.filename }}-windows.7z
           asset_content_type: application/octet-stream
       - name: Upload release asset build-windows-material.zip
-<<<<<<< HEAD
-        uses: actions/upload-release-asset@v1.0.1
-=======
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1701,11 +1403,7 @@ jobs:
           asset_name: ${{ steps.version.outputs.filename }}-windows-material.zip
           asset_content_type: application/zip
       - name: Upload release asset build-windows-material.7z
-<<<<<<< HEAD
-        uses: actions/upload-release-asset@v1.0.1
-=======
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1749,10 +1447,6 @@ jobs:
           asset_path: release-android/build-android.7z
           asset_name: ${{ steps.version.outputs.filename }}-android.7z
           asset_content_type: application/octet-stream
-<<<<<<< HEAD
-      - name: Upload release asset build-windows-suisho.zip
-        uses: actions/upload-release-asset@v1.0.1
-=======
       - name: Upload release asset build-macos.tar.xz
         uses: actions/upload-release-asset@v1
         env:
@@ -1782,7 +1476,6 @@ jobs:
           asset_content_type: application/octet-stream
       - name: Upload release asset build-windows-suisho.zip
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1791,11 +1484,7 @@ jobs:
           asset_name: Suisho5-${{ steps.version.outputs.filename }}-windows.zip
           asset_content_type: application/zip
       - name: Upload release asset build-windows-suisho.7z
-<<<<<<< HEAD
-        uses: actions/upload-release-asset@v1.0.1
-=======
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1804,11 +1493,7 @@ jobs:
           asset_name: Suisho5-${{ steps.version.outputs.filename }}-windows.7z
           asset_content_type: application/octet-stream
       - name: Upload release asset build-android-suisho.zip
-<<<<<<< HEAD
-        uses: actions/upload-release-asset@v1.0.1
-=======
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1817,11 +1502,7 @@ jobs:
           asset_name: Suisho5-${{ steps.version.outputs.filename }}-android.zip
           asset_content_type: application/zip
       - name: Upload release asset build-android-suisho.7z
-<<<<<<< HEAD
-        uses: actions/upload-release-asset@v1.0.1
-=======
         uses: actions/upload-release-asset@v1
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -1829,8 +1510,6 @@ jobs:
           asset_path: release-android-suisho/build-android-suisho.7z
           asset_name: Suisho5-${{ steps.version.outputs.filename }}-android.7z
           asset_content_type: application/octet-stream
-<<<<<<< HEAD
-=======
       - name: Upload release asset build-macos-suisho.tar.xz
         uses: actions/upload-release-asset@v1
         env:
@@ -1876,4 +1555,3 @@ jobs:
           asset_path: release-wasm-suishopetite/build-wasm-suishopetite.7z
           asset_name: SuishoPetite-${{ steps.version.outputs.filename }}-wasm.7z
           asset_content_type: application/octet-stream
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e

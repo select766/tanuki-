@@ -37,36 +37,6 @@ bool pseudo_legal_check(const Position& pos, ExtMove* mlist_start, ExtMove* mlis
 	return all_ok;
 }
 
-// mlist_startからmlist_endまで(mlist_endは含まない)の指し手がpseudo_legalであるかを
-// 調べて、すべてpseudo_legalならばtrueを返す。
-bool pseudo_legal_check(const Position& pos, ExtMove* mlist_start, ExtMove* mlist_end)
-{
-	bool all_ok = true;
-
-	for (auto it = mlist_start; it != mlist_end; ++it)
-		all_ok = pos.pseudo_legal(it->move);
-
-	// Debug用に、非合法手があった時に局面とその指し手を出力する。
-#if 0
-	if (!all_ok)
-	{
-		sync_cout << "Error! : A non-pseudo legal move was generated." << endl
-			      << pos << sync_endl;
-
-		for (auto it = mlist_start; it != mlist_end; ++it)
-		{
-			if (!pos.pseudo_legal(it->move))
-				sync_cout << "move = " << it->move << sync_endl;
-		}
-
-		// ここ↓にbreak pointを仕掛けておくと便利
-		sync_cout << "stopped." << sync_endl;
-	}
-#endif
-
-	return all_ok;
-}
-
 // ----------------------------------
 //      移動による指し手
 // ----------------------------------
@@ -604,11 +574,7 @@ ExtMove* generate_general(const Position& pos, ExtMove* mlist, Square recapSq = 
 		(GenType == CAPTURES_PRO_PLUS)      ?  pos.pieces(Them)   : // 捕獲 + 歩の成る指し手 = 移動先の升は敵駒のある升 + 敵陣(歩のときのみ)
 		(GenType == NON_EVASIONS)           ? ~pos.pieces(Us)     : // すべて = 移動先の升は自駒のない升
 		(GenType == RECAPTURES)             ?  Bitboard(recapSq)  : // リキャプチャー用の升(直前で相手の駒が移動したわけだからここには移動できるはず)
-<<<<<<< HEAD
-		ALL_BB; // error
-=======
 		Bitboard(1); // error
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// 歩の移動先(↑のtargetと違う部分のみをオーバーライド)
 	const Bitboard targetPawn =

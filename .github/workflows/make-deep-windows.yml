@@ -11,17 +11,11 @@ on:
 
 jobs:
   build-deep-windows:
-<<<<<<< HEAD
-    # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-    # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
-    runs-on: windows-latest
-=======
     # windows-latest = windows-2019 => windows-2022
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2019-Readme.md
     # https://github.com/actions/virtual-environments/blob/main/images/win/Windows2022-Readme.md
     runs-on: windows-2022
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     steps:
       - uses: nuget/setup-nuget@v1
@@ -43,10 +37,6 @@ jobs:
         run: |
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-CPU /p:Platform=x64
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-DML /p:Platform=x64
-<<<<<<< HEAD
-          MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-MKL /p:Platform=x64
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           MSBuild.exe /t:build /p:Configuration=Release-Deep-ORT-TRT /p:Platform=x64
         working-directory: main
 

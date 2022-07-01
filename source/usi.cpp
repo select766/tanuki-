@@ -6,9 +6,6 @@
 #include "misc.h"
 #include "testcmd/unit_test.h"
 
-<<<<<<< HEAD
-#include <filesystem>
-=======
 #if !defined(YANEURAOU_ENGINE_DEEP)
 #include "tt.h"
 #endif
@@ -19,9 +16,7 @@
 #endif
 
 #include <sstream>
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 #include <queue>
-#include <sstream>
 
 #include "tanuki_analysis.h"
 #include "tanuki_book.h"
@@ -125,7 +120,7 @@ namespace Learner
   typedef std::pair<Value, std::vector<Move> > ValueAndPV;
 
   ValueAndPV qsearch(Position& pos);
-  ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1 , u64 nodesLimit = 0, bool adjustNodesLimit = false );
+  ValueAndPV search(Position& pos, int depth_, size_t multiPV = 1 , u64 nodesLimit = 0 );
 
 }
 #endif
@@ -148,22 +143,15 @@ void gameover_handler(const string& cmd);
 //     やねうら王 The Cluster
 // ----------------------------------
 
-<<<<<<< HEAD
-#if defined(YANEURAOU_ENGINE_DEEP)
-=======
 #if defined(USE_YO_CLUSTER)
 #if defined(YANEURAOU_ENGINE_DEEP) || defined(YANEURAOU_ENGINE_NNUE)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 namespace YaneuraouTheCluster
 {
 	// cluster時のUSIメッセージの処理ループ
 	void cluster_usi_loop(Position& pos, std::istringstream& is);
 }
 #endif
-<<<<<<< HEAD
-=======
 #endif
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 namespace USI
 {
@@ -983,11 +971,7 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 				vector<string> lines;
 				SystemIO::ReadAllLines(filename, lines);
 				for (auto& line : lines)
-<<<<<<< HEAD
-					cmds.push(line);
-=======
 					std_input.push(line);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 		}
 
@@ -1075,17 +1059,12 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 
 #endif
 
-<<<<<<< HEAD
-#if defined(YANEURAOU_ENGINE_DEEP)
-=======
 #if defined(USE_YO_CLUSTER)
 #if defined(YANEURAOU_ENGINE_DEEP) || defined(YANEURAOU_ENGINE_NNUE)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		else if (token == "cluster")
 			// cluster時のUSIメッセージの処理ループ
 			YaneuraouTheCluster::cluster_usi_loop(pos, is);
 #endif
-<<<<<<< HEAD
 
 #ifdef EVAL_LEARN
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
@@ -1239,8 +1218,8 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 		else if (token == "denryu2_calculate_move_match_ratio2") {
 			Denryu2::CalculateMoveMatchRatio2(pos);
 		}
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
+#endif
+
 #endif
 
 		else

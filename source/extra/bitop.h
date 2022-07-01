@@ -10,10 +10,7 @@
 
 #if defined(_MSC_VER)
 #include <stdlib.h> // _byteswap_uint64
-<<<<<<< HEAD
-=======
 #include <intrin.h> // __popcnt, __popcnt64
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 #endif
 
 // ターゲット環境でSSE,AVX,AVX2が搭載されていない場合はこれらの命令をsoftware emulationにより実行する。
@@ -186,11 +183,7 @@ FORCE_INLINE int MSB32(uint32_t v) { ASSERT_LV3(v != 0); unsigned long index; _B
 FORCE_INLINE int MSB64(uint64_t v) { ASSERT_LV3(v != 0); return uint32_t(v >> 32) ? 32 + MSB32(uint32_t(v >> 32)) : MSB32(uint32_t(v)); }
 #endif
 
-<<<<<<< HEAD
-#elif defined(__GNUC__) && ( defined(__i386__) || defined(__x86_64__) || defined(__ANDROID__) || defined(__ARM_ARCH) )
-=======
 #elif defined(__GNUC__)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 FORCE_INLINE int LSB32(const u32 v) { ASSERT_LV3(v != 0); return __builtin_ctz(v); }
 FORCE_INLINE int LSB64(const u64 v) { ASSERT_LV3(v != 0); return __builtin_ctzll(v); }

@@ -231,29 +231,20 @@ namespace Eval {
 #endif
         {
             const std::string dir_name = Options["EvalDir"];
-<<<<<<< HEAD
-=======
 #if !defined(__EMSCRIPTEN__)
 			const std::string file_name = NNUE::kFileName;
 #else
 			// WASM
 			const std::string file_name = Options["EvalFile"];
 #endif
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
             const bool result = [&] {
                 if (dir_name != "<internal>") {
                     auto full_dir_name = Path::Combine(Directory::GetCurrentFolder(), dir_name);
                     sync_cout << "info string EvalDirectory = " << full_dir_name << sync_endl;
 
-<<<<<<< HEAD
-                    const std::string file_name = Path::Combine(dir_name, NNUE::kFileName);
-                    std::ifstream stream(file_name, std::ios::binary);
-                    sync_cout << "info string loading eval file : " << file_name << sync_endl;
-=======
                     const std::string file_path = Path::Combine(dir_name, file_name);
                     std::ifstream stream(file_path, std::ios::binary);
                     sync_cout << "info string loading eval file : " << file_path << sync_endl;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
                     return NNUE::ReadParameters(stream);
                 }

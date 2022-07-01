@@ -236,13 +236,8 @@ namespace Eval::dlshogi
 			FatalError("buildSerializedNetwork");
 		}
 		auto runtime = InferUniquePtr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(gLogger));
-<<<<<<< HEAD
-		engine.reset(runtime->deserializeCudaEngine(serializedEngine->data(), serializedEngine->size()));
-		if (!engine)
-=======
 		infer_engine.reset(runtime->deserializeCudaEngine(serializedEngine->data(), serializedEngine->size()));
 		if (!infer_engine)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		{
 			FatalError("deserializeCudaEngine");
 		}
@@ -285,12 +280,9 @@ namespace Eval::dlshogi
 			// std::regex_replace(std::string(pciBusId), std::regex("[^A-Za-z0-9._-]"), std::string("_")) + "." +
 			std::to_string(max_batch_size) + "." +
 			"TRT" + std::to_string(getInferLibVersion()) + "." +
-<<<<<<< HEAD
-=======
 #if defined(TRT_NN_FP16)
 			"FP16." +
 #endif
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			"serialized";
 
 		sync_cout << "info string serialized filename = " << serialized_filename << sync_endl;
@@ -307,11 +299,7 @@ namespace Eval::dlshogi
 		if (result.is_ok())
 		{
 			auto runtime = InferUniquePtr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(gLogger));
-<<<<<<< HEAD
-			engine = InferUniquePtr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(modelPtr.get(), modelSize));
-=======
 			infer_engine = InferUniquePtr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(modelPtr.get(), modelSize));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			// ドライバのバージョンが異なるなどが原因で、デシリアライズに失敗することがある。その場合はやりなおす。
 			if (!infer_engine)
@@ -365,27 +353,6 @@ namespace Eval::dlshogi
 	{
 		inputDims1.d[0] = batch_size;
 		inputDims2.d[0] = batch_size;
-<<<<<<< HEAD
-		context->setBindingDimensions(0, inputDims1);
-		context->setBindingDimensions(1, inputDims2);
-
-#if 1
-		checkCudaErrors(cudaMemcpyAsync(x1_dev, x1, sizeof(NN_Input1) * batch_size, cudaMemcpyHostToDevice, cudaStreamPerThread));
-		checkCudaErrors(cudaMemcpyAsync(x2_dev, x2, sizeof(NN_Input2) * batch_size, cudaMemcpyHostToDevice, cudaStreamPerThread));
-		const bool status = context->enqueue(batch_size, inputBindings.data(), cudaStreamPerThread, nullptr);
-		ASSERT_LV3(status);
-		checkCudaErrors(cudaMemcpyAsync(y1, y1_dev, sizeof(NN_Output_Policy) * batch_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
-		checkCudaErrors(cudaMemcpyAsync(y2, y2_dev, sizeof(NN_Output_Value ) * batch_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
-		checkCudaErrors(cudaStreamSynchronize(cudaStreamPerThread));
-#else
-		checkCudaErrors(cudaMemcpy(x1_dev, x1, sizeof(NN_Input1) * batch_size, cudaMemcpyHostToDevice));
-		checkCudaErrors(cudaMemcpy(x2_dev, x2, sizeof(NN_Input2) * batch_size, cudaMemcpyHostToDevice));
-		const bool status = context->executeV2(inputBindings.data());
-		ASSERT_LV3(status);
-		checkCudaErrors(cudaMemcpy(y1, y1_dev, sizeof(NN_Output_Policy) * batch_size, cudaMemcpyDeviceToHost));
-		checkCudaErrors(cudaMemcpy(y2, y2_dev, sizeof(NN_Output_Value ) * batch_size, cudaMemcpyDeviceToHost));
-#endif
-=======
 		infer_context->setBindingDimensions(0, inputDims1);
 		infer_context->setBindingDimensions(1, inputDims2);
 #if defined(UNPACK_CUDA)
@@ -402,7 +369,6 @@ namespace Eval::dlshogi
 		checkCudaErrors(cudaMemcpyAsync(y1, y1_dev, sizeof(NN_Output_Policy) * batch_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
 		checkCudaErrors(cudaMemcpyAsync(y2, y2_dev, sizeof(NN_Output_Value ) * batch_size, cudaMemcpyDeviceToHost, cudaStreamPerThread));
 		checkCudaErrors(cudaStreamSynchronize(cudaStreamPerThread));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	}
 
 } // namespace Eval::dlshogi

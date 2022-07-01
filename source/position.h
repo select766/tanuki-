@@ -317,13 +317,10 @@ public:
 	// rep_ply         : 遡る手数。デフォルトでは16手。あまり大きくすると速度低下を招く。
 	RepetitionState is_repetition(int rep_ply = 16) const;
 
-<<<<<<< HEAD
-=======
 	// is_repetition()の、千日手が見つかった時に、原局面から何手遡ったかを返すバージョン。
 	// REPETITION_NONEではない時は、found_plyにその値が返ってくる。	// ※　定跡生成の時にしか使わない。
 	RepetitionState is_repetition(int rep_ply , int& found_ply) const;
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// --- Bitboard
 
 	// 先手か後手か、いずれかの駒がある場所が1であるBitboardが返る。
@@ -532,25 +529,15 @@ public:
 	// --- Accessing hash keys
 
 	// StateInfo::key()への簡易アクセス。
-<<<<<<< HEAD
-	Key key() const { return st->key(); }
-	HASH_KEY long_key() const { return st->long_key(); }
-=======
 	Key           key() const { return st->key()     ; }
 	HASH_KEY hash_key() const { return st->hash_key(); }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// ある指し手を指した後のhash keyを返す。
 	// 将棋だとこの計算にそこそこ時間がかかるので、通常の探索部でprefetch用に
 	// これを計算するのはあまり得策ではないが、詰将棋ルーチンでは置換表を投機的に
 	// prefetchできるとずいぶん速くなるのでこの関数を用意しておく。
-<<<<<<< HEAD
-	Key key_after(Move m) const;
-	HASH_KEY long_key_after(Move m) const;
-=======
 	Key      key_after     (Move m) const;
 	HASH_KEY hash_key_after(Move m) const;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// --- misc
 
@@ -575,14 +562,10 @@ public:
 
 	// fromからtoに駒が移動したものと仮定して、pinを得る
 	// ※利きのない1手詰め判定のときに必要。
-<<<<<<< HEAD
-	Bitboard pinned_pieces(Color c, Square from, Square to) const { return c == BLACK ? pinned_pieces<BLACK>(from,to) : pinned_pieces<WHITE>(from,to); }
-=======
 	Bitboard pinned_pieces(Color c, Square from, Square to) const
 	{
 		return c == BLACK ? pinned_pieces<BLACK>(from,to) : pinned_pieces<WHITE>(from,to);
 	}
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// ↑のtemplate版
 	template<Color C>
@@ -853,8 +836,6 @@ inline Bitboard Position::attackers_to(Square sq, const Bitboard& occ) const
 	;
 }
 
-<<<<<<< HEAD
-=======
 // c側の駒Ptの利きのある升を表現するBitboardを返す。(MovePickerで用いている。)
 // 遠方駒に関しては盤上の駒を考慮した利き。
 template<Color C , PieceType Pt>
@@ -872,7 +853,6 @@ Bitboard Position::attacks_by() const
 	}
 }
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // ピンされているc側の駒。下手な方向に移動させるとc側の玉が素抜かれる。
 // avoidで指定されている遠方駒は除外して、pinされている駒のbitboardを得る。
 template <Color C>
@@ -893,11 +873,7 @@ Bitboard Position::pinned_pieces(Square avoid) const
 	while (pinners)
 	{
 		b = between_bb(ksq, pinners.pop()) & pieces() & avoid_bb;
-<<<<<<< HEAD
-		if (!more_than_one(b))
-=======
 		if (!b.more_than_one())
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			result |= b & pieces<C>();
 	}
 	return result;
@@ -924,11 +900,7 @@ Bitboard Position::pinned_pieces(Square from, Square to) const {
 	while (pinners)
 	{
 		b = between_bb(ksq, pinners.pop()) & new_pieces;
-<<<<<<< HEAD
-		if (!more_than_one(b))
-=======
 		if (!b.more_than_one())
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			result |= b & pieces(C);
 	}
 	return result;

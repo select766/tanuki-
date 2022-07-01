@@ -8,11 +8,7 @@
 
 // 思考エンジンのバージョンとしてUSIプロトコルの"usi"コマンドに応答するときの文字列。
 // ただし、この値を数値として使用することがあるので数値化できる文字列にしておく必要がある。
-<<<<<<< HEAD
-#define ENGINE_VERSION "7.00beta3"
-=======
 #define ENGINE_VERSION "7.63"
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 // --------------------
 //  思考エンジンの種類
@@ -384,19 +380,6 @@
 // ここ以降では、↑↑↑で設定した内容に基づき必要なdefineを行う。
 // ===============================================================
 
-<<<<<<< HEAD
-// 通例hash keyは64bitだが、これを128にするとPosition::state()->long_key()から128bit hash keyが
-// 得られるようになる。研究時に局面が厳密に合致しているかどうかを判定したいときなどに用いる。
-// 実験用の機能なので、128bit,256bitのhash keyのサポートはAVX2のみ。
-#if !defined(HASH_KEY_BITS) // Makefileの方から指定されているかも知れない。
-#define HASH_KEY_BITS 64
-//#define HASH_KEY_BITS 128
-//#define HASH_KEY_BITS 256
-// 注意 : ふかうら王で、スーパーテラショック定跡の生成を行う時は、HASH_KEY_BITSを128に設定すること。
-#endif
-
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // 通常探索時の最大探索深さ
 constexpr int MAX_PLY_NUM = 246;
 
@@ -837,11 +820,6 @@ constexpr bool pretty_jp = false;
 			#define EVAL_TYPE_NAME "ORT_CPU-" << EVAL_DEEP
 		#elif defined(ORT_DML)
 			#define EVAL_TYPE_NAME "ORT_DML-" << EVAL_DEEP
-<<<<<<< HEAD
-		#elif defined(ORT_MKL)
-			#define EVAL_TYPE_NAME "ORT_MKL-" << EVAL_DEEP
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		#elif defined(ORT_TRT)
 			#define EVAL_TYPE_NAME "ORT_TRT-" << EVAL_DEEP
 		#else
@@ -850,11 +828,8 @@ constexpr bool pretty_jp = false;
 	#elif defined(TENSOR_RT)
 		#include "NvInferRuntimeCommon.h"
 		#define EVAL_TYPE_NAME "TensorRT" << std::to_string(getInferLibVersion()) << "-" << EVAL_DEEP
-<<<<<<< HEAD
-=======
 	#elif defined(COREML)
 		#define EVAL_TYPE_NAME "CoreML-" << EVAL_DEEP
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	#endif
 
 #else

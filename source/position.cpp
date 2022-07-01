@@ -1359,44 +1359,6 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 				// rookEffect()を用いると、香での王手に対応するのが難しくなるので、
 				// 利きの方向ごとに場合分けするほうが簡単
 
-<<<<<<< HEAD
-					// rookEffect()を用いると、香での王手に対応するのが難しくなるので、
-					// 利きの方向ごとに場合分けするほうが簡単
-
-					//   玉
-					//   □
-					//   駒 ← 今回動かした駒のfrom
-					//   □
-					//   香
-					// のようになっているとして、駒のfromから見て玉が上(DIRECT_U)にあるということは、
-					// 駒のfromの下に王手している駒があって、それによって開き王手になったということ。
-					// だから、DIRECT_Uならその反対方向である下方向に駒を探さないといけない。
-
-				case DIRECT_U:
-					st->checkersBB |= lanceEffect<WHITE>(from, pieces()) & pieces<Us>(); break;
-				case DIRECT_D:
-					st->checkersBB |= lanceEffect<BLACK>(from, pieces()) & pieces<Us>(); break;
-
-					// 横に利く遠方駒は飛車(+龍)しかないので、玉の位置から飛車の利きを求めてその利きのなかにいる飛車を足す。
-					// →　飛車の横だけの利きを求める関数を用意したので、それを用いると上と同様の手法で求まる。
-
-				case DIRECT_R: case DIRECT_L:
-					st->checkersBB |= rookRankEffect(from, pieces()) & pieces<Us>(); break;
-
-				// magic bitboardを用いる場合の処理
-
-				// 斜め方向にあった駒を移動させての開き王手になっているので移動させた駒は角・馬ではない。
-				// (移動させた駒が角か馬であったなら、その駒で王を取れるので、非合法局面である)
-				// この移動させた駒はすでに取り除かれている。
-				// よって、王の升目から角が利いているUsの駒(角・馬)があれば、それは王手している遠方駒。
-
-				case DIRECT_RU: case DIRECT_LD:
-				case DIRECT_RD: case DIRECT_LU:
-					st->checkersBB |= bishopEffect(ksq, pieces()) & pieces<Us,BISHOP_HORSE>(); break;
-					
-				default: UNREACHABLE;
-				}
-=======
 				//   玉
 				//   □
 				//   駒 ← 今回動かした駒のfrom
@@ -1406,7 +1368,6 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 				// 駒のfromの下に王手している駒があって、それによって開き王手になったということ。
 
 				st->checkersBB |= directEffect(from, direct_of(ksq, from), pieces()) & pieces<Us>();
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 
 			// 差分更新したcheckersBBが正しく更新されているかをテストするためのassert
@@ -1451,19 +1412,11 @@ void Position::do_move_impl(Move m, StateInfo& new_st, bool givesCheck)
 
 // ある指し手を指した後のhash keyを返す。
 Key Position::key_after(Move m) const {
-<<<<<<< HEAD
-	return (Key)long_key_after(m);
-}
-
-// ある指し手を指した後のhash keyを返す。
-HASH_KEY Position::long_key_after(Move m) const {
-=======
 	return hash_key_to_key(hash_key_after(m));
 }
 
 // ある指し手を指した後のhash keyを返す。
 HASH_KEY Position::hash_key_after(Move m) const {
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	Color Us = side_to_move();
 	auto k = st->board_key_ ^ Zobrist::side;
@@ -2019,8 +1972,6 @@ RepetitionState Position::is_repetition(int repPly /* = 16 */) const
 	return REPETITION_NONE;
 }
 
-<<<<<<< HEAD
-=======
 // is_repetition()の、千日手が見つかった時に、原局面から何手遡ったかを返すバージョン。
 // found_plyにその値が返ってくる。
 RepetitionState Position::is_repetition(int repPly, int& found_ply) const
@@ -2076,7 +2027,6 @@ RepetitionState Position::is_repetition(int repPly, int& found_ply) const
 }
 
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // ----------------------------------
 //      入玉判定
 // ----------------------------------
@@ -2582,8 +2532,6 @@ void Position::UnitTest(Test::UnitTester& tester)
 		}
 	}
 
-<<<<<<< HEAD
-=======
 	{
 		// 指し手生成のテスト
 		auto section2 = tester.section("GenMove");
@@ -2637,7 +2585,6 @@ void Position::UnitTest(Test::UnitTester& tester)
 		}
 	}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 #if 0
 	// ランダムプレイヤーでの対局

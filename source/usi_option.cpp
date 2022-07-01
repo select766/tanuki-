@@ -132,15 +132,6 @@ namespace USI {
 		o["NodesLimit"] << Option(0, 0, int64_max);
 
 		// 評価関数フォルダ。これを変更したとき、評価関数を次のisreadyタイミングで読み直す必要がある。
-<<<<<<< HEAD
-	#if defined(EVAL_EMBEDDING)
-		const char *default_eval_dir = "<internal>";
-	#else
-		const char *default_eval_dir = "eval";
-	#endif
-		last_eval_dir = default_eval_dir;
-		o["EvalDir"] << Option(default_eval_dir, [](const USI::Option&o) {
-=======
 #if defined(EVAL_EMBEDDING)
 		const char* default_eval_dir = "<internal>";
 #elif !defined(__EMSCRIPTEN__)
@@ -151,7 +142,6 @@ namespace USI {
 #endif
 		last_eval_dir = default_eval_dir;
 		o["EvalDir"] << Option(default_eval_dir, [](const USI::Option& o) {
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			if (last_eval_dir != string(o))
 			{
 				// 評価関数フォルダ名の変更に際して、評価関数ファイルの読み込みフラグをクリアする。
@@ -243,20 +233,18 @@ namespace USI {
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
 
-<<<<<<< HEAD
 #ifdef EVAL_LEARN
 		Tanuki::InitializeBook(o);
 		Tanuki::InitializeGenerator(o);
 		Tanuki::InitializeShuffler(o);
 		Tanuki::Progress::Initialize(o);
 #endif
-=======
+
 #if defined(ENGINE_OPTIONS)
 		const string opt = ENGINE_OPTIONS;
 		set_engine_options(opt);
 #endif
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// カレントフォルダに"engine_options.txt"があればそれをオプションとしてOptions[]の値をオーバーライドする機能。
 		read_engine_options("engine_options.txt");
 	}

@@ -48,11 +48,6 @@ void bench_cmd(Position& current, istringstream& is)
 //	std::string ttSize = "1024", threads  ="1", limit ="17" , fenFile ="default", limitType = "depth";
 	// →　固定depthにすると探索部の改良に左右されすぎる。固定timeの方がいいと思う。1局面15秒設定。
 	std::string ttSize = "1024", threads  ="1", limit ="15" , fenFile ="default", limitType = "time";
-<<<<<<< HEAD
-
-	string* positional_args[] = { &ttSize, &threads, &limit, &fenFile, &limitType };
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	string* positional_args[] = { &ttSize, &threads, &limit, &fenFile, &limitType };
 

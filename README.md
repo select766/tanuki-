@@ -1,18 +1,11 @@
-<<<<<<< HEAD
-[![Make CI (MSYS2 for Windows)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-msys2.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-msys2.yml)
-=======
 ﻿[![Make CI (MSYS2 for Windows)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-msys2.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-msys2.yml)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 [![Make CI (DeepLearning for Windows)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-deep-windows.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-deep-windows.yml)
 [![Make CI (MinGW for Windows)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-mingw.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-mingw.yml)
 [![Make CI (for Ubuntu Linux)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make.yml)
 [![Make CI (DeepLearning for Ubuntu Linux)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-deep-ubuntu.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-deep-ubuntu.yml)
 [![NDK CI (for Android)](https://github.com/yaneurao/YaneuraOu/actions/workflows/ndk.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/ndk.yml)
-<<<<<<< HEAD
-=======
 [![Make CI (for MacOS)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-macos.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-macos.yml)
 [![Make CI (for WebAssembly)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-wasm.yml/badge.svg?event=push)](https://github.com/yaneurao/YaneuraOu/actions/workflows/make-wasm.yml)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 # About this project
 

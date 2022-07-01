@@ -102,16 +102,6 @@ namespace Eval::dlshogi
 #if defined(__CUDA_RUNTIME_H__)
 		// CUDAデバイス数を取得
 		cudaGetDeviceCount(&device_count);
-<<<<<<< HEAD
-#else
-		// CUDAからデバイス数が取得出来ない時は、デバイス数 max_gpu と仮定。
-		// 実装していないgpu_idに対して、USIオプション UCT_Threads1 ~ UCT_Threads16 で指定された値を無視して、
-		// 自動的にスレッド数を 0 として取り扱う処理を行わなくなる。
-		device_count = max_gpu;
-#endif
-		return device_count;
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 #else
 		// CUDAからデバイス数が取得出来ない時は、デバイス数 max_gpu と仮定。
 		// 実装していないgpu_idに対して、USIオプション UCT_Threads1 ~ UCT_Threads16 で指定された値を無視して、

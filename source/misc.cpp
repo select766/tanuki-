@@ -1451,19 +1451,11 @@ namespace SystemIO
 	{
 		ASSERT_LV3(fp != nullptr);
 
-<<<<<<< HEAD
-		fseek(fp, 0, SEEK_END);
-		// ftell()は失敗した時に-1を返すらしいのだが…。ここでは失敗を想定していない。
-		size_t endPos = (size_t)ftell(fp);
-		fseek(fp, 0, SEEK_SET);
-		size_t beginPos = (size_t)ftell(fp);
-=======
 		fseek64(fp, 0, SEEK_END);
 		// ftell()は失敗した時に-1を返すらしいのだが…。ここでは失敗を想定していない。
 		size_t endPos = ftell64(fp);
 		fseek64(fp, 0, SEEK_SET);
 		size_t beginPos = ftell64(fp);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		size_t file_size = endPos - beginPos;
 
 		return file_size;
@@ -1925,10 +1917,6 @@ namespace Parser
 
 		// assert(token.empty());
 
-<<<<<<< HEAD
-		while (!raw_eol())
-		{
-=======
 		// 解析開始位置から連続するスペースは読み飛ばす。
 		while (!raw_eol())
 		{
@@ -1941,14 +1929,11 @@ namespace Parser
 		while (!raw_eol())
 		{
 			// スペースに遭遇するまで。
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			char c = line[pos++];
 			if (c == ' ')
 				break;
 			token += c;
 		}
-<<<<<<< HEAD
-=======
 
 		// 次の文字先頭まで解析位置を進めておく。
 		while (!raw_eol())
@@ -1959,7 +1944,6 @@ namespace Parser
 			pos++;
 		}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		return token;
 	}
 
@@ -1971,8 +1955,6 @@ namespace Parser
 		return result;
 	}
 
-<<<<<<< HEAD
-=======
 	// 現在のcursor位置から残りの文字列を取得する。
 	// peek_text()した分があるなら、それも先頭にくっつけて返す。
 	std::string LineScanner::get_rest()
@@ -1982,7 +1964,6 @@ namespace Parser
 			: token + " " + line.substr(pos);
 	}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 次の文字列を数値化して返す。数値化できない時は引数の値がそのまま返る。
 	s64 LineScanner::get_number(s64 defaultValue)
 	{
@@ -2044,11 +2025,7 @@ namespace StringExtension
 
 	// 数字に相当する文字か
 	bool is_number(char c) { return '0' <= c && c <= '9'; }
-<<<<<<< HEAD
-	
-=======
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 行の末尾の"\r","\n",スペース、"\t"を除去した文字列を返す。
 	std::string trim(const std::string& input)
 	{
@@ -2176,15 +2153,12 @@ namespace StringExtension
 		return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 	};
 
-<<<<<<< HEAD
-=======
 	// 文字列sのなかに文字列tが含まれるかを判定する。含まれていればtrueを返す。
 	bool Contains(const std::string& s, const std::string& t) {
 	   return s.find(t) != std::string::npos;
 	   // C++20ならstring::contains()が使えるのだが…。
 	}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 文字列valueに対して文字xを文字yに置換した新しい文字列を返す。
 	std::string Replace(std::string const& value, char x, char y)
 	{
@@ -2204,8 +2178,6 @@ namespace StringExtension
 		return s;
 	}
 
-<<<<<<< HEAD
-=======
 	// sを文字列sepで分割した文字列集合を返す。
 	std::vector<std::string> Split(const std::string& s, const std::string& sep)
 	{
@@ -2226,7 +2198,6 @@ namespace StringExtension
 		}
 		return v;
 	}
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 };
 
@@ -2291,8 +2262,6 @@ namespace CommandLine {
 }
 
 // --------------------
-<<<<<<< HEAD
-=======
 // StandardInputWrapper
 // --------------------
 
@@ -2367,7 +2336,6 @@ void StandardInput::parse_args(int argc, char* argv[])
 }
 
 // --------------------
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 //     UnitTest
 // --------------------
 
@@ -2400,12 +2368,9 @@ namespace Misc {
 				tester.test("to_string_with_zero", StringExtension::to_string_with_zero(123 , 6) == "000123");
 				tester.test("to_string_with_zero", StringExtension::to_string_with_zero(1234, 6) == "001234");
 				tester.test("ToUpper"            , StringExtension::ToUpper("False&True") == "FALSE&TRUE");
-<<<<<<< HEAD
-=======
 
 				auto v = StringExtension::Split("ABC ; DEF ; GHI", " ; ");
 				tester.test("Split"              , v[0]=="ABC" && v[1]=="DEF" && v[2] =="GHI");
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			}
 		}
 	}

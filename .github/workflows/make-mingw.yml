@@ -13,11 +13,7 @@ jobs:
   build-mingw:
     # ubuntu-latest = ubuntu-20.04
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-<<<<<<< HEAD
-    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-=======
     # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     runs-on: ubuntu-20.04
 
     strategy:
@@ -39,10 +35,6 @@ jobs:
           - i686-w64-mingw32-g++-posix
         target:
           - "normal,tournament"
-<<<<<<< HEAD
-          - gensfen
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           - evallearn
         archcpu:
           - "AVX512VNNI,AVX512"
@@ -62,17 +54,6 @@ jobs:
             target: evallearn
           - edition: YANEURAOU_ENGINE_NNUE_KP256
             target: evallearn
-<<<<<<< HEAD
-          - edition: YANEURAOU_ENGINE_NNUE
-            target: gensfen
-          - edition: YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32
-            target: gensfen
-          - edition: YANEURAOU_ENGINE_NNUE_HALFKPE9
-            target: gensfen
-          - edition: YANEURAOU_ENGINE_NNUE_KP256
-            target: gensfen
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           # 以下のエディションには機械学習の実装が存在しない
           # There is no machine learning implementation for the following editions
           - edition: YANEURAOU_MATE_ENGINE

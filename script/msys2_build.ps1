@@ -8,10 +8,7 @@
 <#
 # MSYS2をインストールしたディレクトリで（もしくはPATH環境変数を設定して）以下を実行:
 
-<<<<<<< HEAD
-=======
 msys2_shell.cmd -msys2 -defterm -no-start -lc 'pacman --needed --noconfirm -Syuu';
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 msys2_shell.cmd -msys2 -defterm -no-start -lc 'pacman --needed --noconfirm -Syuu pactoys';
 msys2_shell.cmd -msys2 -defterm -no-start -lc 'pacboy --needed --noconfirm -Syuu clang:m lld:m openblas:x openmp:x toolchain:m base-devel:';
 
@@ -31,15 +28,6 @@ $TGCOMPILERS = @('clang++';'g++';);
     BUILDDIR = 'NNUE_KPE9';
     EDITION = 'YANEURAOU_ENGINE_NNUE_HALFKPE9';
     BUILDNAME = 'YaneuraOu_NNUE_HalfKPE9';
-<<<<<<< HEAD
-    TARGET = @('evallearn';'normal';'tournament';'gensfen';);
-  };
-  @{
-    BUILDDIR = 'NNUE_KPE9';
-    EDITION = 'YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32';
-    BUILDNAME = 'YaneuraOu_NNUE_HalfKP_VM';
-    TARGET = @('evallearn';'normal';'tournament';'gensfen';);
-=======
     TARGET = @('evallearn';'normal';'tournament';);
   };
   @{
@@ -47,7 +35,6 @@ $TGCOMPILERS = @('clang++';'g++';);
     EDITION = 'YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32';
     BUILDNAME = 'YaneuraOu_NNUE_HalfKP_VM';
     TARGET = @('evallearn';'normal';'tournament';);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
   };
   @{
     BUILDDIR = 'NNUE_KP256';

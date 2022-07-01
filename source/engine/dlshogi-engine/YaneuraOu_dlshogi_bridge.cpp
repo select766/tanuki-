@@ -60,11 +60,7 @@ void USI::extra_option(USI::OptionsMap& o)
     o["ReuseSubtree"]                << USI::Option(true);
 
 	// 勝率を評価値に変換する時の定数。
-<<<<<<< HEAD
-	o["Eval_Coef"]                   << USI::Option(756, 1, 10000);
-=======
 	o["Eval_Coef"]                   << USI::Option(285, 1, 10000);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// 投了値 : 1000分率で
 	o["Resign_Threshold"]            << USI::Option(0, 0, 1000);
@@ -72,11 +68,7 @@ void USI::extra_option(USI::OptionsMap& o)
 	// 引き分けの時の値 : 1000分率で
 	// 引き分けの局面では、この値とみなす。
 	// root color(探索開始局面の手番)に応じて、2通り。
-<<<<<<< HEAD
-	
-=======
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	o["DrawValueBlack"]              << USI::Option(500, 0, 1000);
 	o["DrawValueWhite"]              << USI::Option(500, 0, 1000);
 
@@ -118,13 +110,10 @@ void USI::extra_option(USI::OptionsMap& o)
     o["UCT_Threads14"]                << USI::Option(0, 0, 256);
     o["UCT_Threads15"]                << USI::Option(0, 0, 256);
     o["UCT_Threads16"]                << USI::Option(0, 0, 256);
-<<<<<<< HEAD
-=======
 #if defined(COREML)
 	// Core MLでは、ONNXではなく独自形式のモデルが必要。
     o["DNN_Model1"]                  << USI::Option(R"(model.mlmodel)");
 #else
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     o["DNN_Model1"]                  << USI::Option(R"(model.onnx)");
 #endif
     o["DNN_Model2"]                  << USI::Option("");
@@ -149,24 +138,6 @@ void USI::extra_option(USI::OptionsMap& o)
 #elif defined(ONNXRUNTIME)
 	// CPUを使っていることがあるので、default値、ちょっと少なめにしておく。
 	o["DNN_Batch_Size1"]             << USI::Option(32, 1, 1024);
-<<<<<<< HEAD
-#endif
-	o["DNN_Batch_Size2"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size3"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size4"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size5"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size6"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size7"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size8"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size9"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size10"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size11"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size12"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size13"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size14"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size15"]             << USI::Option(0, 0, 65536);
-    o["DNN_Batch_Size16"]             << USI::Option(0, 0, 65536);
-=======
 #elif defined(COREML)
 	// M1チップで8程度でスループットが飽和する。
 	o["DNN_Batch_Size1"]             << USI::Option(8, 1, 1024);
@@ -186,7 +157,6 @@ void USI::extra_option(USI::OptionsMap& o)
 	o["DNN_Batch_Size14"]             << USI::Option(0, 0, 1024);
 	o["DNN_Batch_Size15"]             << USI::Option(0, 0, 1024);
 	o["DNN_Batch_Size16"]             << USI::Option(0, 0, 1024);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
     //(*this)["Const_Playout"]               = USIOption(0, 0, int_max);
 	// →　Playout数固定。これはNodeLimitでできるので不要。
@@ -394,24 +364,12 @@ namespace dlshogi
 	//   Threads.start_thinking(pos, states , limits);
 	//   Threads.main()->wait_for_search_finished(); // 探索の終了を待つ。
 	// のようにUSIのgoコマンド相当で探索したあと、rootの各候補手とそれに対応する評価値を返す。
-<<<<<<< HEAD
-	std::vector < std::pair<Move, float>> GetSearchResult()
-=======
 	void GetSearchResult(std::vector < std::pair<Move, float>>& result)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	{
 		// root node
 		Node* root_node = searcher.search_limits.current_root;
 
 		// 子ノードの数
-<<<<<<< HEAD
-		int num = root_node->child_num;
-
-		// 返し値として返す用のコンテナ
-		std::vector < std::pair<Move, float>> v(num);
-
-		for (int i = 0; i < num; ++i)
-=======
 		ChildNumType num = root_node->child_num;
 
 		// 返し値として返す用のコンテナ
@@ -419,20 +377,11 @@ namespace dlshogi
 		result.reserve(num);
 
 		for (ChildNumType i = 0; i < num; ++i)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		{
 			auto& child = root_node->child[i];
 			Move m = child.move;
 			// move_count == 0であって欲しくはないのだが…。
 			float win = child.move_count == 0 ? child.nnrate : (float)child.win / child.move_count;
-<<<<<<< HEAD
-//			v.emplace_back(std::pair<Move, float>(m, win));
-			v[i] = std::pair<Move, float>(m, win);
-		}
-
-		return v;
-	}
-=======
 //			result.emplace_back(std::pair<Move, float>(m, win));
 			result[i] = std::pair<Move, float>(m, win);
 		}
@@ -604,7 +553,6 @@ namespace dlshogi
 		return (u64)searcher.search_limits.nodes_searched;
 	}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 }
 
 #endif // defined(YANEURAOU_ENGINE_DEEP)

@@ -135,12 +135,9 @@ namespace Test
 
 		// --- 各classに対するUnitTest
 
-<<<<<<< HEAD
-=======
 		// Book namespace
 		tester.run(Book::UnitTest);
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// Bitboard class
 		tester.run(Bitboard::UnitTest);
 		tester.run(Bitboard256::UnitTest);

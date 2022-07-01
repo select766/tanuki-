@@ -21,12 +21,6 @@
 // 64bit版
 typedef uint64_t Key64;
 
-<<<<<<< HEAD
-// 実験用の機能なので、128bit,256bitのhash keyのサポートはAVX2のみ。
-#if defined (USE_AVX2)
-
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // 128bit版
 struct alignas(16) Key128
 {
@@ -109,12 +103,6 @@ template <>
 struct std::hash<Key128> {
 	size_t operator()(const Key128& k) const {
 		// 下位bit返すだけで良いのでは？
-<<<<<<< HEAD
-		return (size_t)(k._u64[0]);
-	}
-};
-
-=======
 		return (size_t)(k.extract64<0>());
 	}
 };
@@ -126,7 +114,6 @@ static std::ostream& operator << (std::ostream& os, const Key128& k)
 	return os;
 }
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // 256bit版
 struct alignas(32) Key256
 {
@@ -200,13 +187,6 @@ template <>
 struct std::hash<Key256> {
 	size_t operator()(const Key256& k) const {
 		// 下位bit返すだけで良いのでは？
-<<<<<<< HEAD
-		return (size_t)(k._u64[0]);
-	}
-};
-
-#endif
-=======
 		return (size_t)(k.extract64<0>());
 	}
 };
@@ -222,6 +202,5 @@ static std::ostream& operator << (std::ostream& os, const Key256& k)
 static Key hash_key_to_key(const Key     key) { return key               ; }
 static Key hash_key_to_key(const Key128& key) { return key.extract64<0>(); }
 static Key hash_key_to_key(const Key256& key) { return key.extract64<0>(); }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 #endif // _KEY128_H_

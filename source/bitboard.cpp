@@ -40,55 +40,6 @@ namespace BB_Table
 	// sqの升が1であるbitboard
 	Bitboard SquareBB[SQ_NB_PLUS1];
 
-<<<<<<< HEAD
-// sqの升が1であるbitboard
-Bitboard SquareBB[SQ_NB_PLUS1];
-
-// 玉、金、銀、桂、歩の利き
-Bitboard KingEffectBB[SQ_NB_PLUS1];
-Bitboard GoldEffectBB[SQ_NB_PLUS1][COLOR_NB];
-Bitboard SilverEffectBB[SQ_NB_PLUS1][COLOR_NB];
-Bitboard KnightEffectBB[SQ_NB_PLUS1][COLOR_NB];
-Bitboard PawnEffectBB[SQ_NB_PLUS1][COLOR_NB];
-
-// 盤上の駒をないものとして扱う、遠方駒の利き。香、角、飛
-Bitboard LanceStepEffectBB[SQ_NB_PLUS1][COLOR_NB];
-Bitboard BishopStepEffectBB[SQ_NB_PLUS1];
-Bitboard RookStepEffectBB[SQ_NB_PLUS1];
-
-// LineBBは、王手の指し手生成からしか使っていないが、move_pickerからQUIET_CHECKS呼び出しているので…。
-// そして、配列シュリンクした。
-Bitboard LineBB[SQ_NB][4];
-
-Bitboard CheckCandidateBB[SQ_NB_PLUS1][KING-1][COLOR_NB];
-Bitboard CheckCandidateKingBB[SQ_NB_PLUS1];
-
-u8 Slide[SQ_NB_PLUS1] = {
-	1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
-	10, 10, 10, 10, 10, 10, 10, 10, 10,
-	19, 19, 19, 19, 19, 19, 19, 19, 19,
-	28, 28, 28, 28, 28, 28, 28, 28, 28,
-	37, 37, 37, 37, 37, 37, 37, 37, 37,
-	46, 46, 46, 46, 46, 46, 46, 46, 46,
-	55, 55, 55, 55, 55, 55, 55, 55, 55,
-	1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 , 1 ,
-	10, 10, 10, 10, 10, 10, 10, 10, 10,
-	0 , // SQ_NB用
-};
-
-Bitboard BetweenBB[785];
-u16 BetweenIndex[SQ_NB_PLUS1][SQ_NB_PLUS1];
-
-// SquareからSquareWithWallへの変換テーブル
-SquareWithWall sqww_table[SQ_NB_PLUS1];
-
-// ----------------------------------------------------------------------------------------------
-// 飛車・角の利きのためのテーブル
-// ----------------------------------------------------------------------------------------------
-
-Bitboard QUGIY_ROOK_MASK[SQ_NB_PLUS1][2];
-Bitboard256 QUGIY_BISHOP_MASK[SQ_NB_PLUS1][2];
-=======
 	const Bitboard ForwardRanksBB[COLOR_NB][RANK_NB] =
 	{
 		{
@@ -162,7 +113,6 @@ Bitboard256 QUGIY_BISHOP_MASK[SQ_NB_PLUS1][2];
 }
 
 using namespace BB_Table;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 // ----------------------------------------------------------------------------------------------
 
@@ -180,40 +130,6 @@ std::ostream& operator<<(std::ostream& os, const Bitboard& board)
 	return os;
 }
 
-<<<<<<< HEAD
-// 盤上sqに駒pc(先後の区別あり)を置いたときの利き。
-Bitboard effects_from(Piece pc, Square sq, const Bitboard& occ)
-{
-	switch (pc)
-	{
-	case B_PAWN:   return pawnEffect  <BLACK>(sq);
-	case B_LANCE:  return lanceEffect <BLACK>(sq, occ);
-	case B_KNIGHT: return knightEffect<BLACK>(sq);
-	case B_SILVER: return silverEffect<BLACK>(sq);
-	case B_GOLD: case B_PRO_PAWN: case B_PRO_LANCE: case B_PRO_KNIGHT: case B_PRO_SILVER: return goldEffect<BLACK>(sq);
-
-	case W_PAWN:   return pawnEffect  <WHITE>(sq);
-	case W_LANCE:  return lanceEffect <WHITE>(sq, occ);
-	case W_KNIGHT: return knightEffect<WHITE>(sq);
-	case W_SILVER: return silverEffect<WHITE>(sq);
-	case W_GOLD: case W_PRO_PAWN: case W_PRO_LANCE: case W_PRO_KNIGHT: case W_PRO_SILVER: return goldEffect<WHITE>(sq);
-
-		//　先後同じ移動特性の駒
-	case B_BISHOP: case W_BISHOP: return bishopEffect(sq, occ);
-	case B_ROOK:   case W_ROOK:   return rookEffect  (sq, occ);
-	case B_HORSE:  case W_HORSE:  return horseEffect (sq, occ);
-	case B_DRAGON: case W_DRAGON: return dragonEffect(sq, occ);
-	case B_KING:   case W_KING:   return kingEffect  (sq     );
-	case B_QUEEN:  case W_QUEEN:  return horseEffect (sq, occ) | rookEffect(sq, occ); // 馬+飛でいいや。(馬+龍は王の利きを2回合成して損)
-	case NO_PIECE: case PIECE_WHITE: return ZERO_BB; // これも入れておかないと初期化が面倒になる。
-
-	default: UNREACHABLE; return ALL_BB;
-	}
-}
-
-
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // Bitboard関連の各種テーブルの初期化。
 void Bitboards::init()
 {
@@ -256,72 +172,6 @@ void Bitboards::init()
 	for (File f = FILE_1; f <= FILE_9; ++f) {
 		for (Rank r = RANK_1; r <= RANK_9; ++r) {
 
-<<<<<<< HEAD
-			Bitboard left = ZERO_BB ,right = ZERO_BB;
-
-			// SQの升から左方向
-			for (File f2 = (File)(f + 1); f2 <= FILE_9; ++f2)
-				left |= Bitboard(f2 | r);
-
-			// SQの升から右方向
-			for (File f2 = (File)(f - 1); f2 >= FILE_1; --f2)
-				right |= Bitboard(f2 | r);
-
-			Bitboard right_rev = right.byte_reverse();
-
-			Bitboard hi, lo;
-			Bitboard::unpack(right_rev, left, hi, lo);
-
-			QUGIY_ROOK_MASK[f | r][0] = lo;
-			QUGIY_ROOK_MASK[f | r][1] = hi;
-		}
-	}
-
-	// 5) Qugiyの角のBitboardテーブルの初期化
-
-	// 4方向
-	const Effect8::Direct bishop_direct[4] ={
-		Effect8::Direct::DIRECT_LU , // 左上
-		Effect8::Direct::DIRECT_LD , // 左下
-		Effect8::Direct::DIRECT_RU , // 右上
-		Effect8::Direct::DIRECT_RD   // 右下
-	};
-
-	for (File f = FILE_1; f <= FILE_9; ++f) {
-		for (Rank r = RANK_1; r <= RANK_9; ++r) {
-
-			// 対象升から
-			Square sq = f | r;
-
-			// 角の左上、左下、右上、右下それぞれへのstep effect
-			Bitboard step_effect[4];
-
-			// 4方向の利きをループで求める
-			for (int i = 0; i < 4; ++i)
-			{
-				Bitboard& bb = step_effect[i];
-
-				bb = ZERO_BB;
-				auto delta = Effect8::DirectToDeltaWW(bishop_direct[i]);
-				// 壁に突き当たるまで進む
-				for (auto sq2 = to_sqww(sq) + delta; is_ok(sq2); sq2 += delta)
-					bb |= Bitboard(sqww_to_sq(sq2));
-			}
-
-			// 右上、右下はbyte reverseしておかないとうまく求められない。(先手の香の利きがうまく求められないのと同様)
-
-			step_effect[2] = step_effect[2].byte_reverse();
-			step_effect[3] = step_effect[3].byte_reverse();
-
-			for (int i = 0; i < 2; ++i)
-				QUGIY_BISHOP_MASK[sq][i] = Bitboard256(
-					Bitboard(step_effect[0].extract64(i), step_effect[2].extract64(i)),
-					Bitboard(step_effect[1].extract64(i), step_effect[3].extract64(i))
-				);
-		}
-	}
-
-=======
 			Bitboard left(ZERO), right(ZERO);
 			
 			// SQの升から左方向
@@ -417,7 +267,6 @@ void Bitboards::init()
 		dd++;
 	}
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// 6. 近接駒(+盤上の利きを考慮しない駒)のテーブルの初期化。
 	// なるべく他の駒の利きに依存しない形で初期化する。
 
@@ -434,21 +283,13 @@ void Bitboards::init()
 			// 歩
 
 			// 備考) 歩の利きは駒が敷き詰められている時の香の利きとして定義できる。
-<<<<<<< HEAD
-			//  PawnEffectBB[sq][c] = lanceEffect(c, sq, ALL_BB);
-=======
 			//  PawnEffectBB[sq][c] = lanceEffect(c, sq, Bitboard(1));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			// → QugiyのアルゴリズムでlanceEffectの計算にpawnEffectを用いるようになったのでこれができなくなった。
 
 			// 歩の利きは何段目であるか。
 			Rank r = (Rank)(rank_of(sq) + (c == BLACK ? -1 : +1));
 			// その段数が1～9段目に収まるなら..
-<<<<<<< HEAD
-			PawnEffectBB[sq][c] = (RANK_1 <= r && r <= RANK_9) ? Bitboard(file_of(sq) | r) : ZERO_BB;
-=======
 			PawnEffectBB[sq][c] = (RANK_1 <= r && r <= RANK_9) ? Bitboard(file_of(sq) | r) : Bitboard(ZERO);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		}
 
 	// 備考) ここでlanceEffectが使えるようになったので、以降、rookEffectが使える。
@@ -461,17 +302,6 @@ void Bitboards::init()
 	{
 		// 玉
 		// 玉の利きは駒が敷き詰められている時の角と飛車の利きの重ね合わせとして定義できる。
-<<<<<<< HEAD
-		KingEffectBB[sq] = bishopEffect(sq, ALL_BB) | rookEffect(sq, ALL_BB);
-
-		// 角
-		// 角のstep effectは、盤上に駒がない時の角の利き。
-		BishopStepEffectBB[sq] = bishopEffect(sq, ZERO_BB);
-
-		// 飛
-		// 飛車のstep effectは、盤上に駒がない時の飛車の利き。
-		RookStepEffectBB[sq]   = rookEffect(sq, ZERO_BB);
-=======
 		KingEffectBB[sq] = bishopEffect(sq, Bitboard(1)) | rookEffect(sq, Bitboard(1));
 
 		// 角
@@ -481,7 +311,6 @@ void Bitboards::init()
 		// 飛
 		// 飛車のstep effectは、盤上に駒がない時の飛車の利き。
 		RookStepEffectBB[sq]   = rookEffect(sq, Bitboard(0));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	}
 
 	// 先後の区別のあるstep effect (桂、銀、金)
@@ -490,13 +319,8 @@ void Bitboards::init()
 		{
 			// 桂
 			// 桂の利きは、歩の利きの地点に長さ1の角の利きを作って、前方のみ残す。
-<<<<<<< HEAD
-			Bitboard tmp = ZERO_BB;
-			Bitboard pawn = lanceEffect(c, sq, ALL_BB);
-=======
 			Bitboard tmp(ZERO);
 			Bitboard pawn = lanceEffect(c, sq, Bitboard(1));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 			if (pawn)
 			{
@@ -509,21 +333,12 @@ void Bitboards::init()
 
 			// 銀
 			// 銀の利きは長さ1の角の利きと長さ1の香の利きの合成として定義できる。
-<<<<<<< HEAD
-			SilverEffectBB[sq][c] = lanceEffect(c, sq, ALL_BB) | bishopEffect(sq, ALL_BB);
-
-			// 金
-			// 金の利きは長さ1の角と飛車の利き。ただし、角のほうは相手側の歩の行き先の段でmaskしてしまう。
-			Bitboard e_pawn = lanceEffect(~c, sq, ALL_BB);
-			Bitboard mask = ZERO_BB;
-=======
 			SilverEffectBB[sq][c] = lanceEffect(c, sq, Bitboard(1)) | bishopEffect(sq, Bitboard(1));
 
 			// 金
 			// 金の利きは長さ1の角と飛車の利き。ただし、角のほうは相手側の歩の行き先の段でmaskしてしまう。
 			Bitboard e_pawn = lanceEffect(~c, sq, Bitboard(1));
 			Bitboard mask(ZERO);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 			if (e_pawn)
 				mask = RANK_BB[rank_of(e_pawn.pop())];
 			GoldEffectBB[sq][c]= (bishopEffect(sq, Bitboard(1)) & ~mask) | rookEffect(sq, Bitboard(1));
@@ -603,11 +418,7 @@ void Bitboards::init()
 		}
 
 
-<<<<<<< HEAD
-	// 8) 王手となる候補の駒のテーブル初期化(王手の指し手生成に必要。やねうら王nanoでは削除予定)
-=======
 	// 8) 王手となる候補の駒のテーブル初期化(王手の指し手生成に必要)
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 #define FOREACH_KING(BB, EFFECT ) { for(auto sq : BB){ target|= EFFECT(sq); } }
 #define FOREACH(BB, EFFECT ) { for(auto sq : BB){ target|= EFFECT(them,sq); } }
@@ -693,8 +504,6 @@ void Bitboards::init()
 
 }
 
-<<<<<<< HEAD
-=======
 // --- Bitboardの実装
 
 Bitboard::Bitboard(u64 p0, u64 p1) :
@@ -803,7 +612,6 @@ Bitboard Bitboard::decrement() const
 
 // --- Bitboard256
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // Bitboard256の1の升を'*'、0の升を'.'として表示する。デバッグ用。
 std::ostream& operator<<(std::ostream& os, const Bitboard256& board)
 {
@@ -884,8 +692,6 @@ void Bitboard::decrement(const Bitboard hi_in,const Bitboard lo_in, Bitboard& hi
 #endif
 }
 
-<<<<<<< HEAD
-=======
 // 2bit以上あるかどうかを判定する。縦横斜め方向に並んだ駒が2枚以上であるかを判定する。この関係にないと駄目。
 // この関係にある場合、Bitboard::merge()によって被覆しないことがBitboardのレイアウトから保証されている。
 bool Bitboard::more_than_one() const
@@ -894,7 +700,6 @@ bool Bitboard::more_than_one() const
 	return POPCNT64(merge()) > 1;
 }
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 // byte単位で入れ替えたBitboardを返す。
 // 飛車の利きの右方向と角の利きの右上、右下方向を求める時に使う。
 Bitboard256 Bitboard256::byte_reverse() const
@@ -908,17 +713,10 @@ Bitboard256 Bitboard256::byte_reverse() const
 	return b0;
 #else
 	Bitboard256 b0;
-<<<<<<< HEAD
-	b0.p[0] = bswap64(p[3]);
-	b0.p[1] = bswap64(p[2]);
-	b0.p[2] = bswap64(p[1]);
-	b0.p[3] = bswap64(p[0]);
-=======
 	b0.p[0] = bswap64(p[1]);
 	b0.p[1] = bswap64(p[0]);
 	b0.p[2] = bswap64(p[3]);
 	b0.p[3] = bswap64(p[2]);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	return b0;
 #endif
 }
@@ -986,8 +784,6 @@ Bitboard Bitboard256::merge() const
 #endif
 }
 
-<<<<<<< HEAD
-=======
 // 駒の利きに関するnamespace
 
 // 盤上sqに駒pc(先後の区別あり)を置いたときの利き。(step effect)
@@ -1050,7 +846,6 @@ Bitboard effects_from(Piece pc, Square sq, const Bitboard& occ)
 	default: UNREACHABLE; return Bitboard(1);
 	}
 }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 // Qugiyのアルゴリズムによる、飛車と角の利きの実装。
 // magic bitboard tableが不要になる。
@@ -1124,9 +919,6 @@ Bitboard bishopEffect(const Square sq, const Bitboard& occupied)
 	return (hi.byte_reverse() | lo).merge();
 }
 
-<<<<<<< HEAD
-
-=======
 // === 大駒の部分利き(SEEなどで用いる) ===
 
 // sqの升から指定した方向dへの利き。盤上の駒も考慮する。
@@ -1145,7 +937,6 @@ Bitboard directEffect(Square sq, Effect8::Direct d, const Bitboard& occupied)
 	default: UNREACHABLE; return Bitboard(ZERO);
 	}
 }
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 // UnitTest
 void Bitboard::UnitTest(Test::UnitTester& tester)
@@ -1170,20 +961,12 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 		tester.test("sq occupied", all_ok);
 	}
 	{
-<<<<<<< HEAD
-#if defined(USE_SSE2)
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// ByteReverseがちゃんと機能しているかのテスト
 
 		Bitboard b(0x0123456789abcdef, 0xfedcba9876543210);
 		Bitboard r = b.byte_reverse();
 
 		tester.test("byte_reverse", r.extract64<0>() == 0x1032547698badcfe && r.extract64<1>() == 0xefcdab8967452301);
-<<<<<<< HEAD
-#endif
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	}
 	{
 		// 9段目が0、そこ以外が1のmask(香の利きを求めるコードのなかで使っている)
@@ -1193,64 +976,39 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 	}
 
 	{
-<<<<<<< HEAD
-=======
 		// 駒の利き
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		bool all_ok = true;
 
 		// 何も駒のない盤面上に駒ptを55に置いた時の利きの数。
 		int p0_table[] = {
 			0,1,4,2,5,16,16,6,	// Empty、歩、香、桂、銀、角、飛、金
-<<<<<<< HEAD
-			8,6,6,6,6,20,20,32,	// 玉、と、…
-=======
 			8,6,6,6,6,20,20,6,	// 玉、と、…
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		};
 		// 駒が敷き詰められた盤面上で駒ptを55に置いた時の利きの数。
 		int p1_table[] = {
 			0,1,1,2,5, 4, 4,6,	// Empty、歩、香、桂、銀、角、飛
-<<<<<<< HEAD
-			8,6,6,6,6, 8, 8,8,	// 玉、と、…
-=======
 			8,6,6,6,6, 8, 8,6,	// 玉、と、…
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		};
 
 		for (Color c : COLOR)
 			for (PieceType pt = PAWN ; pt < PIECE_TYPE_NB ; ++pt )
 			{
 				Piece pc = make_piece(c, pt);
-<<<<<<< HEAD
-				Bitboard bb0 = effects_from(pc, SQ_55, ZERO_BB);
-				int p0 = bb0.pop_count();
-				Bitboard bb1 = effects_from(pc, SQ_55, ALL_BB);
-=======
 				Bitboard bb0 = effects_from(pc, SQ_55, Bitboard(ZERO));
 				int p0 = bb0.pop_count();
 				Bitboard bb1 = effects_from(pc, SQ_55, Bitboard(1));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 				int p1 = bb1.pop_count();
 				bool ok0 = (p0 == p0_table[(int)pt]);
 				if (!ok0)
 				{
-<<<<<<< HEAD
-					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in ZERO_BB , pop_count = " << p0 << endl;
-=======
 					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in Bitboard(ZERO) , pop_count = " << p0 << endl;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					cout << bb0 << endl;
 				}
 				bool ok1 = (p1 == p1_table[(int)pt]);
 				if (!ok1)
 				{
-<<<<<<< HEAD
-					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in ALL_BB , pop_count = " << p1 << endl;
-=======
 					cout << "Effect " << pc  << "(" << pretty(pc) << ")" << " on SQ_55 in Bitboard(1) , pop_count = " << p1 << endl;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 					cout << bb1 << endl;
 				}
 				all_ok &= ok0 & ok1;
@@ -1259,8 +1017,6 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 	}
 
 	{
-<<<<<<< HEAD
-=======
 		// 方向利き
 
 		bool all_ok = true;
@@ -1276,7 +1032,6 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 	}
 
 	{
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// SSE unpack
 
 		const Bitboard bb_0000(0, 0);
@@ -1306,11 +1061,8 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 	}
 
 	{
-<<<<<<< HEAD
-=======
 		// Bitboard::decrement() method
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		const Bitboard all_bb((u64)-1LL, (u64)-1LL);
 		const Bitboard all_bb_minus_one((u64)-2LL, (u64)-2LL);
 		const Bitboard zero_bb(0, 0);
@@ -1330,9 +1082,6 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 		all_ok &= hi_out == all_bb_minus_one;
 		all_ok &= lo_out == all_bb;
 
-<<<<<<< HEAD
-		tester.test("decrement", all_ok );
-=======
 		tester.test("decrement(static function)", all_ok );
 	}
 	{
@@ -1353,7 +1102,6 @@ void Bitboard::UnitTest(Test::UnitTester& tester)
 
 		tester.test("attacks_bb<B_KNIGHT>",attacks_bb<B_KNIGHT>(SQ_77) == (Bitboard(SQ_85) | Bitboard(SQ_65)));
 		tester.test("attacks_bb<W_KNIGHT>",attacks_bb<W_KNIGHT>(SQ_77) == (Bitboard(SQ_89) | Bitboard(SQ_69)));
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	}
 }
 
@@ -1380,10 +1128,6 @@ void Bitboard256::UnitTest(Test::UnitTester& tester)
 
 		tester.test("toBitboard", all_ok);
 	}
-<<<<<<< HEAD
-}
-
-=======
 	{
 		// ByteReverseがちゃんと機能しているかのテスト
 
@@ -1398,4 +1142,3 @@ void Bitboard256::UnitTest(Test::UnitTester& tester)
 }
 
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e

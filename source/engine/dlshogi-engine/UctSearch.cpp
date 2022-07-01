@@ -364,22 +364,13 @@ namespace dlshogi
 		StateInfo si;
 		for (int i = 0; i < policy_value_batch_maxsize; ++i) {
 			pos.set(dummy_sfen((u32)i), &si, Threads.main());
-<<<<<<< HEAD
-			make_input_features(pos, &features1[i], &features2[i]);
-=======
 			make_input_features(pos, i, packed_features1, packed_features2);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		}
 		// このスレッドとGPUとを紐付ける。
 		grp->set_device();
 		// 最大バッチサイズ(policy_value_batch_maxsize) と 最小バッチサイズ(1) でそれぞれ推論を実行しておく
-<<<<<<< HEAD
-		grp->nn_forward(policy_value_batch_maxsize, features1, features2, y1, y2);
-		grp->nn_forward(1, features1, features2, y1, y2);
-=======
 		grp->nn_forward(policy_value_batch_maxsize, packed_features1, packed_features2, features1, features2, y1, y2);
 		grp->nn_forward(1, packed_features1, packed_features2, features1, features2, y1, y2);
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 		// ダミー局面推論終了時間
 		TimePoint tpforwardend = now();
 

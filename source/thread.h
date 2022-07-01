@@ -88,14 +88,8 @@ public:
 	// pvLast   : tbRank絡み。将棋では関係ないので用いない。
 	size_t pvIdx /*,pvLast*/;
 
-<<<<<<< HEAD
-	// 置換表に平均的にどれくらいhitしているかという統計情報。
-	// これに基づき、枝刈りを調整する。
-	RunningAverage doubleExtensionAverage[COLOR_NB];
-=======
 	//RunningAverage complexityAverage;
 	// →　やねうら王では導入せず
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// nodes     : このスレッドが探索したノード数(≒Position::do_move()を呼び出した回数)
 	// bestMoveChanges : 反復深化においてbestMoveが変わった回数。nodeの安定性の指標として用いる。全スレ分集計して使う。
@@ -108,12 +102,6 @@ public:
 	int selDepth, nmpMinPly;
 	Color nmpColor;
 
-<<<<<<< HEAD
-	// search()で、そのnodeでbestMoveを指したときの(探索の)評価値
-	// Stockfishではevaluate()の遅延評価のためにThreadクラスに持たせることになった。
-	// cf. Reduce use of lazyEval : https://github.com/official-stockfish/Stockfish/commit/7b278aab9f61620b9dba31896b38aeea1eb911e2
-	Value bestValue;
-=======
 	// bestValue :
 	// search()で、そのnodeでbestMoveを指したときの(探索の)評価値
 	// Stockfishではevaluate()の遅延評価のためにThreadクラスに持たせることになった。
@@ -121,7 +109,6 @@ public:
 	// optimism  : 楽観値
 	// → やねうら王では導入せず
 	Value bestValue /*, optimism[COLOR_NB]*/ ;
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
 	// 探索開始局面
 	Position rootPos;
@@ -141,14 +128,11 @@ public:
 	//
 	Depth rootDepth, completedDepth;
 
-<<<<<<< HEAD
-=======
 #if defined(__EMSCRIPTEN__)
 	// yaneuraou.wasm
 	std::atomic_bool threadStarted;
 #endif
 
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 	// aspiration searchのrootでの beta - alpha
 	Value rootDelta;
 
@@ -186,17 +170,6 @@ public:
 #if defined(EVAL_LEARN)
 	// 学習用の実行ファイルでは、スレッドごとに置換表を持ちたい。
 	TranspositionTable tt;
-
-	// 前回の探索時のスコア。
-	// 次回の探索のときに何らか使えるかも。
-	Value bestPreviousScoreForLearn;
-
-	// 時間まぎわのときに探索を終了させるかの判定に用いるための、
-	// 反復深化のiteration、前4回分のScore
-	Value iterValueForLearn[4];
-
-	// previousTimeReduction : 反復深化の前回のiteration時のtimeReductionの値。
-	double previousTimeReductionForLearn;
 #endif
 };
 

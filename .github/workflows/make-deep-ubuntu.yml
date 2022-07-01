@@ -13,11 +13,7 @@ jobs:
   build-ubuntu:
     # ubuntu-latest = ubuntu-20.04
     # https://docs.github.com/ja/actions/using-github-hosted-runners/about-github-hosted-runners
-<<<<<<< HEAD
-    # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
-=======
     # https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
     runs-on: ubuntu-20.04
 
     strategy:
@@ -90,14 +86,6 @@ jobs:
       - name: install clang-14
         # LLVM APT
         run: |
-<<<<<<< HEAD
-          # Remove packages that conflict with clang-14 installation
-          sudo apt remove -y \
-          liblldb-10 libomp-10-dev libomp5-10 lldb-10 python3-lldb-10 \
-          liblldb-11 libomp-11-dev libomp5-11 lldb-11 python3-lldb-11 \
-          liblldb-12 libomp-12-dev libomp5-12 lldb-12 python3-lldb-12
-=======
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
           # install clang-14
           wget https://apt.llvm.org/llvm.sh
           sudo bash ./llvm.sh 14 all
@@ -121,15 +109,9 @@ jobs:
         if: ${{ matrix.edition == 'YANEURAOU_ENGINE_DEEP_ORT_CPU' }}
 
       - name: install CUDA, TensorRT
-<<<<<<< HEAD
-        # ここではCUDAアプリケーションの開発環境用に、CUDAドライバーを含まない cuda-minimal-build-11-5 をインストールしている。
-        # CUDAアプリケーションの実行環境用にセットアップする場合、 cuda-minimal-build-11-5 の代わりに
-        # CUDAドライバーを含むメタパッケージ、 cuda-11-5 もしくは cuda をインストールする。
-=======
         # ここではCUDAアプリケーションの開発環境用に、CUDAドライバーを含まない cuda-minimal-build-11-7 をインストールしている。
         # CUDAアプリケーションの実行環境用にセットアップする場合、 cuda-minimal-build-11-7 の代わりに
         # CUDAドライバーを含むメタパッケージ、 cuda-11-7 もしくは cuda をインストールする。
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
         # https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#package-manager-metas
         # https://github.com/NVIDIA/cuda-repo-management/issues/4
         run: |
@@ -139,12 +121,6 @@ jobs:
           sudo cat /etc/apt/sources.list
           sudo ls -R /etc/apt/sources.list.d
           sudo apt update
-<<<<<<< HEAD
-          sudo apt install cuda-minimal-build-11-5 libnvinfer-dev libnvinfer-plugin-dev libnvonnxparsers-dev libnvparsers-dev
-
-      - name: make
-        run: ./main/script/build.sh -e ${{ matrix.edition }} -c ${{ matrix.compiler }} -t ${{ matrix.target }} -a ${{ matrix.archcpu }} -x "EXTRA_CPPFLAGS='-I/usr/local/cuda-11.5/include' EXTRA_LDFLAGS='-L/usr/local/cuda-11.5/lib64'"
-=======
           sudo apt install cuda-minimal-build-11-7 cuda-nvrtc-dev-11-7 libcublas-11-7 libcublas-dev-11-7 libnvinfer-dev libnvinfer-plugin-dev libnvonnxparsers-dev libnvparsers-dev
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
         if: ${{ matrix.edition == 'YANEURAOU_ENGINE_DEEP_TENSOR_RT' }}
@@ -158,7 +134,6 @@ jobs:
       - name: make YANEURAOU_ENGINE_DEEP_TENSOR_RT
         run: ./main/script/build.sh -e ${{ matrix.edition }} -c ${{ matrix.compiler }} -t ${{ matrix.target }} -a ${{ matrix.archcpu }} -x "EXTRA_CPPFLAGS=-I/usr/local/cuda-11.7/include EXTRA_LDFLAGS=-L/usr/local/cuda-11.7/lib64 EXTRA_LDFLAGS+=-L/usr/local/cuda-11.7/lib64/stubs"
         if: ${{ matrix.edition == 'YANEURAOU_ENGINE_DEEP_TENSOR_RT' }}
->>>>>>> 599378d420fa9a8cdae9b1b816615313d41ccf6e
 
       - uses: actions/upload-artifact@v2
         with:
