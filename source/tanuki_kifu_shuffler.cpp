@@ -1,5 +1,3 @@
-#pragma optimize( "", off )
-
 #include "tanuki_kifu_shuffler.h"
 #include "config.h"
 
