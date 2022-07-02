@@ -1065,6 +1065,7 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 			// cluster時のUSIメッセージの処理ループ
 			YaneuraouTheCluster::cluster_usi_loop(pos, is);
 #endif
+#endif
 
 #ifdef EVAL_LEARN
 		else if (token == "create_raw_book") Tanuki::CreateRawBook();
@@ -1073,27 +1074,22 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 
 		else if (token == "merge_book") {
 			Tanuki::MergeBook();
-			break;
 		}
 
 		else if (token == "set_score_to_move") {
 			Tanuki::SetScoreToMove();
-			break;
 		}
 
 		else if (token == "propagate_leaf_node_values_to_root") {
 			Tanuki::PropagateLeafNodeValuesToRoot();
-			break;
 		}
 
 		else if (token == "extract_target_positions") {
 			Tanuki::ExtractTargetPositions();
-			break;
 		}
 
 		else if (token == "add_target_positions") {
 			Tanuki::AddTargetPositions();
-			break;
 		}
 
 		else if (token == "endless_tera_shock") {
@@ -1202,24 +1198,6 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 		else if (token == "analyze_progress") {
 			Tanuki::AnalyzeProgress();
 		}
-
-		else if (token == "denryu2_time") {
-			Denryu2::ExtractTime();
-		}
-
-		else if (token == "denryu2_extract_games") {
-			Denryu2::ExtractGames();
-		}
-
-		else if (token == "denryu2_calculate_move_match_ratio") {
-			Denryu2::CalculateMoveMatchRatio(pos, is);
-		}
-
-		else if (token == "denryu2_calculate_move_match_ratio2") {
-			Denryu2::CalculateMoveMatchRatio2(pos);
-		}
-#endif
-
 #endif
 
 		else

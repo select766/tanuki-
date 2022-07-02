@@ -379,6 +379,12 @@
     <ClInclude Include="engine\yo-cluster\ClusterObserver.h">
       <Filter>リソース ファイル\engine\yo-cluster</Filter>
     </ClInclude>
+    <ClInclude Include="tanuki_start_position_picker.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="tanuki_sfen_start_position_picker.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -627,6 +633,9 @@
     <ClCompile Include="engine\yo-cluster\ClusterStrategy.cpp">
       <Filter>リソース ファイル\engine\yo-cluster</Filter>
     </ClCompile>
+    <ClCompile Include="tanuki_sfen_start_position_picker.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\script\readme.txt">
@@ -659,8 +668,6 @@
     <None Include="..\script\bench.py">
       <Filter>script</Filter>
     </None>
-    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime.dll" />
-    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime_providers_shared.dll" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="eval\deep\unpack.cu">

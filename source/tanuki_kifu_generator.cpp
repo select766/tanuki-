@@ -14,12 +14,13 @@
 #include <random>
 #include <sstream>
 
+#include "learn/learn.h"
 #include "misc.h"
 #include "search.h"
 #include "tanuki_kifu_writer.h"
 #include "tanuki_progress_report.h"
+#include "tanuki_sfen_start_position_picker.h"
 #include "thread.h"
-#include "learn/learn.h"
 
 #ifdef abs
 #undef abs
@@ -61,61 +62,6 @@ namespace {
 		"ConvertSfenToLearningDataSearchDepth";
 	constexpr const char* kOptionConvertSfenToLearningDataOutputFileName =
 		"ConvertSfenToLearningDataOutputFileName";
-
-	std::vector<std::string> start_positions;
-	std::uniform_real_distribution<> probability_distribution;
-
-	bool ReadBook() {
-		// 定跡ファイル(というか単なる棋譜ファイル)の読み込み
-		std::string book_file_name = Options[kOptionGeneratorStartposFileName];
-		std::ifstream fs_book;
-		fs_book.open(book_file_name);
-
-		int start_position_max_play = Options[kOptionGeneratorStartPositionMaxPlay];
-
-		if (!fs_book.is_open()) {
-			sync_cout << "Error! : can't read " << book_file_name << sync_endl;
-			return false;
-		}
-
-		sync_cout << "Reading " << book_file_name << sync_endl;
-		std::string line;
-		int line_index = 0;
-		while (!fs_book.eof()) {
-			Thread& thread = *Threads[0];
-			StateInfo state_infos[4096] = {};
-			StateInfo* state = state_infos + 8;
-			Position& pos = thread.rootPos;
-			pos.set_hirate(state, &thread);
-
-			std::getline(fs_book, line);
-			std::istringstream is(line);
-			std::string token;
-			while (pos.game_ply() <= start_position_max_play) {
-				if (!(is >> token)) {
-					break;
-				}
-				if (token == "startpos" || token == "moves") continue;
-
-				Move m = USI::to_move(pos, token);
-				if (!is_ok(m) || !pos.legal(m)) {
-					//  sync_cout << "Error book.sfen , line = " << book_number << " , moves = " <<
-					//  token << endl << rootPos << sync_endl;
-					// →　エラー扱いはしない。
-					break;
-				}
-
-				pos.do_move(m, state[pos.game_ply()]);
-				start_positions.push_back(pos.sfen());
-			}
-
-			if ((++line_index % 1000) == 0) std::cout << ".";
-		}
-		std::cout << std::endl;
-		sync_cout << "Number of lines: " << line_index << sync_endl;
-		sync_cout << "Number of start positions: " << start_positions.size() << sync_endl;
-		return true;
-	}
 
 	template <typename T>
 	T ParseOptionOrDie(const char* name) {
@@ -190,9 +136,10 @@ namespace {
 void Tanuki::GenerateKifu() {
 	std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-	// 定跡の読み込み
-	if (!ReadBook()) {
-		sync_cout << "Failed to read the book." << sync_endl;
+	// 開始局面集を読み込む。
+	std::unique_ptr<StartPositionPicker> start_position_picker;
+	start_position_picker.reset(new SfenStartPositionPicker());
+	if (!start_position_picker->Open()) {
 		return;
 	}
 
@@ -245,8 +192,7 @@ void Tanuki::GenerateKifu() {
 
 	time_t start_time;
 	std::time(&start_time);
-	ASSERT_LV3(start_positions.size());
-	std::uniform_int_distribution<> start_positions_index(0, static_cast<int>(start_positions.size() - 1));
+
 	// スレッド間で共有する
 	std::atomic_int64_t global_position_index;
 	global_position_index = 0;
@@ -269,15 +215,16 @@ void Tanuki::GenerateKifu() {
 			std::make_unique<KifuWriter>(output_file_path);
 		std::mt19937_64 mt19937_64(start_time + thread_index);
 
+		std::vector<StateInfo> state_info(1024);
 		while (global_position_index < num_positions) {
 			++num_records;
+			int ply = 1;
 			Thread& thread = *Threads[thread_index];
-			StateInfo state_info[1024];
 			Position& pos = thread.rootPos;
-			pos.set(start_positions[start_positions_index(mt19937_64)], &state_info[0], &thread);
+			start_position_picker->Pick(pos, state_info[0], thread);
 
 			if (random_move) {
-				RandomMove(pos, state_info, mt19937_64);
+				RandomMove(pos, &state_info[ply++], mt19937_64);
 			}
 
 			std::vector<Learner::PackedSfenValue> records;
@@ -341,7 +288,7 @@ void Tanuki::GenerateKifu() {
 				record.move = pv_move;
 				records.push_back(record);
 
-				pos.do_move(pv_move, state_info[pos.game_ply()]);
+				pos.do_move(pv_move, state_info[ply++]);
 				// 差分計算のためevaluate()を呼び出す
 				Eval::evaluate(pos);
 
