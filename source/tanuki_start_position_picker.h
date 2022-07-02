@@ -26,9 +26,9 @@ namespace Tanuki {
 		/// <para>複数スレッドから同時に呼ばれるため、内部的にロックを取ることが要求される。</para>
 		/// </summary>
 		/// <param name="position"></param>
-		/// <param name="state_info"></param>
+		/// <param name="state_info">StateInfoへのポインターの参照。Pick()が呼ばれたあと、未使用のStateInfoまでインクリメントされる。</param>
 		/// <param name="thread"></param>
-		virtual void Pick(Position& position, StateInfo& state_info, Thread& thread) = 0;
+		virtual void Pick(Position& position, StateInfo*& state_info, Thread& thread) = 0;
 	};
 }
 

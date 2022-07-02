@@ -385,6 +385,9 @@
     <ClInclude Include="tanuki_sfen_start_position_picker.h">
       <Filter>リソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="tanuki_s_book_black_start_position_picker.h">
+      <Filter>リソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="movegen.cpp">
@@ -634,6 +637,9 @@
       <Filter>リソース ファイル\engine\yo-cluster</Filter>
     </ClCompile>
     <ClCompile Include="tanuki_sfen_start_position_picker.cpp">
+      <Filter>リソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="tanuki_s_book_black_start_position_picker.cpp">
       <Filter>リソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>

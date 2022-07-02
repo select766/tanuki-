@@ -581,6 +581,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalOptions>/source-charset:utf-8 /execution-charset:utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation Condition="'$(Configuration)|$(Platform)'=='Debug-NNUE-LEARN|x64'">true</MultiProcessorCompilation>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -668,6 +669,7 @@
     <ClInclude Include="tanuki_filesystem.h" />
     <ClInclude Include="tanuki_sfen_start_position_picker.h" />
     <ClInclude Include="tanuki_start_position_picker.h" />
+    <ClInclude Include="tanuki_s_book_black_start_position_picker.h" />
     <ClInclude Include="testcmd\unit_test.h" />
     <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="tanuki_analysis.h" />
@@ -748,6 +750,7 @@
     <ClCompile Include="movepick.cpp" />
     <ClCompile Include="sqlite\sqlite3.c" />
     <ClCompile Include="tanuki_sfen_start_position_picker.cpp" />
+    <ClCompile Include="tanuki_s_book_black_start_position_picker.cpp" />
     <ClCompile Include="testcmd\benchmark.cpp" />
     <ClCompile Include="testcmd\mate_test_cmd.cpp" />
     <ClCompile Include="testcmd\normal_test_cmd.cpp" />

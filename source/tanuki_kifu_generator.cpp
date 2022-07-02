@@ -19,6 +19,7 @@
 #include "search.h"
 #include "tanuki_kifu_writer.h"
 #include "tanuki_progress_report.h"
+#include "tanuki_s_book_black_start_position_picker.h"
 #include "tanuki_sfen_start_position_picker.h"
 #include "thread.h"
 
@@ -56,12 +57,15 @@ namespace {
 	constexpr const char* kOptionGeneratorMaxMultiPVMoves = "GeneratorMaxMultiPVMoves";
 	constexpr const char* kOptionGeneratorMaxEvalDiff = "GeneratorMaxEvalDiff";
 	constexpr const char* kOptionGeneratorRandomMove = "GeneratorRandomMove";
+	constexpr const char* kOptionGeneratorStartposType = "GeneratorStartposType";
 	constexpr const char* kOptionConvertSfenToLearningDataInputSfenFileName =
 		"ConvertSfenToLearningDataInputSfenFileName";
 	constexpr const char* kOptionConvertSfenToLearningDataSearchDepth =
 		"ConvertSfenToLearningDataSearchDepth";
 	constexpr const char* kOptionConvertSfenToLearningDataOutputFileName =
 		"ConvertSfenToLearningDataOutputFileName";
+	constexpr const char* kValueSfen = "sfen";
+	constexpr const char* kValueSBookBlack = "s-book_black";
 
 	template <typename T>
 	T ParseOptionOrDie(const char* name) {
@@ -83,6 +87,7 @@ void Tanuki::InitializeGenerator(USI::OptionsMap& o) {
 	o[kOptionGeneratorSearchDepth] << Option(8, 1, MAX_PLY);
 	o[kOptionGeneratorKifuTag] << Option("default_tag");
 	o[kOptionGeneratorStartposFileName] << Option("startpos.sfen");
+	o[kOptionGeneratorStartposType] << Option(std::vector<std::string>({ kValueSfen, kValueSBookBlack }), kValueSfen);
 	o[kOptionGeneratorValueThreshold] << Option(VALUE_MATE, 0, VALUE_MATE);
 	o[kOptionGeneratorOptimumNodesSearched] << Option("0");
 	o[kOptionGeneratorMeasureDepth] << Option(false);
@@ -138,7 +143,18 @@ void Tanuki::GenerateKifu() {
 
 	// 開始局面集を読み込む。
 	std::unique_ptr<StartPositionPicker> start_position_picker;
-	start_position_picker.reset(new SfenStartPositionPicker());
+	auto startpos_type = Options[kOptionGeneratorStartposType];
+	if (startpos_type == kValueSfen) {
+		start_position_picker.reset(new SfenStartPositionPicker());
+	}
+	else if (startpos_type == kValueSBookBlack) {
+		start_position_picker.reset(new SBookBlackStartPositionPicker());
+	}
+	else {
+		sync_cout << "info string Invalid startpos_type. startpos_type=" << startpos_type << sync_endl;
+		return;
+	}
+
 	if (!start_position_picker->Open()) {
 		return;
 	}
@@ -218,13 +234,13 @@ void Tanuki::GenerateKifu() {
 		std::vector<StateInfo> state_info(1024);
 		while (global_position_index < num_positions) {
 			++num_records;
-			int ply = 1;
 			Thread& thread = *Threads[thread_index];
 			Position& pos = thread.rootPos;
-			start_position_picker->Pick(pos, state_info[0], thread);
+			StateInfo* state_info_ptr = &state_info[0];
+			start_position_picker->Pick(pos, state_info_ptr, thread);
 
 			if (random_move) {
-				RandomMove(pos, &state_info[ply++], mt19937_64);
+				RandomMove(pos, state_info_ptr++, mt19937_64);
 			}
 
 			std::vector<Learner::PackedSfenValue> records;
@@ -288,7 +304,7 @@ void Tanuki::GenerateKifu() {
 				record.move = pv_move;
 				records.push_back(record);
 
-				pos.do_move(pv_move, state_info[ply++]);
+				pos.do_move(pv_move, *state_info_ptr++);
 				// 差分計算のためevaluate()を呼び出す
 				Eval::evaluate(pos);
 

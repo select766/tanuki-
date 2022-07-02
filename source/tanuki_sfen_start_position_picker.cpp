@@ -19,7 +19,7 @@ bool SfenStartPositionPicker::Open()
 	std::ifstream fs_book;
 	fs_book.open(book_file_name);
 
-	int start_position_max_play = Options[kOptionGeneratorStartPositionMaxPlay];
+	int start_position_max_play = static_cast<int>(Options[kOptionGeneratorStartPositionMaxPlay]);
 
 	if (!fs_book.is_open()) {
 		sync_cout << "Error! : can't read " << book_file_name << sync_endl;
@@ -73,10 +73,10 @@ bool SfenStartPositionPicker::Open()
 	return true;
 }
 
-void SfenStartPositionPicker::Pick(Position& position, StateInfo& state_info, Thread& thread)
+void SfenStartPositionPicker::Pick(Position& position, StateInfo*& state_info, Thread& thread)
 {
 	std::lock_guard<std::mutex> lock(mutex_);
-	position.set(*start_positions_iterator_++, &state_info, &thread);
+	position.set(*start_positions_iterator_++, state_info++, &thread);
 	if (start_positions_iterator_ == start_positions_.end()) {
 		start_positions_iterator_ = start_positions_.begin();
 	}
