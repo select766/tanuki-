@@ -349,15 +349,17 @@ ifeq (,)
 		learn/learner.cpp                                                      \
 		learn/learning_tools.cpp                                               \
 		learn/multi_think.cpp                                                  \
-		tanuki_book.cpp                                                        \
-		tanuki_kifu_generator.cpp                                              \
-		tanuki_kifu_shuffler.cpp                                               \
-		tanuki_progress_report.cpp                                             \
-		tanuki_kifu_writer.cpp                                                 \
-		tanuki_kifu_reader.cpp                                                 \
-		tanuki_progress.cpp                                                    \
 		tanuki_analysis.cpp                                                    \
+		tanuki_book.cpp                                                        \
 		tanuki_filesystem.cpp                                                  \
+		tanuki_kifu_generator.cpp                                              \
+		tanuki_kifu_reader.cpp                                                 \
+		tanuki_kifu_shuffler.cpp                                               \
+		tanuki_kifu_writer.cpp                                                 \
+		tanuki_progress_report.cpp                                             \
+		tanuki_progress.cpp                                                    \
+		tanuki_s_book_black_start_position_picker.cpp                          \
+		tanuki_sfen_start_position_picker.cpp                                  \
 		csa.cpp
 endif
 
