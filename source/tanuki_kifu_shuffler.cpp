@@ -165,35 +165,35 @@ void Tanuki::ShuffleKifu() {
         sync_cout << "info string " << file_path << sync_endl;
 
         // ファイル全体を読み込む
-        FILE* input_file = std::fopen(file_path.c_str(), "rb");
-        if (input_file == nullptr) {
+        FILE* file = std::fopen(file_path.c_str(), "rb");
+        if (file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
             return;
         }
-        _fseeki64(input_file, 0, SEEK_END);
-        int64_t size = _ftelli64(input_file);
-        _fseeki64(input_file, 0, SEEK_SET);
+        _fseeki64(file, 0, SEEK_END);
+        int64_t size = _ftelli64(file);
+        _fseeki64(file, 0, SEEK_SET);
         std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
-        std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), input_file);
-        std::fclose(input_file);
-        input_file = nullptr;
+        std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), file);
+        std::fclose(file);
+        file = nullptr;
 
         // 棋譜全体をシャッフルする
         std::shuffle(records.begin(), records.end(), mt);
 
         // 棋譜全体を上書きして書き戻す
-        input_file = std::fopen(file_path.c_str(), "wb");
-        if (input_file == nullptr) {
+        file = std::fopen(file_path.c_str(), "wb");
+        if (file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
         }
-        if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), input_file) !=
+        if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), file) !=
             records.size()) {
             sync_cout << "info string Failed to write records to a kifu file. " << file_path
                 << sync_endl;
             return;
         }
-        std::fclose(input_file);
-        input_file = nullptr;
+        std::fclose(file);
+        file = nullptr;
     }
 
     GlobalOptions = old_global_options;
