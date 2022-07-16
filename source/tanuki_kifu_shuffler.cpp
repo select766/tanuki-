@@ -1,5 +1,3 @@
-#pragma optimize( "", off )
-
 #include "tanuki_kifu_shuffler.h"
 #include "config.h"
 
@@ -8,6 +6,7 @@
 #include <cstdio>
 #include <ctime>
 #include <direct.h>
+#include <filesystem>
 #include <omp.h>
 #include <random>
 
@@ -162,41 +161,62 @@ void Tanuki::ShuffleKifu() {
 
     sync_cout << "info string Starting shuffling..." << sync_endl;
 
+    // 出力ファイルを準備する。
+    FILE* output_file = nullptr;
+    {
+        char file_path[_MAX_PATH];
+        sprintf(file_path, "%s/shuffled.bin", shuffled_kifu_dir.c_str());
+        output_file = std::fopen(file_path, "wb");
+
+        if (std::setvbuf(output_file, nullptr, _IOFBF, std::numeric_limits<int>::max())) {
+            sync_cout << "info string Failed to set the output buffer: output_file_path_="
+                << file_path << sync_endl;
+            return;
+        }
+    }
+
     // 各ファイルをシャッフルする
     for (const auto& file_path : file_paths) {
         sync_cout << "info string " << file_path << sync_endl;
 
         // ファイル全体を読み込む
-        FILE* file = std::fopen(file_path.c_str(), "rb");
-        if (file == nullptr) {
+        FILE* input_file = std::fopen(file_path.c_str(), "rb");
+        if (input_file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
             return;
         }
-        _fseeki64(file, 0, SEEK_END);
-        int64_t size = _ftelli64(file);
-        _fseeki64(file, 0, SEEK_SET);
+
+        if (std::setvbuf(input_file, nullptr, _IOFBF, std::numeric_limits<int>::max())) {
+            sync_cout << "info string Failed to set the output buffer: input_file="
+                << file_path << sync_endl;
+            return;
+        }
+
+        _fseeki64(input_file, 0, SEEK_END);
+        int64_t size = _ftelli64(input_file);
+        _fseeki64(input_file, 0, SEEK_SET);
         std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
-        std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), file);
-        std::fclose(file);
-        file = nullptr;
+        std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), input_file);
+        std::fclose(input_file);
+        input_file = nullptr;
 
         // 棋譜全体をシャッフルする
         std::shuffle(records.begin(), records.end(), mt);
 
-        // 棋譜全体を上書きして書き戻す
-        file = std::fopen(file_path.c_str(), "wb");
-        if (file == nullptr) {
-            sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
-        }
-        if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), file) !=
+        // シャッフル済みファイルを削除する
+        std::filesystem::remove(file_path);
+
+        // 出力ファイルに書き出す
+        if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), output_file) !=
             records.size()) {
             sync_cout << "info string Failed to write records to a kifu file. " << file_path
                 << sync_endl;
             return;
         }
-        std::fclose(file);
-        file = nullptr;
     }
+
+    std::fclose(output_file);
+    output_file = nullptr;
 
     GlobalOptions = old_global_options;
 }
