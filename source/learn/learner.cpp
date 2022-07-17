@@ -1685,16 +1685,6 @@ void LearnerThink::calc_loss(size_t thread_id, u64 done)
 			// 複数のプロセスでlearnコマンドを実行した場合、NUMAノード0しか使われなくなる問題への対処
 			WinProcGroup::bindThisThread(thread_id);
 
-			// これ、C++ではループごとに新たなpsのインスタンスをちゃんとcaptureするのだろうか.. →　するようだ。
-			auto th = Threads[thread_id];
-			auto& pos = th->rootPos;
-			StateInfo si;
-			if (pos.set_from_packed_sfen(ps.sfen ,&si, th).is_not_ok())
-			{
-				// 運悪くrmse計算用のsfenとして、不正なsfenを引いてしまっていた。
-				cout << "Error! : illegal packed sfen " << pos.sfen() << endl;
-			}
-
 			// 各タスク内のローカルな総和
 			double local_test_sum_cross_entropy_eval = 0.0;
 			double local_test_sum_cross_entropy_win = 0.0;
