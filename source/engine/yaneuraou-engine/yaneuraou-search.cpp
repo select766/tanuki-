@@ -1408,7 +1408,11 @@ namespace {
 				return value_from_tt(draw_value(draw_type, pos.side_to_move()), ss->ply);
 
 			// 最大手数を超えている、もしくは停止命令が来ている。
-			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY))
+			if (Threads.stop.load(std::memory_order_relaxed) || (ss->ply >= MAX_PLY) ||
+				// 目標としている探索ノード数の10倍を超えたら、さすがに何かがおかしいので止める。
+				// sfen 2lg1p1+Rl/3p1kl2/5b1G1/+R1pSps1pp/K1n+B5/1P1N2P1P/P2P5/2SG5/L2G5 w N3Psn4p 144
+				// で、depth 18から進まなかった。王手延長その他で延長しまくっているのが原因だと思われる。
+				thisThread->nodes.load(std::memory_order_relaxed) > Limits.nodesLimit * 10)
 				return draw_value(REPETITION_DRAW, pos.side_to_move());
 
 			if (pos.game_ply() > Limits.max_game_ply)
@@ -2676,7 +2680,8 @@ namespace {
 			// 停止シグナルが来たときは、探索の結果の値は信頼できないので、
 			// best moveの更新をせず、PVや置換表を汚さずに終了する。
 
-			if (Threads.stop.load(std::memory_order_relaxed))
+			if (Threads.stop.load(std::memory_order_relaxed) ||
+				thisThread->nodes.load(std::memory_order_relaxed) > Limits.nodesLimit * 10)
 				return VALUE_ZERO;
 
 			// -----------------------
@@ -4065,6 +4070,8 @@ namespace Learner
 
 		// 探索の初期化
 		init_for_search(pos, ss , pv, /* qsearch = */ false);
+
+		Limits.nodesLimit = nodesLimit;
 
 		// this_threadに関連する変数のaliasを用意。
 		// ※ "th->"と書かずに済むのであれば、Stockfishのsearch()のコードをコピペできるので。
