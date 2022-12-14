@@ -20,6 +20,8 @@ using Learner::PackedSfenValue;
 
 namespace {
     static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
+    static const constexpr char* kShuffledMinPly = "ShuffledMinPly";
+    static const constexpr char* kShuffledMaxPly = "ShuffledMaxPly";
     static const constexpr char* kApplyQSearch = "ApplyQSearch";
     // シャッフル後のファイル数
     // Windowsでは一度に512個までのファイルしか開けないため
@@ -30,6 +32,8 @@ namespace {
 
 void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
+    o[kShuffledMinPly] << USI::Option(32, 1, 10000);
+    o[kShuffledMaxPly] << USI::Option(96, 1, 10000);
     o[kApplyQSearch] << USI::Option(false);
 }
 
@@ -54,6 +58,8 @@ void Tanuki::ShuffleKifu() {
 
     std::string kifu_dir = Options["KifuDir"];
     std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
+    int min_ply = Options[kShuffledMinPly];
+    int max_ply = Options[kShuffledMaxPly];
     bool apply_qsearch = Options[kApplyQSearch];
 
     sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
@@ -81,12 +87,20 @@ void Tanuki::ShuffleKifu() {
     std::mt19937_64 mt(std::time(nullptr));
     std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
     int64_t num_records = 0;
+    int current_ply = 1;
     for (;;) {
         std::vector<PackedSfenValue> records;
         {
             PackedSfenValue record;
             while (static_cast<int>(records.size()) < kMaxPackedSfenValues && reader->Read(record)) {
-                records.push_back(record);
+                if (min_ply <= current_ply && current_ply <= max_ply) {
+                    records.push_back(record);
+                }
+
+                // 最後の局面を読み込んだら、手数をリセットする。
+                if (record.last_position) {
+                    current_ply = 1;
+                }
             }
         }
 
