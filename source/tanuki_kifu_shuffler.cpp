@@ -101,6 +101,9 @@ void Tanuki::ShuffleKifu() {
                 if (record.last_position) {
                     current_ply = 1;
                 }
+                else {
+                    ++current_ply;
+                }
             }
         }
 
