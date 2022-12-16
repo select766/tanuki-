@@ -32,8 +32,8 @@ namespace {
 
 void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
-    o[kShuffledMinPly] << USI::Option(32, 1, 10000);
-    o[kShuffledMaxPly] << USI::Option(96, 1, 10000);
+    o[kShuffledMinPly] << USI::Option(1, 1, std::numeric_limits<u64>::max() / 2);
+    o[kShuffledMaxPly] << USI::Option(std::numeric_limits<u64>::max() / 2, 1, std::numeric_limits<u64>::max() / 2);
     o[kApplyQSearch] << USI::Option(false);
 }
 
@@ -58,8 +58,8 @@ void Tanuki::ShuffleKifu() {
 
     std::string kifu_dir = Options["KifuDir"];
     std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
-    int min_ply = Options[kShuffledMinPly];
-    int max_ply = Options[kShuffledMaxPly];
+    u64 min_ply = Options[kShuffledMinPly];
+    u64 max_ply = Options[kShuffledMaxPly];
     bool apply_qsearch = Options[kApplyQSearch];
 
     sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
@@ -87,7 +87,7 @@ void Tanuki::ShuffleKifu() {
     std::mt19937_64 mt(std::time(nullptr));
     std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
     int64_t num_records = 0;
-    int current_ply = 1;
+    u64 current_ply = 1;
     for (;;) {
         std::vector<PackedSfenValue> records;
         {
