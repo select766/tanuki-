@@ -9,7 +9,7 @@
 
 namespace Tanuki {
 	void InitializeShuffler(USI::OptionsMap& o);
-	void ShuffleKifu();
+	void ShuffleKifu(Position& position);
 };
 
 #endif

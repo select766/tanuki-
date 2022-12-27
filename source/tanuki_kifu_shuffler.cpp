@@ -14,6 +14,7 @@
 #include "misc.h"
 #include "tanuki_kifu_reader.h"
 #include "tanuki_kifu_writer.h"
+#include "tanuki_progress.h"
 #include "thread.h"
 
 using Learner::PackedSfenValue;
@@ -22,6 +23,8 @@ namespace {
     static const constexpr char* kShuffledKifuDir = "ShuffledKifuDir";
     static const constexpr char* kShuffledMinPly = "ShuffledMinPly";
     static const constexpr char* kShuffledMaxPly = "ShuffledMaxPly";
+    static const constexpr char* kShuffledMinProgress = "ShuffledMinProgress";
+    static const constexpr char* kShuffledMaxProgress = "ShuffledMaxProgress";
     static const constexpr char* kApplyQSearch = "ApplyQSearch";
     // シャッフル後のファイル数
     // Windowsでは一度に512個までのファイルしか開けないため
@@ -34,10 +37,12 @@ void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
     o[kShuffledKifuDir] << USI::Option("kifu_shuffled");
     o[kShuffledMinPly] << USI::Option(1, 1, std::numeric_limits<u64>::max() / 2);
     o[kShuffledMaxPly] << USI::Option(std::numeric_limits<u64>::max() / 2, 1, std::numeric_limits<u64>::max() / 2);
+    o[kShuffledMinProgress] << USI::Option("0.0");
+    o[kShuffledMaxProgress] << USI::Option("1.0");
     o[kApplyQSearch] << USI::Option(false);
 }
 
-void Tanuki::ShuffleKifu() {
+void Tanuki::ShuffleKifu(Position& position) {
     GlobalOptions_ old_global_options = GlobalOptions;
     GlobalOptions.use_eval_hash = false;
     GlobalOptions.use_hash_probe = false;
@@ -60,6 +65,8 @@ void Tanuki::ShuffleKifu() {
     std::string shuffled_kifu_dir = Options[kShuffledKifuDir];
     u64 min_ply = Options[kShuffledMinPly];
     u64 max_ply = Options[kShuffledMaxPly];
+    double min_progress = std::atof(static_cast<std::string>(Options[kShuffledMinProgress]).c_str());
+    double max_progress = std::atof(static_cast<std::string>(Options[kShuffledMaxProgress]).c_str());
     bool apply_qsearch = Options[kApplyQSearch];
 
     sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
@@ -88,12 +95,24 @@ void Tanuki::ShuffleKifu() {
     std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
     int64_t num_records = 0;
     u64 current_ply = 1;
+
+    Tanuki::Progress progress_estimator;
+    if (!progress_estimator.Load()) {
+        sync_cout << "info string Failed to load the progress file..." << sync_endl;
+        std::exit(1);
+    }
+
     for (;;) {
         std::vector<PackedSfenValue> records;
         {
             PackedSfenValue record;
             while (static_cast<int>(records.size()) < kMaxPackedSfenValues && reader->Read(record)) {
-                if (min_ply <= current_ply && current_ply <= max_ply) {
+                StateInfo state_info = {};
+                position.set_from_packed_sfen(record.sfen, &state_info, Threads[0]);
+                double progress = progress_estimator.Estimate(position);
+
+                if (min_ply <= current_ply && current_ply <= max_ply &&
+                    min_progress <= progress && progress <= max_progress) {
                     records.push_back(record);
                 }
 
