@@ -1553,6 +1553,9 @@ struct LearnerThink: public MultiThink
 	// 学習の反復回数のカウンター
 	u64 epoch = 0;
 
+	// 最大epoch数
+	u64 max_epochs = std::numeric_limits<u64>::max() / 2;
+
 	// ミニバッチサイズのサイズ。必ずこのclassを使う側で設定すること。
 	u64 mini_batch_size = 1000*1000;
 
@@ -1918,6 +1921,12 @@ void LearnerThink::thread_worker(size_t thread_id)
 				}
 #endif
 				++epoch;
+
+				// 最大epochを超えたら停止する。
+				if (epoch >= max_epochs) {
+					stop_flag = true;
+					break;
+				}
 
 				// 10億局面ごとに1回保存、ぐらいの感じで。
 
@@ -2546,6 +2555,9 @@ void learn(Position&, istringstream& is)
 	// ループ回数(この回数だけ棋譜ファイルを読み込む)
 	int loop = 1;
 
+	// 最大epoch数
+	u64 max_epochs = std::numeric_limits<u64>::max() / 2;
+
 	// 棋譜ファイル格納フォルダ(ここから相対pathで棋譜ファイルを取得)
 	string base_dir;
 
@@ -2646,6 +2658,9 @@ void learn(Position&, istringstream& is)
 
 		// ループ回数の指定
 		else if (option == "loop")      is >> loop;
+
+		// 最大epoch数の指定
+		else if (option == "max_epochs")is >> max_epochs;
 
 		// 棋譜ファイル格納フォルダ(ここから相対pathで棋譜ファイルを取得)
 		else if (option == "basedir")   is >> base_dir;
@@ -2786,6 +2801,7 @@ void learn(Position&, istringstream& is)
 	}
 
 	cout << "loop              : " << loop << endl;
+	cout << "max_epochs        : " << max_epochs << endl;
 	cout << "eval_limit        : " << eval_limit << endl;
 	cout << "save_only_once    : " << (save_only_once ? "true" : "false") << endl;
 	cout << "no_shuffle        : " << (no_shuffle ? "true" : "false") << endl;
@@ -2895,6 +2911,7 @@ void learn(Position&, istringstream& is)
 	learn_think.eval_save_interval = eval_save_interval;
 	learn_think.loss_output_interval = loss_output_interval;
 	learn_think.mirror_percentage = mirror_percentage;
+	learn_think.max_epochs = max_epochs;
 
 	// 局面ファイルをバックグラウンドで読み込むスレッドを起動
 	// (これを開始しないとmseの計算が出来ない。)
