@@ -1925,6 +1925,7 @@ void LearnerThink::thread_worker(size_t thread_id)
 				// 最大epochを超えたら停止する。
 				if (epoch >= max_epochs) {
 					stop_flag = true;
+					sr.stop_flag = true;
 					break;
 				}
 
