@@ -1129,7 +1129,16 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 
 	// 実際の勝率を補正項として使っている。
 	// これがelmo(WCSC27)のアイデアで、現代のオーパーツ。
-	const double grad = (1 - lambda) * (eval_winrate - t) + lambda * (eval_winrate - teacher_winrate);
+
+	// 教師局面の勝率teacher_winrateを評価値teacher_evalに変換
+	const double teacher_eval = double(-600 * std::log((1 / winning_percentage(deep)) - 1));
+	// lambdaの代わりにGaussian_lambdaを使用。
+	// Gaussian_lambda = lambda * exp(-x^2/2σ^2)
+	// 従来のelmo方式のlambdaをガウス関数で書き換えて、評価値に対応して滑らかに変動させる( x = 教師の評価値 、 σ = 標準偏差 )
+	// 2σ^2 = 2 * 1000 * 1000  (σ = 1000) 標準偏差σを大きくすると、落ち幅が小さいなだらかな曲線になる。
+	const double Gaussian_lambda = double(lambda * exp(double((-1 * teacher_eval * teacher_eval) / (2 * 1000 * 1000))));
+
+	const double grad = (1 - Gaussian_lambda) * (eval_winrate - t) + Gaussian_lambda * (eval_winrate - teacher_winrate);
 
 	return grad;
 }
@@ -1151,7 +1160,11 @@ double calc_grad(Value deep, Value shallow , const PackedSfenValue& psv)
 	// 深い探索での評価値がELMO_LAMBDA_LIMITを超えているならELMO_LAMBDAではなくELMO_LAMBDA2を適用する。
 	const double lambda = (abs(deep) >= ELMO_LAMBDA_LIMIT) ? ELMO_LAMBDA2 : ELMO_LAMBDA;
 
-	const double m = (1.0 - lambda) * t + lambda * p;
+	const double teacher_eval = double(-600 * std::log((1 / winning_percentage(deep)) - 1));
+
+	const double Gaussian_lambda = double(lambda * exp(double((-1 * teacher_eval * teacher_eval) / (2 * 1000 * 1000))));
+
+	const double m = (1.0 - Gaussian_lambda) * t + Gaussian_lambda * p;
 
 	cross_entropy_eval =
 			(-p * std::log(q + epsilon) - (1.0 - p) * std::log(1.0 - q + epsilon)) * weight;
