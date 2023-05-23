@@ -9,8 +9,8 @@
 #
 # 2. Execute the following command.
 # - python -m pip install --upgrade pip
-# - pip install numpy scipy hyperopt pymongo networkx pandas sklearn matplotlib
-# - pip install numpy scipy hyperopt pymongo networkx pandas sklearn matplotlib --upgrade
+# - pip install numpy scipy hyperopt pymongo networkx pandas scikit-learn matplotlib
+# - pip install numpy scipy hyperopt pymongo networkx pandas scikit-learn matplotlib --upgrade
 
 from hyperopt import fmin, tpe, hp, rand, Trials
 from hyperopt_state import HyperoptState
@@ -167,6 +167,10 @@ def function(args):
         str(COMMANDLINE_ARGS.num_searched_nodes),
         "--nodes2",
         str(COMMANDLINE_ARGS.num_searched_nodes),
+        "--depth1",
+        str(COMMANDLINE_ARGS.depth),
+        "--depth2",
+        str(COMMANDLINE_ARGS.depth),
         "--num_numa_nodes",
         str(COMMANDLINE_ARGS.num_numa_nodes),
         "--num_book_moves1",
@@ -301,6 +305,12 @@ def main():
         type=int,
         default=5000000,
         help="Number of searched nodes.",
+    )
+    parser.add_argument(
+        "--depth",
+        type=int,
+        default=0,
+        help="Searched depth (0=inf).",
     )
     parser.add_argument(
         "--num_numa_nodes", type=int, default=2, help="Number of the NUMA nodes."
