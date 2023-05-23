@@ -252,19 +252,20 @@ def function(args):
         STATE.save(STATE_STORE_PATH)
         print("Saved state...", flush=True)
 
-    # Show the histogram.
-    hist = [0] * (COMMANDLINE_ARGS.num_threads + 1)
-    max_win = 0
-    for record in STATE.iteration_logs:
-        win = int(record["win"])
-        hist[win] += 1
-        max_win = max(max_win, hist[win])
+    if COMMANDLINE_ARGS.show_histogram:
+        # Show the histogram.
+        hist = [0] * (COMMANDLINE_ARGS.num_games + 1)
+        max_win = 0
+        for record in STATE.iteration_logs:
+            win = int(record["win"])
+            hist[win] += 1
+            max_win = max(max_win, hist[win])
 
-    for win, count in enumerate(hist):
-        print(
-            "{0:4d} ".format(win) + "*" * int(count * HISTOGRAM_WIDTH / max_win),
-            flush=True,
-        )
+        for win, count in enumerate(hist):
+            print(
+                "{0:4d} ".format(win) + "*" * int(count * HISTOGRAM_WIDTH / max_win),
+                flush=True,
+            )
 
     return -ratio
 
@@ -375,6 +376,11 @@ def main():
         type=str,
         default=r"C:\home\nodchip\hakubishin-private\exe\records2016_10818.sfen",
         help="Sfen file path.",
+    )
+    parser.add_argument(
+        "--show_histogram",
+        action='store_true',
+        help='foo the bars before frobbling'
     )
 
     COMMANDLINE_ARGS = parser.parse_args()
