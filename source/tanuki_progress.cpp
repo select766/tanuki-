@@ -63,6 +63,7 @@ bool Tanuki::Progress::Load() {
 	return true;
 }
 
+#ifdef EVAL_LEARN
 bool Tanuki::Progress::Save() {
 	std::string file_path = (std::string)Options[kProgressFilePath];
 	std::ofstream ofs(file_path, std::ios_base::out | std::ios_base::binary);
@@ -270,6 +271,7 @@ bool Tanuki::Progress::Learn() {
 
 	return true;
 }
+#endif // EVAL_LEARN
 
 double Tanuki::Progress::Estimate(const Position& pos) {
 	Square sq_bk = pos.king_square(BLACK);

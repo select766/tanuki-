@@ -1,4 +1,4 @@
-#ifndef _TANUKI_PROGRESS_H
+﻿#ifndef _TANUKI_PROGRESS_H
 #define _TANUKI_PROGRESS_H
 
 #include <map>
@@ -14,8 +14,10 @@ namespace Tanuki {
 	public:
 		static bool Initialize(USI::OptionsMap& o);
 		bool Load();
+#ifdef EVAL_LEARN
 		bool Save();
 		bool Learn();
+#endif // EVAL_LEARN
 		double Estimate(const Position& pos);
 
 	private:

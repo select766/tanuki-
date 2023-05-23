@@ -1,4 +1,5 @@
-﻿#include "tanuki_s_book_black_start_position_picker.h"
+﻿#ifdef EVAL_LEARN
+#include "tanuki_s_book_black_start_position_picker.h"
 
 #include "thread.h"
 #include "usi.h"
@@ -80,3 +81,4 @@ void SBookBlackStartPositionPicker::Pick(Position& position, StateInfo*& state_i
 	// 各局面に 1 手以上指し手が登録されていると仮定する
 	ASSERT_LV3(book_move_iterator_ != book_iterator_->second->end());
 }
+#endif // EVAL_LEARN

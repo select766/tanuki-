@@ -1,4 +1,5 @@
-﻿#include "tanuki_sfen_start_position_picker.h"
+﻿#ifdef EVAL_LEARN
+#include "tanuki_sfen_start_position_picker.h"
 
 #include "thread.h"
 #include "usi.h"
@@ -81,3 +82,4 @@ void SfenStartPositionPicker::Pick(Position& position, StateInfo*& state_info, T
 		start_positions_iterator_ = start_positions_.begin();
 	}
 }
+#endif // EVAL_LEARN
