@@ -115,6 +115,14 @@ class YaneuraouBuilder(object):
             f.write("PARAM_DEFINE PARAM_QSEARCH_MATE1 = 1;\n")
             f.write("PARAM_DEFINE PARAM_SEARCH_MATE1 = 1;\n")
             f.write("PARAM_DEFINE PARAM_WEAK_MATE_PLY = 1;\n")
+            f.write("PARAM_DEFINE PARAM_NULL_MOVE_MARGIN2 = 22;\n")
+            f.write("PARAM_DEFINE MOVE_PICKER_Q_PARAM1 = 32;\n")
+            f.write("PARAM_DEFINE MOVE_PICKER_Q_PARAM2 = 32;\n")
+            f.write("PARAM_DEFINE MOVE_PICKER_Q_PARAM3 = 32;\n")
+            f.write("PARAM_DEFINE MOVE_PICKER_Q_PARAM4 = 32;\n")
+            f.write("PARAM_DEFINE MOVE_PICKER_Q_PARAM5 = 32;\n")
+            f.write("PARAM_DEFINE AB_TEST1 = 1;\n")
+            f.write("PARAM_DEFINE AB_TEST2 = 1;\n")
             f.write("#endif\n")
 
     def kill(self, process_name):
