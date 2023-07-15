@@ -11,6 +11,8 @@
 # YANEURAOU_ENGINE_NNUE          : NNUE型評価関数(halfKP256),標準NNUE型
 # YANEURAOU_ENGINE_NNUE_KP256    : NNUE型評価関数(KP256)
 # YANEURAOU_ENGINE_NNUE_HALFKPE9 : NNUE型評価関数(halfKPE9)
+# YANEURAOU_ENGINE_NNUE_HALFKP_512X2_16_32 : NNUE型評価関数(halfkp_512x2-16-32)
+# YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32 : NNUE型評価関数(halfkp_1024x2-8-32)
 # YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32 : NNUE型評価関数(halfkp_vm_256x2-32-32)
 # YANEURAOU_ENGINE_KPPT          : KPPT型評価関数
 # YANEURAOU_ENGINE_KPP_KKPT      : KPP_KKPT型評価関数
@@ -19,13 +21,20 @@
 # YANEURAOU_MATE_ENGINE          : やねうら王 詰将棋solver (2020/12/29～)
 # USER_ENGINE                    : USER定義エンジン
 
+# YANEURAOU_ENGINE_DEEP_TENSOR_RT_UBUNTU : ふかうら王(dlshogi互換エンジン) , TensorRT使用 , Ubuntu用build。
+#                                  ビルドを確認したDocker image → nvcr.io/nvidia/tensorrt:22.12-py3
+
+
 YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_KP256
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKPE9
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKP_512X2_16_32
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_KPP_KKPT
 #YANEURAOU_EDITION = YANEURAOU_ENGINE_MATERIAL
+#YANEURAOU_EDITION = YANEURAOU_ENGINE_DEEP_TENSOR_RT_UBUNTU
 #YANEURAOU_EDITION = TANUKI_MATE_ENGINE
 #YANEURAOU_EDITION = YANEURAOU_MATE_ENGINE
 #YANEURAOU_EDITION = USER_ENGINE
@@ -346,6 +355,7 @@ ifeq (,)
 		book/makebook2015.cpp                                                  \
 		book/makebook2019.cpp                                                  \
 		book/makebook2021.cpp                                                  \
+		book/makebook2023.cpp                                                  \
 		learn/learner.cpp                                                      \
 		learn/learning_tools.cpp                                               \
 		learn/multi_think.cpp                                                  \
@@ -392,13 +402,18 @@ ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
 		# とりあえず"YANEURAOU_ENGINE_DEEP"というシンボルを定義してやる。
 		CPPFLAGS += -DYANEURAOU_ENGINE_DEEP
 
-		ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_TENSOR_RT)
+		ifneq (,$(findstring TENSOR_RT,$(YANEURAOU_EDITION)))
 			CPPFLAGS += -DTENSOR_RT
 			NVCC_CPPFLAGS += -DTENSOR_RT
 			LDFLAGS += -lnvinfer -lnvonnxparser -lcudart
-			# CPPFLAGS += -I/usr/local/cuda/include
-			# LDFLAGS += -L/usr/local/cuda/lib64
-			# LDFLAGS += -L/usr/local/cuda/lib64/stubs
+
+			# YANEURAOU_EDITIONのなかにUBUNTUと言う文字列が含まれているならlinkerなどの設定をしてやる。
+			ifneq (,$(findstring UBUNTU,$(YANEURAOU_EDITION)))
+				CPPFLAGS += -I/usr/local/cuda/include
+				LDFLAGS += -L/usr/local/cuda/lib64
+				LDFLAGS += -L/usr/local/cuda/lib64/stubs
+			endif
+
 			CUDA_SOURCES += eval/deep/unpack.cu
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_DEEP_ORT_CPU)
@@ -419,6 +434,7 @@ ifneq (,$(findstring YANEURAOU_ENGINE_DEEP,$(YANEURAOU_EDITION)))
 			OBJC_SOURCES += eval/deep/nn_coreml.mm
 
 		endif
+
 	endif
 
 	# 大して大きなファイルではないので全部追加する。
@@ -446,6 +462,12 @@ ifneq (,$(findstring YANEURAOU_ENGINE_NNUE,$(YANEURAOU_EDITION)))
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKPE9)
 			CPPFLAGS += -DEVAL_NNUE_HALFKPE9
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKP_512X2_16_32)
+			CPPFLAGS += -DEVAL_NNUE_HALFKP_512X2_16_32
+
+		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32)
+			CPPFLAGS += -DEVAL_NNUE_HALFKP_1024X2_8_32
 
 		else ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32)
 			CPPFLAGS += -DEVAL_NNUE_HALFKP_VM_256X2_32_32

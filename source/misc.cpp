@@ -1059,8 +1059,14 @@ namespace Tools
 	}
 
 	// size_ : 全件でいくらあるかを設定する。
-	ProgressBar::ProgressBar(u64 size_) : size(size_)
+	ProgressBar::ProgressBar(u64 size_)
 	{
+		reset(size_);
+	}
+
+	void ProgressBar::reset(u64 size_)
+	{
+		size = size_;
 		if (enable_)
 			cout << "0% [";
 		dots = 0;
@@ -1160,6 +1166,22 @@ namespace SystemIO
 			lines.emplace_back(line);
 
 		return Tools::Result::Ok();
+	}
+
+	// ファイルにすべての行を書き出す。
+	Tools::Result WriteAllLines(const std::string& filename, std::vector<std::string>& lines)
+	{
+		TextWriter writer;
+		if (writer.Open(filename).is_not_ok())
+			return Tools::ResultCode::FileOpenError;
+
+		for(auto& line : lines)
+		{
+			if (writer.WriteLine(line).is_not_ok())
+			return Tools::ResultCode::FileWriteError;
+		}
+
+		return Tools::ResultCode::Ok;
 	}
 
 	Tools::Result ReadFileToMemory(const std::string& filename, std::function<void* (size_t)> callback_func)
