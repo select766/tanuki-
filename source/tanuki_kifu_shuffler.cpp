@@ -109,7 +109,12 @@ void Tanuki::ShuffleKifu(Position& position) {
             while (static_cast<int>(records.size()) < kMaxPackedSfenValues && reader->Read(record)) {
                 StateInfo state_info = {};
                 position.set_from_packed_sfen(record.sfen, &state_info, Threads[0]);
-                double progress = progress_estimator.Estimate(position);
+                double progress = 0.0;
+                if (min_progress != 0.0 || max_progress != 1.0) {
+                    // 高速化のため、min_progressまたはmax_progressが設定されていた場合のみ
+                    // 進行度を推定する。
+                    progress = progress_estimator.Estimate(position);
+                }
 
                 if (min_ply <= current_ply && current_ply <= max_ply &&
                     min_progress <= progress && progress <= max_progress) {
