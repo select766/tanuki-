@@ -239,9 +239,6 @@ void Tanuki::GenerateKifu() {
 			StateInfo* state_info_ptr = &state_info[0];
 			start_position_picker->Pick(pos, state_info_ptr, thread);
 
-			// 自分スレッド用の置換表があるはずなので自分の置換表だけをクリアする。
-			thread.tt.clear();
-
 			if (random_move) {
 				RandomMove(pos, state_info_ptr++, mt19937_64);
 			}
