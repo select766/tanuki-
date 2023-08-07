@@ -683,7 +683,7 @@ constexpr bool pretty_jp = false;
 #endif
 
 #if !defined(TT_CLUSTER_SIZE)
-#define TT_CLUSTER_SIZE 3
+#define TT_CLUSTER_SIZE 4
 #endif
 
 
