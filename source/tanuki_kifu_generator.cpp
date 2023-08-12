@@ -242,6 +242,9 @@ void Tanuki::GenerateKifu() {
 			// 自分スレッド用の置換表があるはずなので自分の置換表だけをクリアする。
 			thread.tt.clear();
 
+			// 自分のスレッドのhistoryをクリアする。
+			thread.clear();
+
 			if (random_move) {
 				RandomMove(pos, state_info_ptr++, mt19937_64);
 			}
