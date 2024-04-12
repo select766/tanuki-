@@ -32,6 +32,11 @@
 // halfkp_512x2-16-32型
 #include "architectures/halfkp_512x2-16-32.h"
 
+#elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_16)
+
+// halfkp_1024x2-8-16型
+#include "architectures/halfkp_1024x2-8-16.h"
+
 #elif defined(YANEURAOU_ENGINE_NNUE_HALFKP_1024X2_8_32)
 
 // halfkp_1024x2-8-32型
