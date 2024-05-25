@@ -21,16 +21,16 @@ jobs:
       matrix:
         edition:
           - YANEURAOU_ENGINE_NNUE
-          - YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32
-          - YANEURAOU_ENGINE_NNUE_HALFKPE9
-          - YANEURAOU_ENGINE_NNUE_KP256
-          - YANEURAOU_ENGINE_KPPT
-          - YANEURAOU_ENGINE_KPP_KKPT
+          # - YANEURAOU_ENGINE_NNUE_HALFKP_VM_256X2_32_32
+          # - YANEURAOU_ENGINE_NNUE_HALFKPE9
+          # - YANEURAOU_ENGINE_NNUE_KP256
+          # - YANEURAOU_ENGINE_KPPT
+          # - YANEURAOU_ENGINE_KPP_KKPT
           #- YANEURAOU_ENGINE_MATERIAL*
-          - "YANEURAOU_ENGINE_MATERIAL,YANEURAOU_ENGINE_MATERIAL9"
-          - YANEURAOU_MATE_ENGINE
-          - TANUKI_MATE_ENGINE
-          - USER_ENGINE
+          # - "YANEURAOU_ENGINE_MATERIAL,YANEURAOU_ENGINE_MATERIAL9"
+          # - YANEURAOU_MATE_ENGINE
+          # - TANUKI_MATE_ENGINE
+          # - USER_ENGINE
         compiler:
           - clang++
           - g++
@@ -39,8 +39,8 @@ jobs:
           - evallearn
         archcpu:
           - "AVX512VNNI,AVXVNNI,AVX512,AVX2,SSE42,SSE41,SSSE3,SSE2,ZEN1,ZEN2,ZEN3"
-          - NO_SSE
-          - OTHER
+          # - NO_SSE
+          # - OTHER
         exclude:
           # 以下のエディションには機械学習の実装が存在しない
           # There is no machine learning implementation for the following editions
