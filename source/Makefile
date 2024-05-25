@@ -162,6 +162,13 @@ endif
 # cf. https://gcc.gnu.org/onlinedocs/gcc-6.3.0/gcc/Optimize-Options.html#Optimize-Options
 LTOFLAGS = -flto
 
+# MSYS2 clang++ で -flto 指定時にリンクを行えない問題の回避
+ifneq (,$(findstring clang++,$(COMPILER)))
+	ifeq ($(OS),Windows_NT)
+		LDFLAGS += -fuse-ld=lld
+	endif
+endif
+
 # wstringを使うためにこのシンボル定義が必要。
 CPPFLAGS  += -DUNICODE
 
