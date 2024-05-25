@@ -97,10 +97,13 @@ void Tanuki::ShuffleKifu(Position& position) {
     u64 current_ply = 1;
 
     Tanuki::Progress progress_estimator;
-    if (!progress_estimator.Load()) {
-        sync_cout << "info string Failed to load the progress file..." << sync_endl;
-        std::exit(1);
-    }
+	if (min_progress != 0.0 || max_progress != 1.0) {
+		// 進行度を使用しない場合、progress.binがなくても続行可能にする
+		if (!progress_estimator.Load()) {
+			sync_cout << "info string Failed to load the progress file..." << sync_endl;
+			std::exit(1);
+		}
+	}
 
     for (;;) {
         std::vector<PackedSfenValue> records;
