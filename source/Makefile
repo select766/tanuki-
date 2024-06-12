@@ -368,7 +368,12 @@ ifeq (,)
 		book/makebook2023.cpp                                                  \
 		learn/learner.cpp                                                      \
 		learn/learning_tools.cpp                                               \
-		learn/multi_think.cpp
+		learn/multi_think.cpp                                                  \
+		tanuki_kifu_generator.cpp                                              \
+		tanuki_kifu_writer.cpp                                                 \
+		tanuki_progress_report.cpp                                             \
+		tanuki_s_book_black_start_position_picker.cpp                          \
+		tanuki_sfen_start_position_picker.cpp
 endif
 
 ifeq ($(YANEURAOU_EDITION),YANEURAOU_ENGINE_KPPT)
