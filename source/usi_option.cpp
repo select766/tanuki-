@@ -7,6 +7,8 @@
 //#include "tt.h"
 #include "usi.h"
 
+#include "tanuki_kifu_generator.h"
+
 using std::string;
 
 // Option設定が格納されたglobal object。
@@ -238,6 +240,12 @@ namespace USI {
 
 		// 各エンジンがOptionを追加したいだろうから、コールバックする。
 		USI::extra_option(o);
+
+#ifdef EVAL_LEARN
+		Tanuki::InitializeGenerator(o);
+
+		o["ForceSilent"] << Option(false);
+#endif#endif
 
 #if defined(ENGINE_OPTIONS)
 		const string opt = ENGINE_OPTIONS;
