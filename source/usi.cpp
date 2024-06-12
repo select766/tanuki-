@@ -18,6 +18,8 @@
 #include <sstream>
 #include <queue>
 
+#include "tanuki_kifu_generator.h"
+
 using namespace std;
 
 // ----------------------------------
@@ -1062,6 +1064,10 @@ void usi_cmdexec(Position& pos, StateListPtr& states, string& cmd)
 			// cluster時のUSIメッセージの処理ループ
 			YaneuraouTheCluster::cluster_usi_loop(pos, is);
 #endif
+#endif
+
+#if defined (EVAL_LEARN)
+		else if (token == "generate_kifu") Tanuki::GenerateKifu();
 #endif
 
 		else

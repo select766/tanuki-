@@ -667,6 +667,12 @@
     <ClInclude Include="misc.h" />
     <ClInclude Include="movepick.h" />
     <ClInclude Include="search.h" />
+    <ClInclude Include="tanuki_kifu_generator.h" />
+    <ClInclude Include="tanuki_kifu_writer.h" />
+    <ClInclude Include="tanuki_progress_report.h" />
+    <ClInclude Include="tanuki_sfen_start_position_picker.h" />
+    <ClInclude Include="tanuki_start_position_picker.h" />
+    <ClInclude Include="tanuki_s_book_black_start_position_picker.h" />
     <ClInclude Include="testcmd\unit_test.h" />
     <ClInclude Include="thread_win32_osx.h" />
     <ClInclude Include="types.h" />
@@ -736,6 +742,11 @@
     <ClCompile Include="misc.cpp" />
     <ClCompile Include="movegen.cpp" />
     <ClCompile Include="movepick.cpp" />
+    <ClCompile Include="tanuki_kifu_generator.cpp" />
+    <ClCompile Include="tanuki_kifu_writer.cpp" />
+    <ClCompile Include="tanuki_progress_report.cpp" />
+    <ClCompile Include="tanuki_sfen_start_position_picker.cpp" />
+    <ClCompile Include="tanuki_s_book_black_start_position_picker.cpp" />
     <ClCompile Include="testcmd\benchmark.cpp" />
     <ClCompile Include="testcmd\mate_test_cmd.cpp" />
     <ClCompile Include="testcmd\normal_test_cmd.cpp" />

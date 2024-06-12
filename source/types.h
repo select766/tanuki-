@@ -450,6 +450,12 @@ enum Value: int32_t
 	VALUE_TB_LOSS_IN_MAX_PLY = -VALUE_TB_WIN_IN_MAX_PLY, 
 
 
+	// 勝ち手順が何らか証明されているときのスコア下限値
+	// Stockfishでは10000に設定されているが、あまり低い数字にすると、
+	// 評価値(evaluate()の返し値)がこれを超えてしまい、誤動作する。
+	// やねうら王では、ぎりぎりの値にしておきたい。
+	VALUE_KNOWN_WIN = int(VALUE_MATE_IN_MAX_PLY) - 1000,
+
 	// 千日手による優等局面への突入したときのスコア
 	// これある程度離しておかないと、置換表に書き込んで、相手番から見て、これから
 	// singularの判定なんかをしようと思ったときに
