@@ -102,8 +102,8 @@ class Trainer<FeatureTransformer> {
 #endif
 
 #pragma omp for
-      for (IndexType b = 0; b < batch.size(); ++b) {
-        const IndexType batch_offset = kOutputDimensions * b;
+      for (int b = 0; b < (int)batch.size(); ++b) {
+        const IndexType batch_offset = kOutputDimensions * (IndexType)b;
         for (IndexType c = 0; c < 2; ++c) {
           const IndexType output_offset = batch_offset + kHalfDimensions * c;
 #if defined(USE_BLAS)
@@ -280,7 +280,8 @@ class Trainer<FeatureTransformer> {
 #endif
 
 #pragma omp for private(training_features)
-      for (IndexType j = 0; j < RawFeatures::kDimensions; ++j) {
+      for (int j_int = 0; j_int < (int)RawFeatures::kDimensions; ++j_int) {
+		IndexType j = (IndexType)j_int;
         training_features.clear();
         Features::Factorizer<RawFeatures>::AppendTrainingFeatures(
             j, &training_features);
