@@ -15,6 +15,7 @@ bool SfenStartPositionPicker::Open()
 {
 	start_positions_.clear();
 
+#if 0
 	// 定跡ファイル(というか単なる棋譜ファイル)の読み込み
 	std::string book_file_name = Options[kOptionGeneratorStartposFileName];
 	std::ifstream fs_book;
@@ -62,6 +63,10 @@ bool SfenStartPositionPicker::Open()
 	std::cout << std::endl;
 	sync_cout << "Number of lines: " << line_index << sync_endl;
 	sync_cout << "Number of start positions: " << start_positions_.size() << sync_endl;
+#else
+	sync_cout << "Adding kyo-oti initial position for start position" << sync_endl;
+	start_positions_.push_back("lnsgkgsn1/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL w - 1");
+#endif
 
 	// 開始局面集をシャッフルする。
 	std::random_device rd;
