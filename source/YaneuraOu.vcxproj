@@ -582,6 +582,7 @@
     <ClCompile>
       <AdditionalOptions>/source-charset:utf-8 /execution-charset:utf-8 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Debug-Deep-TensorRT|x64'">MultiThreadedDebug</RuntimeLibrary>
+      <OpenMPSupport Condition="'$(Configuration)|$(Platform)'=='Release-NNUE-LEARN|x64'">true</OpenMPSupport>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
