@@ -5,7 +5,8 @@
 
 #include <cstdio>
 #include <ctime>
-#include <direct.h>
+#include <sys/stat.h>
+#include <climits>
 #include <filesystem>
 #include <omp.h>
 #include <random>
@@ -26,9 +27,9 @@ namespace {
     static const constexpr char* kShuffledMinProgress = "ShuffledMinProgress";
     static const constexpr char* kShuffledMaxProgress = "ShuffledMaxProgress";
     static const constexpr char* kApplyQSearch = "ApplyQSearch";
-    // ƒVƒƒƒbƒtƒ‹Œã‚Ìƒtƒ@ƒCƒ‹”
-    // Windows‚Å‚Íˆê“x‚É512ŒÂ‚Ü‚Å‚Ìƒtƒ@ƒCƒ‹‚µ‚©ŠJ‚¯‚È‚¢‚½‚ß
-    // 256ŒÂ‚É§ŒÀ‚µ‚Ä‚¨‚­
+    // ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½ï¿½ï¿½Ìƒtï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½
+    // Windowsï¿½Å‚Íˆï¿½xï¿½ï¿½512ï¿½Â‚Ü‚Å‚Ìƒtï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Jï¿½ï¿½ï¿½È‚ï¿½ï¿½ï¿½ï¿½ï¿½
+    // 256ï¿½Â‚Éï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½
     static const constexpr int kNumShuffledKifuFiles = 256;
     static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
 }
@@ -51,14 +52,14 @@ void Tanuki::ShuffleKifu(Position& position) {
     omp_set_num_threads(num_threads);
 
     Search::LimitsType limits;
-    // ˆø‚«•ª‚¯‚Ìè”•t‹ß‚Åˆø‚«•ª‚¯‚Ì’l‚ª•Ô‚é‚Ì‚ğ–h‚®‚½‚ß1 << 16‚É‚·‚é
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìè”ï¿½tï¿½ß‚Åˆï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì’lï¿½ï¿½ï¿½Ô‚ï¿½Ì‚ï¿½hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1 << 16ï¿½É‚ï¿½ï¿½ï¿½
     limits.max_game_ply = 1 << 16;
     limits.depth = MAX_PLY;
     limits.silent = true;
     limits.enteringKingRule = EKR_27_POINT;
     Search::Limits = limits;
 
-    // Šû•ˆ‚ğ“ü—Í‚µA•¡”‚Ìƒtƒ@ƒCƒ‹‚Éƒ‰ƒ“ƒ_ƒ€‚É’Ç‰Á‚µ‚Ä‚¢‚­
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í‚ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½Ìƒtï¿½@ï¿½Cï¿½ï¿½ï¿½Éƒï¿½ï¿½ï¿½ï¿½_ï¿½ï¿½ï¿½É’Ç‰ï¿½ï¿½ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½
     sync_cout << "info string Reading and dividing kifu files..." << sync_endl;
 
     std::string kifu_dir = Options["KifuDir"];
@@ -73,11 +74,11 @@ void Tanuki::ShuffleKifu(Position& position) {
     sync_cout << "shuffled_kifu_dir=" << shuffled_kifu_dir << sync_endl;
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
-    _mkdir(shuffled_kifu_dir.c_str());
+    mkdir(shuffled_kifu_dir.c_str(), 0755);
 
     std::vector<std::string> file_paths;
     for (int file_index = 0; file_index < kNumShuffledKifuFiles; ++file_index) {
-        char file_path[_MAX_PATH];
+        char file_path[PATH_MAX];
         sprintf(file_path, "%s/shuffled.%03d.bin", shuffled_kifu_dir.c_str(), file_index);
         file_paths.push_back(file_path);
     }
@@ -98,7 +99,7 @@ void Tanuki::ShuffleKifu(Position& position) {
 
     Tanuki::Progress progress_estimator;
 	if (min_progress != 0.0 || max_progress != 1.0) {
-		// is“x‚ğg—p‚µ‚È‚¢ê‡Aprogress.bin‚ª‚È‚­‚Ä‚à‘±s‰Â”\‚É‚·‚é
+		// ï¿½iï¿½sï¿½xï¿½ï¿½ï¿½gï¿½pï¿½ï¿½ï¿½È‚ï¿½ï¿½ê‡ï¿½Aprogress.binï¿½ï¿½ï¿½È‚ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½ï¿½sï¿½Â”\ï¿½É‚ï¿½ï¿½ï¿½
 		if (!progress_estimator.Load()) {
 			sync_cout << "info string Failed to load the progress file..." << sync_endl;
 			std::exit(1);
@@ -114,8 +115,8 @@ void Tanuki::ShuffleKifu(Position& position) {
                 position.set_from_packed_sfen(record.sfen, &state_info, Threads[0]);
                 double progress = 0.0;
                 if (min_progress != 0.0 || max_progress != 1.0) {
-                    // ‚‘¬‰»‚Ì‚½‚ßAmin_progress‚Ü‚½‚Ímax_progress‚ªİ’è‚³‚ê‚Ä‚¢‚½ê‡‚Ì‚İ
-                    // is“x‚ğ„’è‚·‚éB
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì‚ï¿½ï¿½ßAmin_progressï¿½Ü‚ï¿½ï¿½ï¿½max_progressï¿½ï¿½ï¿½İ’è‚³ï¿½ï¿½Ä‚ï¿½ï¿½ï¿½ï¿½ê‡ï¿½Ì‚ï¿½
+                    // ï¿½iï¿½sï¿½xï¿½ğ„’è‚·ï¿½ï¿½B
                     progress = progress_estimator.Estimate(position);
                 }
 
@@ -124,7 +125,7 @@ void Tanuki::ShuffleKifu(Position& position) {
                     records.push_back(record);
                 }
 
-                // ÅŒã‚Ì‹Ç–Ê‚ğ“Ç‚İ‚ñ‚¾‚çAè”‚ğƒŠƒZƒbƒg‚·‚éB
+                // ï¿½ÅŒï¿½Ì‹Ç–Ê‚ï¿½Ç‚İï¿½ï¿½ñ‚¾‚ï¿½Aï¿½è”ï¿½ï¿½ï¿½ï¿½ï¿½Zï¿½bï¿½gï¿½ï¿½ï¿½ï¿½B
                 if (record.last_position) {
                     current_ply = 1;
                 }
@@ -180,7 +181,7 @@ void Tanuki::ShuffleKifu(Position& position) {
 
                     record.move = MOVE_NONE;
 
-                    // Root‹Ç–Ê‚Æ––’[‹Ç–Ê‚Ìè”Ô‚ªˆÙ‚È‚éê‡A•]‰¿’l‚ÆŸ”s‚ğ”½“]‚·‚éB
+                    // Rootï¿½Ç–Ê‚Æ–ï¿½ï¿½[ï¿½Ç–Ê‚Ìï¿½Ô‚ï¿½ï¿½Ù‚È‚ï¿½ê‡ï¿½Aï¿½]ï¿½ï¿½ï¿½lï¿½Æï¿½ï¿½sï¿½ğ”½“]ï¿½ï¿½ï¿½ï¿½B
                     if (root_color != leaf_color) {
                         record.score = -record.score;
                         record.game_result = -record.game_result;
@@ -205,10 +206,10 @@ void Tanuki::ShuffleKifu(Position& position) {
 
     sync_cout << "info string Starting shuffling..." << sync_endl;
 
-    // o—Íƒtƒ@ƒCƒ‹‚ğ€”õ‚·‚éB
+    // ï¿½oï¿½Íƒtï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½B
     FILE* output_file = nullptr;
     {
-        char file_path[_MAX_PATH];
+        char file_path[PATH_MAX];
         sprintf(file_path, "%s/shuffled.bin", shuffled_kifu_dir.c_str());
         output_file = std::fopen(file_path, "wb");
 
@@ -219,11 +220,11 @@ void Tanuki::ShuffleKifu(Position& position) {
         }
     }
 
-    // Šeƒtƒ@ƒCƒ‹‚ğƒVƒƒƒbƒtƒ‹‚·‚é
+    // ï¿½eï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     for (const auto& file_path : file_paths) {
         sync_cout << "info string " << file_path << sync_endl;
 
-        // ƒtƒ@ƒCƒ‹‘S‘Ì‚ğ“Ç‚İ‚Ş
+        // ï¿½tï¿½@ï¿½Cï¿½ï¿½ï¿½Sï¿½Ì‚ï¿½Ç‚İï¿½ï¿½ï¿½
         FILE* input_file = std::fopen(file_path.c_str(), "rb");
         if (input_file == nullptr) {
             sync_cout << "info string Failed to open a kifu file. " << file_path << sync_endl;
@@ -236,21 +237,21 @@ void Tanuki::ShuffleKifu(Position& position) {
             return;
         }
 
-        _fseeki64(input_file, 0, SEEK_END);
-        int64_t size = _ftelli64(input_file);
-        _fseeki64(input_file, 0, SEEK_SET);
+        fseeko(input_file, 0, SEEK_END);
+        int64_t size = ftello(input_file);
+        fseeko(input_file, 0, SEEK_SET);
         std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
         std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), input_file);
         std::fclose(input_file);
         input_file = nullptr;
 
-        // Šû•ˆ‘S‘Ì‚ğƒVƒƒƒbƒtƒ‹‚·‚é
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Sï¿½Ì‚ï¿½ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         std::shuffle(records.begin(), records.end(), mt);
 
-        // ƒVƒƒƒbƒtƒ‹Ï‚İƒtƒ@ƒCƒ‹‚ğíœ‚·‚é
+        // ï¿½Vï¿½ï¿½ï¿½bï¿½tï¿½ï¿½ï¿½Ï‚İƒtï¿½@ï¿½Cï¿½ï¿½ï¿½ï¿½ï¿½íœï¿½ï¿½ï¿½ï¿½
         std::filesystem::remove(file_path);
 
-        // o—Íƒtƒ@ƒCƒ‹‚É‘‚«o‚·
+        // ï¿½oï¿½Íƒtï¿½@ï¿½Cï¿½ï¿½ï¿½Éï¿½ï¿½ï¿½ï¿½oï¿½ï¿½
         if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), output_file) !=
             records.size()) {
             sync_cout << "info string Failed to write records to a kifu file. " << file_path
