@@ -7,9 +7,11 @@
 #include <ctime>
 #include <sys/stat.h>
 #include <climits>
+#include <cmath>
 #include <filesystem>
 #include <omp.h>
 #include <random>
+#include <atomic>
 
 #include "learn/learn.h"
 #include "misc.h"
@@ -27,11 +29,20 @@ namespace {
     static const constexpr char* kShuffledMinProgress = "ShuffledMinProgress";
     static const constexpr char* kShuffledMaxProgress = "ShuffledMaxProgress";
     static const constexpr char* kApplyQSearch = "ApplyQSearch";
+    static const constexpr char* kPairedShuffle = "PairedShuffle";
+    static const constexpr char* kMaxOutputSamples = "MaxOutputSamples";
+    static const constexpr char* kOffsetAlpha = "OffsetAlpha";
     // �V���b�t����̃t�@�C����
     // Windows�ł͈�x��512�܂ł̃t�@�C�������J���Ȃ�����
     // 256�ɐ������Ă���
     static const constexpr int kNumShuffledKifuFiles = 256;
     static const constexpr int kMaxPackedSfenValues = 1024 * 1024;
+
+    struct PairedPackedSfenValue {
+        PackedSfenValue dnn;
+        PackedSfenValue nnue;
+    };
+    static_assert(sizeof(PairedPackedSfenValue) == 80);
 }
 
 void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
@@ -41,6 +52,9 @@ void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
     o[kShuffledMinProgress] << USI::Option("0.0");
     o[kShuffledMaxProgress] << USI::Option("1.0");
     o[kApplyQSearch] << USI::Option(false);
+    o[kPairedShuffle] << USI::Option(false);
+    o[kMaxOutputSamples] << USI::Option(0, 0, std::numeric_limits<int>::max());
+    o[kOffsetAlpha] << USI::Option("0.216");
 }
 
 void Tanuki::ShuffleKifu(Position& position) {
@@ -69,9 +83,24 @@ void Tanuki::ShuffleKifu(Position& position) {
     double min_progress = std::atof(static_cast<std::string>(Options[kShuffledMinProgress]).c_str());
     double max_progress = std::atof(static_cast<std::string>(Options[kShuffledMaxProgress]).c_str());
     bool apply_qsearch = Options[kApplyQSearch];
+    bool paired_shuffle = Options[kPairedShuffle];
+    int64_t max_output_samples = static_cast<int64_t>(int(Options[kMaxOutputSamples]));
+    if (max_output_samples < 0) {
+        max_output_samples = 0;
+    }
+    double offset_alpha = std::atof(static_cast<std::string>(Options[kOffsetAlpha]).c_str());
+    if (offset_alpha < 0.0) {
+        offset_alpha = 0.0;
+    }
+    double r = std::exp(-offset_alpha);
+    if (r < 0.0) r = 0.0;
+    if (r > 0.999999999) r = 0.999999999;
 
     sync_cout << "kifu_dir=" << kifu_dir << sync_endl;
     sync_cout << "shuffled_kifu_dir=" << shuffled_kifu_dir << sync_endl;
+    sync_cout << "paired_shuffle=" << paired_shuffle << sync_endl;
+    sync_cout << "max_output_samples=" << max_output_samples << sync_endl;
+    sync_cout << "offset_alpha=" << offset_alpha << sync_endl;
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
     mkdir(shuffled_kifu_dir.c_str(), 0755);
@@ -85,17 +114,37 @@ void Tanuki::ShuffleKifu(Position& position) {
 
     sync_cout << "info string Opening output files..." << sync_endl;
     std::vector<std::shared_ptr<KifuWriter> > writers;
-    for (const auto& file_path : file_paths) {
-        //sync_cout << "file_path=" << file_path << sync_endl;
-        writers.push_back(std::make_shared<KifuWriter>(file_path));
+    std::vector<FILE*> paired_writers;
+    if (!paired_shuffle) {
+        for (const auto& file_path : file_paths) {
+            writers.push_back(std::make_shared<KifuWriter>(file_path));
+        }
+    }
+    else {
+        paired_writers.reserve(file_paths.size());
+        for (const auto& file_path : file_paths) {
+            FILE* f = std::fopen(file_path.c_str(), "wb");
+            if (f == nullptr) {
+                sync_cout << "info string Failed to open paired temp output file: " << file_path << sync_endl;
+                return;
+            }
+            if (std::setvbuf(f, nullptr, _IOFBF, std::numeric_limits<int>::max())) {
+                sync_cout << "info string Failed to set output buffer for paired temp file: " << file_path << sync_endl;
+                std::fclose(f);
+                return;
+            }
+            paired_writers.push_back(f);
+        }
     }
 
     sync_cout << "info string Starting dividing..." << sync_endl;
 
     std::mt19937_64 mt(std::time(nullptr));
     std::uniform_int_distribution<> dist(0, kNumShuffledKifuFiles - 1);
+    std::geometric_distribution<int> offset_dist(1.0 - r);
     int64_t num_records = 0;
     u64 current_ply = 1;
+    bool reached_max_output_samples = false;
 
     Tanuki::Progress progress_estimator;
 	if (min_progress != 0.0 || max_progress != 1.0) {
@@ -137,6 +186,29 @@ void Tanuki::ShuffleKifu(Position& position) {
 
         if (records.empty()) {
             break;
+        }
+
+        std::vector<PackedSfenValue> dnn_records;
+        if (paired_shuffle) {
+            dnn_records.resize(records.size());
+            std::vector<int> game_start_index(records.size());
+            for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+                if (i == 0 || records[i].gamePly != records[i - 1].gamePly + 1) {
+                    game_start_index[i] = i;
+                }
+                else {
+                    game_start_index[i] = game_start_index[i - 1];
+                }
+            }
+
+            for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+                int sampled_offset = offset_dist(mt);
+                int max_offset = i - game_start_index[i];
+                if (sampled_offset > max_offset) {
+                    sampled_offset = max_offset;
+                }
+                dnn_records[i] = records[i - sampled_offset];
+            }
         }
 
         if (apply_qsearch) {
@@ -190,18 +262,49 @@ void Tanuki::ShuffleKifu(Position& position) {
             }
         }
 
-        for (const auto& record : records) {
-            if (!writers[dist(mt)]->Write(record)) {
-                sync_cout << "info string Failed to write a record to a kifu file. " << sync_endl;
+        for (int i = 0; i < static_cast<int>(records.size()); ++i) {
+            if (max_output_samples > 0 && num_records >= max_output_samples) {
+                reached_max_output_samples = true;
+                break;
             }
+
+            int file_index = dist(mt);
+            if (!paired_shuffle) {
+                const auto& record = records[i];
+                if (!writers[file_index]->Write(record)) {
+                    sync_cout << "info string Failed to write a record to a kifu file. " << sync_endl;
+                }
+            }
+            else {
+                PairedPackedSfenValue paired_record = {};
+                paired_record.dnn = dnn_records[i];
+                paired_record.nnue = records[i];
+                if (std::fwrite(&paired_record, sizeof(paired_record), 1, paired_writers[file_index]) != 1) {
+                    sync_cout << "info string Failed to write a paired record to a kifu file." << sync_endl;
+                    reached_max_output_samples = true;
+                    break;
+                }
+            }
+
             ++num_records;
             if (num_records % 10000000 == 0) {
                 sync_cout << "info string " << num_records << sync_endl;
             }
         }
+
+        if (reached_max_output_samples) {
+            break;
+        }
     }
-    for (auto& writer : writers) {
-        writer->Close();
+    if (!paired_shuffle) {
+        for (auto& writer : writers) {
+            writer->Close();
+        }
+    }
+    else {
+        for (auto& writer : paired_writers) {
+            std::fclose(writer);
+        }
     }
 
     sync_cout << "info string Starting shuffling..." << sync_endl;
@@ -240,23 +343,46 @@ void Tanuki::ShuffleKifu(Position& position) {
         fseeko(input_file, 0, SEEK_END);
         int64_t size = ftello(input_file);
         fseeko(input_file, 0, SEEK_SET);
-        std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
-        std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), input_file);
-        std::fclose(input_file);
-        input_file = nullptr;
+        if (!paired_shuffle) {
+            std::vector<PackedSfenValue> records(size / sizeof(PackedSfenValue));
+            std::fread(&records[0], sizeof(PackedSfenValue), size / sizeof(PackedSfenValue), input_file);
+            std::fclose(input_file);
+            input_file = nullptr;
 
-        // �����S�̂��V���b�t������
-        std::shuffle(records.begin(), records.end(), mt);
+            // �����S�̂��V���b�t������
+            std::shuffle(records.begin(), records.end(), mt);
 
-        // �V���b�t���ς݃t�@�C�����폜����
-        std::filesystem::remove(file_path);
+            // �V���b�t���ς݃t�@�C�����폜����
+            std::filesystem::remove(file_path);
 
-        // �o�̓t�@�C���ɏ����o��
-        if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), output_file) !=
-            records.size()) {
-            sync_cout << "info string Failed to write records to a kifu file. " << file_path
-                << sync_endl;
-            return;
+            // �o�̓t�@�C���ɏ����o��
+            if (std::fwrite(&records[0], sizeof(PackedSfenValue), records.size(), output_file) !=
+                records.size()) {
+                sync_cout << "info string Failed to write records to a kifu file. " << file_path
+                    << sync_endl;
+                return;
+            }
+        }
+        else {
+            if (size % sizeof(PairedPackedSfenValue) != 0) {
+                sync_cout << "info string Unexpected paired temp file size: " << file_path << sync_endl;
+                std::fclose(input_file);
+                return;
+            }
+            std::vector<PairedPackedSfenValue> records(size / sizeof(PairedPackedSfenValue));
+            std::fread(&records[0], sizeof(PairedPackedSfenValue), size / sizeof(PairedPackedSfenValue), input_file);
+            std::fclose(input_file);
+            input_file = nullptr;
+
+            std::shuffle(records.begin(), records.end(), mt);
+            std::filesystem::remove(file_path);
+
+            if (std::fwrite(&records[0], sizeof(PairedPackedSfenValue), records.size(), output_file) !=
+                records.size()) {
+                sync_cout << "info string Failed to write paired records to a kifu file. " << file_path
+                    << sync_endl;
+                return;
+            }
         }
     }
 
