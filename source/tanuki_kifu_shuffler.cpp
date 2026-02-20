@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <ctime>
 #include <sys/stat.h>
+#include <algorithm>
 #include <climits>
 #include <cmath>
 #include <filesystem>
@@ -32,6 +33,8 @@ namespace {
     static const constexpr char* kPairedShuffle = "PairedShuffle";
     static const constexpr char* kMaxOutputSamples = "MaxOutputSamples";
     static const constexpr char* kOffsetAlpha = "OffsetAlpha";
+    static const constexpr char* kOffsetDistribution = "OffsetDistribution";
+    static const constexpr char* kOffsetUniformMax = "OffsetUniformMax";
     // �V���b�t����̃t�@�C����
     // Windows�ł͈�x��512�܂ł̃t�@�C�������J���Ȃ�����
     // 256�ɐ������Ă���
@@ -55,6 +58,8 @@ void Tanuki::InitializeShuffler(USI::OptionsMap& o) {
     o[kPairedShuffle] << USI::Option(false);
     o[kMaxOutputSamples] << USI::Option(0, 0, std::numeric_limits<int>::max());
     o[kOffsetAlpha] << USI::Option("0.216");
+    o[kOffsetDistribution] << USI::Option(std::vector<std::string>{"geometric", "uniform"}, "geometric");
+    o[kOffsetUniformMax] << USI::Option(50, 1, std::numeric_limits<int>::max());
 }
 
 void Tanuki::ShuffleKifu(Position& position) {
@@ -92,6 +97,14 @@ void Tanuki::ShuffleKifu(Position& position) {
     if (offset_alpha < 0.0) {
         offset_alpha = 0.0;
     }
+    std::string offset_distribution = Options[kOffsetDistribution];
+    if (offset_distribution != "uniform" && offset_distribution != "geometric") {
+        offset_distribution = "geometric";
+    }
+    int offset_uniform_max = int(Options[kOffsetUniformMax]);
+    if (offset_uniform_max < 1) {
+        offset_uniform_max = 1;
+    }
     double r = std::exp(-offset_alpha);
     if (r < 0.0) r = 0.0;
     if (r > 0.999999999) r = 0.999999999;
@@ -100,6 +113,8 @@ void Tanuki::ShuffleKifu(Position& position) {
     sync_cout << "shuffled_kifu_dir=" << shuffled_kifu_dir << sync_endl;
     sync_cout << "paired_shuffle=" << paired_shuffle << sync_endl;
     sync_cout << "max_output_samples=" << max_output_samples << sync_endl;
+    sync_cout << "offset_distribution=" << offset_distribution << sync_endl;
+    sync_cout << "offset_uniform_max=" << offset_uniform_max << sync_endl;
     sync_cout << "offset_alpha=" << offset_alpha << sync_endl;
 
     auto reader = std::make_unique<KifuReader>(kifu_dir, 1);
@@ -202,10 +217,20 @@ void Tanuki::ShuffleKifu(Position& position) {
             }
 
             for (int i = 0; i < static_cast<int>(records.size()); ++i) {
-                int sampled_offset = offset_dist(mt);
                 int max_offset = i - game_start_index[i];
-                if (sampled_offset > max_offset) {
-                    sampled_offset = max_offset;
+                int sampled_offset = 0;
+                if (offset_distribution == "uniform") {
+                    if (max_offset > 0) {
+                        int max_uniform_offset = std::min(offset_uniform_max, max_offset);
+                        std::uniform_int_distribution<int> uniform_offset_dist(1, max_uniform_offset);
+                        sampled_offset = uniform_offset_dist(mt);
+                    }
+                }
+                else {
+                    sampled_offset = offset_dist(mt);
+                    if (sampled_offset > max_offset) {
+                        sampled_offset = max_offset;
+                    }
                 }
                 dnn_records[i] = records[i - sampled_offset];
             }
